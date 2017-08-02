@@ -51,4 +51,4 @@ or modify the email settings in instance/config.py
 	export MAIL_PASSWORD=<your-gmail-app-password-here>
 	export MAIL_USERNAME=<your-username@gmail.com>
 
-Visit the website at localhost:5000. You should be able to register if your email is in ALLOWED_EMAILS ()
+Visit the website at localhost:5000. You should be able to register if your email is in ALLOWED_EMAILS
