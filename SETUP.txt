@@ -45,8 +45,7 @@ Run breedcafs server:
 		The werkzeug server only seems to work after trying to kill it...
 		To kill it later (for a restart etc.) use:
 	killall -9 python
-
-The above is broken behaviour but won't matter in production because we will be using another server (e.g. Apache)
+		The above is broken behaviour but won't matter in production because we will be using another server (e.g. Apache)
 
 To configure email you need to export the following environment variables:
 or modify the email settings in instance/config.py
