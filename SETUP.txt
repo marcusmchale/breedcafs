@@ -31,7 +31,7 @@ Run breedcafs server:
 	export FLASK_APP=run.py
 	The werkzeug server only seems to work after trying to kill it...:
 		ctrl+C
-	Then to kill it:
+	Then to kill it later (for a restart etc.) use:
 		killall -9 python
 
 The above is broken behaviour but won't matter in production because we will be using another server (e.g. Apache)
