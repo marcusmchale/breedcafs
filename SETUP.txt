@@ -13,7 +13,10 @@ Set up neo4j:
 		sudo apt-get install neo4j
 	Run neo4j:
 		sudo neo4j console
-
+	Visit neo4j in the browser at localhost:7474 and configure username password (default is neo4j:neo4j)
+	You will also need to export these values as environment variables (replace as configured):
+		export NEO4J_USERNAME=username
+		export NEO4J_PASSWORD=password
 
 Set up virtual environment:
 	Install:
@@ -37,7 +40,7 @@ Run breedcafs server:
 The above is broken behaviour but won't matter in production because we will be using another server (e.g. Apache)
 
 To configure email you need to export the following environment variables:
-or modify the emaail settings in instance/config.py
+or modify the email settings in instance/config.py
 	export MAIL_PASSWORD=<your-gmail-app-password-here>
 	export MAIL_USERNAME=<your-username@gmail.com>
 
