@@ -1,0 +1,13 @@
+{% extends "layout.html" %}
+{% block body %}
+{% from "_formhelpers.html" import render_field %}
+	<h2>Upload CSV</h2>
+		<form action="{{ url_for('upload') }}" method="post" enctype=multipart/form-data>
+		{{ form.csrf_token }}
+			<dl>
+			{{ render_field(form.submission_type) }}
+			{{ render_field(form.file) }}
+			</dl>
+			<input type=submit value=Upload>
+		</form>
+{% endblock %}

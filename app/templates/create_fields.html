@@ -1,0 +1,16 @@
+{% extends "layout.html" %}	
+{% block body %}
+{% from "_formhelpers_dynamic.html" import render_field %}
+<h2>Fieldbook tools</h2>
+<h3>Register fields</h3>
+	<form action="{{ url_for('create_fields') }}" method="post">
+	{{ form.csrf_token }}
+		<dl>
+			{{ render_field(form.country) }}
+			{{ render_field(form.region) }}{{ render_field(form.region_new) }}
+			{{ render_field(form.farm) }}
+			{{ render_field(form.plot) }}
+		</dl>
+		<input type="submit" value="Update">
+	</form>
+{% endblock %}
