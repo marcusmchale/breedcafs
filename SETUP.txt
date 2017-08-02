@@ -1,0 +1,44 @@
+This depends all depends on a working neo4j install. For development we perform setup in a virtual environment. An instance folder containing a config file is required but not available in the github repo. This file contains 
+
+SETUP:
+Clone the breedcafs repository:
+	git clone https://github.com/marcusmchale/breedcafs
+
+Add the instance folder:
+	mkdir breedcafs/instance
+	cp /path/to/secret/config.py breedcafs/instance/config.py
+
+Set up neo4j:
+	Install:
+		sudo apt-get install neo4j
+	Run neo4j:
+		sudo neo4j console
+
+
+Set up virtual environment:
+	Install:
+		on ubuntu:
+			sudo apt-get install virtualenv
+	Initialise:
+		virtualenv venv
+	Activate (from breedcafs folder):
+		. ./venv/bin/activate
+	Install requirements:
+		pip install -r REQUIREMENTS.txt 
+
+
+Run breedcafs server:
+	export FLASK_APP=run.py
+	The werkzeug server only seems to work after trying to kill it...:
+		ctrl+C
+	Then to kill it:
+		killall -9 python
+
+The above is broken behaviour but won't matter in production because we will be using another server (e.g. Apache)
+
+To configure email you need to export the following environment variables:
+or modify the emaail settings in instance/config.py
+	export MAIL_PASSWORD=<your-gmail-app-password-here>
+	export MAIL_USERNAME=<your-username@gmail.com>
+
+
