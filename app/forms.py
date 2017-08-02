@@ -3,7 +3,7 @@ from wtforms.validators import DataRequired, Email, EqualTo
 from flask_wtf import FlaskForm
 from flask_wtf.file import FileField, FileRequired
 from app import app
-from models import List
+from app.models import List
 
 class RegistrationForm(FlaskForm):
 	PARTNERS = List('Partner').create_list('name', 'fullname')
@@ -32,7 +32,6 @@ class CreateTraits(FlaskForm):
 class CreateFields(FlaskForm):
 	country = SelectField('Country:', [DataRequired()], default='Nicaragua')
 	region = SelectField('Region:', [DataRequired()])
-	region_new = StringField('New Region')
 	farm = SelectField('Farm:', [DataRequired()])
 	plot = SelectField('Plot:', [DataRequired()])
 
