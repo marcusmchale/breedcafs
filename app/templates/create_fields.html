@@ -1,6 +1,7 @@
 {% extends "layout.html" %}	
 {% block body %}
 {% from "_formhelpers_dynamic.html" import render_field %}
+<noscript>This form requires that you have javascript enabled to work properly, please enable javascript in your browser.</noscript>
 <h2>Fieldbook tools</h2>
 <h3>Register fields</h3>
 	<form action="{{ url_for('create_fields') }}" method="post">

@@ -6,7 +6,7 @@ from app import app
 from app.models import List
 
 class RegistrationForm(FlaskForm):
-	PARTNERS = List('Partner').create_list('name', 'fullname')
+	PARTNERS = Lists('Partner').create_list('name', 'fullname')
 	partner = SelectField('Partner:', [DataRequired()], choices = sorted(tuple(PARTNERS), key=lambda tup: tup[1]))
 	username = StringField('Username:', [DataRequired()])
 	email = StringField('Email Address:', [DataRequired(), Email()])
@@ -23,28 +23,31 @@ class UploadForm(FlaskForm):
 	file = FileField('Select a file:', [FileRequired()])
 
 class CreateTraits(FlaskForm):
-	TRAITS = List('Trait').create_list('name','details')
+	TRAITS = Lists('Trait').create_list('name','details')
 	traits = SelectMultipleField('Trait:', [DataRequired()], 
 		choices = sorted(TRAITS, key=lambda tup: tup[1]), 
 		option_widget=widgets.CheckboxInput(),
 		widget=widgets.ListWidget(prefix_label=False)
 		)
 class CreateFields(FlaskForm):
-	country = SelectField('Country:', [DataRequired()], default='Nicaragua')
+	country = SelectField('Country:', [DataRequired()])
 	region = SelectField('Region:', [DataRequired()])
 	farm = SelectField('Farm:', [DataRequired()])
 	plot = SelectField('Plot:', [DataRequired()])
-
 	@classmethod
 	def update(cls):
 		form=cls()
-		COUNTRIES = List('Country').create_list('name','name')
-		REGIONS = set(List('Country').get_connected('name', form.country.data, 'IS_IN'))
-		FARMS = set(List('Region').get_connected('name', form.region.data, 'IS_IN'))
-		PLOTS = set(List('Farm').get_connected('name', form.farm.data, 'IS_IN'))
+		COUNTRIES = Lists('Country').create_list('name','name')
+		REGIONS = set(Lists('Country').get_connected('name', form.country.data, 'IS_IN'))
+		FARMS = set(Lists('Region').get_connected('name', form.region.data, 'IS_IN'))
+		PLOTS = set(Lists('Farm').get_connected('name', form.farm.data, 'IS_IN'))
 		form = CreateFields()
 		form.country.choices = sorted(COUNTRIES, key=lambda tup: tup[1])
 		form.region.choices = sorted(REGIONS, key=lambda tup: tup[1])
 		form.farm.choices = sorted(FARMS, key=lambda tup: tup[1])
 		form.plot.choices = sorted(PLOTS, key=lambda tup: tup[1])
+		form.country.default =  COUNTRIES[1]
+		form.region.default = REGIONS[1]
+		form.farm.default = FARMS[1]
+		form.plot.default = PLOTS[1]
 		return form

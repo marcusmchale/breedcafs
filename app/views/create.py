@@ -1,6 +1,6 @@
 from app import app
 from flask import session, flash, request, redirect, url_for, render_template, send_file
-from app.models import List
+from app.models import Lists
 from app.forms import CreateTraits, CreateFields
 
 @app.route('/create', methods=['GET'])
@@ -20,7 +20,7 @@ def create_trt():
 		form = CreateTraits()
 		if request.method == 'POST' and form.validate_on_submit():
 			selection = form.traits.data
-			trt=List('Trait').create_trt(selection, 'name')
+			trt=Lists('Trait').create_trt(selection, 'name')
 			return send_file(trt,
 				attachment_filename='BreedCAFS_traits.trt', 
 				as_attachment=True,
