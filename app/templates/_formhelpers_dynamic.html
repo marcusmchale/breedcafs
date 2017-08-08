@@ -1,15 +1,18 @@
-{% macro render_field(field) %}
-	{% if field.type == 'SelectField' %}
-		<dt>{{ field.label }}
-			{% if field.errors %}
-				{% for error in field.errors %}
-					<a>{{ error }}</a>
-				{% endfor %}
-			{% endif %}
-		</dt>
-		<dd>{{ field(**{'onchange':'this.form.submit()'})|safe }}</dd>
+{% macro render_field(field) %}		
+	{% if field.errors %}
+		{% for error in field.errors %}
+			<a>{{ error }}</a>
+		{% endfor %}
+	{% endif %}
+	{% if field.type in ('SelectField') %}
+		<dt>{{ field.label }}</dt>
+		<dd>{{ field|safe }}<input type="submit" value="Set"></dd>
 	{% endif %}
 	{% if field.type in ('StringField', 'SubmitField') %}
-		{{ field }}
+		{{ field|safe}}
+	{% endif %}
+	{% if field.type in ('IntegerField') %}
+		<dt>{{ field.label }}</dt>
+		<dd>{{ field|safe }}</dd>
 	{% endif %}
 {% endmacro %}

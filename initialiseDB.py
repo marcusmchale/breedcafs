@@ -1,5 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
+
+import sys
 import os
 from datetime import datetime
 from neo4j.v1 import GraphDatabase
@@ -46,19 +48,30 @@ TRAITS= ({'trait':'height', 'format':'numeric', 'details':'Height'},
 
 #Mock data to use in development - need to create the tool for users to generate this data (and down to the plant level)
 #include genotype etc.
-FIELDS = ({'id':'1','country':'Nicaragua', 'region':'Highlands', 'farm':'yellow', 'plot':'1'},
-	{'id':'2','country':'Nicaragua', 'region':'Lowlands', 'farm':'blue', 'plot':'1'},
-	{'id':'3','country':'Costa Rica', 'region':'Highlands', 'farm':'red', 'plot':'11'},
-	{'id':'4','country':'Cameroon', 'region':'Lowlands', 'farm':'orange', 'plot':'111'},
-	{'id':'5','country':'France', 'region':'Highlands', 'farm':'yellow', 'plot':'11'})
+TREES = ({'country':'Nicaragua', 'region':'Highlands', 'farm':'yellow', 'plot':'1'},
+	{'country':'Nicaragua', 'region':'Lowlands', 'farm':'blue', 'plot':'1'},
+	{'country':'Costa Rica', 'region':'Highlands', 'farm':'red', 'plot':'11'},
+	{'country':'Cameroon', 'region':'Lowlands', 'farm':'orange', 'plot':'111'},
+	{'country':'France', 'region':'Highlands', 'farm':'yellow', 'plot':'11'})
 
 CONSTRAINTS = ({'node':'User', 'property':'username', 'constraint':'IS UNIQUE'},
 	{'node':'Partner', 'property':'name', 'constraint':'IS UNIQUE'},
 	{'node':'Trait', 'property':'name', 'constraint':'IS UNIQUE'},
-	{'node':'Country', 'property':'name', 'constraint':'IS UNIQUE'},
-	{'node':'Field', 'property':'id', 'constraint':'IS UNIQUE'})
+	{'node':'Plot', 'property':'uid', 'constraint':'IS UNIQUE'},
+	{'node':'Tree', 'property':'id', 'constraint':'IS UNIQUE'})
+
 
 #functions
+def confirm(question):
+	valid = {"yes": True, "y": True, "no": False, "n": False}
+	prompt = " [y/n] "
+	while True:
+		sys.stdout.write(question + prompt)
+		choice = raw_input().lower()
+		if choice in valid:
+			return valid[choice]
+		else:
+			sys.stdout.write("Please respond with 'yes' or 'no' (or 'y' or 'n').\n")
 #erase database 
 def delete_database(tx):
 	tx.run('MATCH (n)-[r]-() DELETE n , r')
@@ -103,26 +116,38 @@ class Create:
 				trait=trait['trait'],
 				format=trait['format'],
 				details=trait['details'])
-	def fields(self, tx, fields):
-		for field in fields:
+#https://stackoverflow.com/questions/32040409/reliable-autoincrementing-identifiers-for-all-nodes-relationships-in-neo4j
+#use counter stored in Neo4j node to establish IDs
+	def trees(self, tx, trees):
+		for tree in trees:
 			tx.run('MATCH (u:User {username:{username}}) '
+				' MERGE (idP:UniqueId{name:"Plots"})'
+				' MERGE (idT:UniqueId{name:"Trees"})'
+				' ON CREATE SET idP.count=1'
+				' ON CREATE SET idT.count=1'
+				' ON MATCH SET idP.count=idP.count+1'
+				' ON MATCH SET idT.count=idT.count+1'
 				' MERGE (c:Country {name: {country}}) '
 				' MERGE (r:Region {name: {region}}) - [:IS_IN] -> (c) '
 				' MERGE (fa:Farm {name: {farm}}) - [:IS_IN] -> (r) '
-				' MERGE (p:Plot {name: {plot}}) - [:IS_IN] -> (fa) '
-				' MERGE (f:Field {id:{id}}) - [:IS_IN] -> (p) '
+				' MERGE (p:Plot {name: {plot}, uid:idP.count}) - [:IS_IN] -> (fa) '
+				' MERGE (t:Tree {uid:idT.count}) - [:IS_IN] -> (p) '
 				' MERGE (u) - [:SUBMITTED] -> (f) ',
 				username=self.username,
-				id=field['id'],
-				plot=field['plot'],
-				farm=field['farm'],
-				region=field['region'],
-				country=field['country'])
+				plot=tree['plot'],
+				farm=tree['farm'],
+				region=tree['region'],
+				country=tree['country'])
+
+if confirm('Do you want to reset the database from scratch?'):
+	print('Full reset of database initiated')
+	with driver.session() as session:
+		session.write_transaction(delete_database)
+else: print('Attempting to write over and retain existing data')
 
 with driver.session() as session:
-	session.write_transaction(delete_database)
 	session.write_transaction(Create.constraints, CONSTRAINTS)
 	session.write_transaction(Create('start').user)
 	session.write_transaction(Create('start').partners, PARTNERS)
 	session.write_transaction(Create('start').traits, TRAITS)
-	session.write_transaction(Create('start').fields, FIELDS)
+	session.write_transaction(Create('start').trees, TREES)
