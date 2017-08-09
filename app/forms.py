@@ -37,12 +37,12 @@ class CreateTraits(FlaskForm):
 		)
 
 class RegisterTrees(FlaskForm):
-	country = SelectField('Country:', [InputRequired()])
-	region = SelectField('Region:', [InputRequired()])
-	farm = SelectField('Farm:', [InputRequired()])
-	plot = SelectField('Plot:', [InputRequired()])
-	count = IntegerField('Number of trees:',[InputRequired(), NumberRange(min=1, 
-		max=1000, message='At most 1000 plants may be registered per plot')])
+	country = SelectField('Country: ', [InputRequired()])
+	region = SelectField('Region: ', [InputRequired()])
+	farm = SelectField('Farm: ', [InputRequired()])
+	plot = SelectField('Plot: ', [InputRequired()])
+	count = IntegerField('Number of trees: ',[InputRequired(), 
+		NumberRange(min=1, max=1000, message='At most 1000 plants may be registered per plot')])
 	submit_trees = SubmitField('Generate fields.csv')
 	@staticmethod
 	def update():

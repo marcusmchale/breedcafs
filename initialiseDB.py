@@ -122,10 +122,10 @@ class Create:
 		for tree in trees:
 			tx.run('MATCH (u:User {username:{username}}) '
 				' MERGE (idP:UniqueId{name:"Plots"})'
-				' MERGE (idT:UniqueId{name:"Trees"})'
 				' ON CREATE SET idP.count=1'
-				' ON CREATE SET idT.count=1'
 				' ON MATCH SET idP.count=idP.count+1'
+				' MERGE (idT:UniqueId{name:"Trees"})'
+				' ON CREATE SET idT.count=1'
 				' ON MATCH SET idT.count=idT.count+1'
 				' MERGE (c:Country {name: {country}}) '
 				' MERGE (r:Region {name: {region}}) - [:IS_IN] -> (c) '

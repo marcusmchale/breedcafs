@@ -29,34 +29,6 @@ def register_trees():
 		add_region = AddRegion()
 		add_farm = AddFarm()
 		add_plot = AddPlot()
-		if submit_trees and register_trees.validate_on_submit():
-			if not country  and region and farm and plot and count:
-				flash ('Please select country, region, farm, plot from the dropdown boxes and enter the number of trees to register')
-			else:
-				fields_csv=Fields(country).add_trees(region, farm, plot, count)
-				flash(str(count) + ' trees registered in: ' + plot + ' of '
-				 + farm + ' of ' + region + ' of ' + country)
-				recipients=[User(session['username']).find('')['email']]
-				subject = "BreedCAFS: Trees registered"
-				html = render_template('emails/register_trees.html', 
-					count=count,
-					plot=plot,
-					farm=farm,
-					region=region,
-					country=country)
-				send_attachment(subject, 
-					app.config['ADMINS'][0], 
-					recipients, 
-					'copy of fields.csv', 
-					html, 
-					u'BreedCAFS_fields.csv', 
-					'text/csv', 
-					fields_csv)
-				return send_file(fields_csv,
-					attachment_filename='BreedCAFS_fields.csv', 
-					as_attachment=True,
-					mimetype=('txt/csv'))
-				flash('fields.csv will also be sent to your email address')
 		if add_country.submit_country.data and add_country.validate_on_submit():
 			if Fields(add_country.text_country.data).find_country():
 				flash('Country already found: ' + add_country.text_country.data)
@@ -91,7 +63,33 @@ def register_trees():
 				Fields(country).add_plot(region, farm, add_plot.text_plot.data)
 				flash('Farm submitted: ' + add_plot.text_plot.data + ' in ' 
 					+ farm + ' of ' + region + ' of ' + country )
-	return render_template('register_trees.html', register_trees=register_trees, add_country=add_country, 
+		if submit_trees and register_trees.validate_on_submit():
+			fields_csv=Fields(country).add_trees(region, farm, plot, count)
+			#flash doesn't work since return isn't a render..need to fix with javascript
+			#flash(str(count) + ' trees registered in: ' + plot + ' of '	+ 
+			#	farm + ' of ' + region + ' of ' + country + '')
+			recipients=[User(session['username']).find('')['email']]
+			subject = "BreedCAFS: Trees registered"
+			html = render_template('emails/register_trees.html', 
+				count=count,
+				plot=plot,
+				farm=farm,
+				region=region,
+				country=country)
+			send_attachment(subject, 
+				app.config['ADMINS'][0], 
+				recipients, 
+				'copy of fields.csv', 
+				html, 
+				u'BreedCAFS_fields.csv', 
+				'text/csv', 
+				fields_csv)
+			#flash('fields.csv has also been sent to your email address')
+			return send_file(fields_csv,
+				attachment_filename='BreedCAFS_fields.csv', 
+				as_attachment=True,
+				mimetype=('txt/csv'))
+		return render_template('register_trees.html', register_trees=register_trees, add_country=add_country, 
 		add_region=add_region, add_farm=add_farm, add_plot=add_plot, title='Register trees and create fields.csv')
 
 @app.route('/create_trt', methods=['GET', 'POST'])
