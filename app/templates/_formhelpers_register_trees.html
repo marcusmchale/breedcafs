@@ -1,0 +1,30 @@
+{% macro render_field(field) %}
+	{% if field.type in ['SelectField'] %}
+		<dt>{{ field.label }}
+			{% if field.errors %}
+				{% for error in field.errors %}
+					<a>{{ error }}</a>
+				{% endfor %}
+			{% endif %}
+		</dt>
+		<dd>{{ field(**kwargs)|safe }} <input type="submit" value="Update"> </dd>
+	{% endif %}
+	{% if field.type in ['StringField','SubmitField'] %}
+		<dt>{{ field(**kwargs)|safe }}</dt>
+		{% if field.errors %}
+			{% for error in field.errors %}
+				<a>{{ error }}</a>
+			{% endfor %}
+		{% endif %}
+	{% endif %}
+	{% if field.type in ['IntegerField'] %}
+		<dt>{{ field.label }}
+			{% if field.errors %}
+				{% for error in field.errors %}
+					<a>{{ error }}</a>
+				{% endfor %}
+			{% endif %}
+		</dt>
+		<dd>{{ field(**kwargs)|safe }}</dd>
+	{% endif %}
+{% endmacro %}
