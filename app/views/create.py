@@ -29,41 +29,7 @@ def register_trees():
 		add_region = AddRegion()
 		add_farm = AddFarm()
 		add_plot = AddPlot()
-		if request.method == 'POST' and add_country.submit_country.data and add_country.validate_on_submit():
-			if Fields(add_country.text_country.data).find_country():
-				flash('Country already found: ' + add_country.text_country.data)
-			else: 
-				Fields(add_country.text_country.data).add_country()
-				flash('Country submitted: ' + add_country.text_country.data)
-		if request.method == 'POST' and add_region.submit_region.data and add_region.validate_on_submit():
-			if not country:
-				flash('Please select a country to register a new region')
-			elif Fields(country).find_region(add_region.text_region.data):
-				flash('Region already found: ' + add_region.text_region.data + ' in ' + country)
-			else:
-				Fields(country).add_region(add_region.text_region.data)
-				flash('Region submitted: ' + add_region.text_region.data + ' in ' + country)
-		if request.method == 'POST' and add_farm.submit_farm.data and add_farm.validate_on_submit():
-			if not country and region:
-				flash ('Please select a country and region to register a new farm')
-			elif Fields(country).find_farm(region, add_farm.text_farm.data):
-				flash('Farm already found: ' + add_farm.text_farm.data + ' in ' 
-					+ region + ' of ' + country )
-			else:
-				Fields(country).add_farm(region, add_farm.text_farm.data)
-				flash('Farm submitted: ' + add_farm.text_farm.data + ' in ' 
-					+ region + ' of ' + country )
-		if request.method == 'POST' and add_plot.submit_plot.data and add_plot.validate_on_submit():
-			if not country and region and farm:
-				flash ('Please select a country, region and farm to register a new plot')
-			elif Fields(country).find_plot(region, farm, add_plot.text_plot.data):
-				flash('Plot already found: ' + add_plot.text_plot.data + ' in ' 
-					+ farm + ' of ' + region + ' of ' + country )
-			else:
-				Fields(country).add_plot(region, farm, add_plot.text_plot.data)
-				flash('Farm submitted: ' + add_plot.text_plot.data + ' in ' 
-					+ farm + ' of ' + region + ' of ' + country )
-		if request.method == 'POST' and submit_trees and register_trees.validate_on_submit():
+		if submit_trees and register_trees.validate_on_submit():
 			if not country  and region and farm and plot and count:
 				flash ('Please select country, region, farm, plot from the dropdown boxes and enter the number of trees to register')
 			else:
@@ -91,6 +57,40 @@ def register_trees():
 					as_attachment=True,
 					mimetype=('txt/csv'))
 				flash('fields.csv will also be sent to your email address')
+		if add_country.submit_country.data and add_country.validate_on_submit():
+			if Fields(add_country.text_country.data).find_country():
+				flash('Country already found: ' + add_country.text_country.data)
+			else: 
+				Fields(add_country.text_country.data).add_country()
+				flash('Country submitted: ' + add_country.text_country.data)
+		if add_region.submit_region.data and add_region.validate_on_submit():
+			if not country:
+				flash('Please select a country to register a new region')
+			elif Fields(country).find_region(add_region.text_region.data):
+				flash('Region already found: ' + add_region.text_region.data + ' in ' + country)
+			else:
+				Fields(country).add_region(add_region.text_region.data)
+				flash('Region submitted: ' + add_region.text_region.data + ' in ' + country)
+		if add_farm.submit_farm.data and add_farm.validate_on_submit():
+			if not country and region:
+				flash ('Please select a country and region to register a new farm')
+			elif Fields(country).find_farm(region, add_farm.text_farm.data):
+				flash('Farm already found: ' + add_farm.text_farm.data + ' in ' 
+					+ region + ' of ' + country )
+			else:
+				Fields(country).add_farm(region, add_farm.text_farm.data)
+				flash('Farm submitted: ' + add_farm.text_farm.data + ' in ' 
+					+ region + ' of ' + country )
+		if add_plot.submit_plot.data and add_plot.validate_on_submit():
+			if not country and region and farm:
+				flash ('Please select a country, region and farm to register a new plot')
+			elif Fields(country).find_plot(region, farm, add_plot.text_plot.data):
+				flash('Plot already found: ' + add_plot.text_plot.data + ' in ' 
+					+ farm + ' of ' + region + ' of ' + country )
+			else:
+				Fields(country).add_plot(region, farm, add_plot.text_plot.data)
+				flash('Farm submitted: ' + add_plot.text_plot.data + ' in ' 
+					+ farm + ' of ' + region + ' of ' + country )
 	return render_template('register_trees.html', register_trees=register_trees, add_country=add_country, 
 		add_region=add_region, add_farm=add_farm, add_plot=add_plot, title='Register trees and create fields.csv')
 
@@ -101,7 +101,7 @@ def create_trt():
 		return redirect(url_for('login'))
 	else:
 		form = CreateTraits()
-		if request.method == 'POST' and form.validate_on_submit():
+		if form.validate_on_submit():
 			selection = form.traits.data
 			trt=Lists('Trait').create_trt(selection, 'name')
 			recipients=[User(session['username']).find('')['email']]

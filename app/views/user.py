@@ -11,7 +11,7 @@ ts = URLSafeTimedSerializer(app.config['SECRET_KEY'], salt=app.config['CONFIRM_E
 @app.route('/register', methods=['GET','POST'])
 def register():
 	form=RegistrationForm()
-	if request.method == 'POST' and form.validate_on_submit():
+	if form.validate_on_submit():
 		username = form.username.data.lower()
 		password = form.password.data
 		email = form.email.data.lower()
@@ -60,7 +60,7 @@ def confirm(token):
 @app.route('/login', methods=['GET', 'POST'])
 def login():
 	form = LoginForm()
-	if request.method == 'POST' and form.validate_on_submit():
+	if form.validate_on_submit():
 		username = form.username.data.lower()
 		password = form.password.data
 #added the bit about username 'start' just to tidy the interface, the user is created when initialiseDB is run

@@ -58,23 +58,24 @@ class RegisterTrees(FlaskForm):
 		form.plot.choices = PLOTS
 		return form
 
+#these fields all require names (e.g. 'Country text input', even though they are not displayed) for validation to work
 class AddCountry(FlaskForm):
 		strip_filter = lambda x: x.strip() if x else None
-		text_country = StringField([InputRequired(),Length(min=1, max=50, message='Maximum 50 characters')],
+		text_country = StringField('Country text input', [InputRequired(),Length(min=1, max=50, message='Maximum 50 characters')],
 			filters=[strip_filter])
-		submit_country = SubmitField('+')
+		submit_country = SubmitField('Add country')
 class AddRegion(FlaskForm):
 		strip_filter = lambda x: x.strip() if x else None
-		text_region = StringField([InputRequired(),Length(min=1, max=50, message='Maximum 50 characters')],
+		text_region = StringField('Region text input', [InputRequired(),Length(min=1, max=50, message='Maximum 50 characters')],
 			filters=[strip_filter])
-		submit_region = SubmitField('+')
+		submit_region = SubmitField('Add region')
 class AddFarm(FlaskForm):
 		strip_filter = lambda x: x.strip() if x else None
-		text_farm = StringField([InputRequired(),Length(min=1, max=50, message='Maximum 50 characters')],
+		text_farm = StringField('Farm text input', [InputRequired(),Length(min=1, max=50, message='Maximum 50 characters')],
 			filters=[strip_filter])
-		submit_farm = SubmitField('+')
+		submit_farm = SubmitField('Add farm')
 class AddPlot(FlaskForm):
 		strip_filter = lambda x: x.strip() if x else None
-		text_plot = StringField([InputRequired(),Length(min=1, max=50, message='Maximum 50 characters')],
+		text_plot = StringField('Plot text input', [InputRequired(),Length(min=1, max=50, message='Maximum 50 characters')],
 			filters=[strip_filter])
-		submit_plot = SubmitField('+')
+		submit_plot = SubmitField('Add plot')
