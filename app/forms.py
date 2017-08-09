@@ -36,17 +36,17 @@ class CreateTraits(FlaskForm):
 		widget=widgets.ListWidget(prefix_label=False)
 		)
 
-class RegisterFields(FlaskForm):
+class RegisterTrees(FlaskForm):
 	country = SelectField('Country:', [InputRequired()])
 	region = SelectField('Region:', [InputRequired()])
 	farm = SelectField('Farm:', [InputRequired()])
 	plot = SelectField('Plot:', [InputRequired()])
 	count = IntegerField('Number of trees:',[InputRequired(), NumberRange(min=1, 
 		max=1000, message='At most 1000 plants may be registered per plot')])
-	submit = SubmitField('Generate fields.csv')
+	submit_trees = SubmitField('Generate fields.csv')
 	@staticmethod
 	def update():
-		form = RegisterFields()
+		form = RegisterTrees()
 		COUNTRIES = sorted(set(Lists('Country').create_list('name','name')), key=lambda tup: tup[1])
 		REGIONS = sorted(set(Lists('Country').get_connected('name', form.country.data, 'IS_IN')), key=lambda tup: tup[1])
 		FARMS = sorted(set(Fields(form.country.data).get_farms(form.region.data)), key=lambda tup: tup[1])
@@ -59,14 +59,22 @@ class RegisterFields(FlaskForm):
 		return form
 
 class AddCountry(FlaskForm):
-		text = StringField([InputRequired(),Length(min=1, max=50, message='Maximum 50 characters')])
-		submit = SubmitField('+')
+		strip_filter = lambda x: x.strip() if x else None
+		text_country = StringField([InputRequired(),Length(min=1, max=50, message='Maximum 50 characters')],
+			filters=[strip_filter])
+		submit_country = SubmitField('+')
 class AddRegion(FlaskForm):
-		text = StringField([InputRequired(),Length(min=1, max=50, message='Maximum 50 characters')])
-		submit = SubmitField('+')
+		strip_filter = lambda x: x.strip() if x else None
+		text_region = StringField([InputRequired(),Length(min=1, max=50, message='Maximum 50 characters')],
+			filters=[strip_filter])
+		submit_region = SubmitField('+')
 class AddFarm(FlaskForm):
-		text = StringField([InputRequired(),Length(min=1, max=50, message='Maximum 50 characters')])
-		submit = SubmitField('+')
+		strip_filter = lambda x: x.strip() if x else None
+		text_farm = StringField([InputRequired(),Length(min=1, max=50, message='Maximum 50 characters')],
+			filters=[strip_filter])
+		submit_farm = SubmitField('+')
 class AddPlot(FlaskForm):
-		text = StringField([InputRequired(),Length(min=1, max=50, message='Maximum 50 characters')])
-		submit = SubmitField('+')
+		strip_filter = lambda x: x.strip() if x else None
+		text_plot = StringField([InputRequired(),Length(min=1, max=50, message='Maximum 50 characters')],
+			filters=[strip_filter])
+		submit_plot = SubmitField('+')
