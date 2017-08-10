@@ -70,11 +70,12 @@ class Fields:
 		self.count = count
 		with driver.session() as session:
 			session.write_transaction(self._add_trees)
-		fieldnames = ['UID','PlotID','TreeID']
+		fieldnames = ['UID','PlotID','TreeCount']
 		fields_csv = cStringIO.StringIO()
 		writer = csv.DictWriter(fields_csv,
 			fieldnames=fieldnames,
-			quoting=csv.QUOTE_ALL)
+			quoting=csv.QUOTE_ALL,
+			extrasaction='ignore')
 		writer.writeheader()
 		for tree in self.id_list:
 			writer.writerow(tree)
@@ -88,7 +89,7 @@ class Fields:
 			plot = self.plot,
 			count = self.count,
 			username= session['username'])
-		self.id_list = [{'UID':str(record[0][0])+'_'+str(record[0][1]) , 'PlotID':record[0][0],'TreeID':record[0][1]} for record in result]
+		self.id_list = [{'UID':str(record[0][0]) , 'PlotID':record[0][1],'TreeCount':record[0][2]} for record in result]
 	def get_farms(self, region):
 		self.region=region
 		with driver.session() as session:

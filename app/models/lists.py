@@ -65,7 +65,8 @@ class Lists:
 		trt = cStringIO.StringIO()
 		writer = csv.DictWriter(trt, 
 			fieldnames=fieldnames, 
-			quoting=csv.QUOTE_ALL)
+			quoting=csv.QUOTE_ALL,
+			extrasaction='ignore')
 		writer.writeheader()
 		for i, trait in enumerate(selected_traits):
 			trait['realPosition'] = str(i+1)

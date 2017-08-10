@@ -3,6 +3,7 @@
 
 import sys
 import os
+#import shutil
 from datetime import datetime
 from neo4j.v1 import GraphDatabase
 
@@ -46,14 +47,6 @@ TRAITS= ({'trait':'height', 'format':'numeric', 'details':'Height'},
 	{'trait':'rust_score', 'format':'rust rating', 'details':'Rust score'},
 	{'trait':'location', 'format':'location', 'details':'Location (device positioning)'})
 
-#Mock data to use in development - need to create the tool for users to generate this data (and down to the plant level)
-#include genotype etc.
-TREES = ({'country':'Nicaragua', 'region':'Highlands', 'farm':'yellow', 'plot':'1'},
-	{'country':'Nicaragua', 'region':'Lowlands', 'farm':'blue', 'plot':'1'},
-	{'country':'Costa Rica', 'region':'Highlands', 'farm':'red', 'plot':'11'},
-	{'country':'Cameroon', 'region':'Lowlands', 'farm':'orange', 'plot':'111'},
-	{'country':'France', 'region':'Highlands', 'farm':'yellow', 'plot':'11'})
-
 CONSTRAINTS = ({'node':'User', 'property':'username', 'constraint':'IS UNIQUE'},
 	{'node':'Partner', 'property':'name', 'constraint':'IS UNIQUE'},
 	{'node':'Trait', 'property':'name', 'constraint':'IS UNIQUE'},
@@ -74,8 +67,8 @@ def confirm(question):
 			sys.stdout.write("Please respond with 'yes' or 'no' (or 'y' or 'n').\n")
 #erase database 
 def delete_database(tx):
-	tx.run('MATCH (n)-[r]-() DELETE n , r')
-	tx.run('MATCH (n) DELETE n')
+#	shutil.rmtree("/var/lib/neo4j/data/databases/graph.db/")
+	tx.run('MATCH (n) OPTIONAL MATCH (n)-[r]-() DELETE n,r')
 
 class Create:
 	def __init__ (self, username):
@@ -89,65 +82,112 @@ class Create:
 			tx.run('CREATE CONSTRAINT ON (n:' + node + ') ASSERT n.' + prop + ' ' + constraint)
 	def user(self, tx):
 		username=self.username
-		tx.run(' CREATE (u:User {username:{username}})', username=username)
+		user_create = tx.run(' MERGE (u:User {username:$username}) '
+			'ON MATCH SET u.found="TRUE" '
+			'ON CREATE SET u.found="FALSE" '
+			'RETURN u.found', 
+			username=username)
+		for record in user_create:
+			if record['u.found'] == 'TRUE' :
+				print ('Found: User ' + username)
+			if record['u.found'] == 'FALSE' :
+				print ('Created: User ' + username)
 	def partners(self, tx, partners):
 		for partner in partners: 
-			tx.run('MATCH (u:User {username : {username}}) '
-			' CREATE (u)-[s:SUBMITTED { submission_time : {submission_time} } ] '
-			'->	(p:Partner {name:{name}, fullname:{fullname}}) '
-			' MERGE (b:Country {name : {based_in}}) '
-			' CREATE (p)-[:BASED_IN]->(b)'
-			' WITH p'
-			' MATCH (o:Country) WHERE o.name IN {operates_in} '
-			' MERGE (p)-[:OPERATES_IN]-> (o)',
+			partner_create = tx.run('MATCH (u:User {username : $username}) '
+				' MERGE (p:Partner {name:$name, fullname:$fullname}) '
+				' ON MATCH SET p.found="TRUE" '
+				' ON CREATE SET p.found="FALSE"'
+				' MERGE (u)-[s:SUBMITTED]->(p) '
+				' ON MATCH SET s.submission_time = $submission_time '
+				' ON CREATE SET s.submission_time = $submission_time '
+				' MERGE (c:Country {name : $based_in}) '
+				' ON MATCH SET c.found ="TRUE"'
+				' ON CREATE SET c.found ="FALSE"'
+				' MERGE (u)-[s2:SUBMITTED]->(c)'
+				' ON MATCH SET s2.submission_time = $submission_time '
+				' ON CREATE SET s2.submission_time = $submission_time '
+				' MERGE (p)-[r:BASED_IN]->(c)'
+				' ON MATCH SET r.found="TRUE"'
+				' ON CREATE SET r.found="FALSE"'
+				' RETURN p.found, c.found, r.found ',
 				username=self.username,
 				submission_time=str(datetime.now()),
 				based_in=partner['BASED_IN'],
 				operates_in=partner['OPERATES_IN'],
 				fullname=partner['fullname'],
 				name=partner['name'])
+			for record in partner_create:
+				if record['p.found'] == 'TRUE' and record['r.found'] == 'TRUE' and record['c.found'] == 'TRUE':
+					print ('Found: ' + partner['name'] + ' BASED_IN ' + partner['BASED_IN'])
+				elif record['p.found'] == 'TRUE' and record['r.found'] == 'FALSE'  and record['c.found'] == 'TRUE':
+					print ('Created: ' + partner['name'] + ' BASED_IN ' + partner['BASED_IN'] + '(relationship only)')
+				elif record['p.found'] == 'TRUE' and record['r.found'] == 'FALSE' and record['c.found'] == 'FALSE':
+					print ('Created: ' + partner['name'] + ' BASED_IN ' + partner['BASED_IN'] + '(country and relationship only)')
+				elif record['p.found'] == 'FALSE' and record['r.found'] == 'FALSE' and record['c.found'] == 'TRUE':
+					print ('Created: ' + partner['name'] + ' BASED_IN ' + partner['BASED_IN'] + '(partner and relationship only)')
+				elif record['p.found'] == 'FALSE' and record['r.found'] == 'FALSE' and record['c.found'] == 'FALSE':
+					print ('Created: ' + partner['name'] + ' BASED_IN ' + partner['BASED_IN'])
+				else:
+					print ('Error with merger of partner ' + partner['name'] + 'and/or BASED_IN relationship' )
+			#separated operates_in call because list of operates_in relationships makes output confusing
+			operates_in = tx.run (' MATCH (p:Partner {name : $name}), '
+				' (u:User {username: $username})'
+				' UNWIND $operates_in AS x'
+				' MERGE (c:Country {name:x}) '
+				' ON MATCH SET c.found="TRUE" '
+				' ON CREATE SET c.found="FALSE" '
+				' MERGE (c)<-[:SUBMITTED]-(u) '
+				' MERGE (c)<-[r:OPERATES_IN]-(p) '
+				' ON MATCH SET r.found="TRUE" '
+				' ON CREATE SET r.found="FALSE" '
+				' return p.name, c.name, c.found, r.found ',
+				username='start',
+				name=partner['name'],
+				operates_in=partner['OPERATES_IN'])
+			for record in operates_in:
+				if record['c.found'] == 'TRUE' and record['r.found'] == 'TRUE':
+					print ('Found: ' + record['p.name'] + ' OPERATES_IN ' + record['c.name'])
+				elif record['c.found'] == 'TRUE' and record['r.found'] == 'FALSE':
+					print ('Created: '  + record['p.name'] + ' OPERATES_IN ' + record['c.name'] + '(relationship only)')
+				elif record['c.found'] == 'FALSE' and record['r.found'] == 'FALSE':
+					print ('Created: '  + record['p.name'] + ' OPERATES_IN ' + record['c.name'])
+				else:
+					print ('Error with merger of relationship OPERATES_IN for ' + record['p.name'])
 	def traits(self, tx, traits):
 		for trait in traits: 
-			tx.run('MATCH (u:User {username:{username}}) '
-			' CREATE (u)-[s:SUBMITTED { submission_time : {submission_time} } ] '
-			'->	(t:Trait {name:{trait}, format:{format}, details:{details}})',
+			trait_create = tx.run('MATCH (u:User {username:$username}) '
+			' MERGE (t:Trait {name:$trait, format:$format, details:$details}) '
+			' ON MATCH SET t.found="TRUE" '
+			' ON CREATE SET t.found="FALSE" '
+			' MERGE (t)<-[s:SUBMITTED { submission_time : $submission_time }]-(u) '
+			' RETURN t.found',
 				username=self.username,
 				submission_time=str(datetime.now()),
 				trait=trait['trait'],
 				format=trait['format'],
 				details=trait['details'])
-#https://stackoverflow.com/questions/32040409/reliable-autoincrementing-identifiers-for-all-nodes-relationships-in-neo4j
-#use counter stored in Neo4j node to establish IDs
-	def trees(self, tx, trees):
-		for tree in trees:
-			tx.run('MATCH (u:User {username:{username}}) '
-				' MERGE (idP:UniqueId{name:"Plots"})'
-				' ON CREATE SET idP.count=1'
-				' ON MATCH SET idP.count=idP.count+1'
-				' MERGE (idT:UniqueId{name:"Trees"})'
-				' ON CREATE SET idT.count=1'
-				' ON MATCH SET idT.count=idT.count+1'
-				' MERGE (c:Country {name: {country}}) '
-				' MERGE (r:Region {name: {region}}) - [:IS_IN] -> (c) '
-				' MERGE (fa:Farm {name: {farm}}) - [:IS_IN] -> (r) '
-				' MERGE (p:Plot {name: {plot}, uid:idP.count}) - [:IS_IN] -> (fa) '
-				' MERGE (t:Tree {uid:idT.count}) - [:IS_IN] -> (p) '
-				' MERGE (u) - [:SUBMITTED] -> (f) ',
-				username=self.username,
-				plot=tree['plot'],
-				farm=tree['farm'],
-				region=tree['region'],
-				country=tree['country'])
-
-if confirm('Do you want to reset the database from scratch?'):
-	print('Full reset of database initiated')
+			for record in trait_create:
+				if record['t.found']=='TRUE':
+					print ('Found: trait ' + trait['trait'])
+				elif record['t.found]'=='FALSE']:
+					print ('Created: trait ' + trait['trait'])
+				else:
+					print ('Error with merger of trait ' + trait['trait'])
+if not confirm('Are you sure you want to proceed? This is should probably only be run when setting up the database'):
+	sys.exit()
+else:
+	if confirm('Do you want to a wipe existing data and rebuild the constraints?'):
+		print('Performing a full reset of database')
+		with driver.session() as session:
+			session.write_transaction(delete_database)
+			session.write_transaction(Create.constraints, CONSTRAINTS)
+	else: print('Attempting to create the following while retaining existing data:\n'
+		'  * user:start \n'
+		'  * partners \n'
+		'  * traits')
 	with driver.session() as session:
-		session.write_transaction(delete_database)
-else: print('Attempting to write over and retain existing data')
-
-with driver.session() as session:
-	session.write_transaction(Create.constraints, CONSTRAINTS)
-	session.write_transaction(Create('start').user)
-	session.write_transaction(Create('start').partners, PARTNERS)
-	session.write_transaction(Create('start').traits, TRAITS)
-	session.write_transaction(Create('start').trees, TREES)
+		session.write_transaction(Create('start').user)
+		session.write_transaction(Create('start').partners, PARTNERS)
+		session.write_transaction(Create('start').traits, TRAITS)
+	print ('Complete')
