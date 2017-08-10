@@ -24,12 +24,19 @@ class Cypher():
 		' WHERE user.username = $username '
 		' OR user.email = $email '
 		' DELETE user ')
-	upload_submit = (' MATCH (user:User {username : $username}) '
-		' LOAD CSV WITH HEADERS FROM $filename as csvLine '
-		' CREATE (user)-[r:Submitted { '
+	upload_submit = (' LOAD CSV WITH HEADERS FROM $filename as csvLine '
+		' MATCH (u:User {username : $username}), '
+		' (t:Tree {uid:csvLine.UID}), '
+		' (tr:Trait {name:csvLine.trait}) '
+		' CREATE (t)<-[:DATA_FROM]-(d:Data {value:csvLine.value,'
+		' timestamp:csvLine.timestamp,'
+		' person:csvLine.person, '
+		' location:csvLine.location}) '
+		' -[:DATA_FOR]->(tr)'
+		' CREATE (u)-[:SUBMITTED { '
 		' submission_time : $submission_time, '
-		' submission_type : $submission_type }] '
-		' -> (p:Plot {id:csvLine.plot_id, yield:csvLine.value}) ')
+		' submission_type : $submission_type }]'
+		' ->(d)')
 	country_find = ('MATCH (country:Country {name : $country}) '
 		' RETURN country ')
 	country_add = ('MATCH (user:User {username:$username}) '
