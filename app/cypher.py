@@ -67,15 +67,21 @@ class Cypher():
 	 	' <-[:IS_IN]-(:Farm { name: $farm}) '
 	 	' <-[:IS_IN]-(plot:Plot { name: $plot}) '
 	 	' RETURN plot.name as name')
-#https://stackoverflow.com/questions/32040409/reliable-autoincrementing-identifiers-for-all-nodes-relationships-in-neo4j
+#for autoincrement:
+# https://stackoverflow.com/questions/32040409/reliable-autoincrementing-identifiers-for-all-nodes-relationships-in-neo4j
+#and for locking the increment counter (allowing for concurrent transactions to be serialised):
+#http://neo4j.com/docs/stable/transactions-isolation.html
+#https://stackoverflow.com/questions/35138645/how-to-perform-an-atomic-update-on-relationship-properties-with-py2neo
+#https://stackoverflow.com/questions/31798311/write-lock-behavior-in-neo4j-cypher-over-transational-rest-api
 	plot_add = ('MATCH (user:User {username:$username}), '
 		' (:Country {name : $country})<-[:IS_IN]-(:Region {name : $region}) '
 		' <-[:IS_IN]-(f:Farm { name: $farm}) '
 		' MERGE (id:UniqueId{name:"Plots"}) '
-		' ON CREATE SET id.count=1 '
-		' ON MATCH SET id.count=id.count+1 '
+		' ON CREATE SET id._LOCK_ = true, id.count=1 '
+		' ON MATCH SET id._LOCK_ = true, id.count=id.count+1 '
 		' MERGE (f)<-[:IS_IN]-(:Plot { name:$plot, uid:id.count}) '
-		' <-[:SUBMITTED]-(user) ')
+		' <-[:SUBMITTED]-(user) '
+		' REMOVE id._LOCK_')
 	trees_add = ('MATCH (user:User {username:$username}), '
 		' (:Country {name : $country}) '
 		' <-[:IS_IN]-(:Region {name : $region}) ' 
@@ -83,11 +89,12 @@ class Cypher():
 		' <-[:IS_IN]-(p:Plot {name:$plot})' 
 		' UNWIND range(1, toInt($count)) as counter ' 
 		' MERGE (p)<-[:ID_COUNTER_FOR]-(id:UniqueId{name:"Trees"})' 
-		' ON CREATE SET id.count=1 '
-		' ON MATCH SET id.count=id.count+1'
+		' ON CREATE SET id._LOCK_ = true, id.count=1 '
+		' ON MATCH SET id._LOCK_ = true, id.count=id.count+1'
 		' MERGE (p)<-[:IS_IN]-(t:Tree {uid:(p.uid + "_" + id.count)}) '
 		' <-[:SUBMITTED]-(user)'
-		' RETURN [t.uid, p.uid, id.count]' )
+		' REMOVE id._LOCK_'
+		' RETURN [t.uid, p.uid, id.count]')
 	get_farms = ('MATCH (:Country { name:$country}) '
 		' <-[:IS_IN]-(:Region { name:$region}) '
 		' <-[:IS_IN]-(f:Farm) '
