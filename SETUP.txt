@@ -1,6 +1,6 @@
 This all depends on a working neo4j install. For development we perform setup in a virtual environment. 
 An instance folder containing a config file is required but not available in the github repo. 
-This file contains the following and you can request a copy from marcus:
+This file contains the following and you can request a (redacted) copy from marcus or build your own:
 	SECRET-KEY 
 	ALLOWED_EMAILS
 	ADMINS
