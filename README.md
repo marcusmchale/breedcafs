@@ -11,4 +11,5 @@
    * Registration/Login/Logout (including sessions)
    * Submissions are assigned to user with SUBMITTED_BY relationship
    * Files generated are also emailed to users
+ * Uses the official [Neo4J driver for python](https://github.com/neo4j/neo4j-python-driver)
 
