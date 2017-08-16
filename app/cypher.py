@@ -28,15 +28,18 @@ class Cypher():
 		' MATCH (u:User {username : $username}), '
 		' (t:Tree {uid:csvLine.UID}), '
 		' (tr:Trait {name:csvLine.trait}) '
-		' CREATE (t)<-[:DATA_FROM]-(d:Data {value:csvLine.value,'
+		' MERGE (t)<-[:DATA_FROM]-(d:Data {value:csvLine.value,'
 		' timestamp:csvLine.timestamp,'
 		' person:csvLine.person, '
 		' location:csvLine.location}) '
 		' -[:DATA_FOR]->(tr)'
+		' ON MATCH SET d.found ="TRUE" '
+		' ON CREATE SET d.found = "FALSE" '
 		' CREATE (u)-[:SUBMITTED { '
 		' submission_time : $submission_time, '
 		' submission_type : $submission_type }]'
-		' ->(d)')
+		' ->(d)'
+		' RETURN d.found')
 	country_find = ('MATCH (country:Country {name : $country}) '
 		' RETURN country ')
 	country_add = ('MATCH (user:User {username:$username}) '

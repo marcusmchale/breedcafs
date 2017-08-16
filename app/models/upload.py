@@ -17,12 +17,18 @@ class Upload(User):
 		self.submission_type=submission_type
 		if self.submission_type == 'FB':
 			with driver.session() as session:
-				session.write_transaction(self._submit)
-			return True
+				return session.write_transaction(self._submit)
 		else:
-			return False
+			pass
 	def _submit(self, tx):
-			tx.run(Cypher.upload_submit, username=self.username,
+			fcount=0
+			ncount=0
+			for record in tx.run(Cypher.upload_submit, username=self.username,
 				filename='file://' + self.filename,
 				submission_time=str(datetime.now()),
-				submission_type=self.submission_type)
+				submission_type=self.submission_type):
+				if record['d.found'] == 'TRUE':
+					fcount = fcount + 1
+				elif record['d.found'] == 'FALSE':
+					ncount = ncount + 1
+			return [ncount, fcount]

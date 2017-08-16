@@ -33,9 +33,8 @@ def upload():
 			if Upload(username, file.filename).allowed_file():
 				filename = username+time+secure_filename(file.filename)
 				file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
-				if Upload(username, os.path.join(uploads, filename)).submit(subtype):
-					flash('Data submitted to server')
-				else: flash('Problem with submission. Please check data type')
+				count = Upload(username, os.path.join(uploads, filename)).submit(subtype)
+				flash (str(count[0]) + ' new records submitted, ' + str(count[1]) + ' records already found')
 			else:
 				flash('Please submit CSV file')
 				return redirect(url_for('upload'))
