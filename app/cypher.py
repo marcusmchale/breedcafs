@@ -72,29 +72,47 @@ class Cypher():
 #and for locking the increment counter (allowing for concurrent transactions to be serialised):
 #http://neo4j.com/docs/stable/transactions-isolation.html
 #https://stackoverflow.com/questions/35138645/how-to-perform-an-atomic-update-on-relationship-properties-with-py2neo
-#https://stackoverflow.com/questions/31798311/write-lock-behavior-in-neo4j-cypher-over-transational-rest-api
+#https://stackoverflow.com/questions/31798311/write-lock-behavior-in-neo4j-cypher-over-transational-rest-ap
+	plot_id_lock = (' MERGE (id:UniqueId{name:"Plots"}) '
+		' ON CREATE SET id._LOCK_ = true, id.count=0 '
+		' ON MATCH SET id._LOCK_ = true ')
 	plot_add = ('MATCH (user:User {username:$username}), '
 		' (:Country {name : $country})<-[:IS_IN]-(:Region {name : $region}) '
 		' <-[:IS_IN]-(f:Farm { name: $farm}) '
-		' MERGE (id:UniqueId{name:"Plots"}) '
-		' ON CREATE SET id._LOCK_ = true, id.count=1 '
-		' ON MATCH SET id._LOCK_ = true, id.count=id.count+1 '
+		' MATCH (id:UniqueId{name:"Plots"}) '
+		' SET id.count=id.count+1 '
 		' MERGE (f)<-[:IS_IN]-(:Plot { name:$plot, uid:id.count}) '
 		' <-[:SUBMITTED]-(user) '
-		' REMOVE id._LOCK_')
+		' SET id._LOCK_ = false')
+	tree_id_lock = (' MATCH  (:Country {name : $country}) '
+		' <-[:IS_IN]-(:Region {name : $region}) ' 
+		' <-[:IS_IN]-(:Farm {name: $farm}) '
+		' <-[:IS_IN]-(p:Plot {name: $plot})'
+		' MERGE (p)<-[:ID_COUNTER_FOR]-(id:UniqueId{name:"Trees"})' 
+		' ON CREATE SET id._LOCK_ = true, id.count = 0 '
+		' ON MATCH SET id._LOCK_ = true ')  
 	trees_add = ('MATCH (user:User {username:$username}), '
 		' (:Country {name : $country}) '
 		' <-[:IS_IN]-(:Region {name : $region}) ' 
 		' <-[:IS_IN]-(:Farm { name: $farm}) '
-		' <-[:IS_IN]-(p:Plot {name:$plot})' 
+		' <-[:IS_IN]-(p:Plot {name: $plot})' 
 		' UNWIND range(1, toInt($count)) as counter ' 
-		' MERGE (p)<-[:ID_COUNTER_FOR]-(id:UniqueId{name:"Trees"})' 
-		' ON CREATE SET id._LOCK_ = true, id.count=1 '
-		' ON MATCH SET id._LOCK_ = true, id.count=id.count+1'
+		' MATCH (p)<-[:ID_COUNTER_FOR]-(id:UniqueId{name:"Trees"})' 
+		' SET id.count=id.count+1'
 		' MERGE (p)<-[:IS_IN]-(t:Tree {uid:(p.uid + "_" + id.count)}) '
 		' <-[:SUBMITTED]-(user)'
-		' REMOVE id._LOCK_'
 		' RETURN [t.uid, p.uid, id.count]')
+#added tree_id_unlock because unwind is likely to interfere with the lock 
+#( set it back to false (i.e. unlock) before all ids are created )
+# I might be misinterpreting the lock functionality but better off safe than sorry
+#may be worth testing if performance is an issue, previously I did all of this in a single cypher query
+#but I wasn't sure if it was atomic
+	tree_id_unlock = (' MATCH  (:Country {name : $country}) '
+		' <-[:IS_IN]-(:Region {name : $region}) ' 
+		' <-[:IS_IN]-(:Farm {name: $farm}) '
+		' <-[:IS_IN]-(p:Plot {name: $plot})'
+		' MATCH (p)<-[:ID_COUNTER_FOR]-(id:UniqueId{name:"Trees"})' 
+		' SET id._LOCK_ = false ')
 	get_farms = ('MATCH (:Country { name:$country}) '
 		' <-[:IS_IN]-(:Region { name:$region}) '
 		' <-[:IS_IN]-(f:Farm) '

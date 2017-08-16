@@ -60,8 +60,10 @@ class Fields:
 		self.farm=farm
 		self.plot=plot
 		with driver.session() as session:
-			session.write_transaction(self._add_plot)
+			with session.begin_transaction() as tx:
+				self._add_plot(tx)
 	def _add_plot (self, tx):
+		tx.run(Cypher.plot_id_lock)
 		tx.run(Cypher.plot_add, country = self.country, region=self.region, farm=self.farm, plot=self.plot, username=session['username'])
 	def add_trees(self, region, farm, plot, count):
 		self.region = region
@@ -69,7 +71,8 @@ class Fields:
 		self.plot = plot
 		self.count = count
 		with driver.session() as session:
-			session.write_transaction(self._add_trees)
+			with session.begin_transaction() as tx:
+				self._add_trees(tx)
 		fieldnames = ['UID','PlotID','TreeCount']
 		fields_csv = cStringIO.StringIO()
 		writer = csv.DictWriter(fields_csv,
@@ -82,6 +85,11 @@ class Fields:
 		fields_csv.seek(0)
 		return fields_csv
 	def _add_trees(self, tx):
+		tx.run(Cypher.tree_id_lock,
+			country = self.country, 
+			region = self.region, 
+			farm = self.farm, 
+			plot = self.plot)
 		result=tx.run(Cypher.trees_add, 
 			country = self.country, 
 			region = self.region, 
@@ -89,6 +97,11 @@ class Fields:
 			plot = self.plot,
 			count = self.count,
 			username= session['username'])
+		tx.run(Cypher.tree_id_unlock,
+			country = self.country, 
+			region = self.region, 
+			farm = self.farm, 
+			plot = self.plot)
 		self.id_list = [{'UID':str(record[0][0]) , 'PlotID':record[0][1],'TreeCount':record[0][2]} for record in result]
 	def get_farms(self, region):
 		self.region=region
