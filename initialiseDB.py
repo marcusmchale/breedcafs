@@ -51,7 +51,7 @@ CONSTRAINTS = ({'node':'User', 'property':'username', 'constraint':'IS UNIQUE'},
 	{'node':'Partner', 'property':'name', 'constraint':'IS UNIQUE'},
 	{'node':'Trait', 'property':'name', 'constraint':'IS UNIQUE'},
 	{'node':'Plot', 'property':'uid', 'constraint':'IS UNIQUE'},
-	{'node':'Tree', 'property':'id', 'constraint':'IS UNIQUE'})
+	{'node':'Tree', 'property':'uid', 'constraint':'IS UNIQUE'})
 
 
 #functions

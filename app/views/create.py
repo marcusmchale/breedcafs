@@ -44,7 +44,7 @@ def register_trees():
 				Fields(country).add_region(add_region.text_region.data)
 				flash('Region submitted: ' + add_region.text_region.data + ' in ' + country)
 		if add_farm.submit_farm.data and add_farm.validate_on_submit():
-			if not (country and region):
+			if not country or region=='None':
 				flash ('Please select a country and region to register a new farm')
 			elif Fields(country).find_farm(region, add_farm.text_farm.data):
 				flash('Farm already found: ' + add_farm.text_farm.data + ' in ' 
@@ -54,7 +54,7 @@ def register_trees():
 				flash('Farm submitted: ' + add_farm.text_farm.data + ' in ' 
 					+ region + ' of ' + country )
 		if add_plot.submit_plot.data and add_plot.validate_on_submit():
-			if not all ((country, region, farm)):
+			if not country or any ((region=='None', farm=='None')):
 				flash ('Please select a country, region and farm to register a new plot')
 			elif Fields(country).find_plot(region, farm, add_plot.text_plot.data):
 				flash('Plot already found: ' + add_plot.text_plot.data + ' in ' 

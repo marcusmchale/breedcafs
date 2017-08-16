@@ -33,7 +33,7 @@ class Cypher():
 		' person:csvLine.person, '
 		' location:csvLine.location}) '
 		' -[:DATA_FOR]->(tr)'
-		' ON MATCH SET d.found ="TRUE" '
+		' ON MATCH SET d.found = "TRUE" '
 		' ON CREATE SET d.found = "FALSE" '
 		' CREATE (u)-[:SUBMITTED { '
 		' submission_time : $submission_time, '
