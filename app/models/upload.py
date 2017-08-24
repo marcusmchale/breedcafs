@@ -1,4 +1,3 @@
-from datetime import datetime
 from app import app
 from app.cypher import Cypher
 from user import User
@@ -25,7 +24,6 @@ class Upload(User):
 			ncount=0
 			for record in tx.run(Cypher.upload_submit, username=self.username,
 				filename='file://' + self.filename,
-				submission_time=str(datetime.now()),
 				submission_type=self.submission_type):
 				if record['d.found'] == 'TRUE':
 					fcount = fcount + 1

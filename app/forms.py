@@ -53,9 +53,9 @@ class RegisterTrees(FlaskForm):
 		PLOTS = sorted(set(Fields(form.country.data).get_plots(form.region.data, form.farm.data)), key=lambda tup: tup[1])
 		empty = [('','')]
 		form.country.choices = empty + COUNTRIES
-		form.region.choices = REGIONS
-		form.farm.choices = FARMS
-		form.plot.choices = PLOTS
+		form.region.choices = empty + REGIONS
+		form.farm.choices = empty + FARMS
+		form.plot.choices = empty + PLOTS
 		return form
 
 #these fields all require names (e.g. 'Country text input', even though they are not displayed) for validation to work

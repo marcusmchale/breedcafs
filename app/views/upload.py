@@ -1,7 +1,7 @@
 import os
 from app import app
 from flask import flash, redirect, url_for, request, session, render_template
-from app.models import User, Upload
+from app.models import User, Upload, Chart
 from app.forms import UploadForm
 from werkzeug.utils import secure_filename
 from datetime import datetime
@@ -37,6 +37,6 @@ def upload():
 				flash (str(count[0]) + ' new records submitted, ' + str(count[1]) + ' records already found')
 			else:
 				flash('Please submit CSV file')
-				return redirect(url_for('upload'))
-			return redirect(url_for('index'))
+			return redirect(url_for('upload'))
 	return render_template('upload.html', form=form, title='Upload')
+

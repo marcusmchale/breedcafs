@@ -4,7 +4,6 @@
 import sys
 import os
 #import shutil
-from datetime import datetime
 from neo4j.v1 import GraphDatabase
 
 #neo4j config
@@ -50,9 +49,10 @@ TRAITS= ({'trait':'height', 'format':'numeric', 'details':'Height'},
 CONSTRAINTS = ({'node':'User', 'property':'username', 'constraint':'IS UNIQUE'},
 	{'node':'Partner', 'property':'name', 'constraint':'IS UNIQUE'},
 	{'node':'Trait', 'property':'name', 'constraint':'IS UNIQUE'},
+	{'node':'PlotID', 'property':'name', 'constraint':'IS UNIQUE'},
+	{'node':'TreeID', 'property':'plotID', 'constraint':'IS UNIQUE'},
 	{'node':'Plot', 'property':'uid', 'constraint':'IS UNIQUE'},
 	{'node':'Tree', 'property':'uid', 'constraint':'IS UNIQUE'})
-
 
 #functions
 def confirm(question):
@@ -79,7 +79,7 @@ class Create:
 			node=constraint['node']
 			prop=constraint['property']
 			constraint=constraint['constraint']
-			tx.run('CREATE CONSTRAINT ON (n:' + node + ') ASSERT n.' + prop + ' ' + constraint)
+			tx.run('CREATE CONSTRAINT ON (n:' + node + ') ASSERT (n.' + prop + ') ' + constraint)
 	def user(self, tx):
 		username=self.username
 		user_create = tx.run(' MERGE (u:User {username:$username}) '
@@ -99,20 +99,19 @@ class Create:
 				' ON MATCH SET p.found="TRUE" '
 				' ON CREATE SET p.found="FALSE"'
 				' MERGE (u)-[s:SUBMITTED]->(p) '
-				' ON MATCH SET s.submission_time = $submission_time '
-				' ON CREATE SET s.submission_time = $submission_time '
+				' ON MATCH SET s.timeInt = timestamp() '
+				' ON CREATE SET s.timeInt = timestamp() '
 				' MERGE (c:Country {name : $based_in}) '
 				' ON MATCH SET c.found ="TRUE"'
 				' ON CREATE SET c.found ="FALSE"'
 				' MERGE (u)-[s2:SUBMITTED]->(c)'
-				' ON MATCH SET s2.submission_time = $submission_time '
-				' ON CREATE SET s2.submission_time = $submission_time '
+				' ON MATCH SET s2.timeInt = timestamp() '
+				' ON CREATE SET s2.timeInt = timestamp() '
 				' MERGE (p)-[r:BASED_IN]->(c)'
 				' ON MATCH SET r.found="TRUE"'
 				' ON CREATE SET r.found="FALSE"'
 				' RETURN p.found, c.found, r.found ',
 				username=self.username,
-				submission_time=str(datetime.now()),
 				based_in=partner['BASED_IN'],
 				operates_in=partner['OPERATES_IN'],
 				fullname=partner['fullname'],
@@ -137,7 +136,9 @@ class Create:
 				' MERGE (c:Country {name:x}) '
 				' ON MATCH SET c.found="TRUE" '
 				' ON CREATE SET c.found="FALSE" '
-				' MERGE (c)<-[:SUBMITTED]-(u) '
+				' MERGE (c)<-[s:SUBMITTED]-(u) '
+				' ON MATCH SET s.timeInt = timestamp() '
+				' ON CREATE SET s.timeInt = timestamp() '
 				' MERGE (c)<-[r:OPERATES_IN]-(p) '
 				' ON MATCH SET r.found="TRUE" '
 				' ON CREATE SET r.found="FALSE" '
@@ -160,10 +161,11 @@ class Create:
 			' MERGE (t:Trait {name:$trait, format:$format, details:$details}) '
 			' ON MATCH SET t.found="TRUE" '
 			' ON CREATE SET t.found="FALSE" '
-			' MERGE (t)<-[s:SUBMITTED { submission_time : $submission_time }]-(u) '
+			' MERGE (t)<-[s:SUBMITTED]-(u) '
+			' ON MATCH SET s.timeInt = timestamp() '
+			' ON CREATE SET s.timeInt = timestamp() '
 			' RETURN t.found',
 				username=self.username,
-				submission_time=str(datetime.now()),
 				trait=trait['trait'],
 				format=trait['format'],
 				details=trait['details'])

@@ -1,4 +1,3 @@
-from flask import session
 from app import app
 from app.cypher import Cypher
 from passlib.hash import bcrypt

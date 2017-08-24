@@ -29,14 +29,13 @@ class Cypher():
 		' (t:Tree {uid:csvLine.UID}), '
 		' (tr:Trait {name:csvLine.trait}) '
 		' MERGE (t)<-[:DATA_FROM]-(d:Data {value:csvLine.value,'
-		' timestamp:csvLine.timestamp,'
+		' timeFB:csvLine.timestamp,'
 		' person:csvLine.person, '
 		' location:csvLine.location}) '
 		' -[:DATA_FOR]->(tr)'
 		' ON MATCH SET d.found = "TRUE" '
 		' ON CREATE SET d.found = "FALSE" '
-		' CREATE (u)-[:SUBMITTED { '
-		' submission_time : $submission_time, '
+		' CREATE (u)-[:SUBMITTED {timeInt : timestamp(), '
 		' submission_type : $submission_type }]'
 		' ->(d)'
 		' RETURN d.found')
@@ -44,7 +43,7 @@ class Cypher():
 		' RETURN country ')
 	country_add = ('MATCH (user:User {username:$username}) '
 		' MERGE (country:Country {name :$country}) '
-		' <-[:SUBMITTED]-(user) ' )
+		' <-[:SUBMITTED {timeInt : timestamp()}]-(user) ' )
 	region_find = ('MATCH (:Country {name : $country}) '
 		'<-[:IS_IN]-(region:Region { name:$region}) '
 		' RETURN region ')
@@ -52,7 +51,7 @@ class Cypher():
 		' (c:Country {name : $country}) '
 		' MERGE (c)<-[:IS_IN]- '
 		' (:Region { name:$region}) '
-		' <-[:SUBMITTED]-(user)')
+		' <-[:SUBMITTED {timeInt : timestamp()}]-(user)')
 	farm_find = ('MATCH (:Country {name : $country}) '
 		' <-[:IS_IN]-(:Region { name:$region}) '
 	 	' <-[:IS_IN]-(farm:Farm { name: $farm}) '
@@ -61,7 +60,7 @@ class Cypher():
 		' (:Country {name : $country}) '
 		' <-[:IS_IN]-(r:Region {name : $region}) '
 		' MERGE (r) <-[:IS_IN]-(:Farm { name:$farm}) '
-		' <-[:SUBMITTED]-(user)')
+		' <-[:SUBMITTED {timeInt : timestamp()}]-(user)')
 	plot_find = ('MATCH (:Country {name : $country}) '
 		' <-[:IS_IN]-(:Region { name:$region}) '
 	 	' <-[:IS_IN]-(:Farm { name: $farm}) '
@@ -69,50 +68,43 @@ class Cypher():
 	 	' RETURN plot.name as name')
 #for autoincrement:
 # https://stackoverflow.com/questions/32040409/reliable-autoincrementing-identifiers-for-all-nodes-relationships-in-neo4j
-#and for locking the increment counter (allowing for concurrent transactions to be serialised):
+# for lock:
+#this allows the increment counter (allowing for concurrent transactions to be serialised):
 #http://neo4j.com/docs/stable/transactions-isolation.html
 #https://stackoverflow.com/questions/35138645/how-to-perform-an-atomic-update-on-relationship-properties-with-py2neo
 #https://stackoverflow.com/questions/31798311/write-lock-behavior-in-neo4j-cypher-over-transational-rest-ap
-	plot_id_lock = (' MERGE (id:UniqueId{name:"Plots"}) '
+#This was tested by running many threads on the same operation (plot_add)
+#without plot_id_lock (as a separate cypher query) it fails to maintain the count properly and clashes with the unique UID constraint
+	plot_id_lock = (' MERGE (id:PlotID{name:"Plots"}) '
 		' ON CREATE SET id._LOCK_ = true, id.count=0 '
 		' ON MATCH SET id._LOCK_ = true ')
 	plot_add = ('MATCH (user:User {username:$username}), '
 		' (:Country {name : $country})<-[:IS_IN]-(:Region {name : $region}) '
 		' <-[:IS_IN]-(f:Farm { name: $farm}) '
-		' MATCH (id:UniqueId{name:"Plots"}) '
+		' MATCH (id:PlotID{name:"Plots"}) '
 		' SET id.count=id.count+1 '
 		' MERGE (f)<-[:IS_IN]-(:Plot { name:$plot, uid:id.count}) '
-		' <-[:SUBMITTED]-(user) '
+		' <-[:SUBMITTED {timeInt : timestamp()}]-(user) '
 		' SET id._LOCK_ = false')
 	tree_id_lock = (' MATCH  (:Country {name : $country}) '
 		' <-[:IS_IN]-(:Region {name : $region}) ' 
 		' <-[:IS_IN]-(:Farm {name: $farm}) '
 		' <-[:IS_IN]-(p:Plot {name: $plot})'
-		' MERGE (p)<-[:ID_COUNTER_FOR]-(id:UniqueId{name:"Trees"})' 
+		' MERGE (p)<-[:ID_COUNTER_FOR]-(id:TreeID{plotID:p.uid})' 
 		' ON CREATE SET id._LOCK_ = true, id.count = 0 '
-		' ON MATCH SET id._LOCK_ = true ')  
+		' ON MATCH SET id._LOCK_ = true ')
 	trees_add = ('MATCH (user:User {username:$username}), '
 		' (:Country {name : $country}) '
 		' <-[:IS_IN]-(:Region {name : $region}) ' 
 		' <-[:IS_IN]-(:Farm { name: $farm}) '
 		' <-[:IS_IN]-(p:Plot {name: $plot})' 
 		' UNWIND range(1, toInt($count)) as counter ' 
-		' MATCH (p)<-[:ID_COUNTER_FOR]-(id:UniqueId{name:"Trees"})' 
+		' MATCH (id:TreeID{plotID:p.uid})' 
 		' SET id.count=id.count+1'
 		' MERGE (p)<-[:IS_IN]-(t:Tree {uid:(p.uid + "_" + id.count)}) '
-		' <-[:SUBMITTED]-(user)'
+		' <-[:SUBMITTED {timeInt : timestamp()}]-(user)'
+		' SET id._LOCK_ = false '
 		' RETURN [t.uid, p.uid, id.count]')
-#added tree_id_unlock because unwind is likely to interfere with the lock 
-#( set it back to false (i.e. unlock) before all ids are created )
-# I might be misinterpreting the lock functionality but better off safe than sorry
-#may be worth testing if performance is an issue, previously I did all of this in a single cypher query
-#but I wasn't sure if it was atomic
-	tree_id_unlock = (' MATCH  (:Country {name : $country}) '
-		' <-[:IS_IN]-(:Region {name : $region}) ' 
-		' <-[:IS_IN]-(:Farm {name: $farm}) '
-		' <-[:IS_IN]-(p:Plot {name: $plot})'
-		' MATCH (p)<-[:ID_COUNTER_FOR]-(id:UniqueId{name:"Trees"})' 
-		' SET id._LOCK_ = false ')
 	get_farms = ('MATCH (:Country { name:$country}) '
 		' <-[:IS_IN]-(:Region { name:$region}) '
 		' <-[:IS_IN]-(f:Farm) '
@@ -122,3 +114,19 @@ class Cypher():
 		' <-[:IS_IN]-(:Farm { name:$farm}) '
 		' <-[:IS_IN]-(p:Plot) '
 		' RETURN properties (p)')
+	get_submissions_range = ('MATCH (:User {username:$username})'
+		' -[s:SUBMITTED]->(d)'
+		' WHERE s.timeInt>=$starttimeInt AND s.timeInt<=$endtimeInt'
+		' MATCH (d)-[r]-(n)'
+		' WHERE NOT type (r) IN ["SUBMITTED","ID_COUNTER_FOR"] '
+		' RETURN '
+			' labels(d)[0] as d_label, '
+			' coalesce(d.name,d.uid,d.value) as d_name,'
+			' id(d) as d_id, '
+			' labels(n)[0] as n_label, '
+			' coalesce(n.name,n.uid,n.value) as n_name,'
+			' id(n) as n_id, '
+			' id(r) as r_id, '
+			' type(r) as r_type, '
+			' id(startNode(r)) as r_start, '
+			' id(endNode(r)) as r_end ')

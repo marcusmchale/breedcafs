@@ -7,7 +7,7 @@
 				{% endfor %}
 			{% endif %}
 		</dt>
-		<dd>{{ field(**kwargs)|safe }} <input type="submit" value="Update"> </dd>
+		<dd>{{ field(**{'onchange':'this.form.submit()'})|safe }} </dd>
 	{% endif %}
 	{% if field.type in ['StringField'] %}
 	<br>

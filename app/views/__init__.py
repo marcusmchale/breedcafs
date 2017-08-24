@@ -3,3 +3,4 @@ from help import help
 from upload import upload
 from user import register, confirm, login, logout
 from create import create, create_trt, register_trees
+from chart import json_submissions
