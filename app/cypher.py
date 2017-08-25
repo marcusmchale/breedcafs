@@ -129,4 +129,19 @@ class Cypher():
 			' id(r) as r_id, '
 			' type(r) as r_type, '
 			' id(startNode(r)) as r_start, '
-			' id(endNode(r)) as r_end ')
+			' id(endNode(r)) as r_end '
+		'LIMIT 100')
+	get_plots_treecount = (' '
+		' MATCH (C:Country) '
+		' OPTIONAL MATCH (C) <-[a:IS_IN]-(R:Region) '
+		' OPTIONAL MATCH (R) <-[b:IS_IN]-(F:Farm) '
+		' OPTIONAL MATCH (F) <-[c:IS_IN]-(P:Plot) '
+		' OPTIONAL MATCH (P) <-[d:ID_COUNTER_FOR]-(T:TreeID) '
+		' RETURN '
+			' id(C) as C_id, '
+			' id(R) as R_id, '
+			' id(F) as F_id, '
+			' id(P) as P_id, '
+			' id(T) as T_id, '
+			' C.name, R.name, F.name, P.name, '
+			' P.uid, T.count ')
