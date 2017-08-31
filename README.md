@@ -3,7 +3,7 @@
 ## Web portal built in Python ([Flask](https://github.com/pallets/flask)) to [Neo4J](https://github.com/neo4j/neo4j) database for BreedCAFS project  
  * Register locations (country,region,farm,plot) and trees
    * Generates unique plot ID and thread safe tree count (concatenated to UID)
- * Exports [Field-Book](https://github.com/PhenoApps/Field-Book) **field.csv** 
+   * Exports [Field-Book](https://github.com/PhenoApps/Field-Book) **field.csv** 
  * Select traits from database to export into [Field-Book](https://github.com/PhenoApps/Field-Book) **trait.trt**
  * Upload collected data as csv
    * From [Field-Book](https://github.com/PhenoApps/Field-Book) export in  database format
