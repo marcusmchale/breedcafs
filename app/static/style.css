@@ -18,21 +18,31 @@ svg					{ border: 5px solid #ccc; padding: 0.8em; background: white; stroke : #c
 .root_node			{
 					stroke: none;
 					fill: none;
-}
+					}
 
-.textroot_node			{
+.collapsedroot_node	{
 					stroke: none;
 					fill: none;
-}
+					}
+
+.textroot_node		{
+					stroke: none;
+					fill: none;
+					}
+
+.countroot_node		{
+					stroke: black;
+					fill:black;
+					}
 
 .Country, .Region, .Farm, .Plot{
 					stroke: green;
-					fill: green;
-					fill-opacity:0.8
+					fill: green ;
+					fill-opacity:0.4
 					}
 
 .collapsedCountry, .collapsedRegion, .collapsedFarm, .collapsedPlot{
-					stroke: black;
+					stroke: green;
 					fill: green;
 					fill-opacity:0.8
 					}
@@ -44,7 +54,8 @@ svg					{ border: 5px solid #ccc; padding: 0.8em; background: white; stroke : #c
 					fill-opacity:1
 					}
 
-.count				{stroke: black;
+.countCountry, .countRegion, .countFarm, .countPlot{
+					stroke: black;
 					fill: black;
 					fill-opacity:1;
 					}
