@@ -3,6 +3,7 @@
 
 import sys
 import os
+import csv
 #import shutil
 from neo4j.v1 import GraphDatabase
 
@@ -33,18 +34,6 @@ PARTNERS = ({'OPERATES_IN':['France', 'Vietnam','Cameroon', 'Costa Rica', 'Frenc
 {'OPERATES_IN':None, 'BASED_IN':'Vietnam', 'name':'NOMAFSI', 'fullname':'Northern Mountainous Agriculture and Forestry Science Institute'},
 {'OPERATES_IN':None, 'BASED_IN':'Sweden', 'name':'Arvid', 'fullname':'Arvid Nordquist HAB'},
 {'OPERATES_IN':None, 'BASED_IN':'Vietnam', 'name':'AGI', 'fullname':'Agricultural Genetics Institute'})
-
-#tuple{trait, input type {for Field-Book), description)
-TRAITS= ({'trait':'height', 'format':'numeric', 'details':'Height'},
-	{'trait':'diameter', 'format':'numeric', 'details':'Diameter (cm) of main stem at 20cm above the ground'},
-	{'trait':'branches', 'format':'counter', 'details':'Branch count'},
-	{'trait':'branches_fruiting', 'format':'counter', 'details':'Fruiting branch count'},
-	{'trait':'nodes_fruiting', 'format':'counter', 'details':'Fruiting nodes per branch'},
-	{'trait':'fruit_load', 'format':'numeric', 'details':'Fruit load (g) per branch/tree'},
-	{'trait':'berry_yield', 'format':'numeric', 'details':'Berry Yield'},
-	{'trait':'borer_incidence', 'format':'multicat', 'details':'Borer incidence'},
-	{'trait':'rust_score', 'format':'rust rating', 'details':'Rust score'},
-	{'trait':'location', 'format':'location', 'details':'Location (device positioning)'})
 
 CONSTRAINTS = ({'node':'User', 'property':'username', 'constraint':'IS UNIQUE'},
 	{'node':'Partner', 'property':'name', 'constraint':'IS UNIQUE'},
@@ -155,27 +144,41 @@ class Create:
 					print ('Created: '  + record['p.name'] + ' OPERATES_IN ' + record['c.name'])
 				else:
 					print ('Error with merger of relationship OPERATES_IN for ' + record['p.name'])
-	def traits(self, tx, traits):
-		for trait in traits: 
-			trait_create = tx.run('MATCH (u:User {username:$username}) '
-			' MERGE (t:Trait {name:$trait, format:$format, details:$details}) '
-			' ON MATCH SET t.found="TRUE" '
-			' ON CREATE SET t.found="FALSE" '
-			' MERGE (t)<-[s:SUBMITTED]-(u) '
-			' ON MATCH SET s.timeInt = timestamp() '
-			' ON CREATE SET s.timeInt = timestamp() '
-			' RETURN t.found',
-				username=self.username,
-				trait=trait['trait'],
-				format=trait['format'],
-				details=trait['details'])
-			for record in trait_create:
-				if record['t.found']=='TRUE':
-					print ('Found: trait ' + trait['trait'])
-				elif record['t.found]'=='FALSE']:
-					print ('Created: trait ' + trait['trait'])
-				else:
-					print ('Error with merger of trait ' + trait['trait'])
+	def traits(self, tx):
+		with open ('traits.csv', 'rb') as traits_csv:
+			reader = csv.DictReader(traits_csv, delimiter=',', quotechar='"')
+			for trait in reader: 
+				trait_create = tx.run('MATCH (u:User {username:$username}) '
+				' MERGE (t:Trait {class: $trait_class, '
+					' name: $trait, '
+					' format: $format, '
+					' defaultValue: $defaultValue, '
+					' minimum: $minimum, '
+					' maximum: $maximum,'
+					' details: $details, '
+					' categories: $categories}) '
+				' ON MATCH SET t.found="TRUE" '
+				' ON CREATE SET t.found="FALSE" '
+				' MERGE (t)<-[s:SUBMITTED]-(u) '
+				' ON MATCH SET s.timeInt = timestamp() '
+				' ON CREATE SET s.timeInt = timestamp() '
+				' RETURN t.found',
+					username=self.username,
+					trait_class=trait['class'],
+					trait=trait['name'],
+					format=trait['format'],
+					defaultValue=trait['defaultValue'],
+					minimum=trait['minimum'],
+					maximum=trait['maximum'],
+					details=trait['details'],
+					categories=trait['categories'])
+				for record in trait_create:
+					if record['t.found']=='TRUE':
+						print ('Found: trait ' + trait['name'])
+					elif record['t.found]'=='FALSE']:
+						print ('Created: trait ' + trait['name'])
+					else:
+						print ('Error with merger of trait ' + trait['name'])
 if not confirm('Are you sure you want to proceed? This is should probably only be run when setting up the database'):
 	sys.exit()
 else:
@@ -191,5 +194,5 @@ else:
 	with driver.session() as session:
 		session.write_transaction(Create('start').user)
 		session.write_transaction(Create('start').partners, PARTNERS)
-		session.write_transaction(Create('start').traits, TRAITS)
+		session.write_transaction(Create('start').traits)
 	print ('Complete')

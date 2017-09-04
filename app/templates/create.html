@@ -1,8 +1,10 @@
 {% extends "layout.html" %}	
 {% block body %}
-<h2>Fieldbook tools</h2>
-	<dl>Register trees and export fields.csv for Field-Book</dl>
-	<dt><a href="{{ url_for('register_trees') }}">Register trees</a></dt>
-	<dl>Create a custom traits.trt file for import to Field-Book</dl>
-	<dt><a href="{{ url_for('create_trt') }}">Create traits.trt</a></dt>
+<div class="text_body">
+	<h2>Fieldbook tools</h2>
+		<dl>Register trees and export fields.csv for Field-Book</dl>
+		<dt><a href="{{ url_for('register_trees') }}">Register trees</a></dt>
+		<dl>Create a custom traits.trt file for import to Field-Book</dl>
+		<dt><a href="{{ url_for('create_trt') }}">Create traits.trt</a></dt>
+</div>
 {% endblock %}

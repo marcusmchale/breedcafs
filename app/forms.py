@@ -42,8 +42,8 @@ class RegisterTrees(FlaskForm):
 	farm = SelectField('Farm: ', [InputRequired()])
 	plot = SelectField('Plot: ', [InputRequired()])
 	count = IntegerField('Number of trees: ',[InputRequired(), 
-		NumberRange(min=1, max=1000, message='At most 1000 plants may be registered per plot')])
-	submit_trees = SubmitField('Generate fields.csv')
+		NumberRange(min=1, max=1000, message='A maximum of 1000 plants may be registered at a time')])
+	submit_trees = SubmitField('Register new trees')
 	@staticmethod
 	def update():
 		form = RegisterTrees()

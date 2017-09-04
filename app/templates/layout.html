@@ -9,29 +9,35 @@
 <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='style.css') }}">
 <body>
 	<div class="page">
-		<div>
-		<a href="/index"><img src="/static/logo.png"><h1>BreedCAFS database tools</h1></a>
-		</div>
 		<div class="metanav">
-		{% if not session.username %}
-		<a href="{{ url_for('register') }}">Register</a>
-		<a href="{{ url_for('login') }}">Login</a>
-		{% else %}
-		<a>Logged in as {{ session.username }}</a>
-		<a href="{{ url_for('logout') }}">Logout</a>
-		{% endif %}
+			{% if session.username %}
+				<a>Logged in as {{ session.username }}:</a>
+				<a href="{{ url_for('logout') }}">Logout</a>
+			{% endif %}
 		</div>
-		{% if session.username %}
-		<div class="utils">
-		<a href="{{ url_for('create') }}"><img src="static/create.svg"></a>
-		<a href="{{ url_for('upload') }}"><img src="static/upload.svg"></a>
-		<a href="{{ url_for('help') }}"><img src="static/help.svg"></a>
+		<div class="header">
+			<a href="/index"><img src="/static/logo.png"><h1>BreedCAFS database tools</h1></a>
+			{% if session.username %}
+			<div class="utils">
+			<a href="{{ url_for('create') }}"><img src="static/create.svg"></a>
+			<a href="{{ url_for('upload') }}"><img src="static/upload.svg"></a>
+			<a href="{{ url_for('help') }}"><img src="static/help.svg"></a>
+			</div>
+			{% endif %}
 		</div>
-		{% endif %}
 		{% for message in get_flashed_messages() %}
-		<div class="flash">{{ message }}</div>
+			<div class="flash">{{ message }}</div>
 		{% endfor %}
-		{% block body %}{% endblock %}
+		<div class="main">
+			{% block body %}
+			{% if not session.username %}
+			<div class="text_body">
+				<p><a href="{{ url_for('register') }}">Register</a> as a new user or <a href="{{ url_for('login') }}">login</a></p>
+			</div>
+			{% endif %}		
+			{% endblock %}
+			{% block chart %}{% endblock %}
+		</div>
 	</div>
 </body>
 </html>

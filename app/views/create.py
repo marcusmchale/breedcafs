@@ -12,7 +12,7 @@ def create():
 	else:
 		return render_template('create.html', title='Create')
 
-@app.route('/register_trees', methods=['GET', 'POST'])
+@app.route('/locations_trees', methods=['GET', 'POST'])
 def register_trees():
 	if 'username' not in session:
 		flash('Please log in')
@@ -90,10 +90,19 @@ def register_trees():
 				attachment_filename='BreedCAFS_fields.csv', 
 				as_attachment=True,
 				mimetype=('txt/csv'))
-		return render_template('register_trees.html', register_trees=register_trees, add_country=add_country, 
-		add_region=add_region, add_farm=add_farm, add_plot=add_plot, title='Register trees and create fields.csv')
+		return render_template('locations_trees.html', 
+			register_trees=register_trees, 
+			add_country=add_country, 
+			add_region=add_region, 
+			add_farm=add_farm, 
+			add_plot=add_plot, 
+			title='Register trees and create fields.csv',
+			sel_country=country, 
+			sel_region=region, 
+			sel_farm=farm, 
+			sel_plot=plot)
 
-@app.route('/create_trt', methods=['GET', 'POST'])
+@app.route('/traits', methods=['GET', 'POST'])
 def create_trt():
 	if 'username' not in session:
 		flash('Please log in')
@@ -119,4 +128,4 @@ def create_trt():
 				as_attachment=True,
 				mimetype=('txt/csv'))
 			flash('Generated traits.trt')
-	return render_template('create_trt.html', form=form, title='Create traits.trt')
+	return render_template('traits.html', form=form, title='Create traits.trt')
