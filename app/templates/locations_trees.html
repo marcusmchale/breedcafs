@@ -1,0 +1,47 @@
+{% extends "layout.html" %}	
+{% block body %}
+<div class="text_body">
+	{% from "_formhelpers_locations_trees.html" import render_field %}
+	<h2>Fieldbook tools</h2>
+	<h3>Register fields</h3>
+	<a>Select a plot and enter the number of trees to register<br></a>
+		<form action="{{ url_for('register_trees') }}" method="post">
+			{{ register_trees.csrf_token }}
+			{{ render_field (register_trees.country) }}
+			{{ render_field (add_country.text_country) }} 
+			{{ render_field (add_country.submit_country) }}
+			{{ render_field (register_trees.region) }}
+			{{ render_field (add_region.text_region) }} 
+			{{ render_field (add_region.submit_region) }}
+			{{ render_field (register_trees.farm) }}
+			{{ render_field (add_farm.text_farm) }} 
+			{{ render_field (add_farm.submit_farm) }}
+			{{ render_field (register_trees.plot) }}
+			{{ render_field (add_plot.text_plot) }} 
+			{{ render_field (add_plot.submit_plot) }}
+			{{ render_field (register_trees.count) }}
+			{{ render_field (register_trees.submit_trees) }}
+		</form>
+</div>
+{% endblock %}
+{% block chart %}
+<div class="chart">
+	<script> 
+	var jsonData = "/json_plots_treecount",
+		country = "{{sel_country}}",
+		region = "{{sel_region}}",
+		farm = "{{sel_farm}}",
+		plot = "{{sel_plot}}";
+	</script>
+	<p>Registered plots and counts of trees (click to expand/collapse)</p>
+	<svg width=500 height=500></svg>
+	<script src="static/d3.v4.min.js" type="text/javascript"></script>
+	<script type="text/javascript" src="static/d3_tree.js" charset="utf-8"></script>
+	<script>
+		console.log(countries);
+		console.log(regions);
+		console.log(farms);
+		console.log(plots);
+	</script>
+</div>
+{% endblock %}
