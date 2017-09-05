@@ -18,7 +18,10 @@ Add the instance folder:
 
 Set up neo4j:
 	Install:
-		sudo apt-get install neo4j
+		on ubuntu:
+			sudo apt-get install neo4j
+		on fedora:
+			sudo yum install neo4j
 	Run neo4j:
 		sudo neo4j console
 	Visit neo4j in the browser at localhost:7474 and configure username password (default is neo4j:neo4j)
@@ -30,6 +33,9 @@ Set up virtual environment:
 	Install:
 		on ubuntu:
 			sudo apt-get install virtualenv
+		on fedora (was already installed for me in v25 but otherwise:
+			sudo yum install python-virtualenv
+
 	Initialise:
 		virtualenv venv
 	Activate (from breedcafs folder):
@@ -46,6 +52,7 @@ Run breedcafs server:
 		To kill it later (for a restart etc.) use:
 	killall -9 python
 		The above is broken behaviour but won't matter in production because we will be using another server (e.g. Apache)
+
 
 To configure email you need to export the following environment variables:
 or modify the email settings in instance/config.py

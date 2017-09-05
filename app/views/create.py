@@ -1,8 +1,10 @@
 from app import app
-from flask import session, flash, request, redirect, url_for, render_template, send_file
+from flask import session, flash, request, redirect, url_for, render_template, send_file, make_response
 from app.models import Lists, Fields, User
 from app.forms import CreateTraits, RegisterTrees, AddCountry, AddRegion, AddFarm, AddPlot
 from app.emails import send_attachment
+from flask.views import MethodView
+import json
 
 @app.route('/create', methods=['GET'])
 def create():
@@ -12,8 +14,37 @@ def create():
 	else:
 		return render_template('create.html', title='Create')
 
+class countries(MethodView):
+	def get(self):
+		countries = Lists('Country').create_list('name','name')
+		response = make_response(json.dumps(countries))
+		response.content_type = 'application/json'
+		return response
+
+class regions(MethodView):
+	def get(self, country):
+		regions = Lists('Country').get_connected('name', country, 'IS_IN')
+		response = make_response(json.dumps(regions))
+		response.content_type = 'application/json'
+		return response
+
+class farms(MethodView):
+	def get(self, country, region):
+		farms = Fields(country).get_farms(region)
+		response = make_response(json.dumps(farms))
+		response.content_type = 'application/json'
+		return response
+
+class plots(MethodView):
+	def get(self, country, region, farm):
+		plots = Fields(country).get_plots(region, farm)
+		response = make_response(json.dumps(plots))
+		response.content_type = 'application/json'
+		return response
+
 @app.route('/locations_trees', methods=['GET', 'POST'])
 def register_trees():
+	
 	if 'username' not in session:
 		flash('Please log in')
 		return redirect(url_for('login'))
@@ -96,11 +127,7 @@ def register_trees():
 			add_region=add_region, 
 			add_farm=add_farm, 
 			add_plot=add_plot, 
-			title='Register trees and create fields.csv',
-			sel_country=country, 
-			sel_region=region, 
-			sel_farm=farm, 
-			sel_plot=plot)
+			title='Register trees and create fields.csv')
 
 @app.route('/traits', methods=['GET', 'POST'])
 def create_trt():

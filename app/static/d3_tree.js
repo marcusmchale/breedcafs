@@ -26,35 +26,6 @@ d3.json(jsonData, function(error, data) {
 })
 
 function load(data) {
-	//All countries in json for dropboxes
-	var countries=[], 
-		regions=[], 
-		farms=[],
-		plots=[];
-	for (var i = 0; i < data.children.length; i++) {
-		countries.push(data.children[i].name);
-		if (country === data.children[i].name)	 {
-			for (var j = 0; j < data.children[i].children.length; j++) {
-				regions.push(data.children[i].children[j].name)
-				if (region === data.children[i].children[j].name) {
-					for (var k = 0; k < data.children[i].children[j].children.length; k++) {
-						farms.push(data.children[i].children[j].children[k].name)
-						if (farm === data.children[i].children[j].children[k].name) {
-							for (var l = 0; l < data.children[i].children[j].children[k].children.length; l++) {
-								plots.push(data.children[i].children[j].children[k].children[l].name)
-							}
-						}
-					}
-				}
-			}
-		}
-	};
-	//return [(node[key1], node[key2]) for node in self.get_nodes()]
-
-	//Lists('Country').create_list('name','name')
-
-	//COUNTRIES = sorted(set(***), key=lambda tup: tup[1])
-
 
 	//remove countries without region for chart
 	var i = data.children.length 
