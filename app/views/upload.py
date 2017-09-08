@@ -14,7 +14,6 @@ def upload():
 	else:
 		form = UploadForm()
 		if request.method == 'POST' and form.validate_on_submit():
-			uploads=app.config['UPLOAD_FOLDER']
 			username=session['username']
 			time=datetime.now().strftime('_%Y%m%d-%H%M%S_')
 			file = form.file.data
@@ -32,8 +31,10 @@ def upload():
 				return redirect(url_for('upload'))
 			if Upload(username, file.filename).allowed_file():
 				filename = username+time+secure_filename(file.filename)
-				file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
-				count = Upload(username, os.path.join(uploads, filename)).submit(subtype)
+				file.save(os.path.join(app.instance_path, 
+					app.config['UPLOAD_FOLDER'], 
+					filename))
+				count = Upload(username, filename).submit(subtype)
 				flash (str(count[0]) + ' new records submitted, ' + str(count[1]) + ' records already found')
 			else:
 				flash('Please submit CSV file')

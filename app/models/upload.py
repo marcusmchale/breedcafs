@@ -23,7 +23,7 @@ class Upload(User):
 			fcount=0
 			ncount=0
 			for record in tx.run(Cypher.upload_submit, username=self.username,
-				filename='file://' + self.filename,
+				filename= ("file:///" + self.filename),
 				submission_type=self.submission_type):
 				if record['d.found'] == 'TRUE':
 					fcount = fcount + 1

@@ -1,39 +1,14 @@
 {% macro render_field(field) %}
 	{% if field.type in ['SelectField'] %}
-		<dt>{{ field.label (id=field.label) }}
-			{% if field.errors %}
-				{% for error in field.errors %}
-					<a>{{ error }}</a>
-				{% endfor %}
-			{% endif %}
-		</dt>
-		<dd>{{ field(**kwargs)|safe }} </dd>
+		<dd>{{ field(**kwargs)|safe }} 
 	{% endif %}
 	{% if field.type in ['StringField'] %}
-	<br>
-		{{ field(**kwargs)|safe }}
-		{% if field.errors %}
-			{% for error in field.errors %}
-				<a>{{ error }}</a>
-			{% endfor %}
-		{% endif %}
-	{% endif %}
-	{% if field.type in ['SubmitField'] %}
-		{{ field(**kwargs)|safe }}
-		{% if field.errors %}
-			{% for error in field.errors %}
-				<a>{{ error }}</a>
-			{% endfor %}
-		{% endif %}
+		{{ field(placeholder=field.description)|safe }}
 	{% endif %}
 	{% if field.type in ['IntegerField'] %}
-		<dt>{{ field.label }}
-			{% if field.errors %}
-				{% for error in field.errors %}
-					<a>{{ error }}</a>
-				{% endfor %}
-			{% endif %}
-		</dt>
-		<dd>{{ field(**kwargs)|safe }}</dd>
+		<dd>{{ field(placeholder=field.description)|safe }}
+	{% endif %}
+	{% if field.type in ['SubmitField'] %}
+		{{ field(**kwargs)|safe }}</dd>
 	{% endif %}
 {% endmacro %}

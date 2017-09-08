@@ -15,15 +15,22 @@ var svg = d3.select("svg"),
 var svg = svg.append("g")
 	.attr("transform", "translate(" + margin.left + "," + margin.top + ")");
 
-//load data - asynchronous so update has to be called here
-d3.json(jsonData, function(error, data) {
-	if (error) throw error;
-	load(data);
-	root.children.forEach(collapse);
-	root.x0 = height/2;
-	root.y0 = 0;
-	update(root);
-})
+//load data - asynchronous so update has to be called here 
+//(stored so can be called on button clicks in location_select.js)
+var load_chart = function () {
+	d3.json(jsonData, function(error, data) {
+		if (error) throw error;
+		load(data);
+		root.children.forEach(collapse);
+		root.x0 = height/2;
+		root.y0 = 0;
+		update(root);
+	})
+}
+
+//first load it anyway
+load_chart();
+//and reload it in location_select.js when new locations/trees are submitted
 
 function load(data) {
 
@@ -96,7 +103,8 @@ function update(source) {
 		.on("click", click);
 
 	nodeEnter.append("circle")
-		.attr("r", function (d) { return Math.max(10, 3*Math.log2(d.value))} )
+		.attr("r", 0)
+		.style('opacity', 0)	
 		.attr("class", function(d) {
 			if (d._children) {
 				return "node collapsed" + d.data.label
@@ -141,7 +149,7 @@ function update(source) {
 			}
 		});
 
-	//UPDATE
+	// UPDATE
 	var nodeUpdate = nodeEnter.merge(node); 
 
 	//transition to the proper node position
@@ -149,6 +157,10 @@ function update(source) {
 		.attr("transform", function(d) {
 			return "translate(" + d.y + "," + d.x + ")";
 		});
+
+	nodeUpdate.select("circle").transition().duration(duration)
+		.attr("r", function (d) { return Math.max(10, 3*Math.log2(d.value))} )
+		.style('opacity', 1);
 
 	//update node attributes and style
 	nodeUpdate.select("circle, text")
@@ -169,7 +181,7 @@ function update(source) {
 		.remove();
 
   	// On exit reduce the radius and opacity to 0
-	nodeExit.select("g")
+	nodeExit.select("circle")
 		.attr("r", 0)
 		.style('opacity', 0);
 

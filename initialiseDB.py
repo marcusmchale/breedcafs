@@ -149,7 +149,7 @@ class Create:
 			reader = csv.DictReader(traits_csv, delimiter=',', quotechar='"')
 			for trait in reader: 
 				trait_create = tx.run('MATCH (u:User {username:$username}) '
-				' MERGE (t:Trait {class: $trait_class, '
+				' MERGE (t:Trait {group: $group, '
 					' name: $trait, '
 					' format: $format, '
 					' defaultValue: $defaultValue, '
@@ -164,7 +164,7 @@ class Create:
 				' ON CREATE SET s.timeInt = timestamp() '
 				' RETURN t.found',
 					username=self.username,
-					trait_class=trait['class'],
+					group=trait['group'],
 					trait=trait['name'],
 					format=trait['format'],
 					defaultValue=trait['defaultValue'],

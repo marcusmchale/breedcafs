@@ -4,7 +4,6 @@
 	{% from "_formhelpers_locations_trees.html" import render_field %}
 	<h2>Fieldbook tools</h2>
 	<h3>Register fields</h3>
-	<a>Select a plot and enter the number of trees to register<br></a>
 		<a> {{ country }} </a>
 		<form action="{{ url_for('register_trees') }}" id="register_trees" method="post">
 			{{ register_trees.csrf_token }}
@@ -24,8 +23,6 @@
 			{{ render_field (register_trees.submit_trees) }}
 		</form>
 </div>
-<script src="static/jquery_1.8.3_min.js"></script>
-<script src="static/location_select.js"></script>
 {% endblock %}
 {% block chart %}
 <div class="chart">
@@ -34,5 +31,7 @@
 	<script>jsonData = "/json_plots_treecount";</script>
 	<script type="text/javascript" src="static/d3.v4.min.js"></script>
 	<script type="text/javascript" src="static/d3_tree.js" charset="utf-8"></script>
+	<script src="static/jquery_1.8.3_min.js"></script>
+	<script src="static/location_select.js"></script>
 </div>
 {% endblock %}

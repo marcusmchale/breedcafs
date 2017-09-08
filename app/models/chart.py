@@ -1,8 +1,8 @@
 from app import app
 from app.cypher import Cypher
 from config import uri, driver
-import json
 from datetime import datetime
+from flask import jsonify
 #Get dicts of values matching a node in the database then generate list for forms
 
 class Chart:
@@ -32,7 +32,7 @@ class Chart:
 		nodes={node['id']:node for node in nodes}.values()
 		rels={rel['id']:rel for rel in rels}.values()
 		#and create the d3 input
-		return json.dumps({"nodes":nodes, "links":rels})
+		return jsonify({"nodes":nodes, "links":rels})
 	def _get_plots_treecount(self, tx):
 		return [record for record in tx.run(Cypher.get_plots_treecount)]
 	#get lists of submitted nodes (rels and directly linked nodes too) in json format
@@ -59,4 +59,4 @@ class Chart:
 											if record['P.name'] not in [plot['name'] for plot in farm['children']]:
 												farm['children'].append({'name':record['P.name'],'label':record['P_label'],
 													'uid':record['P.uid'],'treecount':record['T.count']})
-		return json.dumps(nested)
+		return jsonify(nested)

@@ -1,10 +1,9 @@
 from app import app
-from flask import session, flash, request, redirect, url_for, render_template, send_file, make_response
+from flask import session, flash, request, redirect, url_for, render_template, send_file, make_response, jsonify
 from app.models import Lists, Fields, User
 from app.forms import CreateTraits, RegisterTrees, AddCountry, AddRegion, AddFarm, AddPlot
 from app.emails import send_attachment
 from flask.views import MethodView
-import json
 
 @app.route('/create', methods=['GET'])
 def create():
@@ -17,110 +16,137 @@ def create():
 class countries(MethodView):
 	def get(self):
 		countries = Lists('Country').create_list('name','name')
-		response = make_response(json.dumps(countries))
+		response = make_response(jsonify(countries))
 		response.content_type = 'application/json'
 		return response
 
 class regions(MethodView):
 	def get(self, country):
 		regions = Lists('Country').get_connected('name', country, 'IS_IN')
-		response = make_response(json.dumps(regions))
+		response = make_response(jsonify(regions))
 		response.content_type = 'application/json'
 		return response
 
 class farms(MethodView):
 	def get(self, country, region):
 		farms = Fields(country).get_farms(region)
-		response = make_response(json.dumps(farms))
+		response = make_response(jsonify(farms))
 		response.content_type = 'application/json'
 		return response
 
 class plots(MethodView):
 	def get(self, country, region, farm):
 		plots = Fields(country).get_plots(region, farm)
-		response = make_response(json.dumps(plots))
+		response = make_response(jsonify(plots))
 		response.content_type = 'application/json'
 		return response
 
+@app.route('/add_country', methods=["POST"])
+def add_country():
+	form = AddCountry()
+	text_country = request.form['text_country']
+	if form.validate_on_submit():
+		if Fields(text_country).find_country():
+			return ("Country already found: " + text_country)
+		else:
+			Fields(text_country).add_country()
+			return ("Country submitted: " + text_country)
+	else:
+		return form.errors["text_country"][0]
+
+@app.route('/add_region', methods=["POST"])
+def add_region():
+	form = AddRegion()
+	country = request.form['country']
+	text_region = request.form['text_region']
+	if form.validate_on_submit():
+		if country in ['','None']:
+			return ('Please select a country to register a new region')
+		elif Fields(country).find_region(text_region):
+			return ("Region already found: " + text_region)
+		else:
+			Fields(country).add_region(text_region)
+			return ("Region submitted: " + text_region )
+	else:
+		return form.errors["text_region"][0]
+
+@app.route('/add_farm', methods=["POST"])
+def add_farm():
+	form = AddFarm()
+	country = request.form['country']
+	region = request.form['region']
+	text_farm = request.form['text_farm']
+	if form.validate_on_submit():
+		if bool(set([country,region]) & set(['','None'])):
+			return ('Please select a country and region to register a new farm')
+		elif Fields(country).find_farm(region, text_farm):
+			return ("Farm already found: " + text_farm )
+		else:
+			Fields(country).add_farm(region, text_farm)
+			return ("Farm submitted: " + text_farm )
+	else:
+		return form.errors["text_farm"][0]
+
+@app.route('/add_plot', methods=["POST"])
+def add_plot():
+	form = AddPlot()
+	country = request.form['country']
+	region = request.form['region']
+	farm = request.form['farm']
+	text_plot = request.form['text_plot']
+	if form.validate_on_submit():
+		if bool(set([country,region,farm]) & set(['','None'])):
+			return ('Please select a country, region and farm to register a new plot')
+		elif Fields(country).find_plot(region, farm, text_plot):
+			return ("Plot already found: " + text_plot )
+		else:
+			Fields(country).add_plot(region, farm, text_plot )
+			return ("Farm submitted: " + text_plot )
+	else:
+		return form.errors["text_plot"][0]
+
+@app.route('/add_trees', methods=["POST"])
+def add_trees():
+	form = RegisterTrees().update()
+	country = request.form['country']
+	region = request.form['region']
+	farm = request.form['farm']
+	plot = request.form['plot']
+	count = request.form['count']
+	if form.validate_on_submit():
+		fields_csv=Fields(country).add_trees(region, farm, plot, count)
+		recipients=[User(session['username']).find('')['email']]
+		subject = "BreedCAFS: Trees registered"
+		html = render_template('emails/register_trees.html', 
+			count=count,
+			plot=plot,
+			farm=farm,
+			region=region,
+			country=country)
+		send_attachment(subject, 
+			app.config['ADMINS'][0], 
+			recipients, 
+			'copy of fields.csv', 
+			html, 
+			u'BreedCAFS_fields.csv', 
+			'text/csv', 
+			fields_csv)
+		#return as jsonify so that can be interpreted the same way as error message
+		return jsonify({"submitted" : str(count + " trees registered")})
+	else:
+		return jsonify(form.errors)
+
 @app.route('/locations_trees', methods=['GET', 'POST'])
 def register_trees():
-	
 	if 'username' not in session:
 		flash('Please log in')
 		return redirect(url_for('login'))
 	else:
 		register_trees = RegisterTrees().update()
-		country = register_trees.country.data
-		region = register_trees.region.data
-		farm = register_trees.farm.data
-		plot = register_trees.plot.data
-		count = register_trees.count.data
-		submit_trees = register_trees.submit_trees.data
 		add_country = AddCountry()
 		add_region = AddRegion()
 		add_farm = AddFarm()
 		add_plot = AddPlot()
-		empty=set(['','None'])
-		if add_country.submit_country.data and add_country.validate_on_submit():
-			if Fields(add_country.text_country.data).find_country():
-				flash('Country already found: ' + add_country.text_country.data)
-			else: 
-				Fields(add_country.text_country.data).add_country()
-				flash('Country submitted: ' + add_country.text_country.data)
-		if add_region.submit_region.data and add_region.validate_on_submit():
-			if country in ['','None']:
-				flash('Please select a country to register a new region')
-			elif Fields(country).find_region(add_region.text_region.data):
-				flash('Region already found: ' + add_region.text_region.data + ' in ' + country)
-			else:
-				Fields(country).add_region(add_region.text_region.data)
-				flash('Region submitted: ' + add_region.text_region.data + ' in ' + country)
-		if add_farm.submit_farm.data and add_farm.validate_on_submit():
-			if bool(set([country,region]) & empty):
-				flash ('Please select a country and region to register a new farm')
-			elif Fields(country).find_farm(region, add_farm.text_farm.data):
-				flash('Farm already found: ' + add_farm.text_farm.data + ' in ' 
-					+ region + ' of ' + country )
-			else:
-				Fields(country).add_farm(region, add_farm.text_farm.data)
-				flash('Farm submitted: ' + add_farm.text_farm.data + ' in ' 
-					+ region + ' of ' + country )
-		if add_plot.submit_plot.data and add_plot.validate_on_submit():
-			if bool(set([country,region,farm]) & empty):
-				flash ('Please select a country, region and farm to register a new plot')
-			elif Fields(country).find_plot(region, farm, add_plot.text_plot.data):
-				flash('Plot already found: ' + add_plot.text_plot.data + ' in ' 
-					+ farm + ' of ' + region + ' of ' + country )
-			else:
-				Fields(country).add_plot(region, farm, add_plot.text_plot.data)
-				flash('Farm submitted: ' + add_plot.text_plot.data + ' in ' 
-					+ farm + ' of ' + region + ' of ' + country )
-		if submit_trees and register_trees.validate_on_submit():
-			fields_csv=Fields(country).add_trees(region, farm, plot, count)
-			#flash doesn't work since return isn't a render..need to fix with javascript
-			#flash(str(count) + ' trees registered in: ' + plot + ' of '	+ 
-			#	farm + ' of ' + region + ' of ' + country + '')
-			recipients=[User(session['username']).find('')['email']]
-			subject = "BreedCAFS: Trees registered"
-			html = render_template('emails/register_trees.html', 
-				count=count,
-				plot=plot,
-				farm=farm,
-				region=region,
-				country=country)
-			send_attachment(subject, 
-				app.config['ADMINS'][0], 
-				recipients, 
-				'copy of fields.csv', 
-				html, 
-				u'BreedCAFS_fields.csv', 
-				'text/csv', 
-				fields_csv)
-			#flash('fields.csv has also been sent to your email address')
-			return send_file(fields_csv,
-				attachment_filename='BreedCAFS_fields.csv', 
-				as_attachment=True,
-				mimetype=('txt/csv'))
 		return render_template('locations_trees.html', 
 			register_trees=register_trees, 
 			add_country=add_country, 

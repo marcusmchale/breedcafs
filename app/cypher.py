@@ -14,6 +14,9 @@ class Cypher():
 	confirm_email = ('MATCH (user:User) '
 		' WHERE user.email = $email '
 		' SET user.confirmed = "True" ')
+	password_reset = ('MATCH (user:User) '
+		' WHERE user.email = $email '
+		' SET user.password = $password ')
 	user_register = ('MATCH (partner:Partner) '
 		' WHERE partner.name = $partner '
 		' CREATE (user:User {username : $username, '

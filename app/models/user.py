@@ -54,3 +54,9 @@ class User:
 		with driver.session() as session:
 			with session.begin_transaction() as tx:
 				tx.run(Cypher.confirm_email, email=email)
+#This is a classmethod so that it doesn't need username
+	@classmethod
+	def password_reset(cls, email, password):
+		with driver.session() as session:
+			with session.begin_transaction() as tx:
+				tx.run(Cypher.password_reset, email=email, password=bcrypt.encrypt(password))
