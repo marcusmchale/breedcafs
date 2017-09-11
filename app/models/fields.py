@@ -120,6 +120,34 @@ class Fields:
 			count = self.count,
 			username= session['username'])
 		self.id_list = [{'UID':str(record[0][0]), 'PlotID':record[0][1],'TreeCount':record[0][2]} for record in result]
+	def get_trees(self, region, farm, plot, start, end):
+		self.region = region
+		self.farm = farm
+		self.plot = plot
+		self.start = start
+		self.end = end
+		with driver.session() as session:
+			session.read_transaction(self._get_trees)
+		fieldnames = ['UID','PlotID','TreeCount']
+		fields_csv = cStringIO.StringIO()
+		writer = csv.DictWriter(fields_csv,
+			fieldnames=fieldnames,
+			quoting=csv.QUOTE_ALL,
+			extrasaction='ignore')
+		writer.writeheader()
+		for tree in self.id_list:
+			writer.writerow(tree)
+		fields_csv.seek(0)
+		return fields_csv
+	def _get_trees(self, tx):
+		result=tx.run(Cypher.trees_get, 
+			country = self.country, 
+			region = self.region, 
+			farm = self.farm, 
+			plot = self.plot,
+			start = self.start,
+			end = self.end)
+		self.id_list = [{'UID':str(record[0][0]), 'PlotID':record[0][1],'TreeCount':record[0][2]} for record in result]
 	def get_farms(self, region):
 		self.region=region
 		with driver.session() as session:

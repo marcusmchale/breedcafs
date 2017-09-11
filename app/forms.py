@@ -38,19 +38,15 @@ class UploadForm(FlaskForm):
 		choices = sorted(app.config['SUBMISSION_TYPES'], key=lambda tup: tup[1]))
 	file = FileField('Select a file:', [FileRequired()])
 
-class RegisterTrees(FlaskForm):
-	id = "register_trees"
+class LocationForm(FlaskForm):
+	id = "location_form"
 	country = SelectField('Country: ', [InputRequired()])
 	region = SelectField('Region: ', [InputRequired()])
 	farm = SelectField('Farm: ', [InputRequired()])
-	plot = SelectField('Plot: ', [InputRequired()])
-	count = IntegerField('Number of trees: ',[InputRequired(), 
-		NumberRange(min=1, max=1000, message='Register from 1-1000 plants at a time')],
-		description= "Number of new trees")
-	submit_trees = SubmitField('Register new trees')
+	plot = SelectField('Plot: ', [InputRequired()])	
 	@staticmethod
 	def update():
-		form = RegisterTrees()
+		form = LocationForm()
 		COUNTRIES = sorted(set(Lists('Country').create_list('name','name')), key=lambda tup: tup[1])
 		REGIONS = sorted(set(Lists('Country').get_connected('name', form.country.data, 'IS_IN')), key=lambda tup: tup[1])
 		FARMS = sorted(set(Fields(form.country.data).get_farms(form.region.data)), key=lambda tup: tup[1])
@@ -61,42 +57,60 @@ class RegisterTrees(FlaskForm):
 		form.plot.choices = [('','Select Plot')] + PLOTS
 		return form
 
+class AddTrees(FlaskForm):
+	id = "add_trees"
+	count = IntegerField('Number of trees: ',[InputRequired(), 
+		NumberRange(min=1, max=1000, message='Register from 1-1000 plants at a time')],
+		description= "Number of new trees")
+	submit_trees = SubmitField('Register new trees')
+
 #these fields all require names (e.g. 'Country text input', even though they are not displayed) for validation to work
 class AddCountry(FlaskForm):
-		id = "add_country"
-		strip_filter = lambda x: x.strip() if x else None
-		text_country = StringField('Country text input', 
-			[InputRequired(),Length(min=1, max=50, message='Maximum 50 characters')],
-			filters=[strip_filter],
-			description = "Add new country")
-		submit_country = SubmitField('+')
+	id = "add_country"
+	strip_filter = lambda x: x.strip() if x else None
+	text_country = StringField('Country text input', 
+		[InputRequired(),Length(min=1, max=50, message='Maximum 50 characters')],
+		filters=[strip_filter],
+		description = "Add new country")
+	submit_country = SubmitField('+')
 
 class AddRegion(FlaskForm):
-		id = "add_region"
-		strip_filter = lambda x: x.strip() if x else None
-		text_region = StringField('Region text input', 
-			[InputRequired(),Length(min=1, max=50, message='Maximum 50 characters')],
-			filters=[strip_filter],
-			description = "Add new region")
-		submit_region = SubmitField('+')
+	id = "add_region"
+	strip_filter = lambda x: x.strip() if x else None
+	text_region = StringField('Region text input', 
+		[InputRequired(),Length(min=1, max=50, message='Maximum 50 characters')],
+		filters=[strip_filter],
+		description = "Add new region")
+	submit_region = SubmitField('+')
 
 class AddFarm(FlaskForm):
-		id = "add_farm"
-		strip_filter = lambda x: x.strip() if x else None
-		text_farm = StringField('Farm text input', 
-			[InputRequired(),Length(min=1, max=50, message='Maximum 50 characters')],
-			filters=[strip_filter],
-			description = "Add new farm")
-		submit_farm = SubmitField('+')
+	id = "add_farm"
+	strip_filter = lambda x: x.strip() if x else None
+	text_farm = StringField('Farm text input', 
+		[InputRequired(),Length(min=1, max=50, message='Maximum 50 characters')],
+		filters=[strip_filter],
+		description = "Add new farm")
+	submit_farm = SubmitField('+')
 
 class AddPlot(FlaskForm):
-		id = "add_plot"
-		strip_filter = lambda x: x.strip() if x else None
-		text_plot = StringField('Plot text input', 
-			[InputRequired(),Length(min=1, max=50, message='Maximum 50 characters')],
-			filters=[strip_filter],
-			description = "Add new plot")
-		submit_plot = SubmitField('+')
+	id = "add_plot"
+	strip_filter = lambda x: x.strip() if x else None
+	text_plot = StringField('Plot text input',
+		[InputRequired(),Length(min=1, max=50, message='Maximum 50 characters')],
+		filters=[strip_filter],
+		description = "Add new plot")
+	submit_plot = SubmitField('+')
+
+class FieldsForm(FlaskForm):
+	id = "fields_form"
+	strip_filter = lambda x: x.strip() if x else None
+	trees_start = 	IntegerField('Start TreeID',[InputRequired(), 
+		NumberRange(min=1, max=100000, message='')],
+		description= "Start TreeID")
+	trees_end = IntegerField('End TreeID',[InputRequired(), 
+		NumberRange(min=1, max=100000, message='')],
+		description= "End TreeID")
+	submit_fields = SubmitField('Custom Fields.csv')
 
 class CreateTraits(FlaskForm):
 	TRAITS = Lists('Trait').get_nodes()
@@ -104,33 +118,33 @@ class CreateTraits(FlaskForm):
 	for trait in TRAITS:
 		trait_dict[trait['group']].append((trait['name'], trait['details']))
 	general = SelectMultipleField('general', [InputRequired()], 
-		choices = sorted(trait_dict['general'], key=lambda tup: tup[1]), 
+		choices = sorted(trait_dict['general'], 
+			key=lambda tup: tup[1]), 
+		default= ['location','variety','hybrid_parent1','hybrid_parent2','date'],
 		option_widget=widgets.CheckboxInput(),
 		widget=widgets.ListWidget(prefix_label=False)
 		)	
-	agronomic = SelectMultipleField('agronomic', [InputRequired()], 
+	agronomic = SelectMultipleField('agronomic', 
 		choices = sorted(trait_dict['agronomic'], key=lambda tup: tup[1]), 
 		option_widget=widgets.CheckboxInput(),
 		widget=widgets.ListWidget(prefix_label=False)
 		)	
-	morphological = SelectMultipleField('morphological', [InputRequired()], 
+	morphological = SelectMultipleField('morphological', 
 		choices = sorted(trait_dict['morphological'], key=lambda tup: tup[1]), 
 		option_widget=widgets.CheckboxInput(),
 		widget=widgets.ListWidget(prefix_label=False)
 		)	
-	photosynthetic = SelectMultipleField('photosynthetic', [InputRequired()], 
+	photosynthetic = SelectMultipleField('photosynthetic', 
 		choices = sorted(trait_dict['photosynthetic'], key=lambda tup: tup[1]), 
 		option_widget=widgets.CheckboxInput(),
 		widget=widgets.ListWidget(prefix_label=False)
 		)
-	metabolomic = SelectMultipleField('metabolomic', [InputRequired()], 
+	metabolomic = SelectMultipleField('metabolomic',
 		choices = sorted(trait_dict['metabolomic'], key=lambda tup: tup[1]), 
 		option_widget=widgets.CheckboxInput(),
 		widget=widgets.ListWidget(prefix_label=False)
 		)	
-	#couldn't get the below to work so repeated myself above, 
-	#complains of no attribute, i think i need to 
-	#instantiate with the fields, or something 
+	# the below didn't work so repeated myself above - should look into programatic field generation
 	#for group in trait_dict:
 	#	group = SelectMultipleField(group, [InputRequired()], 
 	#		choices = sorted(trait_dict[group], key=lambda tup: tup[1]), 

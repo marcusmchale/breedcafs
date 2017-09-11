@@ -1,12 +1,12 @@
 "group","name","format","defaultValue","minimum","maximum","details","categories"
 "general","location","location",,,,"Location (device positioning)",
 "general","variety","multicat",,,,"Variety","Hybrid/Arabica/Robusta/Arabusta/With/Varieties/Available/Up/To/12/Separated/like/this"
-"general","hybrid_parent1","multicat",,,,"Variety","Arabica/Robusta/Arabusta/With/Varieties/Available/Up/To/12/Separated/like/this"
-"general","hybrid_parent2","multicat",,,,"Variety","Arabica/Robusta/Arabusta/With/Varieties/Available/Up/To/12/Separated/like/this"
-"general","type","multicat",,,,"Tree size","Low/Tall"
-"general","sprout","multicat",,,,"Leaf sprout color","Green/Bronze"
-"general","Male sterility","boolean",,,,"Presence/absence of pollen","Yes/No"
+"general","hybrid_parent1","multicat",,,,"Variety: Parent 1 (female/maternal)","Arabica/Robusta/Arabusta/With/Varieties/Available/Up/To/12/Separated/like/this"
+"general","hybrid_parent2","multicat",,,,"Variety: Parent 2 (male/paternal)","Arabica/Robusta/Arabusta/With/Varieties/Available/Up/To/12/Separated/like/this"
 "general","date","date",,,,"date of measurement",
+"agronomic","type","multicat",,,,"Tree size","Low/Tall"
+"agronomic","sprout","multicat",,,,"Leaf sprout color","Green/Bronze"
+"agronomic","Male sterility","boolean",,,,"Presence/absence of pollen","Yes/No"
 "agronomic","branches","counter",,,,"Branch count",
 "agronomic","leaves","counter",,,,"Average of leaves number per branch",
 "agronomic","rust_leaf","boolean",,,,"Presence of rust or not, based on 2 leaves","Yes/No"

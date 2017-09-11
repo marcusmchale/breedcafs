@@ -108,6 +108,14 @@ class Cypher():
 		' <-[:SUBMITTED {timeInt : timestamp()}]-(user)'
 		' SET id._LOCK_ = false '
 		' RETURN [t.uid, p.uid, id.count]')
+	trees_get = ('MATCH (:Country {name : $country}) '
+		' <-[:IS_IN]-(:Region {name : $region}) ' 
+		' <-[:IS_IN]-(:Farm { name: $farm}) '
+		' <-[:IS_IN]-(p:Plot {name: $plot})' 
+		' <-[:IS_IN]-(t:Tree)'
+		' WHERE toInt(last(split(t.uid, "_")))>=$start '
+		' AND toInt(last(split(t.uid, "_")))<=$end '
+		' RETURN [t.uid, p.uid, last(split(t.uid, "_"))]')
 	get_farms = ('MATCH (:Country { name:$country}) '
 		' <-[:IS_IN]-(:Region { name:$region}) '
 		' <-[:IS_IN]-(f:Farm) '

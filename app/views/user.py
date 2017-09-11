@@ -65,10 +65,10 @@ def login():
 # username 'start' is created when initialiseDB is run, just hiding it here.
 		if username == 'start':
 			flash ('Username not registered')
-			return redirect(url_for('login')) 
+			return redirect(url_for('index')) 
 		if not User(username).find(''):
 			flash ('Username not registered')
-			return redirect(url_for('login'))
+			return redirect(url_for('index'))
 		if not User(username).check_confirmed(''):
 			flash ('Please check your email to confirm registration')
 			return redirect(url_for('login'))

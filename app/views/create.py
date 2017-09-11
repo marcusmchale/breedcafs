@@ -1,7 +1,7 @@
 from app import app
 from flask import session, flash, request, redirect, url_for, render_template, send_file, make_response, jsonify
 from app.models import Lists, Fields, User
-from app.forms import CreateTraits, RegisterTrees, AddCountry, AddRegion, AddFarm, AddPlot
+from app.forms import CreateTraits, LocationForm, AddCountry, AddRegion, AddFarm, AddPlot, AddTrees, FieldsForm
 from app.emails import send_attachment
 from flask.views import MethodView
 
@@ -107,17 +107,18 @@ def add_plot():
 
 @app.route('/add_trees', methods=["POST"])
 def add_trees():
-	form = RegisterTrees().update()
+	location_form = LocationForm().update()
+	add_trees_form = AddTrees()
 	country = request.form['country']
 	region = request.form['region']
 	farm = request.form['farm']
 	plot = request.form['plot']
 	count = request.form['count']
-	if form.validate_on_submit():
+	if all([location_form.validate_on_submit(), add_trees_form.validate_on_submit()]):
 		fields_csv=Fields(country).add_trees(region, farm, plot, count)
 		recipients=[User(session['username']).find('')['email']]
 		subject = "BreedCAFS: Trees registered"
-		html = render_template('emails/register_trees.html', 
+		html = render_template('emails/add_trees.html', 
 			count=count,
 			plot=plot,
 			farm=farm,
@@ -132,28 +133,69 @@ def add_trees():
 			'text/csv', 
 			fields_csv)
 		#return as jsonify so that can be interpreted the same way as error message
-		return jsonify({"submitted" : str(count + " trees registered")})
+		return jsonify({"submitted" : str(count + " trees registered and fields.csv emailed to your registered address")})
 	else:
-		return jsonify(form.errors)
+		errors = jsonify([location_form.errors, add_trees_form.errors])
+		return errors
 
-@app.route('/locations_trees', methods=['GET', 'POST'])
-def register_trees():
+@app.route('/custom_fields', methods=["POST"])
+def custom_fields():
+	location_form = LocationForm().update()
+	fields_form = FieldsForm()
+	country = request.form['country']
+	region = request.form['region']
+	farm = request.form['farm']
+	plot = request.form['plot']
+	count = request.form['count']
+	start = request.form['trees_start']
+	end = request.form['trees_end']
+	if all([location_form.validate_on_submit(), fields_form.validate_on_submit()]):
+		fields_csv=Fields(country).get_trees(region, farm, plot, start, end)
+		recipients=[User(session['username']).find('')['email']]
+		subject = "BreedCAFS: Custom fields.csv"
+		html = render_template('emails/custom_fields.html', 
+			start=start,
+			end=end,
+			plot=plot,
+			farm=farm,
+			region=region,
+			country=country)
+		send_attachment(subject, 
+			app.config['ADMINS'][0], 
+			recipients, 
+			'copy of fields.csv', 
+			html, 
+			u'BreedCAFS_fields.csv', 
+			'text/csv', 
+			fields_csv)
+		#return as jsonify so that can be interpreted the same way as error message
+		return jsonify({"submitted" : str("Fields.csv sent to your email address")})
+	else:
+		errors = jsonify([location_form.errors, fields_form.errors])
+		return errors
+
+@app.route('/location_trees', methods=['GET', 'POST'])
+def location_trees():
 	if 'username' not in session:
 		flash('Please log in')
 		return redirect(url_for('login'))
 	else:
-		register_trees = RegisterTrees().update()
+		location_form = LocationForm().update()
+		add_trees = AddTrees()
 		add_country = AddCountry()
 		add_region = AddRegion()
 		add_farm = AddFarm()
 		add_plot = AddPlot()
-		return render_template('locations_trees.html', 
-			register_trees=register_trees, 
-			add_country=add_country, 
-			add_region=add_region, 
-			add_farm=add_farm, 
-			add_plot=add_plot, 
-			title='Register trees and create fields.csv')
+		fields_form = FieldsForm()
+		return render_template('location_trees.html', 
+			location_form = location_form,
+			add_country = add_country, 
+			add_region = add_region, 
+			add_farm = add_farm, 
+			add_plot = add_plot,
+			add_trees = add_trees, 
+			fields_form = fields_form,
+			title = 'Register trees and create fields.csv')
 
 @app.route('/traits', methods=['GET', 'POST'])
 def create_trt():
@@ -163,7 +205,7 @@ def create_trt():
 	else:
 		form = CreateTraits()
 		if form.validate_on_submit():
-			selection = form.traits.data
+			selection = form.general.data + form.agronomic.data + form.morphological.data + form.photosynthetic.data + form.metabolomic.data
 			trt=Lists('Trait').create_trt(selection, 'name')
 			recipients=[User(session['username']).find('')['email']]
 			subject = "BreedCAFS: traits.trt"
