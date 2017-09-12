@@ -113,28 +113,29 @@ class FieldsForm(FlaskForm):
 	submit_fields = SubmitField('Custom Fields.csv')
 
 class CreateTraits(FlaskForm):
+	id = "traits_form"
 	TRAITS = Lists('Trait').get_nodes()
 	trait_dict = defaultdict(list)
 	for trait in TRAITS:
 		trait_dict[trait['group']].append((trait['name'], trait['details']))
-	general = SelectMultipleField('general', [InputRequired()], 
+	general = SelectMultipleField('general', [InputRequired()],
 		choices = sorted(trait_dict['general'], 
-			key=lambda tup: tup[1]), 
+		key=lambda tup: tup[1]), 
 		default= ['location','variety','hybrid_parent1','hybrid_parent2','date'],
 		option_widget=widgets.CheckboxInput(),
 		widget=widgets.ListWidget(prefix_label=False)
-		)	
-	agronomic = SelectMultipleField('agronomic', 
+		)
+	agronomic = SelectMultipleField('agronomic',
 		choices = sorted(trait_dict['agronomic'], key=lambda tup: tup[1]), 
 		option_widget=widgets.CheckboxInput(),
 		widget=widgets.ListWidget(prefix_label=False)
 		)	
-	morphological = SelectMultipleField('morphological', 
+	morphological = SelectMultipleField('morphological',
 		choices = sorted(trait_dict['morphological'], key=lambda tup: tup[1]), 
 		option_widget=widgets.CheckboxInput(),
 		widget=widgets.ListWidget(prefix_label=False)
 		)	
-	photosynthetic = SelectMultipleField('photosynthetic', 
+	photosynthetic = SelectMultipleField('photosynthetic',
 		choices = sorted(trait_dict['photosynthetic'], key=lambda tup: tup[1]), 
 		option_widget=widgets.CheckboxInput(),
 		widget=widgets.ListWidget(prefix_label=False)

@@ -4,14 +4,16 @@
 	{% from "_formhelpers.html" import render_field %}
 	<h2>Fieldbook tools</h2>
 	<h3>Create traits.trt</h3>
-		<form action="{{ url_for('create_trt') }}" method="post">
+		<form action="{{ url_for('select_traits') }}" method="post">
 		{{ form.csrf_token }}
 			<dl>{{ render_field(form.general) }}</dl>
 			<dl>{{ render_field(form.agronomic) }}</dl>
 			<dl>{{ render_field(form.morphological) }}</dl>
 			<dl>{{ render_field(form.photosynthetic) }}</dl>
 			<dl>{{ render_field(form.metabolomic) }}</dl>
-			<input type="submit" value="Create">
+			<input id="submit_traits" type="submit" value="Create">
 		</form>
+	<script src="static/jquery_1.8.3_min.js"></script>
+	<script src="static/trait_select.js"></script>
 </div>
 {% endblock %}

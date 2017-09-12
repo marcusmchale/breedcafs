@@ -88,66 +88,71 @@ class Fields:
 			farm=self.farm, 
 			plot=self.plot, 
 			username=session['username'])
-	def add_trees(self, region, farm, plot, count):
-		self.region = region
-		self.farm = farm
-		self.plot = plot
-		self.count = count
+	@classmethod #has plotID so doesn't need country
+	def add_trees(cls, plotID, count):
+		cls.plotID = plotID
+		cls.count = count
 		with driver.session() as session:
-			session.write_transaction(self._add_trees)
-		fieldnames = ['UID','PlotID','TreeCount']
+			session.write_transaction(cls._add_trees)
+		fieldnames = ['UID','PlotID','TreeCount', 'Plot', 'Farm', 'Region', 'Country']
 		fields_csv = cStringIO.StringIO()
 		writer = csv.DictWriter(fields_csv,
 			fieldnames=fieldnames,
 			quoting=csv.QUOTE_ALL,
 			extrasaction='ignore')
 		writer.writeheader()
-		for tree in self.id_list:
+		for tree in cls.id_list:
 			writer.writerow(tree)
 		fields_csv.seek(0)
 		return fields_csv
-	def _add_trees(self, tx):
+	@classmethod #has plotID so doesn't need country
+	def _add_trees(cls, tx):
 		tx.run(Cypher.tree_id_lock,
-			country = self.country, 
-			region = self.region, 
-			farm = self.farm, 
-			plot = self.plot)
+			plotID = cls.plotID)
 		result=tx.run(Cypher.trees_add, 
-			country = self.country, 
-			region = self.region, 
-			farm = self.farm, 
-			plot = self.plot,
-			count = self.count,
+			plotID = cls.plotID,
+			count = cls.count,
 			username= session['username'])
-		self.id_list = [{'UID':str(record[0][0]), 'PlotID':record[0][1],'TreeCount':record[0][2]} for record in result]
-	def get_trees(self, region, farm, plot, start, end):
-		self.region = region
-		self.farm = farm
-		self.plot = plot
-		self.start = start
-		self.end = end
+		cls.id_list = [{'UID':str(record[0][0]),
+			'PlotID':record[0][1], 
+			'TreeID':record[0][2],
+			'Plot':record[0][3],
+			'Farm':record[0][4],
+			'Region':record[0][5],
+			'Country':record[0][6]
+			} for record in result]
+	@classmethod #has plotID so doesn't need country
+	def get_trees(cls, plotID, start, end):
+		cls.plotID = plotID
+		cls.start = start
+		cls.end = end
 		with driver.session() as session:
-			session.read_transaction(self._get_trees)
-		fieldnames = ['UID','PlotID','TreeCount']
+			session.read_transaction(cls._get_trees)
+		fieldnames = ['UID','PlotID','TreeCount', 'Plot', 'Farm', 'Region', 'Country']
 		fields_csv = cStringIO.StringIO()
 		writer = csv.DictWriter(fields_csv,
 			fieldnames=fieldnames,
 			quoting=csv.QUOTE_ALL,
 			extrasaction='ignore')
 		writer.writeheader()
-		for tree in self.id_list:
+		for tree in cls.id_list:
 			writer.writerow(tree)
 		fields_csv.seek(0)
 		return fields_csv
-	def _get_trees(self, tx):
+	@classmethod #has plotID so doesn't need country
+	def _get_trees(cls, tx):
 		result=tx.run(Cypher.trees_get, 
-			country = self.country, 
-			region = self.region, 
-			farm = self.farm, 
-			plot = self.plot,
-			start = self.start,
-			end = self.end)
-		self.id_list = [{'UID':str(record[0][0]), 'PlotID':record[0][1],'TreeCount':record[0][2]} for record in result]
+			plotID = cls.plotID,
+			start = cls.start,
+			end = cls.end)
+		cls.id_list = [{'UID':str(record[0][0]),
+			'PlotID':record[0][1], 
+			'TreeID':record[0][2],
+			'Plot':record[0][3],
+			'Farm':record[0][4],
+			'Region':record[0][5],
+			'Country':record[0][6]
+			} for record in result]
 	def get_farms(self, region):
 		self.region=region
 		with driver.session() as session:
@@ -169,4 +174,5 @@ class Fields:
 			region=self.region, 
 			farm=self.farm)
 		dict_result= [record[0] for record in result]
-		return [(node['name'], node['name']) for node in dict_result]
+		return [(str(node['uid']), node['name']) for node in dict_result]
+

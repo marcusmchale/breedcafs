@@ -48,7 +48,7 @@ class User:
 			return bcrypt.verify(password, user['password'])
 		else:
 			return False
-#This is a classmethod so that it doesn't need username
+#This is a classmethod as doesn't need username
 	@classmethod
 	def confirm_email(cls, email):
 		with driver.session() as session:

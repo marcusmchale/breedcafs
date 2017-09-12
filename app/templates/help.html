@@ -1,11 +1,28 @@
 {% extends "layout.html" %}	
 {% block body %}
 <div class="text_body">
-	<a href=http://cassavabase.wikispaces.com/CassavaBaseManual>Cassava base has good instructions for fieldbook</a>
-	<p>From Field Book: Settings => Export =></p>
+<h1>Field-book</h1>
+<p>To assist field data collection and ensure standardised reporting, the BreedCAFS database tools support use of the <a href="http://wheatgenetics.org/field-book">Field Book</a> app for Android mobile devices. <br><br>To collect data with Field-Book you need two files, one that describes the trees (fields.csv), and another that describes the traits to be measured (traits.trt). Tools to generate both of these files are provided on this site.<br></p>
+
+<h2>Registering fields and trees</h2>
+	<p>Visit <a href="/create"> Create</a> => <a href="/location_trees">Register Trees</a>. <br>
+	Here you can add new Countries, Regions, Farms and Plots to the database. Trees can then be registered and will be assigned unique ID's in the database. A fields.csv file will be generated and a copy will emailed to your user address. This fields.csv file is to be placed in Field-Book's field_import directory.	Subsequently, custom fields.csv files for any given plot can be generated for a range of supplied TreeIDs. <br><br>You can see the number of trees registered within each location in the tree chart provided.
+	</p>
+
+<h2>Selecting traits</h2>
+	<p>Visit <a href="/create"> Create</a> => <a href="/traits">Create traits.trt</a>. <br>
+	Here you can select from a range of traits for which you may be collecting data. At the bottom of the list is a button labeled "Create". Click this to have a traits.trt file generated for the selected traits and emailed to your registered address.
+
+<h2>Uploading data from Field Book</h2>
+	<p>From the  Field Book app click the icon in the top left => select "Settings" => then "Export".<br>
+	  - Under "Format" check the box for "Database"<br>
+	  - Under "Field columns" select "Only unique identifier"<br>
+	  - Under "Traits" select "All traits"<br>
+	  - Then click "OK"</p>
 	<img src="static/fieldbook.png">
 
-	<p> Registering Trees: Visit Create => Register Trees. Here you can add new Countries, Regions, Farms and Plots to the database. Trees can then be registered and will be assigned unique ID's in the database. A fields.csv file will be generated and a copy will emailed to your user address. This file is to be placed in Field-Book's field_import directory on your mobile device. Subsequent
-	</p>
+	<p>Note: <br>
+	  - a maximum of 64 traits may be exported at once. If you need to collect information on more than 64 traits then this may be exported as multiple files by selecting the active traits in Field Book.<br>
+	  - 
 </div>
 {% endblock %}
