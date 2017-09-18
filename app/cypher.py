@@ -150,3 +150,8 @@ class Cypher():
 			' labels(P)[0] as P_label, '
 			' C.name, R.name, F.name, P.name, '
 			' P.uid, T.count ')
+	tissue_find = ('MATCH (tissue:Tissue {name : $tissue}) '
+		' RETURN tissue ')
+	tissue_add = ('MATCH (user:User {username:$username}) '
+		' MERGE (tissue:Tissue {name :$tissue}) '
+		' <-[:SUBMITTED {timeInt : timestamp()}]-(user) ' )

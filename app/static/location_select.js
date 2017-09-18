@@ -78,11 +78,17 @@ update_plots = function() {
 	}
 };
 
-
 $( window ).load(update_countries).load(update_regions).load(update_farms).load(update_plots)
 $("#country").change(update_regions).change(update_farms).change(update_plots);
 $("#region").change(update_farms).change(update_plots);
 $("#farm").change(update_plots);
+
+//Disable submit on keypress "Enter" for all text boxes
+$("input").keypress( function(e) {
+	if (e.keyCode == 13) {
+		e.preventDefault();	
+	}
+})
 
 
 $("#submit_country").click( function(e) {
