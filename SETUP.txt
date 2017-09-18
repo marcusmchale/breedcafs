@@ -9,25 +9,40 @@ This file contains the following and you can request a (redacted) copy from marc
 	MAIL-SERVER (and associated values)
 
 SETUP:
-Clone the breedcafs repository:
+
+Set up neo4j:
+	Install:
+		on ubuntu:
+			apt-get install neo4j
+		on fedora:
+			yum install neo4j
+
+	Set initial password:
+		neo4j-admin set-initial-password SECURE-PASSWORD-HERE
+
+		Alternative for local install:
+			Visit neo4j in the browser at localhost:7474 and configure username password (default is neo4j:neo4j)
+
+	Run neo4j:
+		service neo4j start
+
+		As startup service :
+			 - preconfigured to run on startup in Debian
+			 - on fedora: systemctl enable neo4j
+
+	Set import directory (for CSV uploads):
+		Edit /etc/neo4j/neo4j.conf as follows:
+			# `LOAD CSV` section of the manual for details.
+			dbms.directories.import=/var/www/breedcafs/instance/import
+
+Clone the breedcafs repository into the webserver directory:
+	cd /var/www
 	git clone https://github.com/marcusmchale/breedcafs
 
 Add the instance folder:
 	mkdir breedcafs/instance
 	cp /path/to/file/config.py breedcafs/instance/config.py
-
-Set up neo4j:
-	Install:
-		on ubuntu:
-			sudo apt-get install neo4j
-		on fedora:
-			sudo yum install neo4j
-	Run neo4j:
-		sudo neo4j console
-	Visit neo4j in the browser at localhost:7474 and configure username password (default is neo4j:neo4j)
-	You will also need to export these values as environment variables (replace as configured):
-		export NEO4J_USERNAME=username
-		export NEO4J_PASSWORD=password
+	mkdir instance/import
 
 Set up virtual environment:
 	Install:
@@ -37,26 +52,40 @@ Set up virtual environment:
 			sudo yum install python-virtualenv
 
 	Initialise:
-		virtualenv venv
+		virtualenv /var/www/breedcafs/venv
 	Activate (from breedcafs folder):
-		. ./venv/bin/activate
+		. ./var/www/breedcafs/venv/bin/activate
 	Install requirements:
 		pip install -r REQUIREMENTS.txt 
 
-
-Run breedcafs server:
-	export FLASK_APP=run.py
-	flask run
-	ctrl+C
-		The werkzeug server only seems to work after trying to kill it...
-		To kill it later (for a restart etc.) use:
-	killall -9 python
-		The above is broken behaviour but won't matter in production because we will be using another server (e.g. Apache)
+Set permissions:
+	chgrp -R www-data /var/www/breedcafs
+	chmod 755 /var/www/breedcafs
 
 
-To configure email you need to export the following environment variables:
-or modify the email settings in instance/config.py
-	export MAIL_PASSWORD=<your-gmail-app-password-here>
-	export MAIL_USERNAME=<your-username@gmail.com>
+Configure apache2:
 
-Visit the website at localhost:5000. You should be able to register if your email is in ALLOWED_EMAILS
+	Add the following virtual host to /etc/apache2/sites-available/breedcafs.conf
+
+		<VirtualHost *:80>
+			ServerName SERVERNAME-OR-IP
+			SetEnv NEO4J_USERNAME neo4j
+			SetEnv NEO4J_PASSWORD SECURE-PASSWORD-HERE
+			SetEnv MAIL_PASSWORD SECURE-MAIL-PASSWORD-HERE
+			SetEnv MAIL_USERNAME your@email.add
+			WSGIDaemonProcess breedcafs python-home=/var/www/breedcafs/venv processes=2 threads=15 display-name=%{GROUP}
+			WSGIScriptAlias / /var/www/breedcafs/breedcafs.wsgi
+			<Directory /var/www/breedcafs>
+			    WSGIProcessGroup breedcafs
+			    WSGIApplicationGroup %{GLOBAL}
+			    Require all granted
+			</Directory>
+		</VirtualHost>
+
+	Activate the site:
+		cd /etc/apache2/sites-available
+		a2ensite breedcafs.conf
+
+	Alternative for local install (Werkzeug server):
+		export FLASK_APP=run.py
+		flask run
