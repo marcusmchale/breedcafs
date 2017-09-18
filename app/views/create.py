@@ -1,7 +1,27 @@
 from app import app
-from flask import session, flash, request, redirect, url_for, render_template, send_file, make_response, jsonify
-from app.models import Lists, Fields, User
-from app.forms import CreateTraits, LocationForm, AddCountry, AddRegion, AddFarm, AddPlot, AddTrees, FieldsForm
+from flask import session, \
+	flash, \
+	request, \
+	redirect, \
+	url_for, \
+	render_template, \
+	send_file, \
+	make_response, \
+	jsonify
+from app.models import Lists, \
+	Fields, \
+	User, \
+	Samples
+from app.forms import CreateTraits, \
+	LocationForm, \
+	AddCountry, \
+	AddRegion, \
+	AddFarm, \
+	AddPlot, \
+	AddTrees, \
+	FieldsForm, \
+	AddTissueForm, \
+	SampleRegForm
 from app.emails import send_attachment
 from flask.views import MethodView
 
@@ -221,3 +241,38 @@ def create_trt():
 		return jsonify({"submitted" : "Custom traits.trt sent to your email address"})
 	else:
 		return jsonify(form.errors)
+
+
+class tissues(MethodView):
+	def get(self):
+		tissues = Lists('Tissue').create_list('name','name')
+		response = make_response(jsonify(tissues))
+		response.content_type = 'application/json'
+		return response
+
+@app.route('/add_tissue', methods=["POST"])
+def add_tissue():
+	form = AddTissueForm()
+	text_tissue = request.form['text_tissue']
+	if form.validate_on_submit():
+		if Samples(text_tissue).find_tissue():
+			return ("Tissue already found: " + text_tissue)
+		else:
+			Samples(text_tissue).add_tissue()
+			return ("Tissue submitted: " + text_tissue)
+	else:
+		return form.errors["text_tissue"][0]
+
+@app.route('/sample_reg', methods =['GET','POST'])
+def sample_reg():
+	if 'username' not in session:
+		flash('Please log in')
+		return redirect(url_for('login'))
+	else:
+		add_tissue_form = AddTissueForm()
+		sample_reg_form = SampleRegForm().update()
+		return render_template('sample_reg.html', 
+			add_tissue_form = add_tissue_form,
+			sample_reg_form = sample_reg_form,
+			title = 'Sample registration')
+

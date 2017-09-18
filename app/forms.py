@@ -1,4 +1,4 @@
-from wtforms import StringField, PasswordField, SelectField, SelectMultipleField, IntegerField, SubmitField, widgets
+from wtforms import StringField, PasswordField, SelectField, SelectMultipleField, IntegerField, SubmitField, DateField, DateTimeField, widgets
 from wtforms.validators import InputRequired, Email, EqualTo, NumberRange, Length
 from flask_wtf import FlaskForm
 from flask_wtf.file import FileField, FileRequired
@@ -103,7 +103,6 @@ class AddPlot(FlaskForm):
 
 class FieldsForm(FlaskForm):
 	id = "fields_form"
-	strip_filter = lambda x: x.strip() if x else None
 	trees_start = 	IntegerField('Start TreeID',[InputRequired(), 
 		NumberRange(min=1, max=100000, message='')],
 		description= "Start TreeID")
@@ -152,3 +151,25 @@ class CreateTraits(FlaskForm):
 	#		option_widget=widgets.CheckboxInput(),
 	#		widget=widgets.ListWidget(prefix_label=False)
 	#		)
+
+class AddTissueForm(FlaskForm):
+	id = "add_tissue_form"
+	strip_filter = lambda x: x.strip() if x else None
+	text_tissue = StringField('Tissue type text',	
+		[InputRequired(), Length(min=1, max=100, message='Maximum 100 characters')],
+		filters=[strip_filter],
+		description = "Add new tissue")
+	submit_tissue = SubmitField('+')
+
+class SampleRegForm(FlaskForm):
+	id = "sample_reg_form"
+	tissue = SelectField('Tissue: ', [InputRequired()])
+	date_collected = DateField('Date collected (YYYY-mm-dd): ', [InputRequired()], format='%Y-%m-%d')
+	time_collected = DateTimeField('Time collected (HH-MM): ', format='%H-%M')
+	date_received = DateField('Date received (YYYY-mm-dd): ', format='%Y-%m-%d')
+	@staticmethod
+	def update():
+		form = SampleRegForm()
+		TISSUES = sorted(set(Lists('Tissue').create_list('name', 'name')), key=lambda tup: tup[1])
+		form.tissue.choices = [('','Select Tissue')] + TISSUES
+		return form

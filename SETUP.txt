@@ -61,7 +61,7 @@ Set up virtual environment:
 Set permissions:
 	chgrp -R www-data /var/www/breedcafs
 	chmod 755 /var/www/breedcafs
-
+	chmod g+w /var/www/breedcafs/instance/import
 
 Configure apache2:
 
@@ -89,3 +89,10 @@ Configure apache2:
 	Alternative for local install (Werkzeug server):
 		export FLASK_APP=run.py
 		flask run
+
+Setup mail server:
+	On Ubuntu:
+		sudo apt-get update
+		sudo apt-get install postfix
+		...still need to set this up - need domain name.
+

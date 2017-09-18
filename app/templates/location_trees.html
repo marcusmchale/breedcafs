@@ -4,7 +4,6 @@
 	{% from "_formhelpers_location_trees.html" import render_field %}
 	<h2>Fieldbook tools</h2>
 	<h3>Register fields</h3>
-		<a> {{ country }} </a>
 		<form action="{{ url_for('location_trees') }}" id="location_trees" method="post">
 			{{ location_form.csrf_token }}
 			{{ render_field (location_form.country) }}

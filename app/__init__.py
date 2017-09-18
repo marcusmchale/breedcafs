@@ -21,3 +21,7 @@ app.add_url_rule('/location_trees/<country>/<region>/',
 app.add_url_rule('/location_trees/<country>/<region>/<farm>/', 
 	view_func=views.plots.as_view('plots'), 
 	methods=['GET'])
+
+app.add_url_rule('/sample_reg/tissues/', 
+	view_func=views.tissues.as_view('tissues'), 
+	methods=['GET'])

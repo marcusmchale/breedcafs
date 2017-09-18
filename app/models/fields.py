@@ -94,7 +94,7 @@ class Fields:
 		cls.count = count
 		with driver.session() as session:
 			session.write_transaction(cls._add_trees)
-		fieldnames = ['UID','PlotID','TreeCount', 'Plot', 'Farm', 'Region', 'Country']
+		fieldnames = ['UID','PlotID','TreeID', 'Plot', 'Farm', 'Region', 'Country']
 		fields_csv = cStringIO.StringIO()
 		writer = csv.DictWriter(fields_csv,
 			fieldnames=fieldnames,

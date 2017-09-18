@@ -1,0 +1,20 @@
+{% extends "layout.html" %}	
+{% block body %}
+<div class=text_body>
+	{% from "_formhelpers_sample_reg.html" import render_field %}
+	<h2>Sample tools</h2>
+	<h3>Register samples</h3>
+		<form action="{{ url_for('sample_reg') }}" id="sample_reg" method="post">
+			{{ sample_reg_form.csrf_token }}
+			{{ render_field (sample_reg_form.tissue) }}
+			{{ render_field (add_tissue_form.text_tissue) }}
+			{{ render_field (add_tissue_form.submit_tissue) }}
+			{{ render_field (sample_reg_form.date_collected) }}
+			<dd>{{ render_field (sample_reg_form.time_collected) }}
+			<dd>{{ render_field (sample_reg_form.date_received) }}
+		</form>
+</div>
+<script src="static/jquery_1.8.3_min.js"></script>
+<script src="static/jquery-ui-1.12.1.custom/jquery-ui.js"></script>
+<script src="static/sample_reg.js"></script>
+{% endblock %}
