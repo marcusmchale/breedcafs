@@ -1,5 +1,4 @@
 #add submission time for all SUBMITTED with ON MATCH SET and ON CREATE SET
-
 class Cypher():
 	user_find = ('MATCH (user:User) '
 	' WHERE user.username = $username '
@@ -96,8 +95,8 @@ class Cypher():
 	trees_add = ('MATCH (user:User {username:$username}), '
 		' (c:Country)<-[:IS_IN]-(r:Region)<-[:IS_IN]-(f:Farm)'
 		' <-[:IS_IN]-(p:Plot {uid: $plotID})' 
-		' UNWIND range(1, toInt($count)) as counter ' 
 		' MATCH (id:TreeID {plotID:p.uid}) '
+		' UNWIND range(1, toInt($count)) as counter ' 
 		' SET id.count=id.count+1 '
 		' MERGE (p)<-[:IS_IN]-(t:Tree {uid:(p.uid + "_" + id.count), id:id.count}) '
 		' <-[:SUBMITTED {timeInt : timestamp()}]-(user)'
@@ -150,8 +149,30 @@ class Cypher():
 			' labels(P)[0] as P_label, '
 			' C.name, R.name, F.name, P.name, '
 			' P.uid, T.count ')
-	tissue_find = ('MATCH (tissue:Tissue {name : $tissue}) '
-		' RETURN tissue ')
 	tissue_add = ('MATCH (user:User {username:$username}) '
 		' MERGE (tissue:Tissue {name :$tissue}) '
 		' <-[:SUBMITTED {timeInt : timestamp()}]-(user) ' )
+	storage_add = ('MATCH (user:User {username:$username}) '
+		' MERGE (storage:Storage {name :$storage}) '
+		' <-[:SUBMITTED {timeInt : timestamp()}]-(user) ' )
+	sample_id_lock = (' MATCH  (p:Plot {uid: $plotID})'
+		' MERGE (p)<-[:ID_COUNTER_FOR]-(id:SampleID{plotID:p.uid})' 
+		' ON CREATE SET id._LOCK_ = true, id.count = 0 '
+		' ON MATCH SET id._LOCK_ = true ')
+	samples_add = ('MATCH (p:Plot {uid: $plotID})<-[:IS_IN]-(t:Tree)' 
+		' WITH t '
+		' ORDER BY t.id '
+		' WHERE t.id >= $start '
+		' AND t.id <= $end '
+		' MATCH (user:User {username:$username}), '
+		' (tissue:Tissue {name:$tissue}), '
+		' (storage:Storage {name:$storage}), '
+		' (c:Country)<-[:IS_IN]-(r:Region)<-[:IS_IN]-(f:Farm)'
+		' <-[:IS_IN]-(p:Plot {uid: $plotID})<-[:IS_IN]-(t),' 
+		' (id:SampleID {plotID:p.uid} ) '
+		' SET id.count=id.count+1 '
+		' MERGE (t)<-[:SAMPLE_FROM]-(s:Sample {uid:(t.uid + "_" + id.count), id:id.count, date:$date}) '
+		' -[:SAMPLE_OF]->(tissue)'
+		' MERGE (s)-[:STORED_IN {stored_on:$date}]->(storage)'
+		' RETURN [s.uid, p.uid, t.id, s.id, s.date, tissue.name, storage.name, p.name, f.name, r.name, c.name] '
+		' ORDER BY s.id')

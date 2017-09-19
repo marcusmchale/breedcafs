@@ -161,15 +161,44 @@ class AddTissueForm(FlaskForm):
 		description = "Add new tissue")
 	submit_tissue = SubmitField('+')
 
+class AddStorageForm(FlaskForm):
+	id = "add_storage_form"
+	strip_filter = lambda x: x.strip() if x else None
+	text_storage = StringField('Storage type text',	
+		[InputRequired(), Length(min=1, max=100, message='Maximum 100 characters')],
+		filters=[strip_filter],
+		description = "Add new storage method")
+	submit_storage = SubmitField('+')
+
 class SampleRegForm(FlaskForm):
 	id = "sample_reg_form"
+	country = SelectField('Country: ', [InputRequired()])
+	region = SelectField('Region: ', [InputRequired()])
+	farm = SelectField('Farm: ', [InputRequired()])
+	plot = SelectField('Plot: ', [InputRequired()])
+	trees_start = 	IntegerField('Start TreeID',[InputRequired(), 
+		NumberRange(min=1, max=100000, message='')],
+		description= "Start TreeID")
+	trees_end = IntegerField('End TreeID',[InputRequired(), 
+		NumberRange(min=1, max=100000, message='')],
+		description= "End TreeID")
 	tissue = SelectField('Tissue: ', [InputRequired()])
+	storage = SelectField('Tissue: ', [InputRequired()])
 	date_collected = DateField('Date collected (YYYY-mm-dd): ', [InputRequired()], format='%Y-%m-%d')
-	time_collected = DateTimeField('Time collected (HH-MM): ', format='%H-%M')
-	date_received = DateField('Date received (YYYY-mm-dd): ', format='%Y-%m-%d')
+	submit_samples = SubmitField('Register samples')
 	@staticmethod
 	def update():
 		form = SampleRegForm()
+		COUNTRIES = sorted(set(Lists('Country').create_list('name','name')), key=lambda tup: tup[1])
+		REGIONS = sorted(set(Lists('Country').get_connected('name', form.country.data, 'IS_IN')), key=lambda tup: tup[1])
+		FARMS = sorted(set(Fields(form.country.data).get_farms(form.region.data)), key=lambda tup: tup[1])
+		PLOTS = sorted(set(Fields(form.country.data).get_plots(form.region.data, form.farm.data)), key=lambda tup: tup[1])
 		TISSUES = sorted(set(Lists('Tissue').create_list('name', 'name')), key=lambda tup: tup[1])
+		STORAGE_TYPES = sorted(set(Lists('Storage').create_list('name', 'name')), key=lambda tup: tup[1])
+		form.country.choices = [('','Select Country')] + COUNTRIES
+		form.region.choices = [('','Select Region')] + REGIONS
+		form.farm.choices = [('','Select Farm')] + FARMS
+		form.plot.choices = [('','Select Plot')] + PLOTS
 		form.tissue.choices = [('','Select Tissue')] + TISSUES
+		form.storage.choices = [('','Select Storage')] + STORAGE_TYPES
 		return form

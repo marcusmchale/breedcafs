@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+
 from flask import Flask
 
 app = Flask(__name__, instance_relative_config=True)
@@ -24,4 +26,8 @@ app.add_url_rule('/location_trees/<country>/<region>/<farm>/',
 
 app.add_url_rule('/sample_reg/tissues/', 
 	view_func=views.tissues.as_view('tissues'), 
+	methods=['GET'])
+
+app.add_url_rule('/sample_reg/storage_methods/', 
+	view_func=views.storage_methods.as_view('storage_methods'), 
 	methods=['GET'])

@@ -1,3 +1,5 @@
+//update the drop down boxes
+
 update_countries = function() {
 	var request = $.ajax({
 		type: 'GET',
@@ -83,14 +85,14 @@ $("#country").change(update_regions).change(update_farms).change(update_plots);
 $("#region").change(update_farms).change(update_plots);
 $("#farm").change(update_plots);
 
-//Disable submit on keypress "Enter" for all text boxes
+//Disable submit on keypress "Enter" for all inputs boxes
 $("input").keypress( function(e) {
 	if (e.keyCode == 13) {
 		e.preventDefault();	
 	}
 })
 
-
+//Submit locations
 $("#submit_country").click( function(e) {
 	e.preventDefault();
 	$(".flash").remove();
@@ -164,6 +166,7 @@ $("#submit_plot").click( function(e) {
 	submit_plot.done(update_plots).done(load_chart);
 })
 
+//register new trees
 $("#submit_trees").click( function(e) {
 	e.preventDefault();
 	$(".flash").remove();
@@ -179,26 +182,19 @@ $("#submit_trees").click( function(e) {
 				flash_submitted = "<div id='trees_flash' class='flash'>" + response.submitted + "</div>";
 				$("#trees_flash").replaceWith(flash_submitted);
 			} else {
-				$("#trees_flash").remove()
-				if (response[1].hasOwnProperty('count')) {
-					flash_count = "<div id='trees_flash' class='flash'>" + response[1].count[0] + "</div>";
-					$("#trees_flash").replaceWith(flash_count);
+				$("#trees_flash").remove();
+				for (var key in response[0]){
+					if (response[0].hasOwnProperty(key)) {
+						flash = "<div id='flash_" + key + "' class='flash'>" + response[0][key][0] + "</div>";
+						$('#' + key).after(flash);
+					}
 				}
-				if (response[0].hasOwnProperty('country')) {
-					flash_country = "<div id='country_flash' class='flash'>" + response[0].country[0] + "</div>";
-					$("#country").after(flash_country);
-				}
-				if (response[0].hasOwnProperty('region')) {
-					flash_region = "<div id='region_flash' class='flash'>" + response[0].region[0] + "</div>";
-					$("#region").after(flash_region);
-				}
-				if (response[0].hasOwnProperty('farm')) {
-					flash_farm = "<div id='farm_flash' class='flash'>" + response[0].farm[0] + "</div>";
-					$("#farm").after(flash_farm);
-				}
-				if (response[0].hasOwnProperty('plot')) {
-					flash_plot = "<div id='plot_flash' class='flash'>" + response[0].plot[0] + "</div>";
-					$("#plot").after(flash_plot);
+				//this response is an array from two forms so need two of these (alternatively could iterate over these...)
+				for (var key in response[1]){
+					if (response[1].hasOwnProperty(key)) {
+						flash = "<div id='flash_" + key + "' class='flash'>" + response[1][key][0] + "</div>";
+						$('#' + key).after(flash);
+					}
 				}
 			}
 		},
@@ -209,6 +205,7 @@ $("#submit_trees").click( function(e) {
 	submit_trees.done(load_chart);
 })
 
+//get custom fields.csv
 $("#submit_fields").click( function(e) {
 	e.preventDefault();
 	$(".flash").remove();
@@ -225,29 +222,18 @@ $("#submit_fields").click( function(e) {
 				$("#fields_flash").replaceWith(flash_submitted);
 			} else {
 				$("#fields_flash").remove();
-				if (response[1].hasOwnProperty('trees_start')) {
-					flash_start = "<div id='start_flash' class='flash'>" + response[1].trees_start[0] + "</div>";
-					$("#trees_start").after(flash_start);
+				for (var key in response[0]){
+					if (response[0].hasOwnProperty(key)) {
+						flash = "<div id='flash_" + key + "' class='flash'>" + response[0][key][0] + "</div>";
+						$('#' + key).after(flash);
+					}
 				}
-				if (response[1].hasOwnProperty('trees_end')) {
-					flash_end = "<div id='end_flash' class='flash'>" + response[1].trees_end[0] + "</div>";
-					$("#trees_end").after(flash_end);
-				}
-				if (response[0].hasOwnProperty('country')) {
-					flash_country = "<div id='country_flash' class='flash'>" + response[0].country[0] + "</div>";
-					$("#country").after(flash_country);
-				}
-				if (response[0].hasOwnProperty('region')) {
-					flash_region = "<div id='region_flash' class='flash'>" + response[0].region[0] + "</div>";
-					$("#region").after(flash_region);
-				}
-				if (response[0].hasOwnProperty('farm')) {
-					flash_farm = "<div id='farm_flash' class='flash'>" + response[0].farm[0] + "</div>";
-					$("#farm").after(flash_farm);
-				}
-				if (response[0].hasOwnProperty('plot')) {
-					flash_plot = "<div id='plot_flash' class='flash'>" + response[0].plot[0] + "</div>";
-					$("#plot").after(flash_plot);
+				//this response is an array from two forms so need two of these (alternatively could iterate over these...)
+				for (var key in response[1]){
+					if (response[1].hasOwnProperty(key)) {
+						flash = "<div id='flash_" + key + "' class='flash'>" + response[1][key][0] + "</div>";
+						$('#' + key).after(flash);
+					}
 				}
 			}
 		},

@@ -10,19 +10,14 @@
 <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='style.css') }}">
 <body>
 	<div class="page">
+		<div id="google_translate_element"></div>
 		<div class="metanav">
 			{% if session.username %}
 				<a>Logged in as {{ session.username }}:</a>
 				<a href="{{ url_for('logout') }}">Logout</a>
 			{% endif %}
 		</div>
-		<script type="text/javascript" src="//translate.google.com/translate_a/element.js?cb=googleTranslateElementInit"></script> 
-		<script type="text/javascript">
-			function googleTranslateElementInit() {
-				new google.translate.TranslateElement({pageLanguage: 'en'}, 'google_translate_element');
-			}
-		</script>
-		<div id="google_translate_element"></div>
+		
 		<div class="header">
 			<a href="/index"><img src="/static/logo.png"></a>
 			<a href="/index"><h1>BreedCAFS database tools</h1></a>
@@ -50,3 +45,9 @@
 	</div>
 </body>
 </html>
+<script type="text/javascript" src="//translate.google.com/translate_a/element.js?cb=googleTranslateElementInit"></script> 
+<script type="text/javascript">
+	function googleTranslateElementInit() {
+		new google.translate.TranslateElement({pageLanguage: 'en'}, 'google_translate_element');
+	}
+</script>

@@ -10,6 +10,7 @@ from create import create, \
 	farms, \
 	plots, \
 	sample_reg, \
-	tissues
+	tissues, \
+	storage_methods
 from chart import json_submissions
 from flask.views import View

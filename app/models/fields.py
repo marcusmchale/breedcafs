@@ -128,7 +128,7 @@ class Fields:
 		cls.end = end
 		with driver.session() as session:
 			session.read_transaction(cls._get_trees)
-		fieldnames = ['UID','PlotID','TreeCount', 'Plot', 'Farm', 'Region', 'Country']
+		fieldnames = ['UID','PlotID','TreeID', 'Plot', 'Farm', 'Region', 'Country']
 		fields_csv = cStringIO.StringIO()
 		writer = csv.DictWriter(fields_csv,
 			fieldnames=fieldnames,

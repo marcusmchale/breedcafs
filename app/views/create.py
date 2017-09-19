@@ -21,6 +21,7 @@ from app.forms import CreateTraits, \
 	AddTrees, \
 	FieldsForm, \
 	AddTissueForm, \
+	AddStorageForm, \
 	SampleRegForm
 from app.emails import send_attachment
 from flask.views import MethodView
@@ -121,7 +122,7 @@ def add_plot():
 			return ("Plot already found: " + text_plot )
 		else:
 			Fields(country).add_plot(region, farm, text_plot )
-			return ("Farm submitted: " + text_plot )
+			return ("Plot submitted: " + text_plot )
 	else:
 		return form.errors["text_plot"][0]
 
@@ -242,6 +243,22 @@ def create_trt():
 	else:
 		return jsonify(form.errors)
 
+#Sample registration section
+
+@app.route('/sample_reg', methods =['GET','POST'])
+def sample_reg():
+	if 'username' not in session:
+		flash('Please log in')
+		return redirect(url_for('login'))
+	else:
+		add_tissue_form = AddTissueForm()
+		add_storage_form = AddStorageForm()
+		sample_reg_form = SampleRegForm().update()
+		return render_template('sample_reg.html', 
+			add_tissue_form = add_tissue_form,
+			add_storage_form = add_storage_form,
+			sample_reg_form = sample_reg_form,
+			title = 'Sample registration')
 
 class tissues(MethodView):
 	def get(self):
@@ -255,24 +272,63 @@ def add_tissue():
 	form = AddTissueForm()
 	text_tissue = request.form['text_tissue']
 	if form.validate_on_submit():
-		if Samples(text_tissue).find_tissue():
+		if Lists('Tissue').find_node(text_tissue):
 			return ("Tissue already found: " + text_tissue)
 		else:
-			Samples(text_tissue).add_tissue()
+			Samples().add_tissue(text_tissue)
 			return ("Tissue submitted: " + text_tissue)
 	else:
 		return form.errors["text_tissue"][0]
 
-@app.route('/sample_reg', methods =['GET','POST'])
-def sample_reg():
-	if 'username' not in session:
-		flash('Please log in')
-		return redirect(url_for('login'))
-	else:
-		add_tissue_form = AddTissueForm()
-		sample_reg_form = SampleRegForm().update()
-		return render_template('sample_reg.html', 
-			add_tissue_form = add_tissue_form,
-			sample_reg_form = sample_reg_form,
-			title = 'Sample registration')
+class storage_methods(MethodView):
+	def get(self):
+		storage_methods = Lists('Storage').create_list('name','name')
+		response = make_response(jsonify(storage_methods))
+		response.content_type = 'application/json'
+		return response
 
+@app.route('/add_storage', methods=["POST"])
+def add_storage():
+	form = AddStorageForm()
+	text_storage = request.form['text_storage']
+	if form.validate_on_submit():
+		if Lists('Storage').find_node(text_storage):
+			return ("Storage already found: " + text_storage)
+		else:
+			Samples().add_storage(text_storage)
+			return ("Storage submitted: " + text_storage)
+	else:
+		return form.errors["text_storage"][0]
+
+@app.route('/add_samples', methods = ['GET','POST'])
+def add_samples():
+	form=SampleRegForm().update()
+	if form.validate_on_submit():
+		plotID = int(request.form['plot'])
+		start = int(request.form['trees_start'])
+		end = int(request.form['trees_end'])
+		tissue = request.form['tissue']
+		storage = request.form['storage']
+		date = request.form['date_collected']
+		samples_csv = Samples().add_samples(plotID, start, end, tissue, storage, date)
+		recipients=[User(session['username']).find('')['email']]
+		subject = "BreedCAFS: Samples registered"
+		html = render_template('emails/add_samples.html', 
+			plotID=plotID,
+			start=start,
+			end=end,
+			tissue=tissue,
+			storage=storage,
+			date=date)
+		send_attachment(subject,
+			app.config['ADMINS'][0],
+			recipients,
+			'copy of samples.csv',
+			html,
+			u'BreedCAFS_samples.csv',
+			'text/csv',
+			samples_csv)
+		return jsonify({"submitted" : tissue + " samples submitted and samples.csv sent to your registered email address"})
+	else:
+		errors = jsonify(form.errors)
+		return errors

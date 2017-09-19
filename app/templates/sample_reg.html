@@ -6,12 +6,20 @@
 	<h3>Register samples</h3>
 		<form action="{{ url_for('sample_reg') }}" id="sample_reg" method="post">
 			{{ sample_reg_form.csrf_token }}
+			{{ render_field (sample_reg_form.country) }}
+			{{ render_field (sample_reg_form.region) }}
+			{{ render_field (sample_reg_form.farm) }}
+			{{ render_field (sample_reg_form.plot) }}
+			{{ render_field (sample_reg_form.trees_start) }}
+			{{ render_field (sample_reg_form.trees_end) }}
 			{{ render_field (sample_reg_form.tissue) }}
 			{{ render_field (add_tissue_form.text_tissue) }}
 			{{ render_field (add_tissue_form.submit_tissue) }}
+			{{ render_field (sample_reg_form.storage) }}
+			{{ render_field (add_storage_form.text_storage) }}
+			{{ render_field (add_storage_form.submit_storage) }}
 			{{ render_field (sample_reg_form.date_collected) }}
-			<dd>{{ render_field (sample_reg_form.time_collected) }}
-			<dd>{{ render_field (sample_reg_form.date_received) }}
+			{{ render_field (sample_reg_form.submit_samples) }}
 		</form>
 </div>
 <script src="static/jquery_1.8.3_min.js"></script>

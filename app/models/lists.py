@@ -7,14 +7,24 @@ from config import uri, driver
 class Lists:
 	def __init__(self, node_label):
 		self.node_label=node_label
+	def find_node(self, name):
+		self.name = name
+		with driver.session() as session:
+			return session.read_transaction(self._find_node)
+	def _find_node(self, tx):
+		node_label = self.node_label
+		name = self.name
+		Cypher_node_find='MATCH (n: ' + node_label +' {name:$name}) RETURN (n)'
+		for record in tx.run(Cypher_node_find, name=self.name):
+			return record
 	#get lists of all nodes with properties as dict
 	def get_nodes(self):
 		with driver.session() as session:
 			return session.read_transaction(self._node_properties)
 	def _node_properties(self, tx):
 		node_label=self.node_label
-		Cypher_node_list='MATCH (n: ' + node_label +') RETURN properties (n)'
-		result = tx.run(Cypher_node_list, node_label=self.node_label)
+		Cypher_node_properties='MATCH (n: ' + node_label +') RETURN properties (n)'
+		result = tx.run(Cypher_node_properties)
 		return [record[0] for record in result]
 	#create tuple for forms: for given key pair (e.g. name, fullname)
 	#use set to only get unique values	
