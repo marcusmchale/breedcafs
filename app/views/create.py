@@ -10,19 +10,23 @@ from flask import session, \
 	jsonify
 from app.models import Lists, \
 	Fields, \
+	FieldDetails, \
 	User, \
 	Samples
-from app.forms import CreateTraits, \
-	LocationForm, \
+from app.forms import LocationForm, \
 	AddCountry, \
 	AddRegion, \
 	AddFarm, \
 	AddPlot, \
-	AddTrees, \
 	FieldsForm, \
+	AddSoilForm, \
+	AddShadeTreeForm, \
+	AddTrees, \
+	CustomTreesForm, \
+	SampleRegForm, \
 	AddTissueForm, \
 	AddStorageForm, \
-	SampleRegForm
+	CreateTraits
 from app.emails import send_attachment
 from flask.views import MethodView
 
@@ -34,6 +38,7 @@ def create():
 	else:
 		return render_template('create.html', title='Create')
 
+#Locations
 class countries(MethodView):
 	def get(self):
 		countries = Lists('Country').create_list('name','name')
@@ -126,6 +131,106 @@ def add_plot():
 	else:
 		return form.errors["text_plot"][0]
 
+#Field Details
+class soil_types(MethodView):
+	def get(self):
+		soil_types = Lists('Soil').create_list('name','name')
+		response = make_response(jsonify(soil_types))
+		response.content_type = 'application/json'
+		return response
+
+class shade_trees(MethodView):
+	def get(self):
+		shade_trees = Lists('ShadeTree').create_list('name','name')
+		response = make_response(jsonify(shade_trees))
+		response.content_type = 'application/json'
+		return response
+
+@app.route('/add_soil', methods=["POST"])
+def add_soil():
+	form = AddSoilForm()
+	text_soil = request.form['text_soil']
+	if form.validate_on_submit():
+		if Lists('Soil').find_node(text_soil):
+			return ("Soil type already found: " + text_soil)
+		else:
+			FieldDetails().add_soil(text_soil)
+			return ("Soil type submitted: " + text_soil)
+	else:
+		return form.errors["text_soil"][0]
+
+@app.route('/add_shade_tree', methods=["POST"])
+def add_shade_tree():
+	form = AddShadeTreeForm()
+	text_shade_tree = request.form['text_shade_tree']
+	if form.validate_on_submit():
+		if Lists('ShadeTree').find_node(text_shade_tree):
+			return ("Shade tree already found: " + text_shade_tree)
+		else:
+			FieldDetails().add_shade_tree(text_shade_tree)
+			return ("Shade tree submitted: " + text_shade_tree)
+	else:
+		return form.errors["text_shade_tree"][0]
+
+@app.route('/add_field_details', methods=['POST'])
+def add_field_details():
+	location_form = LocationForm().update()
+	fields_form = FieldsForm().update()
+	if all([location_form.validate_on_submit(), fields_form.validate_on_submit()]):
+		plotID = int(request.form['plot'])
+		soil = request.form['soil']
+		shade_trees = request.form.getlist('shade_trees')
+		FieldDetails.update(soil, shade_trees)
+		return jsonify({"submitted": "Field details submitted"})
+	else:
+		errors = jsonify([location_form.errors, fields_form.errors])
+		return errors
+
+@app.route('/location_fields', methods=['GET', 'POST'])
+def location_fields():
+	if 'username' not in session:
+		flash('Please log in')
+		return redirect(url_for('login'))
+	else:
+		location_form = LocationForm().update()
+		add_country = AddCountry()
+		add_region = AddRegion()
+		add_farm = AddFarm()
+		add_plot = AddPlot()
+		fields_form = FieldsForm().update()
+		add_soil_form = AddSoilForm()
+		add_shade_tree_form = AddShadeTreeForm()
+		return render_template('location_fields.html', 
+			location_form = location_form,
+			add_country = add_country, 
+			add_region = add_region, 
+			add_farm = add_farm, 
+			add_plot = add_plot,
+			fields_form = fields_form,
+			add_soil_form = add_soil_form,
+			add_shade_tree_form = add_shade_tree_form,
+			title = 'Register fields and submit details')
+
+#Trees
+@app.route('/location_trees', methods=['GET', 'POST'])
+def location_trees():
+	if 'username' not in session:
+		flash('Please log in')
+		return redirect(url_for('login'))
+	else:
+		location_form = LocationForm().update()
+		add_trees = AddTrees()
+		add_country = AddCountry()
+		add_region = AddRegion()
+		add_farm = AddFarm()
+		add_plot = AddPlot()
+		custom_trees_form = CustomTreesForm()
+		return render_template('location_trees.html', 
+			location_form = location_form,
+			add_trees = add_trees, 
+			custom_trees_form = custom_trees_form,
+			title = 'Register trees and create fields.csv')
+
 @app.route('/add_trees', methods=["POST"])
 def add_trees():
 	location_form = LocationForm().update()
@@ -156,8 +261,8 @@ def add_trees():
 @app.route('/custom_fields', methods=["POST"])
 def custom_fields():
 	location_form = LocationForm().update()
-	fields_form = FieldsForm()
-	if all([location_form.validate_on_submit(), fields_form.validate_on_submit()]):
+	custom_trees_form = CustomTreesForm()
+	if all([location_form.validate_on_submit(), custom_trees_form.validate_on_submit()]):
 		plotID = int(request.form['plot'])
 		start = int(request.form['trees_start'])
 		end = int(request.form['trees_end'])
@@ -179,31 +284,9 @@ def custom_fields():
 		#return as jsonify so that can be interpreted the same way as error message
 		return jsonify({"submitted" : "Fields.csv sent to your email address"})
 	else:
-		errors = jsonify([location_form.errors, fields_form.errors])
+		errors = jsonify([location_form.errors, custom_trees_form.errors])
 		return errors
-
-@app.route('/location_trees', methods=['GET', 'POST'])
-def location_trees():
-	if 'username' not in session:
-		flash('Please log in')
-		return redirect(url_for('login'))
-	else:
-		location_form = LocationForm().update()
-		add_trees = AddTrees()
-		add_country = AddCountry()
-		add_region = AddRegion()
-		add_farm = AddFarm()
-		add_plot = AddPlot()
-		fields_form = FieldsForm()
-		return render_template('location_trees.html', 
-			location_form = location_form,
-			add_country = add_country, 
-			add_region = add_region, 
-			add_farm = add_farm, 
-			add_plot = add_plot,
-			add_trees = add_trees, 
-			fields_form = fields_form,
-			title = 'Register trees and create fields.csv')
+#traits
 
 @app.route('/traits', methods=['GET', 'POST'])
 def select_traits():
@@ -243,7 +326,7 @@ def create_trt():
 	else:
 		return jsonify(form.errors)
 
-#Sample registration section
+#Samples
 
 @app.route('/sample_reg', methods =['GET','POST'])
 def sample_reg():

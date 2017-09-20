@@ -1,14 +1,18 @@
 {% macro render_field(field) %}
 	{% if field.type in ['SelectField'] %}
-		<dd>{{ field(**kwargs)|safe }}</dd> 
+		<dd>{{ field(**kwargs)|safe }}
+	{% endif %}
+	{% if field.type in ['SelectMultipleField'] %}
+		<dt>{{ field.label }}</dt>
+		<dd>{{ field(**kwargs)|safe }}
 	{% endif %}
 	{% if field.type in ['StringField'] %}
 		{{ field(placeholder=field.description)|safe }}
 	{% endif %}
-	{% if field.type in ['IntegerField'] %}
-		<dd>{{ field(placeholder=field.description)|safe }}
-	{% endif %}
 	{% if field.type in ['SubmitField'] %}
 		{{ field(**kwargs)|safe }}</dd>
+	{% endif %}
+	{% if field.type in ['IntegerField'] %}
+		{{ field(placeholder=field.description)|safe }}
 	{% endif %}
 {% endmacro %}

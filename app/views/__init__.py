@@ -9,8 +9,11 @@ from create import create, \
 	regions, \
 	farms, \
 	plots, \
+	soil_types, \
+	shade_trees, \
 	sample_reg, \
 	tissues, \
 	storage_methods
 from chart import json_submissions
 from flask.views import View
+

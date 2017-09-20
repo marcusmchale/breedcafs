@@ -12,5 +12,6 @@ neo4j-driver==1.4.0
 passlib==1.7.1
 pycparser==2.18
 six==1.10.0
+unicodecsv==0.14.1
 Werkzeug==0.12.2
 WTForms==2.1

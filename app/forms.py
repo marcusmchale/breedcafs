@@ -6,19 +6,27 @@ from app import app
 from app.models import Lists, Fields
 from collections import defaultdict
 
+#user 
 class RegistrationForm(FlaskForm):
+	strip_filter = lambda x: x.strip() if x else None
 	PARTNERS = Lists('Partner').create_list('name', 'fullname')
 	partner = SelectField('Partner:', [InputRequired()], 
 		choices = sorted(tuple(PARTNERS), key=lambda tup: tup[1]))
 	username = StringField('Username:', [InputRequired(), Length(min=1, 
-		max=20, message='Maximum 20 characters')])
+		max=20, message='Maximum 20 characters')],
+		filters=[strip_filter],
+		description = "Enter a username")
 	email = StringField('Email Address:', [InputRequired(), Email(), Length(min=1, 
-		max=100, message='Maximum 100 characters')])
+		max=100, message='Maximum 100 characters')],
+		filters = [strip_filter],
+		description = "Enter your email address")
 	name = StringField('Full Name:', [InputRequired(), Length(min=1, 
-		max=100, message='Maximum 100 characters')])
-	password = PasswordField('New Password:', [InputRequired(), EqualTo('confirm', 
-		message='Passwords must match'), Length(min=1, max=100, message='Maximum 100 characters')])
-	confirm = PasswordField('Repeat Password:')
+		max=100, message='Maximum 100 characters')],
+		filters=[strip_filter],
+		description = "Enter your full name")
+	password = PasswordField('New Password:', [InputRequired(), Length(min=6, max=100,
+		message='Passwords must be at least 6 characters')],
+		description = "Please choose a secure password for this site")
 
 class PasswordResetRequestForm(FlaskForm):
 	email = StringField('Email Address:', [InputRequired(), Email(), Length(min=1, 
@@ -33,10 +41,10 @@ class LoginForm(FlaskForm):
 	username = StringField('Username:', [InputRequired()])
 	password = PasswordField('Password:', [InputRequired()])
 
-class UploadForm(FlaskForm):
-	submission_type =  SelectField('Submission type:', [InputRequired()], 
-		choices = sorted(app.config['SUBMISSION_TYPES'], key=lambda tup: tup[1]))
-	file = FileField('Select a file:', [FileRequired()])
+#Location (used on multiple pages)
+#NB:
+#all wtforms fields require names (e.g. 'Country text input', even though they are not displayed) 
+#for validation to work when multiple forms are on a page
 
 class LocationForm(FlaskForm):
 	id = "location_form"
@@ -57,14 +65,6 @@ class LocationForm(FlaskForm):
 		form.plot.choices = [('','Select Plot')] + PLOTS
 		return form
 
-class AddTrees(FlaskForm):
-	id = "add_trees"
-	count = IntegerField('Number of trees: ',[InputRequired(), 
-		NumberRange(min=1, max=1000, message='Register from 1-1000 plants at a time')],
-		description= "Number of new trees")
-	submit_trees = SubmitField('Register new trees')
-
-#these fields all require names (e.g. 'Country text input', even though they are not displayed) for validation to work
 class AddCountry(FlaskForm):
 	id = "add_country"
 	strip_filter = lambda x: x.strip() if x else None
@@ -101,8 +101,50 @@ class AddPlot(FlaskForm):
 		description = "Add new plot")
 	submit_plot = SubmitField('+')
 
-class FieldsForm(FlaskForm):
+#Fields
+class FieldsForm(FlaskForm): #details of plot
 	id = "fields_form"
+	strip_filter = lambda x: x.strip() if x else None
+	soil = SelectField('soil type')
+	shade_trees = SelectMultipleField('Select shade trees:', option_widget=widgets.CheckboxInput(), widget=widgets.ListWidget(prefix_label=False))
+	submit_field_details = SubmitField('submit field details')
+	@staticmethod
+	def update():
+		form = FieldsForm()
+		SOIL_TYPES = sorted(set(Lists('Soil').create_list('name','name')), key=lambda tup: tup[1])
+		SHADE_TREES = sorted(set(Lists('ShadeTree').create_list('name','name')), key=lambda tup: tup[1])
+		form.soil.choices = [('','Select Soil Type')] + SOIL_TYPES
+		form.shade_trees.choices = SHADE_TREES
+		return form
+
+class AddSoilForm(FlaskForm):
+	id = "add_soil_form"
+	strip_filter = lambda x: x.strip() if x else None
+	text_soil = StringField('Soil text input',
+		[InputRequired(),Length(min=1, max=50, message='Maximum 50 characters')],
+		filters=[strip_filter],
+		description = "Add new soil type")
+	submit_soil = SubmitField('+')
+
+class AddShadeTreeForm(FlaskForm):
+	id = "add_shade_tree_form"
+	strip_filter = lambda x: x.strip() if x else None
+	text_shade_tree = StringField('Shade Tree text input',
+		[InputRequired(),Length(min=1, max=50, message='Maximum 50 characters')],
+		filters=[strip_filter],
+		description = "Add new shade tree variety")
+	submit_shade_tree = SubmitField('+')
+
+#Trees
+class AddTrees(FlaskForm):
+	id = "add_trees"
+	count = IntegerField('Number of trees: ',[InputRequired(), 
+		NumberRange(min=1, max=1000, message='Register from 1-1000 plants at a time')],
+		description= "Number of new trees")
+	submit_trees = SubmitField('Register new trees')
+
+class CustomTreesForm(FlaskForm):
+	id = "custom_trees_Form"
 	trees_start = 	IntegerField('Start TreeID',[InputRequired(), 
 		NumberRange(min=1, max=100000, message='')],
 		description= "Start TreeID")
@@ -111,13 +153,14 @@ class FieldsForm(FlaskForm):
 		description= "End TreeID")
 	submit_fields = SubmitField('Custom Fields.csv')
 
+#Traits
 class CreateTraits(FlaskForm):
 	id = "traits_form"
 	TRAITS = Lists('Trait').get_nodes()
 	trait_dict = defaultdict(list)
 	for trait in TRAITS:
 		trait_dict[trait['group']].append((trait['name'], trait['details']))
-	general = SelectMultipleField('general', [InputRequired()],
+	general = SelectMultipleField('general',
 		choices = sorted(trait_dict['general'], 
 		key=lambda tup: tup[1]), 
 		default= ['location','variety','hybrid_parent1','hybrid_parent2','date'],
@@ -151,6 +194,8 @@ class CreateTraits(FlaskForm):
 	#		option_widget=widgets.CheckboxInput(),
 	#		widget=widgets.ListWidget(prefix_label=False)
 	#		)
+
+#Samples
 
 class AddTissueForm(FlaskForm):
 	id = "add_tissue_form"
@@ -202,3 +247,9 @@ class SampleRegForm(FlaskForm):
 		form.tissue.choices = [('','Select Tissue')] + TISSUES
 		form.storage.choices = [('','Select Storage')] + STORAGE_TYPES
 		return form
+
+#upload
+class UploadForm(FlaskForm):
+	submission_type =  SelectField('Submission type:', [InputRequired()], 
+		choices = sorted(app.config['SUBMISSION_TYPES'], key=lambda tup: tup[1]))
+	file = FileField('Select a file:', [FileRequired()])

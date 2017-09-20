@@ -176,3 +176,14 @@ class Cypher():
 		' MERGE (s)-[:STORED_IN {stored_on:$date}]->(storage)'
 		' RETURN [s.uid, p.uid, t.id, s.id, s.date, tissue.name, storage.name, p.name, f.name, r.name, c.name] '
 		' ORDER BY s.id')
+	soil_add = ('MATCH (user:User {username:$username}) '
+		' MERGE (:Soil {name :$soil}) '
+		' <-[:SUBMITTED {timeInt : timestamp()}]-(user) ' )
+	shade_tree_add = ('MATCH (user:User {username:$username}) '
+		' MERGE (:ShadeTree {name :$shade_tree}) '
+		' <-[:SUBMITTED {timeInt : timestamp()}]-(user) ' )
+	field_details_update = ('MATCH (user:User {username:$username}), '
+		' (p:Plot {plotID:$plotID}) '
+		' MERGE (p)-[h:HAS PROPERTY]-> (:Soil {name:$soil})'
+		' ON CREATE SET  '
+		' ON MATCH SET ')

@@ -7,22 +7,16 @@
 		<form action="{{ url_for('location_trees') }}" id="location_trees" method="post">
 			{{ location_form.csrf_token }}
 			{{ render_field (location_form.country) }}
-			{{ render_field (add_country.text_country) }} 
-			{{ render_field (add_country.submit_country) }}
 			{{ render_field (location_form.region) }}
-			{{ render_field (add_region.text_region) }} 
-			{{ render_field (add_region.submit_region) }}
 			{{ render_field (location_form.farm) }}
-			{{ render_field (add_farm.text_farm) }} 
-			{{ render_field (add_farm.submit_farm) }}
 			{{ render_field (location_form.plot) }}
-			{{ render_field (add_plot.text_plot) }} 
-			{{ render_field (add_plot.submit_plot) }}
+			<br><a>Add trees to the selected plot:</a><br>
 			{{ render_field (add_trees.count) }}
 			{{ render_field (add_trees.submit_trees) }}
-			{{ render_field (fields_form.trees_start) }}
-			{{ render_field (fields_form.trees_end) }}
-			{{ render_field (fields_form.submit_fields) }}
+			<br><a>Download fields.csv for the selected plot:</a><br>
+			{{ render_field (custom_trees_form.trees_start) }}
+			{{ render_field (custom_trees_form.trees_end) }}
+			{{ render_field (custom_trees_form.submit_fields) }}
 		</form>
 </div>
 {% endblock %}
@@ -34,6 +28,7 @@
 	<script type="text/javascript" src="static/d3.v4.min.js"></script>
 	<script type="text/javascript" src="static/d3_tree.js" charset="utf-8"></script>
 	<script src="static/jquery_1.8.3_min.js"></script>
-	<script src="static/location_select.js"></script>
+	<script src="static/jquery_location.js"></script>
+	<script src="static/jquery_trees.js"></script>
 </div>
 {% endblock %}

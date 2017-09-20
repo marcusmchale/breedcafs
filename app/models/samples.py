@@ -1,4 +1,5 @@
-import csv, cStringIO
+import unicodecsv as csv 
+import cStringIO
 from app import app
 from app.cypher import Cypher
 from config import uri, driver

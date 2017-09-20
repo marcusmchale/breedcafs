@@ -1,84 +1,3 @@
-update_countries = function() {
-	var request = $.ajax({
-		type: 'GET',
-		url: "/location_trees/countries/",
-	});
-	request.done(function(data){
-		var countries = [["","Select Country"]].concat(data).sort();
-		$("#country").empty();
-		for (var i = 0; i < countries.length; i++) {
-			$("#country").append(
-				$("<option></option>").attr(
-					"value", countries[i][0]).text(countries[i][1])
-			);
-		}
-	});
-}
-
-update_regions = function() {
-	var sel_country= $("#country").find(":selected").val();
-	if (sel_country !== "") {
-		var request = $.ajax({
-			type: 'GET',
-			url: "/location_trees/" + sel_country +'/',
-		});
-		request.done(function(data){
-			var regions = [["","Select Region"]].concat(data).sort();
-			$("#region").empty();
-			for (var i = 0; i < regions.length; i++) {
-				$("#region").append(
-					$("<option></option>").attr(
-						"value", regions[i][0]).text(regions[i][1])
-				);
-			}
-		});
-	}
-}
-
-update_farms = function() {
-	var sel_country= $("#country").find(":selected").val();
-	var sel_region= $("#region").find(":selected").val();
-	if (sel_country !== "" && sel_region !== "" ) {
-		var request = $.ajax({
-			type: 'GET',
-			url: "/location_trees/" + sel_country +'/' + sel_region + '/',
-		});
-		request.done(function(data){
-			var farms = [["","Select Farm"]].concat(data).sort();
-			$("#farm").empty();
-			for (var i = 0; i < farms.length; i++) {
-				$("#farm").append(
-					$("<option></option>").attr(
-						"value", farms[i][0]).text(farms[i][1])
-				);
-			}
-		});
-	}
-};
-
-update_plots = function() {
-	var sel_country = $("#country").find(":selected").val();
-	var sel_region = $("#region").find(":selected").val();
-	var sel_farm = $("#farm").find(":selected").val();
-	if (sel_country !== "" && sel_region !== "" && sel_farm !== "") {
-		var request = $.ajax({
-			type: 'GET',
-			url: "/location_trees/" + sel_country + '/' + sel_region + '/' + sel_farm + '/',
-		});
-		request.done(function(data){
-			var plots = [["","Select Plot"]].concat(data).sort();
-			$("#plot").empty();
-			for (var i = 0; i < plots.length; i++) {
-				$("#plot").append(
-					$("<option></option>").attr(
-						"value", plots[i][0]).text(plots[i][1])
-				);
-			}
-		});
-	}
-};
-
-
 update_tissues = function() {
 	var request = $.ajax({
 		type: 'GET',
@@ -94,6 +13,7 @@ update_tissues = function() {
 			);
 		}
 	});
+	$(".flash").remove();
 }
 
 update_storage = function() {
@@ -111,19 +31,10 @@ update_storage = function() {
 			);
 		}
 	});
+	$(".flash").remove();
 }
 
-$( window ).load(update_countries).load(update_regions).load(update_farms).load(update_plots).load(update_tissues).load(update_storage)
-$("#country").change(update_regions).change(update_farms).change(update_plots);
-$("#region").change(update_farms).change(update_plots);
-$("#farm").change(update_plots);
-
-//Disable submit on keypress "Enter" for all inputs boxes
-$("input").keypress( function(e) {
-	if (e.keyCode == 13) {
-		e.preventDefault();	
-	}
-})
+$( window ).load(update_tissues).load(update_storage)
 
 $("#submit_tissue").click( function(e) {
 	e.preventDefault();
