@@ -26,21 +26,40 @@ class Cypher():
 		' WHERE user.username = $username '
 		' OR user.email = $email '
 		' DELETE user ')
-	upload_submit = (' LOAD CSV WITH HEADERS FROM $filename as csvLine '
-		' MATCH (u:User {username : $username}), '
-		' (t:Tree {uid:csvLine.UID}), '
-		' (tr:Trait {name:csvLine.trait}) '
-		' MERGE (t)<-[:DATA_FROM]-(d:Data {value:csvLine.value,'
-		' timeFB:csvLine.timestamp,'
-		' person:csvLine.person, '
-		' location:csvLine.location}) '
-		' -[:DATA_FOR]->(tr)'
-		' ON MATCH SET d.found = "TRUE" '
-		' ON CREATE SET d.found = "FALSE" '
-		' CREATE (u)-[:SUBMITTED {timeInt : timestamp(), '
-		' submission_type : $submission_type }]'
-		' ->(d)'
-		' RETURN d.found')
+# Data submission (upload) is separated from retrieval to allow proper curation of submissions
+# and data structure for speed in retrieval.
+# This will require background processing to generate the retrieval structure,
+# and will be better implemented with more understanding of the data structure required (types of common queries)
+	upload_submit =	( ' MATCH (user:User {username : $username}) '
+		#so that users don't have a relationship for each submission
+		' MERGE (user)-[:SUBMITTED]-(u:UserSubmissions)'
+		' WITH u '
+		# Now we keep that node and load in the csv
+		' LOAD CSV WITH HEADERS FROM $filename as csvLine '
+		# And identify the plots and traits assessed
+		' MATCH (pl:Plot {uid:toInt(head(split(csvLine.UID, "_")))}), '
+			' (tr:Trait {name:csvLine.trait})'
+		# Data is split out to container node per plot per trait level
+		# once again to reduce the number of relationships when later searching
+		' MERGE (pl)-[:TRAIT_DATA]-> '
+			' (pts:PlotTraitData)<-[:PLOT_DATA]-(tr) '
+		# Then to allow fast identification of a users submissions 
+		# (without building a huge number of relationships to each data nodes)
+		# we store attempts to update a PlotTraitData node
+		' MERGE (u)-[:UPDATED {time:timestamp()}]-(pts) '
+		#Then create only unique data points off these containers
+		' MERGE (pts)-[:UNIQUE_SUBMISSIONS]-> '
+			' (d:Data {tree:csvLine.UID, '
+				' value:csvLine.value, '
+				' timeFB:csvLine.timestamp, '
+				' person:csvLine.person, '
+				' location:csvLine.location}) '
+			' ON MATCH SET d.found="TRUE" '
+			' ON CREATE SET d.found="FALSE", '
+			' d.submitted_by=$username, '
+			' d.submitted_on=timestamp() '
+		#And give the user feedback on their submission success
+		' RETURN d.found' )
 	country_find = ('MATCH (country:Country {name : $country}) '
 		' RETURN country ')
 	country_add = ('MATCH (user:User {username:$username}) '
@@ -184,6 +203,8 @@ class Cypher():
 		' <-[:SUBMITTED {timeInt : timestamp()}]-(user) ' )
 	field_details_update = ('MATCH (user:User {username:$username}), '
 		' (p:Plot {plotID:$plotID}) '
-		' MERGE (p)-[h:HAS PROPERTY]-> (:Soil {name:$soil})'
+		' MERGE (p)<-[:DATA FROM]-(:Data {value:$soil}-[:DATA_FOR]->(:Soil)'
 		' ON CREATE SET  '
 		' ON MATCH SET ')
+	#DECIDE whether to store data field details submission data in the relationship:
+	#  or create node for easier user submission tracking etc...can't link to a rel directly (can only add property of username/date etc.)

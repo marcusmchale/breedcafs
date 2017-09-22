@@ -30,3 +30,4 @@ class Upload(User):
 				elif record['d.found'] == 'FALSE':
 					ncount = ncount + 1
 			return [ncount, fcount]
+			#could be doing this with result.consume().counters
