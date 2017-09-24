@@ -26,45 +26,42 @@ class Cypher():
 		' WHERE user.username = $username '
 		' OR user.email = $email '
 		' DELETE user ')
-# Data submission (upload) is separated from retrieval to allow proper curation of submissions
-# and data structure for speed in retrieval.
-# This will require background processing to generate the retrieval structure,
-# and will be better implemented with more understanding of the data structure required (types of common queries)
 	upload_submit =	( ' MATCH (user:User {username : $username}) '
 		#so that users don't have a relationship for each submission
-		' MERGE (user)-[:SUBMITTED]-(u:UserSubmissions)'
+		' MERGE (user)-[:SUBMITTED_DATA_TYPE]->(u:FieldBookSubmissions)'
 		' WITH u '
 		# Now we keep that node and load in the csv
 		' LOAD CSV WITH HEADERS FROM $filename as csvLine '
 		# And identify the plots and traits assessed
-		' MATCH (pl:Plot {uid:toInt(head(split(csvLine.UID, "_")))}), '
-			' (tr:Trait {name:csvLine.trait})'
+		' MATCH (plot:Plot {uid:toInt(head(split(csvLine.UID, "_")))}), '
+			' (tree:Tree {uid:csvLine.UID}),'
+			' (trait:Trait {name:csvLine.trait}) '
 		# Data is split out to container node per plot per trait level
 		# once again to reduce the number of relationships when later searching
-		' MERGE (pl)-[:TRAIT_DATA]-> '
-			' (pts:PlotTraitData)<-[:PLOT_DATA]-(tr) '
-		# Then to allow fast identification of a users submissions 
-		# (without building a huge number of relationships to each data nodes)
-		# we store attempts to update a PlotTraitData node
-		' MERGE (u)-[:UPDATED {time:timestamp()}]-(pts) '
-		#Then create only unique data points off these containers
-		' MERGE (pts)-[:UNIQUE_SUBMISSIONS]-> '
+		' MERGE (plot)-[:TRAIT_DATA {trait:csvLine.trait}]-> '
+			' (pts:PlotTraitData {trait:csvLine.trait, plotID:toInt(head(split(csvLine.UID, "_")))}) '
+			' <-[:PLOT_DATA {plotID:toInt(head(split(csvLine.UID, "_")))}]-(trait) '
+		#Then create only unique data points off these containers then link to tree
+		#If any of tree, value, timeFB, person or location are different, a new node is created
+		' MERGE (pts)-[s:SUBMISSIONS]-> '
 			' (d:Data {tree:csvLine.UID, '
 				' value:csvLine.value, '
 				' timeFB:csvLine.timestamp, '
 				' person:csvLine.person, '
 				' location:csvLine.location}) '
+				' -[:DATA_FOR]->(tree)'
 			' ON MATCH SET d.found="TRUE" '
-			' ON CREATE SET d.found="FALSE", '
-			' d.submitted_by=$username, '
-			' d.submitted_on=timestamp() '
+			#recording details of first submission
+			' ON CREATE SET d.found="FALSE", s.username=$username, s.timestamp=timestamp()'
+		# but to allow faster identification of a users submissions we store attempts to update a PlotTrait node
+		' MERGE (u)-[:UPDATED {time:timestamp()}]-(pts)'
 		#And give the user feedback on their submission success
 		' RETURN d.found' )
 	country_find = ('MATCH (country:Country {name : $country}) '
 		' RETURN country ')
 	country_add = ('MATCH (user:User {username:$username}) '
 		' MERGE (country:Country {name :$country}) '
-		' <-[:SUBMITTED {timeInt : timestamp()}]-(user) ' )
+		' <-[:SUBMITTED {time : timestamp()}]-(user) ' )
 	region_find = ('MATCH (:Country {name : $country}) '
 		'<-[:IS_IN]-(region:Region { name:$region}) '
 		' RETURN region ')
@@ -72,7 +69,7 @@ class Cypher():
 		' (c:Country {name : $country}) '
 		' MERGE (c)<-[:IS_IN]- '
 		' (:Region { name:$region}) '
-		' <-[:SUBMITTED {timeInt : timestamp()}]-(user)')
+		' <-[:SUBMITTED {time : timestamp()}]-(user)')
 	farm_find = ('MATCH (:Country {name : $country}) '
 		' <-[:IS_IN]-(:Region { name:$region}) '
 	 	' <-[:IS_IN]-(farm:Farm { name: $farm}) '
@@ -81,7 +78,7 @@ class Cypher():
 		' (:Country {name : $country}) '
 		' <-[:IS_IN]-(r:Region {name : $region}) '
 		' MERGE (r) <-[:IS_IN]-(:Farm { name:$farm}) '
-		' <-[:SUBMITTED {timeInt : timestamp()}]-(user)')
+		' <-[:SUBMITTED {time : timestamp()}]-(user)')
 	plot_find = ('MATCH (:Country {name : $country}) '
 		' <-[:IS_IN]-(:Region { name:$region}) '
 	 	' <-[:IS_IN]-(:Farm { name: $farm}) '
@@ -105,20 +102,28 @@ class Cypher():
 		' MATCH (id:PlotID{name:"Plots"}) '
 		' SET id.count=id.count+1 '
 		' MERGE (f)<-[:IS_IN]-(:Plot { name:$plot, uid:id.count}) '
-		' <-[:SUBMITTED {timeInt : timestamp()}]-(user) '
+		' <-[:SUBMITTED {time : timestamp()}]-(user) '
 		' SET id._LOCK_ = false')
-	tree_id_lock = (' MATCH  (p:Plot {uid: $plotID})'
-		' MERGE (p)<-[:ID_COUNTER_FOR]-(id:TreeID{plotID:p.uid})' 
+	tree_id_lock = (' MATCH (p:Plot {uid: $plotID})'
+		' MERGE (p)-[:CONTAINS_TREES]->(:PlotTrees) '
+		' <-[:COUNTER_FOR]-(id:TreeCounter)'
 		' ON CREATE SET id._LOCK_ = true, id.count = 0 '
 		' ON MATCH SET id._LOCK_ = true ')
-	trees_add = ('MATCH (user:User {username:$username}), '
-		' (c:Country)<-[:IS_IN]-(r:Region)<-[:IS_IN]-(f:Farm)'
-		' <-[:IS_IN]-(p:Plot {uid: $plotID})' 
-		' MATCH (id:TreeID {plotID:p.uid}) '
+	trees_add = ('MATCH (user:User {username:$username}) '
+		' MERGE (user)-[:SUBMITTED_TREES]->(u:TreeSubmissions) '
+		' WITH u'
+		' MATCH	(c:Country)<-[:IS_IN]-(r:Region)<-[:IS_IN]-(f:Farm) '
+		' <-[:IS_IN]-(p:Plot {uid: $plotID}) '
+		' -[:CONTAINS_TREES]->(pt:PlotTrees) '
+		' <-[:COUNTER_FOR]-(id:TreeCounter) '
 		' UNWIND range(1, toInt($count)) as counter ' 
 		' SET id.count=id.count+1 '
-		' MERGE (p)<-[:IS_IN]-(t:Tree {uid:(p.uid + "_" + id.count), id:id.count}) '
-		' <-[:SUBMITTED {timeInt : timestamp()}]-(user)'
+		' MERGE (pt)-[:REGISTERED_TREE { '
+				' username:$username, '
+				' timestamp:timestamp()}]'
+			'->(t:Tree {uid:(p.uid + "_" + id.count), '
+			' id:id.count}) '
+		' MERGE (u)-[:UPDATED {time:timestamp()}]-(pt)'
 		' SET id._LOCK_ = false '
 		' RETURN [t.uid, p.uid, t.id, p.name, f.name, r.name, c.name]'
 		' ORDER BY t.id')
@@ -140,7 +145,7 @@ class Cypher():
 		' RETURN properties (p)')
 	get_submissions_range = ('MATCH (:User {username:$username})'
 		' -[s:SUBMITTED]->(d)'
-		' WHERE s.timeInt>=$starttimeInt AND s.timeInt<=$endtimeInt'
+		' WHERE s.time>=$starttime AND s.time<=$endtime'
 		' MATCH (d)-[r]-(n)'
 		' WHERE NOT type (r) IN ["SUBMITTED","ID_COUNTER_FOR"] '
 		' RETURN '
@@ -170,10 +175,10 @@ class Cypher():
 			' P.uid, T.count ')
 	tissue_add = ('MATCH (user:User {username:$username}) '
 		' MERGE (tissue:Tissue {name :$tissue}) '
-		' <-[:SUBMITTED {timeInt : timestamp()}]-(user) ' )
+		' <-[:SUBMITTED {time : timestamp()}]-(user) ' )
 	storage_add = ('MATCH (user:User {username:$username}) '
 		' MERGE (storage:Storage {name :$storage}) '
-		' <-[:SUBMITTED {timeInt : timestamp()}]-(user) ' )
+		' <-[:SUBMITTED {time : timestamp()}]-(user) ' )
 	sample_id_lock = (' MATCH  (p:Plot {uid: $plotID})'
 		' MERGE (p)<-[:ID_COUNTER_FOR]-(id:SampleID{plotID:p.uid})' 
 		' ON CREATE SET id._LOCK_ = true, id.count = 0 '
@@ -197,10 +202,10 @@ class Cypher():
 		' ORDER BY s.id')
 	soil_add = ('MATCH (user:User {username:$username}) '
 		' MERGE (:Soil {name :$soil}) '
-		' <-[:SUBMITTED {timeInt : timestamp()}]-(user) ' )
+		' <-[:SUBMITTED {time : timestamp()}]-(user) ' )
 	shade_tree_add = ('MATCH (user:User {username:$username}) '
 		' MERGE (:ShadeTree {name :$shade_tree}) '
-		' <-[:SUBMITTED {timeInt : timestamp()}]-(user) ' )
+		' <-[:SUBMITTED {time : timestamp()}]-(user) ' )
 	field_details_update = ('MATCH (user:User {username:$username}), '
 		' (p:Plot {plotID:$plotID}) '
 		' MERGE (p)<-[:DATA FROM]-(:Data {value:$soil}-[:DATA_FOR]->(:Soil)'

@@ -11,14 +11,14 @@ class Chart:
 	def _get_submissions_range(self, tx):
 		return [record for record in tx.run(Cypher.get_submissions_range, 
 			username=self.username, 
-			starttimeInt=self.starttimeInt, 
-			endtimeInt=self.endtimeInt)]
+			starttime=self.starttime, 
+			endtime=self.endtime)]
 	#get lists of submitted nodes (rels and directly linked nodes too) in json format
 	def get_submissions_range(self, username, startdate, enddate):
 		self.username=username
 		epoch = datetime.utcfromtimestamp(0)
-		self.starttimeInt =  ((datetime.strptime(startdate, '%Y-%m-%d')-epoch).total_seconds())*1000
-		self.endtimeInt =  ((datetime.strptime(enddate, '%Y-%m-%d')-epoch).total_seconds())*1000
+		self.starttime =  ((datetime.strptime(startdate, '%Y-%m-%d')-epoch).total_seconds())*1000
+		self.endtime =  ((datetime.strptime(enddate, '%Y-%m-%d')-epoch).total_seconds())*1000
 		with driver.session() as session:
 			records = session.read_transaction(self._get_submissions_range)
 		#collect all nodes/rels from records into lists of dicts
