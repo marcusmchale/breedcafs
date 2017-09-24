@@ -34,7 +34,6 @@ update_shade_trees = function() {
 
 $( window ).load(update_soil_types).load(update_shade_trees)
 
-
 //Submit soil types
 $("#submit_soil").click( function(e) {
 	e.preventDefault();

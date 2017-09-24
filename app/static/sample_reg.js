@@ -13,7 +13,6 @@ update_tissues = function() {
 			);
 		}
 	});
-	$(".flash").remove();
 }
 
 update_storage = function() {
@@ -31,11 +30,11 @@ update_storage = function() {
 			);
 		}
 	});
-	$(".flash").remove();
 }
 
 $( window ).load(update_tissues).load(update_storage)
 
+//Submit tissue
 $("#submit_tissue").click( function(e) {
 	e.preventDefault();
 	$(".flash").remove();

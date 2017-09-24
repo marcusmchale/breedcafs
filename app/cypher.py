@@ -129,7 +129,8 @@ class Cypher():
 		' ORDER BY t.id')
 	trees_get = ('MATCH (c:Country)<-[:IS_IN]'
 		' -(r:Region)<-[:IS_IN]-(f:Farm)<-[:IS_IN]-'
-		' (p:Plot {uid: $plotID})<-[:IS_IN]-(t:Tree)'
+		' (p:Plot {uid: $plotID})-[:CONTAINS_TREES]->(pt:PlotTrees) '
+		' -[:REGISTERED_TREE]->(t:Tree)'
 		' WHERE t.id>=$start '
 		' AND t.id<=$end '
 		' RETURN [t.uid, p.uid, t.id, p.name, f.name, r.name, c.name]'
@@ -162,17 +163,17 @@ class Cypher():
 		'LIMIT 100')
 	get_plots_treecount = (' '
 		' MATCH (C:Country) '
-		' OPTIONAL MATCH (C) <-[a:IS_IN]-(R:Region) '
-		' OPTIONAL MATCH (R) <-[b:IS_IN]-(F:Farm) '
-		' OPTIONAL MATCH (F) <-[c:IS_IN]-(P:Plot) '
-		' OPTIONAL MATCH (P) <-[d:ID_COUNTER_FOR]-(T:TreeID) '
+		' OPTIONAL MATCH (C) <-[:IS_IN]-(R:Region) '
+		' OPTIONAL MATCH (R) <-[:IS_IN]-(F:Farm) '
+		' OPTIONAL MATCH (F) <-[:IS_IN]-(P:Plot) '
+		' OPTIONAL MATCH (P) -[:CONTAINS_TREES]->(pt:PlotTrees) '
+		' OPTIONAL MATCH (pt) <-[:COUNTER_FOR]-(T:TreeCounter) '
 		' RETURN '
 			' labels(C)[0] as C_label, '
 			' labels(R)[0] as R_label, '
 			' labels(F)[0] as F_label, '
 			' labels(P)[0] as P_label, '
-			' C.name, R.name, F.name, P.name, '
-			' P.uid, T.count ')
+			' C.name, R.name, F.name, P.name, P.uid, T.count ' )
 	tissue_add = ('MATCH (user:User {username:$username}) '
 		' MERGE (tissue:Tissue {name :$tissue}) '
 		' <-[:SUBMITTED {time : timestamp()}]-(user) ' )
@@ -180,24 +181,38 @@ class Cypher():
 		' MERGE (storage:Storage {name :$storage}) '
 		' <-[:SUBMITTED {time : timestamp()}]-(user) ' )
 	sample_id_lock = (' MATCH  (p:Plot {uid: $plotID})'
-		' MERGE (p)<-[:ID_COUNTER_FOR]-(id:SampleID{plotID:p.uid})' 
+		' MERGE (p)<-[:SAMPLES_FROM]-(:PlotSamples) '
+		' <-[:ID_COUNTER_FOR]-(id:SampleID)'
 		' ON CREATE SET id._LOCK_ = true, id.count = 0 '
 		' ON MATCH SET id._LOCK_ = true ')
-	samples_add = ('MATCH (p:Plot {uid: $plotID})<-[:IS_IN]-(t:Tree)' 
+	samples_add = (' MATCH (p:Plot {uid: $plotID}) '
+		' -[:CONTAINS_TREES]->(pt:PlotTrees) '
+		' -[:REGISTERED_TREE]-(t:Tree) '
+		#with the selected trees to be sampled
 		' WITH t '
 		' ORDER BY t.id '
 		' WHERE t.id >= $start '
 		' AND t.id <= $end '
-		' MATCH (user:User {username:$username}), '
-		' (tissue:Tissue {name:$tissue}), '
-		' (storage:Storage {name:$storage}), '
-		' (c:Country)<-[:IS_IN]-(r:Region)<-[:IS_IN]-(f:Farm)'
-		' <-[:IS_IN]-(p:Plot {uid: $plotID})<-[:IS_IN]-(t),' 
-		' (id:SampleID {plotID:p.uid} ) '
+		' MATCH'
+			' (user:User {username:$username}), '
+			' (tissue:Tissue {name:$tissue}), '
+			' (storage:Storage {name:$storage}), '
+			' (c:Country)<-[:IS_IN]-(r:Region)<-[:IS_IN]-(f:Farm) '
+				' <-[:IS_IN]-(p:Plot {uid:$plotID})<-[:SAMPLES_FROM]-(ps:PlotSamples) '
+				' <-[:ID_COUNTER_FOR]-(id:SampleID )'
+		#store the sample linked to its tree and plot incrementing with a plot level counter
 		' SET id.count=id.count+1 '
-		' MERGE (t)<-[:SAMPLE_FROM]-(s:Sample {uid:(t.uid + "_" + id.count), id:id.count, date:$date}) '
-		' -[:SAMPLE_OF]->(tissue)'
-		' MERGE (s)-[:STORED_IN {stored_on:$date}]->(storage)'
+		' MERGE (t)<-[:SAMPLE_FROM_TREE] '
+		' -(s:Sample {uid:(t.uid + "_" + id.count),'
+			' id:id.count, date:$date, tissue:$tissue, storage:$storage}) '
+		' -[:SAMPLE_FROM_PLOT]->(ps)'
+		#track user submissions
+		' MERGE (user)-[:SUBMITTED_SAMPLES]-(ss:SampleSubmissions) '
+		' MERGE (ss)-[:UPDATED {time:timestamp()}]->(ps) '
+		#track tissue types and storage methods from plot
+		' MERGE (tissue)-[:COLLECTED_AT]->(ps) '
+		' MERGE (storage)-[:STORED_AT]->(ps) '
+		#return for csv
 		' RETURN [s.uid, p.uid, t.id, s.id, s.date, tissue.name, storage.name, p.name, f.name, r.name, c.name] '
 		' ORDER BY s.id')
 	soil_add = ('MATCH (user:User {username:$username}) '
