@@ -8,6 +8,7 @@ app.config.from_pyfile('config.py')
 
 from app import views
 
+#these are the variable view rules for retrieving lists
 app.add_url_rule('/location_trees/countries/', 
 	view_func=views.countries.as_view('countries'), 
 	methods=['GET'])
@@ -39,4 +40,3 @@ app.add_url_rule('/sample_reg/tissues/',
 app.add_url_rule('/sample_reg/storage_methods/', 
 	view_func=views.storage_methods.as_view('storage_methods'), 
 	methods=['GET'])
-

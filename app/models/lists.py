@@ -5,6 +5,7 @@ from app.cypher import Cypher
 from passlib.hash	import bcrypt
 from config import uri, driver
 #Get dicts of values matching a node in the database then generate list for forms
+#careful with any node_label functions to prevent injection - don't allow user input assigned node_labels
 class Lists:
 	def __init__(self, node_label):
 		self.node_label=node_label

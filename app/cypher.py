@@ -203,6 +203,8 @@ class Cypher():
 			' (c:Country)<-[:IS_IN]-(r:Region)<-[:IS_IN]-(f:Farm) '
 				' <-[:IS_IN]-(p:Plot {uid:$plotID})<-[:SAMPLES_FROM]-(ps:PlotSamples) '
 				' <-[:ID_COUNTER_FOR]-(id:SampleID )'
+		#with $replicates
+		' UNWIND range(1, $replicates) as replicates '
 		#store the sample linked to its tree and plot incrementing with a plot level counter
 		' SET id.count=id.count+1 '
 		' MERGE (t)<-[:SAMPLE_FROM_TREE] '

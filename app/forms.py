@@ -227,6 +227,9 @@ class SampleRegForm(FlaskForm):
 	trees_end = IntegerField('End TreeID',[InputRequired(), 
 		NumberRange(min=1, max=100000, message='')],
 		description= "End TreeID")
+	replicates = IntegerField('Replicates', [InputRequired(), 
+		NumberRange(min=1, max=10, message='')],
+		description= "Replicates")
 	tissue = SelectField('Tissue: ', [InputRequired()])
 	storage = SelectField('Tissue: ', [InputRequired()])
 	date_collected = DateField('Date collected (YYYY-mm-dd): ', [InputRequired()], format='%Y-%m-%d')

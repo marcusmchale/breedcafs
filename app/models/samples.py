@@ -25,10 +25,11 @@ class Samples:
 		tx.run(Cypher.storage_add,
 			storage = self.storage,
 			username = session['username'])
-	def add_samples(self, plotID, start, end, tissue, storage, date):
+	def add_samples(self, plotID, start, end, replicates, tissue, storage, date):
 		self.plotID = plotID
 		self.start = start
 		self.end = end
+		self.replicates = replicates
 		self.tissue = tissue
 		self.storage = storage
 		self.date = date
@@ -52,6 +53,7 @@ class Samples:
 			plotID = self.plotID,
 			start = self.start,
 			end = self.end,
+			replicates = self.replicates,
 			tissue = self.tissue,
 			storage=self.storage,
 			date=self.date,
