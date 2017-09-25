@@ -19,8 +19,11 @@ class Cypher():
 	user_register = ('MATCH (partner:Partner) '
 		' WHERE partner.name = $partner '
 		' CREATE (user:User {username : $username, '
-		' password : $password, email : $email, name : $name,'
-		' confirmed : $confirmed}) '
+			' password : $password, ' 
+			' email : $email, '
+			' name : $name, '
+			' time : timestamp(), '
+			' confirmed : $confirmed}) '
 		' -[r:Affiliated] -> (partner) ')
 	user_del = ('MATCH (user:User) '
 		' WHERE user.username = $username '
@@ -221,10 +224,13 @@ class Cypher():
 	shade_tree_add = ('MATCH (user:User {username:$username}) '
 		' MERGE (:ShadeTree {name :$shade_tree}) '
 		' <-[:SUBMITTED {time : timestamp()}]-(user) ' )
-	field_details_update = ('MATCH (user:User {username:$username}), '
+	field_details_add = ('MATCH (user:User {username:$username}), '
 		' (p:Plot {plotID:$plotID}) '
-		' MERGE (p)<-[:DATA FROM]-(:Data {value:$soil}-[:DATA_FOR]->(:Soil)'
-		' ON CREATE SET  '
-		' ON MATCH SET ')
-	#DECIDE whether to store data field details submission data in the relationship:
-	#  or create node for easier user submission tracking etc...can't link to a rel directly (can only add property of username/date etc.)
+		#create if necessary container for plot details
+		' MERGE (p)-[:DETAIL_SUBMISSIONS]-(pd:PlotDetails)'
+		#and user container plot detail submissions
+		' MERGE (user)-[:SUBMITTED_PLOT_DETAILS]-(pds:PlotDetailSubmissions)'
+		#then log the user update 
+		' MERGE (pds)-[:UPDATED {time:timestamp()}]->(pd)'
+		#and store the details with a timestamp
+		' MERGE (pd)<-[:PLOT_DETAIL]-(:Soil {name:$soil, time:timestamp()})')

@@ -29,7 +29,7 @@ class FieldDetails:
 		with driver.session() as session:
 			session.write_transaction(self._update)
 	def _update(self, tx):
-		tx.run(Cypher.field_details_update,
+		tx.run(Cypher.field_details_add,
 			plotID = self.plotID,
 			soil = self.soil,
 			shade_trees = self.shade_trees,

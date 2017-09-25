@@ -180,7 +180,7 @@ def add_field_details():
 		plotID = int(request.form['plot'])
 		soil = request.form['soil']
 		shade_trees = request.form.getlist('shade_trees')
-		FieldDetails.update(soil, shade_trees)
+		FieldDetails().update(plotID, soil, shade_trees)
 		return jsonify({"submitted": "Field details submitted"})
 	else:
 		errors = jsonify([location_form.errors, fields_form.errors])

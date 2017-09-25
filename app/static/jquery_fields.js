@@ -70,6 +70,7 @@ $("#submit_shade_tree").click( function(e) {
 			}
 		});
 	submit_shade_tree.done(update_shade_trees);
+	$("#shade_trees").load(location.href+" #shade_trees>*");
 })
 
 
