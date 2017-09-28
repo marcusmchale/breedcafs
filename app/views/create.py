@@ -18,17 +18,18 @@ from app.forms import LocationForm, \
 	AddRegion, \
 	AddFarm, \
 	AddPlot, \
+	AddBlock, \
 	FieldsForm, \
-	AddSoilForm, \
-	AddShadeTreeForm, \
 	AddTrees, \
 	CustomTreesForm, \
 	SampleRegForm, \
 	AddTissueForm, \
 	AddStorageForm, \
-	CreateTraits
+	CreateTreeTraits, \
+	CreateBlockTraits
 from app.emails import send_attachment
 from flask.views import MethodView
+from datetime import datetime
 
 @app.route('/create', methods=['GET'])
 def create():
@@ -67,16 +68,23 @@ class plots(MethodView):
 		response.content_type = 'application/json'
 		return response
 
+class blocks(MethodView):
+	def get(self, plotID):
+		blocks = Fields.get_blocks(plotID)
+		response = make_response(jsonify(blocks))
+		response.content_type = 'application/json'
+		return response
+
 @app.route('/add_country', methods=["POST"])
 def add_country():
 	form = AddCountry()
 	text_country = request.form['text_country']
 	if form.validate_on_submit():
 		if Fields(text_country).find_country():
-			return ("Country already found: " + text_country)
+			return ("Country already found: " + str(text_country))
 		else:
 			Fields(text_country).add_country()
-			return ("Country submitted: " + text_country)
+			return ("Country submitted: " + str(text_country))
 	else:
 		return form.errors["text_country"][0]
 
@@ -89,10 +97,10 @@ def add_region():
 		if country in ['','None']:
 			return ('Please select a country to register a new region')
 		elif Fields(country).find_region(text_region):
-			return ("Region already found: " + text_region)
+			return ("Region already found: " + str(text_region))
 		else:
 			Fields(country).add_region(text_region)
-			return ("Region submitted: " + text_region )
+			return ("Region submitted: " + str(text_region))
 	else:
 		return form.errors["text_region"][0]
 
@@ -106,10 +114,10 @@ def add_farm():
 		if bool(set([country,region]) & set(['','None'])):
 			return ('Please select a country and region to register a new farm')
 		elif Fields(country).find_farm(region, text_farm):
-			return ("Farm already found: " + text_farm )
+			return ("Farm already found: " + str(text_farm))
 		else:
 			Fields(country).add_farm(region, text_farm)
-			return ("Farm submitted: " + text_farm )
+			return ("Farm submitted: " + str(text_farm))
 	else:
 		return form.errors["text_farm"][0]
 
@@ -124,67 +132,112 @@ def add_plot():
 		if bool(set([country,region,farm]) & set(['','None'])):
 			return ('Please select a country, region and farm to register a new plot')
 		elif Fields(country).find_plot(region, farm, text_plot):
-			return ("Plot already found: " + text_plot )
+			return ("Plot already found: " + str(text_plot))
 		else:
 			Fields(country).add_plot(region, farm, text_plot )
-			return ("Plot submitted: " + text_plot )
+			return ("Plot submitted: " + str(text_plot))
 	else:
 		return form.errors["text_plot"][0]
 
-#Field Details
-class soil_types(MethodView):
-	def get(self):
-		soil_types = Lists('Soil').create_list('name','name')
-		response = make_response(jsonify(soil_types))
-		response.content_type = 'application/json'
-		return response
-
-class shade_trees(MethodView):
-	def get(self):
-		shade_trees = Lists('ShadeTree').create_list('name','name')
-		response = make_response(jsonify(shade_trees))
-		response.content_type = 'application/json'
-		return response
-
-@app.route('/add_soil', methods=["POST"])
-def add_soil():
-	form = AddSoilForm()
-	text_soil = request.form['text_soil']
-	if form.validate_on_submit():
-		if Lists('Soil').find_node(text_soil):
-			return ("Soil type already found: " + text_soil)
-		else:
-			FieldDetails().add_soil(text_soil)
-			return ("Soil type submitted: " + text_soil)
-	else:
-		return form.errors["text_soil"][0]
-
-@app.route('/add_shade_tree', methods=["POST"])
-def add_shade_tree():
-	form = AddShadeTreeForm()
-	text_shade_tree = request.form['text_shade_tree']
-	if form.validate_on_submit():
-		if Lists('ShadeTree').find_node(text_shade_tree):
-			return ("Shade tree already found: " + text_shade_tree)
-		else:
-			FieldDetails().add_shade_tree(text_shade_tree)
-			return ("Shade tree submitted: " + text_shade_tree)
-	else:
-		return form.errors["text_shade_tree"][0]
-
-@app.route('/add_field_details', methods=['POST'])
-def add_field_details():
+@app.route('/add_block', methods=["POST"])
+def add_block():
 	location_form = LocationForm().update()
-	fields_form = FieldsForm().update()
+	add_block_form = AddBlock()
+	if all([location_form.validate_on_submit(), add_block_form.validate_on_submit()]):
+		plotID = int(request.form['plot'])
+		text_block = request.form['text_block']
+		if plotID in ['','None']:
+			return jsonify({"submitted": "Please select a plot to register a new block"})
+		elif Fields.find_block(plotID, text_block):
+			return jsonify({"submitted": "Block already found: " + str(text_block)})
+		else:
+			Fields.add_block(plotID, text_block)
+			return jsonify({"submitted" : "Plot submitted: " + str(text_block)})
+	else:
+		errors = jsonify([location_form.errors, add_block_form.errors])
+		return errors
+
+@app.route('/generate_blocks_csv', methods=["POST"])
+def generate_blocks_csv():
+	location_form = LocationForm().update()
+	fields_form = FieldsForm()
 	if all([location_form.validate_on_submit(), fields_form.validate_on_submit()]):
 		plotID = int(request.form['plot'])
-		soil = request.form['soil']
-		shade_trees = request.form.getlist('shade_trees')
-		FieldDetails().update(plotID, soil, shade_trees)
-		return jsonify({"submitted": "Field details submitted"})
+		blocks_csv= Fields.get_blocks_csv (plotID)
+		recipients=[User(session['username']).find('')['email']]
+		subject = "BreedCAFS: Generate blocks.csv"
+		body = "You requested a blocks.csv file for blocks in plotID: " + str(plotID)
+		" These are described in the attached file that should be placed in the Field-Book field_import directory."
+		html = render_template('emails/generate_blocks.html',
+			plotID=plotID)
+		send_attachment(subject, 
+			app.config['ADMINS'][0], 
+			recipients, 
+			body, 
+			html,
+			u'BreedCAFS_plot_' + str(plotID) + '_blocks.csv',
+			'text/csv', 
+			blocks_csv)
+		#return as jsonify so that can be interpreted the same way as error message
+		return jsonify({"submitted" : "Blocks.csv sent to your email address"})
 	else:
 		errors = jsonify([location_form.errors, fields_form.errors])
 		return errors
+
+#Field Details
+#class soil_types(MethodView):
+#	def get(self):
+#		soil_types = Lists('Soil').create_list('name','name')
+#		response = make_response(jsonify(soil_types))
+#		response.content_type = 'application/json'
+#		return response
+#
+#class shade_trees(MethodView):
+#	def get(self):
+#		shade_trees = Lists('ShadeTree').create_list('name','name')
+#		response = make_response(jsonify(shade_trees))
+#		response.content_type = 'application/json'
+#		return response
+#
+#@app.route('/add_soil', methods=["POST"])
+#def add_soil():
+#	form = AddSoilForm()
+#	text_soil = request.form['text_soil']
+#	if form.validate_on_submit():
+#		if Lists('Soil').find_node(text_soil):
+#			return ("Soil type already found: " + str(text_soil))
+#		else:
+#			FieldDetails().add_soil(text_soil)
+#			return ("Soil type submitted: " + str(text_soil))
+#	else:
+#		return form.errors["text_soil"][0]
+#
+#@app.route('/add_shade_tree', methods=["POST"])
+#def add_shade_tree():
+#	form = AddShadeTreeForm()
+#	text_shade_tree = request.form['text_shade_tree']
+#	if form.validate_on_submit():
+#		if Lists('ShadeTree').find_node(text_shade_tree):
+#			return ("Shade tree already found: " + str(text_shade_tree))
+#		else:
+#			FieldDetails().add_shade_tree(text_shade_tree)
+#			return ("Shade tree submitted: " + str(text_shade_tree))
+#	else:
+#		return form.errors["text_shade_tree"][0]
+
+#@app.route('/add_field_details', methods=['POST'])
+#def add_field_details():
+#	location_form = LocationForm().update()
+#	fields_form = FieldsForm().update()
+#	if all([location_form.validate_on_submit(), fields_form.validate_on_submit()]):
+#		plotID = int(request.form['plot'])
+#		soil = request.form['soil']
+#		shade_trees = request.form.getlist('shade_trees')
+#		FieldDetails().update(plotID, soil, shade_trees)
+#		return jsonify({"submitted": "Field details submitted"})
+#	else:
+#		errors = jsonify([location_form.errors, fields_form.errors])
+#		return errors
 
 @app.route('/location_fields', methods=['GET', 'POST'])
 def location_fields():
@@ -197,18 +250,16 @@ def location_fields():
 		add_region = AddRegion()
 		add_farm = AddFarm()
 		add_plot = AddPlot()
-		fields_form = FieldsForm().update()
-		add_soil_form = AddSoilForm()
-		add_shade_tree_form = AddShadeTreeForm()
+		add_block = AddBlock()
+		fields_form = FieldsForm()
 		return render_template('location_fields.html', 
 			location_form = location_form,
 			add_country = add_country, 
 			add_region = add_region, 
 			add_farm = add_farm, 
 			add_plot = add_plot,
+			add_block = add_block,
 			fields_form = fields_form,
-			add_soil_form = add_soil_form,
-			add_shade_tree_form = add_shade_tree_form,
 			title = 'Register fields and submit details')
 
 #Trees
@@ -229,7 +280,7 @@ def location_trees():
 			location_form = location_form,
 			add_trees = add_trees, 
 			custom_trees_form = custom_trees_form,
-			title = 'Register trees and create fields.csv')
+			title = 'Register trees and create trees.csv')
 
 @app.route('/add_trees', methods=["POST"])
 def add_trees():
@@ -238,71 +289,83 @@ def add_trees():
 	if all([location_form.validate_on_submit(), add_trees_form.validate_on_submit()]):
 		plotID = int(request.form['plot'])
 		count = int(request.form['count'])
-		fields_csv=Fields.add_trees(plotID, count)
+		trees_csv=Fields.add_trees(plotID, count)
 		recipients=[User(session['username']).find('')['email']]
 		subject = "BreedCAFS: Trees registered"
+		body = "You successfully registered " + str(count) + " trees in plotID: " + str(plotID) + "." 
+		" These trees now have unique IDs (UID) and are described in the attached file." 
+		" This file should be placed in the Field-Book field_import directory."
 		html = render_template('emails/add_trees.html', 
 			count=count,
 			plotID=plotID)
 		send_attachment(subject, 
 			app.config['ADMINS'][0], 
 			recipients, 
-			'copy of fields.csv', 
+			body, 
 			html, 
-			u'BreedCAFS_fields.csv', 
+			u'BreedCAFS_plot_' + str(plotID) + '_trees_registered_' + datetime.now().strftime('%Y%m%d') + '.csv', 
 			'text/csv', 
-			fields_csv)
+			trees_csv)
 		#return as jsonify so that can be interpreted the same way as error message
-		return jsonify({"submitted" : str(count) + " trees registered and fields.csv emailed to your registered address"})
+		return jsonify({"submitted" : str(count) + " trees registered and trees.csv emailed to your registered address"})
 	else:
 		errors = jsonify([location_form.errors, add_trees_form.errors])
 		return errors
 
-@app.route('/custom_fields', methods=["POST"])
-def custom_fields():
+@app.route('/custom_trees_csv', methods=["POST"])
+def custom_trees_csv():
 	location_form = LocationForm().update()
 	custom_trees_form = CustomTreesForm()
 	if all([location_form.validate_on_submit(), custom_trees_form.validate_on_submit()]):
 		plotID = int(request.form['plot'])
 		start = int(request.form['trees_start'])
 		end = int(request.form['trees_end'])
-		fields_csv=Fields.get_trees(plotID, start, end)
+		trees_csv=Fields.get_trees(plotID, start, end)
 		recipients=[User(session['username']).find('')['email']]
-		subject = "BreedCAFS: Custom fields.csv"
-		html = render_template('emails/custom_fields.html', 
+		subject = "BreedCAFS: Custom trees.csv"
+		body = "You requested a custom trees.csv file for trees " + str(start) + " to " + str(end) + " in PlotID: " + str(plotID)
+		" These are described in the attached file. This file should be placed in the Field-Book field_import directory."
+		html = render_template('emails/custom_trees.html',
 			start=start,
 			end=end,
 			plotID=plotID)
 		send_attachment(subject, 
 			app.config['ADMINS'][0], 
 			recipients, 
-			'copy of fields.csv', 
+			body, 
 			html, 
-			u'BreedCAFS_fields.csv', 
+			u'BreedCAFS_' + str(plotID) + '_trees_' + str(start) + '-' + str(end) + '.csv', 
 			'text/csv', 
-			fields_csv)
+			trees_csv)
 		#return as jsonify so that can be interpreted the same way as error message
-		return jsonify({"submitted" : "Fields.csv sent to your email address"})
+		return jsonify({"submitted" : "Trees.csv sent to your email address"})
 	else:
 		errors = jsonify([location_form.errors, custom_trees_form.errors])
 		return errors
-#traits
 
-@app.route('/traits', methods=['GET', 'POST'])
-def select_traits():
+#traits
+@app.route('/traits/<level>/', methods=['GET', 'POST'])
+def select_traits(level):
 	if 'username' not in session:
 		flash('Please log in')
 		return redirect(url_for('login'))
 	else:
-		form = CreateTraits()
-		return render_template('traits.html', 
+		if level == 'tree':
+			form = CreateTreeTraits()
+		elif level == 'block':
+			form = CreateBlockTraits()
+		return render_template('traits_' + level + '.html', 
 			form=form, 
-			title='Select traits for traits.trt')
+			title='Select traits for ' + level + '_traits.trt')
 
-
-@app.route('/create_trt', methods=['GET', 'POST'])
-def create_trt():
-	form = CreateTraits()
+@app.route('/traits/<level>/create_trt', methods=['GET', 'POST'])
+def create_trt(level):
+	if level == 'tree':
+		form = CreateTreeTraits()
+		Level = 'Tree'
+	elif level == 'block':
+		form = CreateBlockTraits()
+		Level = 'Block'
 	if form.validate_on_submit():
 		gen = request.form.getlist('general')
 		agro = request.form.getlist('agronomic')
@@ -310,16 +373,17 @@ def create_trt():
 		photo = request.form.getlist('photosynthetic')
 		metab = request.form.getlist('metabolomic')
 		selection = gen + agro + morph + photo + metab
-		trt=Lists('Trait').create_trt(selection, 'name')
+		trt=Lists(Level + 'Trait').create_trt(selection, 'name')
 		recipients=[User(session['username']).find('')['email']]
 		subject = "BreedCAFS: traits.trt"
+		body = "You generated a " + level + "_traits.trt file in the BreedCAFS database. The file is attached to this email. "
 		html = render_template('emails/create_traits.html')
 		send_attachment(subject, 
 			app.config['ADMINS'][0], 
 			recipients, 
-			'copy of traits.trt', 
+			body, 
 			html, 
-			u'BreedCAFS_traits.trt', 
+			u'BreedCAFS_' + level +'_traits.trt', 
 			'text/csv', 
 			trt)
 		return jsonify({"submitted" : "Custom traits.trt sent to your email address"})
@@ -327,7 +391,6 @@ def create_trt():
 		return jsonify(form.errors)
 
 #Samples
-
 @app.route('/sample_reg', methods =['GET','POST'])
 def sample_reg():
 	if 'username' not in session:
@@ -356,10 +419,10 @@ def add_tissue():
 	text_tissue = request.form['text_tissue']
 	if form.validate_on_submit():
 		if Lists('Tissue').find_node(text_tissue):
-			return ("Tissue already found: " + text_tissue)
+			return ("Tissue already found: " + str(text_tissue))
 		else:
 			Samples().add_tissue(text_tissue)
-			return ("Tissue submitted: " + text_tissue)
+			return ("Tissue submitted: " + str(text_tissue))
 	else:
 		return form.errors["text_tissue"][0]
 
@@ -376,10 +439,10 @@ def add_storage():
 	text_storage = request.form['text_storage']
 	if form.validate_on_submit():
 		if Lists('Storage').find_node(text_storage):
-			return ("Storage already found: " + text_storage)
+			return ("Storage already found: " + str(text_storage))
 		else:
 			Samples().add_storage(text_storage)
-			return ("Storage submitted: " + text_storage)
+			return ("Storage submitted: " + str(text_storage))
 	else:
 		return form.errors["text_storage"][0]
 
@@ -397,6 +460,10 @@ def add_samples():
 		samples_csv = Samples().add_samples(plotID, start, end, replicates, tissue, storage, date)
 		recipients=[User(session['username']).find('')['email']]
 		subject = "BreedCAFS: Samples registered"
+		body = "You sucessfully registered " + str(replicates) + " replicates of " + str(tissue)
+		" samples stored in " + str(storage) + " on " + str(date) + " for trees from " + str(start) + " to " + str(end) + " in plotID: " + str(plotID)  + "." 
+		" These samples now have unique IDs (UID) and are described in the attached file." 
+		" Please use these ID's to label samples, track their movement and register data from analyses."
 		html = render_template('emails/add_samples.html', 
 			plotID=plotID,
 			start=start,
@@ -408,12 +475,12 @@ def add_samples():
 		send_attachment(subject,
 			app.config['ADMINS'][0],
 			recipients,
-			'copy of samples.csv',
+			body,
 			html,
 			u'BreedCAFS_samples.csv',
 			'text/csv',
 			samples_csv)
-		return jsonify({"submitted" : tissue + " samples submitted and samples.csv sent to your registered email address"})
+		return jsonify({"submitted" : str(tissue) + " samples submitted and samples.csv sent to your registered email address"})
 	else:
 		errors = jsonify(form.errors)
 		return errors

@@ -3,15 +3,11 @@ from help import help
 from upload import upload
 from user import register, confirm, login, logout
 from create import create, \
-	select_traits, \
-	location_trees, \
 	countries, \
 	regions, \
 	farms, \
 	plots, \
-	soil_types, \
-	shade_trees, \
-	sample_reg, \
+	blocks, \
 	tissues, \
 	storage_methods
 from chart import json_submissions

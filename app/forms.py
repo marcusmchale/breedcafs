@@ -101,39 +101,49 @@ class AddPlot(FlaskForm):
 		description = "Add new plot")
 	submit_plot = SubmitField('+')
 
-#Fields
+#Fields/Plots
+class AddBlock(FlaskForm):
+	id = "add_block"
+	strip_filter = lambda x: x.strip() if x else None
+	text_block = StringField('Block text input',
+		[InputRequired(),Length(min=1, max=50, message='Maximum 50 characters')],
+		filters=[strip_filter],
+		description = "Add new block")
+	submit_block = SubmitField('+')
+
 class FieldsForm(FlaskForm): #details of plot
-	id = "fields_form"
-	strip_filter = lambda x: x.strip() if x else None
-	soil = SelectField('soil type')
-	shade_trees = SelectMultipleField('Select shade trees:', option_widget=widgets.CheckboxInput(), widget=widgets.ListWidget(prefix_label=False))
-	submit_field_details = SubmitField('submit field details')
-	@staticmethod
-	def update():
-		form = FieldsForm()
-		SOIL_TYPES = sorted(set(Lists('Soil').create_list('name','name')), key=lambda tup: tup[1])
-		SHADE_TREES = sorted(set(Lists('ShadeTree').create_list('name','name')), key=lambda tup: tup[1])
-		form.soil.choices = [('','Select Soil Type')] + SOIL_TYPES
-		form.shade_trees.choices = SHADE_TREES
-		return form
+	id = "plots_csv_form"
+	generate_blocks_csv = SubmitField('Generate blocks.csv')
+	#soil = SelectField('soil type')
+	#shade_trees = SelectMultipleField('Select shade trees:', option_widget=widgets.CheckboxInput(), widget=widgets.ListWidget(prefix_label=False))
+	
+	#@staticmethod
+	#def update():
+	#	form = FieldsForm()
+	#	SOIL_TYPES = sorted(set(Lists('Soil').create_list('name','name')), key=lambda tup: tup[1])
+	#	SHADE_TREES = sorted(set(Lists('ShadeTree').create_list('name','name')), key=lambda tup: tup[1])
+	#	form.soil.choices = [('','Select Soil Type')] + SOIL_TYPES
+	#	form.shade_trees.choices = SHADE_TREES
+	#	return form
 
-class AddSoilForm(FlaskForm):
-	id = "add_soil_form"
-	strip_filter = lambda x: x.strip() if x else None
-	text_soil = StringField('Soil text input',
-		[InputRequired(),Length(min=1, max=50, message='Maximum 50 characters')],
-		filters=[strip_filter],
-		description = "Add new soil type")
-	submit_soil = SubmitField('+')
-
-class AddShadeTreeForm(FlaskForm):
-	id = "add_shade_tree_form"
-	strip_filter = lambda x: x.strip() if x else None
-	text_shade_tree = StringField('Shade Tree text input',
-		[InputRequired(),Length(min=1, max=50, message='Maximum 50 characters')],
-		filters=[strip_filter],
-		description = "Add new shade tree variety")
-	submit_shade_tree = SubmitField('+')
+#move these forms to a traits section -allow users to enter new values for traits?
+#class AddSoilForm(FlaskForm):
+#	id = "add_soil_form"
+#	strip_filter = lambda x: x.strip() if x else None
+#	text_soil = StringField('Soil text input',
+#		[InputRequired(),Length(min=1, max=50, message='Maximum 50 characters')],
+#		filters=[strip_filter],
+#		description = "Add new soil type")
+#	submit_soil = SubmitField('+')
+#
+#class AddShadeTreeForm(FlaskForm):
+#	id = "add_shade_tree_form"
+#	strip_filter = lambda x: x.strip() if x else None
+#	text_shade_tree = StringField('Shade Tree text input',
+#		[InputRequired(),Length(min=1, max=50, message='Maximum 50 characters')],
+#		filters=[strip_filter],
+#		description = "Add new shade tree variety")
+#	submit_shade_tree = SubmitField('+')
 
 #Trees
 class AddTrees(FlaskForm):
@@ -151,12 +161,31 @@ class CustomTreesForm(FlaskForm):
 	trees_end = IntegerField('End TreeID',[InputRequired(), 
 		NumberRange(min=1, max=100000, message='')],
 		description= "End TreeID")
-	submit_fields = SubmitField('Custom Fields.csv')
+	custom_trees_csv = SubmitField('Custom trees.csv')
 
 #Traits
-class CreateTraits(FlaskForm):
-	id = "traits_form"
-	TRAITS = Lists('Trait').get_nodes()
+class CreateBlockTraits(FlaskForm):
+	id = "block_traits_form"
+	TRAITS = Lists('BlockTrait').get_nodes()
+	trait_dict = defaultdict(list)
+	for trait in TRAITS:
+		trait_dict[trait['group']].append((trait['name'], trait['details']))
+	general = SelectMultipleField('general',
+		choices = sorted(trait_dict['general'], 
+		key=lambda tup: tup[1]), 
+		default= ['location'],
+		option_widget=widgets.CheckboxInput(),
+		widget=widgets.ListWidget(prefix_label=False)
+		)
+	agronomic = SelectMultipleField('agronomic',
+		choices = sorted(trait_dict['agronomic'], key=lambda tup: tup[1]), 
+		option_widget=widgets.CheckboxInput(),
+		widget=widgets.ListWidget(prefix_label=False)
+		)	
+
+class CreateTreeTraits(FlaskForm):
+	id = "tree_traits_form"
+	TRAITS = Lists('TreeTrait').get_nodes()
 	trait_dict = defaultdict(list)
 	for trait in TRAITS:
 		trait_dict[trait['group']].append((trait['name'], trait['details']))
@@ -187,16 +216,8 @@ class CreateTraits(FlaskForm):
 		option_widget=widgets.CheckboxInput(),
 		widget=widgets.ListWidget(prefix_label=False)
 		)	
-	# the below didn't work so repeated myself above - should look into programatic field generation
-	#for group in trait_dict:
-	#	group = SelectMultipleField(group, [InputRequired()], 
-	#		choices = sorted(trait_dict[group], key=lambda tup: tup[1]), 
-	#		option_widget=widgets.CheckboxInput(),
-	#		widget=widgets.ListWidget(prefix_label=False)
-	#		)
 
 #Samples
-
 class AddTissueForm(FlaskForm):
 	id = "add_tissue_form"
 	strip_filter = lambda x: x.strip() if x else None

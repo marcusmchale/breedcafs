@@ -3,8 +3,8 @@
 <div class="text_body">
 	{% from "_formhelpers.html" import render_field %}
 	<h2>Fieldbook tools</h2>
-	<h3>Create traits.trt</h3>
-		<form action="{{ url_for('select_traits') }}" method="post">
+	<h3>Create tree_traits.trt</h3>
+		<form action="{{ url_for('select_traits', level='tree') }}" method="post">
 		{{ form.csrf_token }}
 			<dl>{{ render_field(form.general) }}</dl>
 			<dl>{{ render_field(form.agronomic) }}</dl>
@@ -13,7 +13,7 @@
 			<dl>{{ render_field(form.metabolomic) }}</dl>
 			<input id="submit_traits" type="submit" value="Create">
 		</form>
-	<script src="static/jquery_1.8.3_min.js"></script>
-	<script src="static/jquery_traits.js"></script>
 </div>
+<script src="{{ url_for('static', filename='jquery_1.8.3_min.js') }}"></script>
+<script src="{{ url_for('static', filename='jquery_traits.js') }}"></script>
 {% endblock %}

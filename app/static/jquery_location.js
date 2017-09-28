@@ -3,7 +3,7 @@
 update_countries = function() {
 	var request = $.ajax({
 		type: 'GET',
-		url: "/location_trees/countries/",
+		url: "/location/countries/",
 	});
 	request.done(function(data){
 		var countries = [["","Select Country"]].concat(data).sort();
@@ -22,7 +22,7 @@ update_regions = function() {
 	if (sel_country !== "") {
 		var request = $.ajax({
 			type: 'GET',
-			url: "/location_trees/" + sel_country +'/',
+			url: "/location/" + sel_country +'/',
 		});
 		request.done(function(data){
 			var regions = [["","Select Region"]].concat(data).sort();
@@ -43,7 +43,7 @@ update_farms = function() {
 	if (sel_country !== "" && sel_region !== "" ) {
 		var request = $.ajax({
 			type: 'GET',
-			url: "/location_trees/" + sel_country +'/' + sel_region + '/',
+			url: "/location/" + sel_country +'/' + sel_region + '/',
 		});
 		request.done(function(data){
 			var farms = [["","Select Farm"]].concat(data).sort();
@@ -65,7 +65,7 @@ update_plots = function() {
 	if (sel_country !== "" && sel_region !== "" && sel_farm !== "") {
 		var request = $.ajax({
 			type: 'GET',
-			url: "/location_trees/" + sel_country + '/' + sel_region + '/' + sel_farm + '/',
+			url: "/location/" + sel_country + '/' + sel_region + '/' + sel_farm + '/',
 		});
 		request.done(function(data){
 			var plots = [["","Select Plot"]].concat(data).sort();
@@ -80,10 +80,15 @@ update_plots = function() {
 	}
 };
 
+remove_flash = function() {
+	$(".flash").remove();
+}
+
 $( window ).load(update_countries).load(update_regions).load(update_farms).load(update_plots)
-$("#country").change(update_regions).change(update_farms).change(update_plots);
-$("#region").change(update_farms).change(update_plots);
-$("#farm").change(update_plots);
+$("#country").change(update_regions).change(update_farms).change(update_plots).change(remove_flash);
+$("#region").change(update_farms).change(update_plots).change(remove_flash);
+$("#farm").change(update_plots).change(remove_flash);
+$('#plot').change(remove_flash);
 
 //Disable submit on keypress "Enter" for all inputs boxes
 $("input").keypress( function(e) {
@@ -96,7 +101,7 @@ $("input").keypress( function(e) {
 //Submit locations
 $("#submit_country").click( function(e) {
 	e.preventDefault();
-	$(".flash").remove();
+	remove_flash();
 	var submit_country = $.ajax({
 			url: "/add_country",
 			data: $("form").serialize(),
@@ -114,7 +119,7 @@ $("#submit_country").click( function(e) {
 
 $("#submit_region").click( function(e) {
 	e.preventDefault();
-	$(".flash").remove();
+	remove_flash();
 	var submit_region = $.ajax({
 			url: "/add_region",
 			data: $("form").serialize(),
@@ -132,7 +137,7 @@ $("#submit_region").click( function(e) {
 
 $("#submit_farm").click( function(e) {
 	e.preventDefault();
-	$(".flash").remove();
+	remove_flash();
 	var submit_farm = $.ajax({
 			url: "/add_farm",
 			data: $("form").serialize(),
@@ -151,7 +156,7 @@ $("#submit_farm").click( function(e) {
 
 $("#submit_plot").click( function(e) {
 	e.preventDefault();
-	$(".flash").remove();
+	remove_flash();
 	var submit_plot = $.ajax({
 		url: "/add_plot",
 		data: $("form").serialize(),

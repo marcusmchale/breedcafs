@@ -1,8 +1,7 @@
-
 //register new trees
 $("#submit_trees").click( function(e) {
 	e.preventDefault();
-	$(".flash").remove();
+	remove_flash();
 	wait_message = "Please wait for trees to be registered and files generated"
 	flash_wait = "<div id='trees_flash' class='flash'>" + wait_message + "</div>"
 	$("#submit_trees").after(flash_wait)
@@ -38,15 +37,15 @@ $("#submit_trees").click( function(e) {
 	submit_trees.done(load_chart);
 })
 
-//get custom fields.csv
-$("#submit_fields").click( function(e) {
+//get custom trees.csv
+$("#custom_trees_csv").click( function(e) {
 	e.preventDefault();
-	$(".flash").remove();
+	remove_flash();
 	wait_message = "Please wait for file to be generated";
 	flash_wait = "<div id='fields_flash' class='flash'>" + wait_message + "</div>";
 	$(this).after(flash_wait)
-	var submit_fields = $.ajax({
-		url: "/custom_fields",
+	var custom_trees_csv = $.ajax({
+		url: "/custom_trees_csv",
 		data: $("form").serialize(),
 		type: 'POST',
 		success: function(response) {

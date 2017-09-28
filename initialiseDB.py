@@ -144,12 +144,12 @@ class Create:
 					print ('Created: '  + record['p.name'] + ' OPERATES_IN ' + record['c.name'])
 				else:
 					print ('Error with merger of relationship OPERATES_IN for ' + record['p.name'])
-	def traits(self, tx):
-		with open ('traits.csv', 'rb') as traits_csv:
+	def traits(self, tx, traits_file, level):
+		with open (traits_file, 'rb') as traits_csv:
 			reader = csv.DictReader(traits_csv, delimiter=',', quotechar='"')
 			for trait in reader: 
 				trait_create = tx.run('MATCH (u:User {username:$username}) '
-				' MERGE (t:Trait {group: $group, '
+				' MERGE (t:' + level +'Trait {group: $group, '
 					' name: $trait, '
 					' format: $format, '
 					' defaultValue: $defaultValue, '
@@ -174,11 +174,11 @@ class Create:
 					categories=trait['categories'])
 				for record in trait_create:
 					if record['t.found']=='TRUE':
-						print ('Found: trait ' + trait['name'])
+						print ('Found: ' + level + 'Trait ' + trait['name'])
 					elif record['t.found]'=='FALSE']:
-						print ('Created: trait ' + trait['name'])
+						print ('Created: '+ level + 'Trait ' + trait['name'])
 					else:
-						print ('Error with merger of trait ' + trait['name'])
+						print ('Error with merger of ' + level +'Trait ' + trait['name'])
 if not confirm('Are you sure you want to proceed? This is should probably only be run when setting up the database'):
 	sys.exit()
 else:
@@ -194,5 +194,6 @@ else:
 	with driver.session() as session:
 		session.write_transaction(Create('start').user)
 		session.write_transaction(Create('start').partners, PARTNERS)
-		session.write_transaction(Create('start').traits)
+		session.write_transaction(Create('start').traits, 'tree_traits.csv', 'Tree')
+		session.write_transaction(Create('start').traits, 'block_traits.csv', 'Block')
 	print ('Complete')

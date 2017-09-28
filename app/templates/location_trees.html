@@ -13,10 +13,10 @@
 			<br><a>Add trees to the selected plot:</a><br>
 			{{ render_field (add_trees.count) }}
 			{{ render_field (add_trees.submit_trees) }}
-			<br><a>Download fields.csv for the selected plot:</a><br>
+			<br><a>Download trees.csv for the selected plot:</a><br>
 			{{ render_field (custom_trees_form.trees_start) }}
 			{{ render_field (custom_trees_form.trees_end) }}
-			{{ render_field (custom_trees_form.submit_fields) }}
+			{{ render_field (custom_trees_form.custom_trees_csv) }}
 		</form>
 </div>
 {% endblock %}
@@ -24,11 +24,11 @@
 <div class="chart">
 	<p>Registered plots and counts of trees (click to expand/collapse)</p>
 	<svg width=500 height=500></svg>
-	<script>jsonData = "/json_plots_treecount";</script>
-	<script type="text/javascript" src="static/d3.v4.min.js"></script>
-	<script type="text/javascript" src="static/d3_tree.js" charset="utf-8"></script>
-	<script src="static/jquery_1.8.3_min.js"></script>
-	<script src="static/jquery_location.js"></script>
-	<script src="static/jquery_trees.js"></script>
 </div>
+<script>jsonData = "/json_plots_treecount";</script>
+<script type="text/javascript" src="static/d3.v4.min.js"></script>
+<script type="text/javascript" src="static/d3_tree.js" charset="utf-8"></script>
+<script src="static/jquery_1.8.3_min.js"></script>
+<script src="static/jquery_location.js"></script>
+<script src="static/jquery_trees.js"></script>
 {% endblock %}

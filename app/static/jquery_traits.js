@@ -1,3 +1,4 @@
+//select all boxes
 $('ul').each( function () {
 	$(this).before("<input id='select_all_" + $(this).attr('id') + "' type='checkbox'>");
 })
@@ -11,8 +12,10 @@ $('ul').prev().change(function () {
 	}
 })
 
+//generate traits.csv
 $('#submit_traits').click( function(e) {
 	e.preventDefault();
+	level = $("form").attr('action').split('/').slice(-2,-1);
 	$(".flash").remove();
 	wait_message = "Please wait for file to be generated"
 	flash_wait = "<div id='traits_flash' class='flash'>" + wait_message + "</div>"
@@ -29,8 +32,9 @@ $('#submit_traits').click( function(e) {
 		flash_select = "<div id='traits_flash' class='flash'>" + select_message + "</div>"
 		$("#traits_flash").replaceWith(flash_select)
 	} else {
+		console.log($("form").serialize())
 		var submit_traits = $.ajax({
-			url: "/create_trt",
+			url: "/traits/" + level + "/create_trt",
 			data: $("form").serialize(),
 			type: 'POST',
 			success: function(response) {

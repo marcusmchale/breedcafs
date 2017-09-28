@@ -48,15 +48,18 @@ class User:
 			return bcrypt.verify(password, user['password'])
 		else:
 			return False
-#This is a classmethod as doesn't need username
+#These are classmethods as they don't need a username
 	@classmethod
 	def confirm_email(cls, email):
 		with driver.session() as session:
-			with session.begin_transaction() as tx:
-				tx.run(Cypher.confirm_email, email=email)
-#This is a classmethod so that it doesn't need username
+			session.write_transaction(cls._confirm_email, email=email)
+	@classmethod
+	def _confirm_email(cls, tx, email):
+		tx.run(Cypher.confirm_email, email=email)
 	@classmethod
 	def password_reset(cls, email, password):
 		with driver.session() as session:
-			with session.begin_transaction() as tx:
-				tx.run(Cypher.password_reset, email=email, password=bcrypt.encrypt(password))
+			session.write_transaction(cls._password_reset, email=email, password=password)
+	@classmethod		
+	def _password_reset(cls, tx, email, password):
+		tx.run(Cypher.password_reset, email=email, password=bcrypt.encrypt(password))

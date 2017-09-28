@@ -18,14 +18,12 @@
 			{{ render_field (location_form.plot) }}
 			{{ render_field (add_plot.text_plot) }} 
 			{{ render_field (add_plot.submit_plot) }}
-			<br><a>Add details to the selected plot</a><br>
-			{{ render_field (fields_form.soil) }}
-			{{ render_field (add_soil_form.text_soil) }} 
-			{{ render_field (add_soil_form.submit_soil) }}
-			{{ render_field (fields_form.shade_trees) }}
-			{{ render_field (add_shade_tree_form.text_shade_tree) }} 
-			{{ render_field (add_shade_tree_form.submit_shade_tree) }}
-			{{ render_field (fields_form.submit_field_details) }}
+			<br><a>Generate a blocks.csv</a><br>
+			{{ render_field (fields_form.generate_blocks_csv) }}
+			<br><br><a>Add treatment blocks to the selected plot</a><br><br>
+			{{ render_field (add_block.text_block) }}
+			{{ render_field (add_block.submit_block) }}
+
 		</form>
 </div>
 {% endblock %}
@@ -33,11 +31,11 @@
 <div class="chart">
 	<p>Registered plots and counts of trees (click to expand/collapse)</p>
 	<svg width=500 height=500></svg>
-	<script>jsonData = "/json_plots_treecount";</script>
-	<script type="text/javascript" src="static/d3.v4.min.js"></script>
-	<script type="text/javascript" src="static/d3_tree.js" charset="utf-8"></script>
-	<script src="static/jquery_1.8.3_min.js"></script>
-	<script src="static/jquery_location.js"></script>
-	<script src="static/jquery_fields.js"></script>
 </div>
+<script>jsonData = "/json_plots_treecount";</script>
+<script type="text/javascript" src="static/d3.v4.min.js"></script>
+<script type="text/javascript" src="static/d3_tree.js" charset="utf-8"></script>
+<script src="static/jquery_1.8.3_min.js"></script>
+<script src="static/jquery_location.js"></script>
+<script src="static/jquery_fields.js"></script>
 {% endblock %}

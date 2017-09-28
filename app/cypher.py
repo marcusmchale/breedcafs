@@ -36,14 +36,14 @@ class Cypher():
 		# Now we keep that node and load in the csv
 		' LOAD CSV WITH HEADERS FROM $filename as csvLine '
 		# And identify the plots and traits assessed
-		' MATCH (plot:Plot {uid:toInt(head(split(csvLine.UID, "_")))}), '
+		' MATCH (plot:Plot {uid:toInteger(head(split(csvLine.UID, "_")))}), '
 			' (tree:Tree {uid:csvLine.UID}),'
 			' (trait:Trait {name:csvLine.trait}) '
 		# Data is split out to container node per plot per trait level
 		# once again to reduce the number of relationships when later searching
 		' MERGE (plot)-[:TRAIT_DATA {trait:csvLine.trait}]-> '
-			' (pts:PlotTraitData {trait:csvLine.trait, plotID:toInt(head(split(csvLine.UID, "_")))}) '
-			' <-[:PLOT_DATA {plotID:toInt(head(split(csvLine.UID, "_")))}]-(trait) '
+			' (pts:PlotTraitData {trait:csvLine.trait, plotID:toInteger(head(split(csvLine.UID, "_")))}) '
+			' <-[:PLOT_DATA {plotID:toInteger(head(split(csvLine.UID, "_")))}]-(trait) '
 		#Then create only unique data points off these containers then link to tree
 		#If any of tree, value, timeFB, person or location are different, a new node is created
 		' MERGE (pts)-[s:SUBMISSIONS]-> '
@@ -87,6 +87,9 @@ class Cypher():
 	 	' <-[:IS_IN]-(:Farm { name: $farm}) '
 	 	' <-[:IS_IN]-(plot:Plot { name: $plot}) '
 	 	' RETURN plot.name as name')
+	block_find = ('MATCH (:Plot {uid: $plotID})-[CONTAINS_BLOCKS]-(:PlotBlocks) '
+		' -[:REGISTERED_BLOCK]-(b:Block {name:$block})'
+	 	' RETURN b.name as name')
 #for autoincrement:
 # https://stackoverflow.com/questions/32040409/reliable-autoincrementing-identifiers-for-all-nodes-relationships-in-neo4j
 # for lock:
@@ -107,6 +110,33 @@ class Cypher():
 		' MERGE (f)<-[:IS_IN]-(:Plot { name:$plot, uid:id.count}) '
 		' <-[:SUBMITTED {time : timestamp()}]-(user) '
 		' SET id._LOCK_ = false')
+	block_find = ('MATCH (:Plot {uid: $plotID}) '
+		' -[:CONTAINS_BLOCKS]-(:PlotBlocks) '
+		' -[:REGISTERED_BLOCK]->(b:Block {name: $block}) '
+	 	' RETURN b.name as name')
+	block_id_lock = (' MATCH (p:Plot {uid: $plotID})'
+		' MERGE (p)-[:CONTAINS_BLOCKS]->(:PlotBlocks) '
+		' <-[:COUNTER_FOR]-(id:PlotBlockCounter)'
+		' ON CREATE SET id._LOCK_ = true, id.count = 0 '
+		' ON MATCH SET id._LOCK_ = true ')
+	block_add = ('MATCH (user:User {username:$username}) '
+		' MERGE (user)-[:SUBMITTED_BLOCKS]->(u:BlockSubmissions) '
+		' WITH u '
+		' MATCH (:Plot {uid: $plotID})-[:CONTAINS_BLOCKS]->(pb:PlotBlocks)'
+			' <-[:COUNTER_FOR]-(id:PlotBlockCounter) '
+		' SET id.count=id.count+1 '
+		' MERGE (pb)-[:REGISTERED_BLOCK { '
+			' username:$username, '
+			' timestamp:timestamp()}]'
+			' ->(:Block {name:$block, uid:($plotID + "_" + "B" + id.count), id:id.count}) '
+		' MERGE (pb)<-[:UPDATED {time : timestamp()}]-(u) '
+		' SET id._LOCK_ = false')
+	get_blocks_csv = ('MATCH (c:Country)<-[:IS_IN]'
+		' -(r:Region)<-[:IS_IN]-(f:Farm)<-[:IS_IN]-'
+		' (p:Plot {uid: $plotID})-[:CONTAINS_BLOCKS]->(pb:PlotBlocks) '
+		' -[:REGISTERED_BLOCK]->(b:Block)'
+		' RETURN [b.uid, p.uid, b.id, p.name, f.name, r.name, c.name]'
+		' ORDER BY b.id')
 	tree_id_lock = (' MATCH (p:Plot {uid: $plotID})'
 		' MERGE (p)-[:CONTAINS_TREES]->(:PlotTrees) '
 		' <-[:COUNTER_FOR]-(id:TreeCounter)'
@@ -119,7 +149,7 @@ class Cypher():
 		' <-[:IS_IN]-(p:Plot {uid: $plotID}) '
 		' -[:CONTAINS_TREES]->(pt:PlotTrees) '
 		' <-[:COUNTER_FOR]-(id:TreeCounter) '
-		' UNWIND range(1, toInt($count)) as counter ' 
+		' UNWIND range(1, toInteger($count)) as counter ' 
 		' SET id.count=id.count+1 '
 		' MERGE (pt)-[:REGISTERED_TREE { '
 				' username:$username, '
@@ -147,6 +177,9 @@ class Cypher():
 		' <-[:IS_IN]-(:Farm { name:$farm}) '
 		' <-[:IS_IN]-(p:Plot) '
 		' RETURN properties (p)')
+	get_blocks = ('MATCH (:Plot {uid: toInteger($plotID)})-[:CONTAINS_BLOCKS]->(:PlotBlocks) '
+		' -[:REGISTERED_BLOCK]->(b:Block) '
+		' RETURN properties (b)')
 	get_submissions_range = ('MATCH (:User {username:$username})'
 		' -[s:SUBMITTED]->(d)'
 		' WHERE s.time>=$starttime AND s.time<=$endtime'
@@ -220,19 +253,20 @@ class Cypher():
 		#return for csv
 		' RETURN [s.uid, p.uid, t.id, s.id, s.date, tissue.name, storage.name, p.name, f.name, r.name, c.name] '
 		' ORDER BY s.id')
-	soil_add = ('MATCH (user:User {username:$username}) '
-		' MERGE (:Soil {name :$soil}) '
-		' <-[:SUBMITTED {time : timestamp()}]-(user) ' )
-	shade_tree_add = ('MATCH (user:User {username:$username}) '
-		' MERGE (:ShadeTree {name :$shade_tree}) '
-		' <-[:SUBMITTED {time : timestamp()}]-(user) ' )
-	field_details_add = ('MATCH (user:User {username:$username}), '
-		' (p:Plot {plotID:$plotID}) '
-		#create if necessary container for plot details
-		' MERGE (p)-[:DETAIL_SUBMISSIONS]-(pd:PlotDetails)'
-		#and user container plot detail submissions
-		' MERGE (user)-[:SUBMITTED_PLOT_DETAILS]-(pds:PlotDetailSubmissions)'
-		#then log the user update 
-		' MERGE (pds)-[:UPDATED {time:timestamp()}]->(pd)'
-		#and store the details with a timestamp
-		' MERGE (pd)<-[:PLOT_DETAIL]-(:Soil {name:$soil, time:timestamp()})')
+
+#	soil_add = ('MATCH (user:User {username:$username}) '
+#		' MERGE (:Soil {name :$soil}) '
+#		' <-[:SUBMITTED {time : timestamp()}]-(user) ' )
+#	shade_tree_add = ('MATCH (user:User {username:$username}) '
+#		' MERGE (:ShadeTree {name :$shade_tree}) '
+#		' <-[:SUBMITTED {time : timestamp()}]-(user) ' )
+#	field_details_add = ('MATCH (user:User {username:$username}), '
+#		' (p:Plot {plotID:$plotID}) '
+#		#create if necessary container for plot details
+#		' MERGE (p)-[:DETAIL_SUBMISSIONS]-(pd:PlotDetails)'
+#		#and user container plot detail submissions
+#		' MERGE (user)-[:SUBMITTED_PLOT_DETAILS]-(pds:PlotDetailSubmissions)'
+#		#then log the user update 
+#		' MERGE (pds)-[:UPDATED {time:timestamp()}]->(pd)'
+#		#and store the details with a timestamp
+#		' MERGE (pd)<-[:PLOT_DETAIL]-(:Soil {name:$soil, time:timestamp()})')

@@ -1,13 +1,24 @@
 {% extends "layout.html" %}	
 {% block body %}
 <div class="text_body">
-	<h2><a href="{{ url_for('location_fields') }}">Fields</a></h2>
-		<dl>Register fields and submit relevant data</dl>
-	<h2><a href="{{ url_for('location_trees') }}">Trees</a></h2>
-		<dl>Register trees and export fields.csv for Field-Book</dl>
-	<h2><a href="{{ url_for('select_traits') }}">Traits</a></h2>
-		<dl>Create a custom traits.trt file for import to Field-Book</dl>
-	<h2><a href="{{ url_for('sample_reg') }}">Samples</a></h2>
-		<dl>Register samples and export sample ID's</dl>
+	<h2>Fields</h2>
+		<dl>
+			<dt><a href="{{ url_for('location_fields') }}">Register fields</a></dt>
+			<dd>Register field locations and export blocks.csv for Field-Book</dd>
+			<dt><a href="{{ url_for('select_traits', level='block') }}">Select block traits</a></dt>
+			<dd>Create a custom block_traits.trt for import to Field-Book</dd>
+		</dl>
+	<h2>Trees</h2>
+		<dl>
+			<dt><a href="{{ url_for('location_trees') }}">Register trees</a></dt>
+			<dd>Register trees and export trees.csv for Field-Book</dd>
+			<dt><a href="{{ url_for('select_traits', level='tree') }}">Select tree traits</a></dt>
+			<dd>Create a custom tree_traits.trt for import to Field-Book</dd>
+		</dl>
+	<h2>Samples</h2>
+		<dl>
+			<dt><a href="{{ url_for('sample_reg') }}">Register samples</a></dt>
+			<dd>Register samples and export sample ID's</dd>
+		</dl>
 </div>
 {% endblock %}

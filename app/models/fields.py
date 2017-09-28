@@ -85,10 +85,36 @@ class Fields:
 		tx.run(Cypher.plot_id_lock)
 		tx.run(Cypher.plot_add, 
 			country = self.country, 
-			region=self.region, 
-			farm=self.farm, 
-			plot=self.plot, 
-			username=session['username'])
+			region = self.region, 
+			farm = self.farm, 
+			plot = self.plot, 
+			username = session['username'])
+	@classmethod #has plotID so doesn't need country
+	def find_block(cls, plotID, block):
+		cls.plotID = plotID
+		cls.block = block
+		with driver.session() as session:
+			return session.read_transaction(cls._find_block)
+	@classmethod #has plotID so doesn't need country
+	def _find_block(cls, tx):
+		for record in tx.run(Cypher.block_find, 
+			plotID = cls.plotID,
+			block = cls.block):
+			return (record['name'])
+	@classmethod #has plotID so doesn't need country
+	def add_block(cls, plotID, block):
+		cls.plotID=plotID
+		cls.block=block
+		with driver.session() as session:
+			session.write_transaction(cls._add_block)
+	@classmethod #has plotID so doesn't need country
+	def _add_block (cls, tx):
+		tx.run(Cypher.block_id_lock,
+			plotID = cls.plotID)
+		tx.run(Cypher.block_add, 
+			plotID = cls.plotID,
+			block = cls.block,
+			username = session['username'])
 	@classmethod #has plotID so doesn't need country
 	def add_trees(cls, plotID, count):
 		cls.plotID = plotID
@@ -96,16 +122,16 @@ class Fields:
 		with driver.session() as session:
 			session.write_transaction(cls._add_trees)
 		fieldnames = ['UID','PlotID','TreeID', 'Plot', 'Farm', 'Region', 'Country']
-		fields_csv = cStringIO.StringIO()
-		writer = csv.DictWriter(fields_csv,
+		trees_csv = cStringIO.StringIO()
+		writer = csv.DictWriter(trees_csv,
 			fieldnames=fieldnames,
 			quoting=csv.QUOTE_ALL,
 			extrasaction='ignore')
 		writer.writeheader()
 		for tree in cls.id_list:
 			writer.writerow(tree)
-		fields_csv.seek(0)
-		return fields_csv
+		trees_csv.seek(0)
+		return trees_csv
 	@classmethod #has plotID so doesn't need country
 	def _add_trees(cls, tx):
 		tx.run(Cypher.tree_id_lock,
@@ -130,16 +156,16 @@ class Fields:
 		with driver.session() as session:
 			session.read_transaction(cls._get_trees)
 		fieldnames = ['UID','PlotID','TreeID', 'Plot', 'Farm', 'Region', 'Country']
-		fields_csv = cStringIO.StringIO()
-		writer = csv.DictWriter(fields_csv,
+		trees_csv = cStringIO.StringIO()
+		writer = csv.DictWriter(trees_csv,
 			fieldnames=fieldnames,
 			quoting=csv.QUOTE_ALL,
 			extrasaction='ignore')
 		writer.writeheader()
 		for tree in cls.id_list:
 			writer.writerow(tree)
-		fields_csv.seek(0)
-		return fields_csv
+		trees_csv.seek(0)
+		return trees_csv
 	@classmethod #has plotID so doesn't need country
 	def _get_trees(cls, tx):
 		result=tx.run(Cypher.trees_get, 
@@ -176,4 +202,42 @@ class Fields:
 			farm=self.farm)
 		dict_result= [record[0] for record in result]
 		return [(str(node['uid']), node['name']) for node in dict_result]
-
+	@classmethod #has plotID so doesn't need country
+	def get_blocks(cls, plotID):
+		cls.plotID = plotID
+		with driver.session() as session:
+			return session.read_transaction(cls._get_blocks)
+	@classmethod #has plotID so doesn't need country
+	def _get_blocks(cls, tx):
+		result = tx.run(Cypher.get_blocks,
+			plotID = cls.plotID)
+		dict_result = [record[0] for record in result]
+		return [(node['id'], node['name']) for node in dict_result]
+	@classmethod #has plotID so doesn't need country
+	def get_blocks_csv(cls, plotID):
+		cls.plotID = plotID
+		with driver.session() as session:
+			session.read_transaction(cls._get_blocks_csv)
+		fieldnames = ['UID', 'PlotID', 'BlockID', 'Plot', 'Farm', 'Region', 'Country']
+		blocks_csv = cStringIO.StringIO()
+		writer = csv.DictWriter(blocks_csv,
+			fieldnames=fieldnames,
+			quoting=csv.QUOTE_ALL,
+			extrasaction='ignore')
+		writer.writeheader()
+		for block in cls.id_list:
+			writer.writerow(block)
+		blocks_csv.seek(0)
+		return blocks_csv
+	@classmethod #has plotID so doesn't need country
+	def _get_blocks_csv(cls, tx):
+		result=tx.run(Cypher.get_blocks_csv, 
+			plotID = cls.plotID)
+		cls.id_list = [{'UID':str(record[0][0]),
+			'PlotID':record[0][1], 
+			'BlockID':record[0][2],
+			'Plot':record[0][3],
+			'Farm':record[0][4],
+			'Region':record[0][5],
+			'Country':record[0][6]
+			} for record in result]
