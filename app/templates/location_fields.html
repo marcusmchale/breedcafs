@@ -18,12 +18,10 @@
 			{{ render_field (location_form.plot) }}
 			{{ render_field (add_plot.text_plot) }} 
 			{{ render_field (add_plot.submit_plot) }}
-			<br><a>Generate a blocks.csv</a><br>
-			{{ render_field (fields_form.generate_blocks_csv) }}
-			<br><br><a>Add treatment blocks to the selected plot</a><br><br>
+			<br><br><a>Add block to the selected plot</a><br><br>
 			{{ render_field (add_block.text_block) }}
 			{{ render_field (add_block.submit_block) }}
-
+			{{ render_field (fields_form.generate_blocks_csv) }}
 		</form>
 </div>
 {% endblock %}
@@ -33,9 +31,9 @@
 	<svg width=500 height=500></svg>
 </div>
 <script>jsonData = "/json_plots_treecount";</script>
-<script type="text/javascript" src="static/d3.v4.min.js"></script>
-<script type="text/javascript" src="static/d3_tree.js" charset="utf-8"></script>
-<script src="static/jquery_1.8.3_min.js"></script>
-<script src="static/jquery_location.js"></script>
-<script src="static/jquery_fields.js"></script>
+<script src="{{ url_for('static', filename='d3.v4.min.js') }}"></script>
+<script src="{{ url_for('static', filename='d3_tree.js') }}"></script>
+<script src="{{ url_for('static', filename='jquery_1.8.3_min.js') }}"></script>
+<script src="{{ url_for('static', filename='jquery_location.js') }}"></script>
+<script src="{{ url_for('static', filename='jquery_fields.js') }}"></script>
 {% endblock %}

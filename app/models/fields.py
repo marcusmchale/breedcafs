@@ -116,12 +116,13 @@ class Fields:
 			block = cls.block,
 			username = session['username'])
 	@classmethod #has plotID so doesn't need country
-	def add_trees(cls, plotID, count):
+	def add_trees(cls, plotID, count, blockUID=None):
 		cls.plotID = plotID
 		cls.count = count
+		cls.blockUID = blockUID
 		with driver.session() as session:
 			session.write_transaction(cls._add_trees)
-		fieldnames = ['UID','PlotID','TreeID', 'Plot', 'Farm', 'Region', 'Country']
+		fieldnames = ['UID','PlotID','TreeID', 'Block', 'Plot', 'Farm', 'Region', 'Country']
 		trees_csv = cStringIO.StringIO()
 		writer = csv.DictWriter(trees_csv,
 			fieldnames=fieldnames,
@@ -136,18 +137,20 @@ class Fields:
 	def _add_trees(cls, tx):
 		tx.run(Cypher.tree_id_lock,
 			plotID = cls.plotID)
-		result=tx.run(Cypher.trees_add, 
-			plotID = cls.plotID,
-			count = cls.count,
-			username= session['username'])
-		cls.id_list = [{'UID':str(record[0][0]),
-			'PlotID':record[0][1], 
-			'TreeID':record[0][2],
-			'Plot':record[0][3],
-			'Farm':record[0][4],
-			'Region':record[0][5],
-			'Country':record[0][6]
-			} for record in result]
+		if cls.blockUID == None:
+			result=tx.run(Cypher.trees_add, 
+				plotID = cls.plotID,
+				count = cls.count,
+				username= session['username'])
+			cls.id_list = [record[0] for record in result]
+		else:
+			result=tx.run(Cypher.block_trees_add, 
+				plotID = cls.plotID,
+				count = cls.count,
+				blockUID = cls.blockUID,
+				username = session['username'])
+#use name references instead of list position e.g. t.uid etc.
+			cls.id_list = [record[0] for record in result]
 	@classmethod #has plotID so doesn't need country
 	def get_trees(cls, plotID, start, end):
 		cls.plotID = plotID
@@ -155,7 +158,7 @@ class Fields:
 		cls.end = end
 		with driver.session() as session:
 			session.read_transaction(cls._get_trees)
-		fieldnames = ['UID','PlotID','TreeID', 'Plot', 'Farm', 'Region', 'Country']
+		fieldnames = ['UID','PlotID','TreeID', 'TreeName', 'Block', 'Plot', 'Farm', 'Region', 'Country']
 		trees_csv = cStringIO.StringIO()
 		writer = csv.DictWriter(trees_csv,
 			fieldnames=fieldnames,
@@ -172,14 +175,7 @@ class Fields:
 			plotID = cls.plotID,
 			start = cls.start,
 			end = cls.end)
-		cls.id_list = [{'UID':str(record[0][0]),
-			'PlotID':record[0][1], 
-			'TreeID':record[0][2],
-			'Plot':record[0][3],
-			'Farm':record[0][4],
-			'Region':record[0][5],
-			'Country':record[0][6]
-			} for record in result]
+		cls.id_list = [record[0] for record in result]
 	def get_farms(self, region):
 		self.region=region
 		with driver.session() as session:
@@ -212,13 +208,13 @@ class Fields:
 		result = tx.run(Cypher.get_blocks,
 			plotID = cls.plotID)
 		dict_result = [record[0] for record in result]
-		return [(node['id'], node['name']) for node in dict_result]
+		return [(node['uid'], node['name']) for node in dict_result]
 	@classmethod #has plotID so doesn't need country
 	def get_blocks_csv(cls, plotID):
 		cls.plotID = plotID
 		with driver.session() as session:
 			session.read_transaction(cls._get_blocks_csv)
-		fieldnames = ['UID', 'PlotID', 'BlockID', 'Plot', 'Farm', 'Region', 'Country']
+		fieldnames = ['UID', 'PlotID', 'BlockID', 'Block', 'Plot', 'Farm', 'Region', 'Country']
 		blocks_csv = cStringIO.StringIO()
 		writer = csv.DictWriter(blocks_csv,
 			fieldnames=fieldnames,
@@ -233,11 +229,4 @@ class Fields:
 	def _get_blocks_csv(cls, tx):
 		result=tx.run(Cypher.get_blocks_csv, 
 			plotID = cls.plotID)
-		cls.id_list = [{'UID':str(record[0][0]),
-			'PlotID':record[0][1], 
-			'BlockID':record[0][2],
-			'Plot':record[0][3],
-			'Farm':record[0][4],
-			'Region':record[0][5],
-			'Country':record[0][6]
-			} for record in result]
+		cls.id_list = [record[0] for record in result]

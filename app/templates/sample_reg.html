@@ -23,9 +23,9 @@
 			{{ render_field (sample_reg_form.submit_samples) }}
 		</form>
 </div>
-<script src="static/jquery_1.8.3_min.js"></script>
-<script src="static/jquery_location.js"></script>
-<script src="static/jquery-ui-1.12.1.custom/jquery-ui.js"></script>
-<script src="static/sample_reg.js"></script>
+<script src="{{ url_for('static', filename='jquery_1.8.3_min.js') }}"></script>
+<script src="{{ url_for('static', filename='jquery_location.js') }}"></script>
+<script src="{{ url_for('static', filename='jquery-ui-1.12.1.custom/jquery-ui.js') }}"></script>
+<script src="{{ url_for('static', filename='sample_reg.js') }}"></script>
 {% endblock %}
 

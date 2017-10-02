@@ -4,6 +4,7 @@
 "general","hybrid_parent1","multicat",,,,"Variety: Parent 1 (female/maternal)","Arabica/Robusta/Arabusta/With/Varieties/Available/Up/To/12/Separated/like/this"
 "general","hybrid_parent2","multicat",,,,"Variety: Parent 2 (male/paternal)","Arabica/Robusta/Arabusta/With/Varieties/Available/Up/To/12/Separated/like/this"
 "general","date","date",,,,"date of measurement",
+"general","name","text",,,,"User defined name or identifier",
 "agronomic","type","multicat",,,,"Tree size","Low/Tall"
 "agronomic","sprout","multicat",,,,"Leaf sprout color","Green/Bronze"
 "agronomic","Male sterility","boolean",,,,"Presence/absence of pollen","Yes/No"

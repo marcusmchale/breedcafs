@@ -35,7 +35,7 @@ class Samples:
 		self.date = date
 		with driver.session() as session:
 			session.write_transaction(self._add_samples)
-		fieldnames= ['UID', 'PlotID', 'TreeID', 'SampleID', 'Date', 'Tissue', 'Storage', 'Plot', 'Farm', 'Region', 'Country']
+		fieldnames= ['UID', 'PlotID', 'TreeID', 'TreeName', 'SampleID', 'Date', 'Tissue', 'Storage', 'Plot', 'Farm', 'Region', 'Country']
 		samples_csv = cStringIO.StringIO()
 		writer = csv.DictWriter(samples_csv,
 			fieldnames=fieldnames,
@@ -58,15 +58,4 @@ class Samples:
 			storage=self.storage,
 			date=self.date,
 			username = session['username'])
-		self.id_list = [{'UID':str(record[0][0]),
-			'PlotID':record[0][1],
-			'TreeID':record[0][2],
-			'SampleID':record[0][3],
-			'Date':record[0][4],
-			'Tissue':record[0][5],
-			'Storage':record[0][6],
-			'Plot':record[0][7],
-			'Farm':record[0][8],
-			'Region':record[0][9],
-			'Country':record[0][10]
-			} for record in result]
+		self.id_list = [record[0] for record in result]

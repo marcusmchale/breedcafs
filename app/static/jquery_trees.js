@@ -1,3 +1,28 @@
+update_blocks = function() {
+	var sel_plot = $("#plot").find(":selected").val();
+	if (sel_plot !== "") {
+		var request = $.ajax({
+			type: 'GET',
+			url: "/location/blocks/" + sel_plot + '/',
+		});
+		request.done(function(data){
+			var blocks = [["","Select Block"]].concat(data).sort();
+			$("#block").empty();
+			for (var i = 0; i < blocks.length; i++) {
+				$("#block").append(
+					$("<option></option>").attr(
+						"value", blocks[i][0]).text(blocks[i][1])
+				);
+			}
+		});
+	}
+};
+
+$('#plot').change(update_blocks);
+$('#farm').change(update_blocks);
+$('#region').change(update_blocks);
+$('#country').change(update_blocks);
+
 //register new trees
 $("#submit_trees").click( function(e) {
 	e.preventDefault();
@@ -10,6 +35,7 @@ $("#submit_trees").click( function(e) {
 		data: $("form").serialize(),
 		type: 'POST',
 		success: function(response) {
+			console.log($("form").serialize());
 			if (response.hasOwnProperty('submitted')) {
 				flash_submitted = "<div id='trees_flash' class='flash'>" + response.submitted + "</div>";
 				$("#trees_flash").replaceWith(flash_submitted);

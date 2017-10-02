@@ -37,11 +37,12 @@ PARTNERS = ({'OPERATES_IN':['France', 'Vietnam','Cameroon', 'Costa Rica', 'Frenc
 
 CONSTRAINTS = ({'node':'User', 'property':'username', 'constraint':'IS UNIQUE'},
 	{'node':'Partner', 'property':'name', 'constraint':'IS UNIQUE'},
-	{'node':'Trait', 'property':'name', 'constraint':'IS UNIQUE'},
-	{'node':'PlotID', 'property':'name', 'constraint':'IS UNIQUE'},
-	{'node':'TreeID', 'property':'plotID', 'constraint':'IS UNIQUE'},
+	{'node':'TreeTrait', 'property':'name', 'constraint':'IS UNIQUE'},
+	{'node':'BlockTrait', 'property':'name', 'constraint':'IS UNIQUE'},
 	{'node':'Plot', 'property':'uid', 'constraint':'IS UNIQUE'},
-	{'node':'Tree', 'property':'uid', 'constraint':'IS UNIQUE'})
+	{'node':'Block', 'property':'uid', 'constraint':'IS UNIQUE'},
+	{'node':'Tree', 'property':'uid', 'constraint':'IS UNIQUE'},
+	{'node':'Sample', 'property':'uid', 'constraint':'IS UNIQUE'})
 
 #functions
 def confirm(question):

@@ -1,5 +1,5 @@
 from wtforms import StringField, PasswordField, SelectField, SelectMultipleField, IntegerField, SubmitField, DateField, DateTimeField, widgets
-from wtforms.validators import InputRequired, Email, EqualTo, NumberRange, Length
+from wtforms.validators import InputRequired, Optional, Email, EqualTo, NumberRange, Length
 from flask_wtf import FlaskForm
 from flask_wtf.file import FileField, FileRequired
 from app import app
@@ -52,6 +52,7 @@ class LocationForm(FlaskForm):
 	region = SelectField('Region: ', [InputRequired()])
 	farm = SelectField('Farm: ', [InputRequired()])
 	plot = SelectField('Plot: ', [InputRequired()])	
+	block = SelectField('Block: ', [Optional()])
 	@staticmethod
 	def update():
 		form = LocationForm()
@@ -59,10 +60,12 @@ class LocationForm(FlaskForm):
 		REGIONS = sorted(set(Lists('Country').get_connected('name', form.country.data, 'IS_IN')), key=lambda tup: tup[1])
 		FARMS = sorted(set(Fields(form.country.data).get_farms(form.region.data)), key=lambda tup: tup[1])
 		PLOTS = sorted(set(Fields(form.country.data).get_plots(form.region.data, form.farm.data)), key=lambda tup: tup[1])
+		BLOCKS = sorted(set(Fields.get_blocks(form.plot.data)), key=lambda tup: tup[1])
 		form.country.choices = [('','Select Country')] + COUNTRIES
 		form.region.choices = [('','Select Region')] + REGIONS
 		form.farm.choices = [('','Select Farm')] + FARMS
 		form.plot.choices = [('','Select Plot')] + PLOTS
+		form.block.choices = [('','Select Block')] + BLOCKS
 		return form
 
 class AddCountry(FlaskForm):
@@ -146,7 +149,7 @@ class FieldsForm(FlaskForm): #details of plot
 #	submit_shade_tree = SubmitField('+')
 
 #Trees
-class AddTrees(FlaskForm):
+class AddTreesForm(FlaskForm):
 	id = "add_trees"
 	count = IntegerField('Number of trees: ',[InputRequired(), 
 		NumberRange(min=1, max=1000, message='Register from 1-1000 plants at a time')],

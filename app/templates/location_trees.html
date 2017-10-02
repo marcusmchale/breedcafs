@@ -10,7 +10,9 @@
 			{{ render_field (location_form.region) }}
 			{{ render_field (location_form.farm) }}
 			{{ render_field (location_form.plot) }}
-			<br><a>Add trees to the selected plot:</a><br>
+			<a>Optional:</a>{{ render_field (location_form.block) }}
+			<p>This can also be entered for each tree in Field-Book</p>
+			<br><a>Add trees to the selected plot</a><br>
 			{{ render_field (add_trees.count) }}
 			{{ render_field (add_trees.submit_trees) }}
 			<br><a>Download trees.csv for the selected plot:</a><br>
@@ -26,9 +28,9 @@
 	<svg width=500 height=500></svg>
 </div>
 <script>jsonData = "/json_plots_treecount";</script>
-<script type="text/javascript" src="static/d3.v4.min.js"></script>
-<script type="text/javascript" src="static/d3_tree.js" charset="utf-8"></script>
-<script src="static/jquery_1.8.3_min.js"></script>
-<script src="static/jquery_location.js"></script>
-<script src="static/jquery_trees.js"></script>
+<script src="{{ url_for('static', filename='d3.v4.min.js') }}"></script>
+<script src="{{ url_for('static', filename='d3_tree.js') }}"></script>
+<script src="{{ url_for('static', filename='jquery_1.8.3_min.js') }}"></script>
+<script src="{{ url_for('static', filename='jquery_location.js') }}"></script>
+<script src="{{ url_for('static', filename='jquery_trees.js') }}"></script>
 {% endblock %}

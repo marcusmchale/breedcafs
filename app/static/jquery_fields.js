@@ -7,7 +7,7 @@ update_blocks = function () {
 		});
 		request.done(function(data){
 			$('#blocks_list_div').remove();
-			$("#location_fields").after("<div id=blocks_list_div><a>Blocks in selected plot:</a><ul id=blocks_list></ul></div>");
+			$("#submit_plot").after("<div id=blocks_list_div><a>Blocks in selected plot:</a><ul id=blocks_list></ul></div>");
 			$("#blocks_list").empty();
 			var blocks = [].concat(data).sort();
 			for (var i=0; i < blocks.length; i++) {
@@ -18,6 +18,9 @@ update_blocks = function () {
 }
 
 $('#plot').change(update_blocks);
+$('#farm').change(update_blocks);
+$('#region').change(update_blocks);
+$('#country').change(update_blocks);
 
 //generate blocks.csv
 $("#generate_blocks_csv").click( function(e) {
@@ -69,6 +72,7 @@ $("#submit_block").click( function(e) {
 		data: $("form").serialize(),
 		type: 'POST',
 		success: function(response) {
+			console.log(response);
 			if (response.hasOwnProperty('submitted')) {
 				flash_submitted = "<div id='submit_block_flash' class='flash'>" + response.submitted + "</div>";
 				$("#submit_block_flash").replaceWith(flash_submitted);
