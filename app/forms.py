@@ -1,4 +1,4 @@
-from wtforms import StringField, PasswordField, SelectField, SelectMultipleField, IntegerField, SubmitField, DateField, DateTimeField, widgets
+from wtforms import StringField, PasswordField, BooleanField, SelectField, SelectMultipleField, IntegerField, SubmitField, DateField, DateTimeField, widgets
 from wtforms.validators import InputRequired, Optional, Email, EqualTo, NumberRange, Length
 from flask_wtf import FlaskForm
 from flask_wtf.file import FileField, FileRequired
@@ -68,6 +68,29 @@ class LocationForm(FlaskForm):
 		form.block.choices = [('','Select Block')] + BLOCKS
 		return form
 
+class OptionalLocationForm(FlaskForm):
+	id = "location_form"
+	country = SelectField('Country: ', [Optional()])
+	region = SelectField('Region: ', [Optional()])
+	farm = SelectField('Farm: ', [Optional()])
+	plot = SelectField('Plot: ', [Optional()])	
+	block = SelectField('Block: ', [Optional()])
+	@staticmethod
+	def update():
+		form = OptionalLocationForm()
+		COUNTRIES = sorted(set(Lists('Country').create_list('name','name')), key=lambda tup: tup[1])
+		REGIONS = sorted(set(Lists('Country').get_connected('name', form.country.data, 'IS_IN')), key=lambda tup: tup[1])
+		FARMS = sorted(set(Fields(form.country.data).get_farms(form.region.data)), key=lambda tup: tup[1])
+		PLOTS = sorted(set(Fields(form.country.data).get_plots(form.region.data, form.farm.data)), key=lambda tup: tup[1])
+		BLOCKS = sorted(set(Fields.get_blocks(form.plot.data)), key=lambda tup: tup[1])
+		form.country.choices = [('','Select Country')] + COUNTRIES
+		form.region.choices = [('','Select Region')] + REGIONS
+		form.farm.choices = [('','Select Farm')] + FARMS
+		form.plot.choices = [('','Select Plot')] + PLOTS
+		form.block.choices = [('','Select Block')] + BLOCKS
+		return form
+
+
 class AddCountry(FlaskForm):
 	id = "add_country"
 	strip_filter = lambda x: x.strip() if x else None
@@ -116,37 +139,9 @@ class AddBlock(FlaskForm):
 
 class FieldsForm(FlaskForm): #details of plot
 	id = "plots_csv_form"
+	email_checkbox = BooleanField('Email checkbox', default = 'TRUE')
 	generate_blocks_csv = SubmitField('Generate blocks.csv')
-	#soil = SelectField('soil type')
-	#shade_trees = SelectMultipleField('Select shade trees:', option_widget=widgets.CheckboxInput(), widget=widgets.ListWidget(prefix_label=False))
-	
-	#@staticmethod
-	#def update():
-	#	form = FieldsForm()
-	#	SOIL_TYPES = sorted(set(Lists('Soil').create_list('name','name')), key=lambda tup: tup[1])
-	#	SHADE_TREES = sorted(set(Lists('ShadeTree').create_list('name','name')), key=lambda tup: tup[1])
-	#	form.soil.choices = [('','Select Soil Type')] + SOIL_TYPES
-	#	form.shade_trees.choices = SHADE_TREES
-	#	return form
 
-#move these forms to a traits section -allow users to enter new values for traits?
-#class AddSoilForm(FlaskForm):
-#	id = "add_soil_form"
-#	strip_filter = lambda x: x.strip() if x else None
-#	text_soil = StringField('Soil text input',
-#		[InputRequired(),Length(min=1, max=50, message='Maximum 50 characters')],
-#		filters=[strip_filter],
-#		description = "Add new soil type")
-#	submit_soil = SubmitField('+')
-#
-#class AddShadeTreeForm(FlaskForm):
-#	id = "add_shade_tree_form"
-#	strip_filter = lambda x: x.strip() if x else None
-#	text_shade_tree = StringField('Shade Tree text input',
-#		[InputRequired(),Length(min=1, max=50, message='Maximum 50 characters')],
-#		filters=[strip_filter],
-#		description = "Add new shade tree variety")
-#	submit_shade_tree = SubmitField('+')
 
 #Trees
 class AddTreesForm(FlaskForm):
@@ -173,18 +168,18 @@ class CreateBlockTraits(FlaskForm):
 	trait_dict = defaultdict(list)
 	for trait in TRAITS:
 		trait_dict[trait['group']].append((trait['name'], trait['details']))
-	general = SelectMultipleField('general',
+	block_general = SelectMultipleField('general',
 		choices = sorted(trait_dict['general'], 
 		key=lambda tup: tup[1]), 
 		default= ['location'],
 		option_widget=widgets.CheckboxInput(),
 		widget=widgets.ListWidget(prefix_label=False)
 		)
-	agronomic = SelectMultipleField('agronomic',
+	block_agronomic = SelectMultipleField('agronomic',
 		choices = sorted(trait_dict['agronomic'], key=lambda tup: tup[1]), 
 		option_widget=widgets.CheckboxInput(),
 		widget=widgets.ListWidget(prefix_label=False)
-		)	
+		)
 
 class CreateTreeTraits(FlaskForm):
 	id = "tree_traits_form"
@@ -277,6 +272,14 @@ class SampleRegForm(FlaskForm):
 
 #upload
 class UploadForm(FlaskForm):
+	id = "upload_form"
 	submission_type =  SelectField('Submission type:', [InputRequired()], 
-		choices = sorted(app.config['SUBMISSION_TYPES'], key=lambda tup: tup[1]))
+		choices = sorted([('FB','Field Book Database')], key=lambda tup: tup[1]))
 	file = FileField('Select a file:', [FileRequired()])
+	upload_submit = SubmitField('Upload')
+
+#download
+class DownloadForm(FlaskForm):
+	trait_level = SelectField('Trait level', [InputRequired()],
+		choices = [('','Select Level'),('block','Block'), ('tree','Tree')])
+	submit_download = SubmitField('Generate data file')

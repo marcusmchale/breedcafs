@@ -15,17 +15,16 @@
 				<a>Logged in as {{ session.username }}:</a>
 				<a href="{{ url_for('logout') }}">Logout</a>
 			{% endif %}
-			<!--<div id="google_translate_element"></div>-->
 		</div>
-		
 		<div class="header">
 			<a href="/index"><img src="/static/logo.png"></a>
 			<a href="/index"><h1>BreedCAFS database tools</h1></a>
 			{% if session.username %}
 			<div class="utils">
-			<a href="{{ url_for('create') }}"><img src="{{ url_for('static', filename='create.svg') }}"></a>
-			<a href="{{ url_for('upload') }}"><img src="{{ url_for('static', filename='upload.svg') }}"></a>
-			<a href="{{ url_for('help') }}"><img src="{{ url_for('static', filename='help.svg') }}"></a>
+				<a href="{{ url_for('create') }}"><img src="{{ url_for('static', filename='create.svg') }}"></a>
+				<a href="{{ url_for('upload') }}"><img src="{{ url_for('static', filename='upload.svg') }}"></a>
+				<a href="{{ url_for('download') }}"><img src="{{ url_for('static', filename='download_espresso.svg') }}"></a>
+				<a href="{{ url_for('help') }}"><img src="{{ url_for('static', filename='help.svg') }}"></a>
 			</div>
 			{% endif %}
 		</div>
@@ -45,12 +44,3 @@
 	</div>
 </body>
 </html>
-<!--
-	Google translate doesn't work in jQueryUI date picker - also opens up many other cans of worms
-<script type="text/javascript" src="//translate.google.com/translate_a/element.js?cb=googleTranslateElementInit"></script> 
-<script type="text/javascript">
-	function googleTranslateElementInit() {
-		new google.translate.TranslateElement({pageLanguage: 'en'}, 'google_translate_element');
-	}
-</script>
--->

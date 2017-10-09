@@ -1,3 +1,4 @@
+//update blockx (not in location form as different rendering on different pages (list dropbox))
 update_blocks = function() {
 	var sel_plot = $("#plot").find(":selected").val();
 	if (sel_plot !== "") {
@@ -35,7 +36,6 @@ $("#submit_trees").click( function(e) {
 		data: $("form").serialize(),
 		type: 'POST',
 		success: function(response) {
-			console.log($("form").serialize());
 			if (response.hasOwnProperty('submitted')) {
 				flash_submitted = "<div id='trees_flash' class='flash'>" + response.submitted + "</div>";
 				$("#trees_flash").replaceWith(flash_submitted);

@@ -1,32 +1,32 @@
 from app import app
-from flask import session, \
-	flash, \
-	request, \
-	redirect, \
-	url_for, \
-	render_template, \
-	send_file, \
-	make_response, \
-	jsonify
-from app.models import Lists, \
-	Fields, \
-	FieldDetails, \
-	User, \
-	Samples
-from app.forms import LocationForm, \
-	AddCountry, \
-	AddRegion, \
-	AddFarm, \
-	AddPlot, \
-	AddBlock, \
-	FieldsForm, \
-	AddTreesForm, \
-	CustomTreesForm, \
-	SampleRegForm, \
-	AddTissueForm, \
-	AddStorageForm, \
-	CreateTreeTraits, \
-	CreateBlockTraits
+from flask import (session, 
+	flash, 
+	request, 
+	redirect, 
+	url_for, 
+	render_template, 
+	send_file, 
+	make_response, 
+	jsonify)
+from app.models import (Lists, 
+	Fields, 
+	FieldDetails, 
+	User, 
+	Samples)
+from app.forms import (LocationForm, 
+	AddCountry, 
+	AddRegion, 
+	AddFarm, 
+	AddPlot, 
+	AddBlock, 
+	FieldsForm, 
+	AddTreesForm, 
+	CustomTreesForm, 
+	SampleRegForm, 
+	AddTissueForm, 
+	AddStorageForm, 
+	CreateTreeTraits, 
+	CreateBlockTraits)
 from app.emails import send_attachment
 from flask.views import MethodView
 from datetime import datetime
@@ -299,12 +299,12 @@ def select_traits(level):
 		flash('Please log in')
 		return redirect(url_for('login'))
 	else:
-		if level == 'tree':
-			form = CreateTreeTraits()
-		elif level == 'block':
-			form = CreateBlockTraits()
-		return render_template('traits_' + level + '.html', 
-			form=form, 
+		tree_traits_form = CreateTreeTraits()
+		block_traits_form = CreateBlockTraits()
+		return render_template('traits.html', 
+			level = level,
+			tree_traits_form = tree_traits_form,
+			block_traits_form = block_traits_form,
 			title='Select traits for ' + level + '_traits.trt')
 
 @app.route('/traits/<level>/create_trt', methods=['GET', 'POST'])
@@ -316,12 +316,16 @@ def create_trt(level):
 		form = CreateBlockTraits()
 		Level = 'Block'
 	if form.validate_on_submit():
+		#tree traits
 		gen = request.form.getlist('general')
 		agro = request.form.getlist('agronomic')
 		morph = request.form.getlist('morphological')
 		photo = request.form.getlist('photosynthetic')
 		metab = request.form.getlist('metabolomic')
-		selection = gen + agro + morph + photo + metab
+		#block traits
+		b_gen = request.form.getlist('block_general')
+		b_agro = request.form.getlist('block_agronomic')
+		selection = gen + agro + morph + photo + metab + b_agro + b_gen
 		trt=Lists(Level + 'Trait').create_trt(selection, 'name')
 		recipients=[User(session['username']).find('')['email']]
 		subject = "BreedCAFS: traits.trt"

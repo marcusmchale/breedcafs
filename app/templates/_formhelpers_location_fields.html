@@ -15,4 +15,7 @@
 	{% if field.type in ['IntegerField'] %}
 		{{ field(placeholder=field.description)|safe }}
 	{% endif %}
+	{% if field.type in ['BooleanField'] %}
+		{{ field(placeholder=field.description)|safe }}<a>Email a copy</a><br>
+	{% endif %}
 {% endmacro %}

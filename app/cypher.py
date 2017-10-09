@@ -1,4 +1,3 @@
-#add submission time for all SUBMITTED with ON MATCH SET and ON CREATE SET
 class Cypher():
 	user_find = ('MATCH (user:User) '
 	' WHERE user.username = $username '
@@ -29,35 +28,6 @@ class Cypher():
 		' WHERE user.username = $username '
 		' OR user.email = $email '
 		' DELETE user ')
-	upload_submit =	( ' MATCH (user:User {username : $username}) '
-		#so that users don't have a relationship for each submission
-		' MERGE (user)-[:SUBMITTED_DATA_TYPE]->(u:FieldBookSubmissions)'
-		' WITH u '
-		# Now we keep that node and load in the csv
-		' LOAD CSV WITH HEADERS FROM $filename as csvLine '
-		# And identify the plots and traits assessed
-		' MATCH (plot:Plot {uid:toInteger(head(split(csvLine.UID, "_")))}), '
-			' (tree:Tree {uid:csvLine.UID}),'
-			' (trait:TreeTrait {name:csvLine.trait}) '
-		# Data is split out to container node per plot per trait level
-		# once again to reduce the number of relationships when later searching
-		' MERGE (plot)-[:TRAIT_DATA]->(pt:PlotTraitData)<-[:PLOT_DATA]-(trait) '
-		#Then create only unique data points off these containers then link to tree
-		#If any of tree, value, timeFB, person or location are different, a new node is created
-		' MERGE (pt)-[s:SUBMISSIONS]-> '
-			' (d:Data {tree:csvLine.UID, '
-				' value:csvLine.value, '
-				' timeFB:csvLine.timestamp, '
-				' person:csvLine.person, '
-				' location:csvLine.location}) '
-				' -[:DATA_FOR]->(tree)'
-			' ON MATCH SET d.found="TRUE" '
-			#recording details of first submission
-			' ON CREATE SET d.found="FALSE", s.username=$username, s.timestamp=timestamp()'
-		# but to allow faster identification of a users submissions we store attempts to update a PlotTrait node
-		' MERGE (u)-[:UPDATED {time:timestamp()}]-(pt)'
-		#And give the user feedback on their submission success
-		' RETURN d.found' )
 	country_find = ('MATCH (country:Country {name : $country}) '
 		' RETURN country ')
 	country_add = ('MATCH (user:User {username:$username}) '
@@ -200,7 +170,7 @@ class Cypher():
 		' -[:REGISTERED_TREE]->(t:Tree) '
 		' OPTIONAL MATCH (t)<-[:CONTAINS_TREES]-(b:Block)'
 		' OPTIONAL MATCH (t)<-[:DATA_FOR]-(d:Data) '
-			'<-[:SUBMISSIONS]-(:PlotTraitData)<-[:PLOT_DATA]-(:TreeTrait {name:"name"})'
+			'<-[:SUBMISSIONS]-(:PlotTreeTraitData)<-[:PLOT_DATA]-(:TreeTrait {name:"name"})'
 		' WHERE t.id>=$start '
 		' AND t.id<=$end '
 		' RETURN {UID : t.uid, '
@@ -282,13 +252,14 @@ class Cypher():
 				' <-[:IS_IN]-(p:Plot {uid:$plotID})<-[:SAMPLES_FROM]-(ps:PlotSamples) '
 				' <-[:ID_COUNTER_FOR]-(id:SampleID )'
 		' OPTIONAL MATCH (t)<-[:DATA_FOR]-(d:Data) '
-			'<-[:SUBMISSIONS]-(:PlotTraitData)<-[:PLOT_DATA]-(:TreeTrait {name:"name"})'
+			'<-[:SUBMISSIONS]-(:PlotTreeTraitData)<-[:PLOT_DATA]-(:TreeTrait {name:"name"})'
 		#with $replicates
 		' UNWIND range(1, $replicates) as replicates '
 		#store the sample linked to its tree and plot incrementing with a plot level counter
 		' SET id.count=id.count+1 '
-		' MERGE (t)<-[:SAMPLE_FROM_TREE] '
-		' -(s:Sample {uid:(p.uid + "_S" + id.count),'
+		' MERGE (t)-[:SAMPLED]->(ts:TreeSamples) '
+		' MERGE (ts)-[:REGISTERED_SAMPLE] '
+		' ->(s:Sample {uid:(p.uid + "_S" + id.count),'
 			' id:id.count, date:$date, tissue:$tissue, storage:$storage}) '
 		' -[:SAMPLE_FROM_PLOT]->(ps)'
 		#track user submissions
@@ -311,20 +282,69 @@ class Cypher():
 			' Region : r.name, '
 			' Country : c.name} '
 		' ORDER BY s.id')
+	upload_FB_tree = ( ' MATCH (user:User {username : $username}) '
+		#so that users don't have a relationship for each submission
+		' MERGE (user)-[:SUBMITTED_DATA_TYPE]->(u:FieldBookSubmissions)'
+		' WITH u '
+		# Now we keep that node and load in the csv
+		' LOAD CSV WITH HEADERS FROM $filename as csvLine '
+		# And identify the plots and traits assessed
+		' MATCH (plot:Plot {uid:toInteger(head(split(csvLine.UID, "_")))}), '
+			' (tree:Tree {uid:csvLine.UID}),'
+			' (trait:TreeTrait {name:csvLine.trait}) '
+		# Data is split out to container node per plot per trait level
+		# once again to reduce the number of relationships when later searching
+		' MERGE (plot)-[:TRAIT_DATA]->(pt:PlotTreeTraitData)<-[:PLOT_DATA]-(trait) '
+		#Then create only unique data points off these containers then link to tree
+		#If any of tree, value, timeFB, person or location are different, a new node is created
+		' MERGE (pt)-[s:SUBMISSIONS]-> '
+			' (d:Data {tree:csvLine.UID, '
+				' value:csvLine.value, '
+				' timeFB:csvLine.timestamp, '
+				' person:csvLine.person, '
+				' location:csvLine.location}) '
+				' -[:DATA_FOR]->(tree)'
+			' ON MATCH SET d.found="TRUE" '
+			#recording details of first submission
+			' ON CREATE SET d.found="FALSE", s.username=$username, s.timestamp=timestamp()'
+		# but to allow faster identification of a users submissions we store attempts to update a PlotTrait node
+		' MERGE (u)-[:UPDATED {time:timestamp()}]-(pt)'
+		#And give the user feedback on their submission success
+		' RETURN d.found' )
+	upload_FB_block = ( ' MATCH (user:User {username : $username}) '
+		#so that users don't have a relationship for each submission
+		' MERGE (user)-[:SUBMITTED_DATA_TYPE]->(u:FieldBookSubmissions)'
+		' WITH u '
+		# Now we keep that node and load in the csv
+		' LOAD CSV WITH HEADERS FROM $filename as csvLine '
+		# And identify the plots and traits assessed
+		' MATCH (:Plot {uid:toInteger(head(split(csvLine.UID, "_")))})-[:CONTAINS_BLOCKS]-(pb:PlotBlocks), '
+			' (block:Block {uid:csvLine.UID}),'
+			' (trait:BlockTrait {name:csvLine.trait}) '
+		# Data is split out to container node per plot per trait level
+		# once again to reduce the number of relationships when later searching
+		' MERGE (pb)-[:TRAIT_DATA]->(pt:PlotBlockTraitData)<-[:PLOT_DATA]-(trait) '
+		#Then create only unique data points off these containers then link to tree
+		#If any of tree, value, timeFB, person or location are different, a new node is created
+		' MERGE (pt)-[s:SUBMISSIONS]-> '
+			' (d:Data {block:csvLine.UID, '
+				' value:csvLine.value, '
+				' timeFB:csvLine.timestamp, '
+				' person:csvLine.person, '
+				' location:csvLine.location}) '
+				' -[:DATA_FOR]->(block)'
+			' ON MATCH SET d.found="TRUE" '
+			#recording details of first submission
+			' ON CREATE SET d.found="FALSE", s.username=$username, s.timestamp=timestamp()'
+		# but to allow faster identification of a users submissions we store attempts to update a PlotTrait node
+		' MERGE (u)-[:UPDATED {time:timestamp()}]-(pt)'
+		#And give the user feedback on their submission success
+		' RETURN d.found' )
 
-#	soil_add = ('MATCH (user:User {username:$username}) '
-#		' MERGE (:Soil {name :$soil}) '
-#		' <-[:SUBMITTED {time : timestamp()}]-(user) ' )
-#	shade_tree_add = ('MATCH (user:User {username:$username}) '
-#		' MERGE (:ShadeTree {name :$shade_tree}) '
-#		' <-[:SUBMITTED {time : timestamp()}]-(user) ' )
-#	field_details_add = ('MATCH (user:User {username:$username}), '
-#		' (p:Plot {plotID:$plotID}) '
-#		#create if necessary container for plot details
-#		' MERGE (p)-[:DETAIL_SUBMISSIONS]-(pd:PlotDetails)'
-#		#and user container plot detail submissions
-#		' MERGE (user)-[:SUBMITTED_PLOT_DETAILS]-(pds:PlotDetailSubmissions)'
-#		#then log the user update 
-#		' MERGE (pds)-[:UPDATED {time:timestamp()}]->(pd)'
-#		#and store the details with a timestamp
-#		' MERGE (pd)<-[:PLOT_DETAIL]-(:Soil {name:$soil, time:timestamp()})')
+
+
+
+
+
+
+

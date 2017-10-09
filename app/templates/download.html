@@ -1,0 +1,31 @@
+{% extends "layout.html" %}
+{% block body %}
+{% from "_formhelpers.html" import render_field %}
+<div class="text_body">
+	<h2> Select data to download</h2>
+		<form action="{{ url_for('download') }}" id="download" method="post">
+			<h3>Select subset by location</h3>
+				<dt>{{ location_form.csrf_token }}</dt>
+				<dt>{{ location_form.country }}</dt>
+				<dt>{{ location_form.region }}</dt>
+				<dt>{{ location_form.farm }}</dt>
+				<dt>{{ location_form.plot }}</dt>
+				<dt>{{ location_form.block }}</dt>
+			<h3>Select level of data</h3>
+				<dt>{{ download_form.trait_level }}</dt>
+			<h3>Select traits to return data on</h3>
+				<div id= "blockTraits">
+					{% include "traits_block_form.html" %}		
+				</div>
+				<div id= "treeTraits">
+					{% include "traits_tree_form.html" %}
+				</div>
+			<dt>{{ download_form.submit_download }}</dt>
+		</form>
+</div>
+{% endblock %}
+{% block chart %}
+<script src="{{ url_for('static', filename='jquery_1.8.3_min.js') }}"></script>
+<script src="{{ url_for('static', filename='jquery_location.js') }}"></script>
+<script src="{{ url_for('static', filename='jquery_download.js') }}"></script>
+{% endblock %}

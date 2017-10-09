@@ -3,13 +3,12 @@
 <div class="text_body">
 	{% from "_formhelpers.html" import render_field %}
 	<h2>Fieldbook tools</h2>
-	<h3>Create block_traits.trt</h3>
-		<form action="{{ url_for('select_traits', level='block') }}" method="post">
-		{{ form.csrf_token }}
-			<dl>{{ render_field(form.general) }}</dl>
-			<dl>{{ render_field(form.agronomic) }}</dl>
-			<input id="submit_traits" type="submit" value="Create">
-		</form>
+		<h3>Create {{ level }}_traits.trt</h3>
+			{% if level == 'tree' %}
+				{% include "traits_tree_form.html" %}
+			{% elif level == 'block' %}
+				{% include "traits_block_form.html" %}
+			{% endif %}
 </div>
 <script src="{{ url_for('static', filename='jquery_1.8.3_min.js') }}"></script>
 <script src="{{ url_for('static', filename='jquery_traits.js') }}"></script>

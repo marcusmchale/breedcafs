@@ -1,16 +1,28 @@
-//select all boxes
-$('ul').each( function () {
-	$(this).before("<input id='select_all_" + $(this).attr('id') + "' type='checkbox'>");
+//Add select all checkboxes to the form
+$('dl').each( function () {
+	//get ID from ul element
+	id = $(this).find('dd > ul').attr('id'); 
+	//expand collapse trait details on click label
+	$(this).find('dt > label').click(function () {
+		$(this).parent().next().toggle();
+	});
+	//and start collapsed
+	$(this).find('dd').hide()
+	//add checkbox
+	$(this).find('dt > label').before("<input id='select_all_" + id + "' type='checkbox'>");
+	//on checkbox change toggle children true/false
+	$('#select_all_' + id).change(function () {
+		if (this.checked) { 
+			$(this).parent().next().find("input").prop("checked", true);
+		}
+		else {
+			$(this).parent().next().find("input").prop("checked", false);
+		}
+	})
 })
 
-$('ul').prev().change(function () {
-	if (this.checked) { 
-		$(this).next().find("input").prop("checked", true);
-	}
-	else {
-		$(this).next().find("input").prop("checked", false);
-	}
-})
+//expand the general tab as defaults are set (and as example)
+$('#select_all_general').parent().next().show();
 
 //generate traits.csv
 $('#submit_traits').click( function(e) {
@@ -20,7 +32,8 @@ $('#submit_traits').click( function(e) {
 	wait_message = "Please wait for file to be generated"
 	flash_wait = "<div id='traits_flash' class='flash'>" + wait_message + "</div>"
 	$("#submit_traits").after(flash_wait)
-	trait_count = $("form input[type=checkbox]:checked").length;
+	trait_count = $("form input[type=checkbox]:checked").length - $('[id^=select_all_]:checked').length;
+	console.log(trait_count);
 	if (trait_count > 64) {
 		$("#traits_flash").after("<div id='traits_flash' \
 			class='flash'>Caution: Field Book can only export up to 64 traits at a time\
@@ -32,7 +45,6 @@ $('#submit_traits').click( function(e) {
 		flash_select = "<div id='traits_flash' class='flash'>" + select_message + "</div>"
 		$("#traits_flash").replaceWith(flash_select)
 	} else {
-		console.log($("form").serialize())
 		var submit_traits = $.ajax({
 			url: "/traits/" + level + "/create_trt",
 			data: $("form").serialize(),

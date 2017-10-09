@@ -12,17 +12,20 @@ class Upload(User):
 	def allowed_file(self):
 		return '.' in self.filename and \
 			self.filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
-	def submit(self, submission_type):
+	def submit(self, submission_type, level):
 		self.submission_type=submission_type
-		if self.submission_type == 'FB':
-			with driver.session() as session:
-				return session.write_transaction(self._submit)
-		else:
-			pass
+		self.level = level
+		with driver.session() as session:
+			return session.write_transaction(self._submit)
 	def _submit(self, tx):
 			fcount=0
 			ncount=0
-			for record in tx.run(Cypher.upload_submit, username=self.username,
+			if self.submission_type == 'FB':
+				if self.level == 'tree':
+					query = Cypher.upload_FB_tree
+				elif self.level == 'block':
+					query = Cypher.upload_FB_block
+			for record in tx.run(query, username=self.username,
 				filename= ("file:///" + self.filename),
 				submission_type=self.submission_type):
 				if record['d.found'] == 'TRUE':

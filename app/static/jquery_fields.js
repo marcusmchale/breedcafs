@@ -1,3 +1,4 @@
+//update blockx (not in location form as different rendering on different pages (list dropbox))
 update_blocks = function () {
 	var sel_plotID = $("#plot").find(":selected").val();
 	if (sel_plotID !== "") {
