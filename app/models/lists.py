@@ -42,11 +42,12 @@ class Lists:
 		with driver.session() as session:
 			return session.read_transaction(self._get_connected)
 	def _get_connected(self, tx):
-		key=self.key
-		rel=self.rel
+		key = self.key
+		rel = self.rel
+		value = self.value
 		node_label=self.node_label
-		Cypher_get_connected='MATCH (n: ' + node_label +' {' + key + ':{value}}) <- [:' \
-			+ rel + '] - (r) RETURN properties (r)'
+		Cypher_get_connected=('MATCH (n: ' + node_label +' {' + key + ':{value}}) <- [:' 
+			+ rel + '] - (r) RETURN properties (r)')
 		result = tx.run(Cypher_get_connected, value=self.value)
 		dict_result= [record[0] for record in result]
 		return [(node['name'], node['name']) for node in dict_result]
