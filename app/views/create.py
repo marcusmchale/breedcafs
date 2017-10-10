@@ -39,38 +39,38 @@ def create():
 	else:
 		return render_template('create.html', title='Create')
 
-#Locations
+#Locations as tuples for forms
 class countries(MethodView):
 	def get(self):
-		countries = Lists('Country').create_list('name','name')
+		countries = Lists('Country').create_list_tup('name','name')
 		response = make_response(jsonify(countries))
 		response.content_type = 'application/json'
 		return response
 
 class regions(MethodView):
 	def get(self, country):
-		regions = Lists('Country').get_connected('name', country, 'IS_IN')
-		response = make_response(jsonify(regions))
+		REGIONS = Lists('Country').get_connected('name', country, 'IS_IN')
+		response = make_response(jsonify([(REGIONS[i],REGIONS[i]) for i, items in enumerate(REGIONS)]))
 		response.content_type = 'application/json'
 		return response
 
 class farms(MethodView):
 	def get(self, country, region):
-		farms = Fields(country).get_farms(region)
-		response = make_response(jsonify(farms))
+		FARMS = Fields(country).get_farms(region)
+		response = make_response(jsonify([(FARMS[i],FARMS[i]) for i, items in enumerate(FARMS)]))
 		response.content_type = 'application/json'
 		return response
 
 class plots(MethodView):
 	def get(self, country, region, farm):
-		plots = Fields(country).get_plots(region, farm)
+		plots = Fields(country).get_plots_tup(region, farm)
 		response = make_response(jsonify(plots))
 		response.content_type = 'application/json'
 		return response
 
 class blocks(MethodView):
 	def get(self, plotID):
-		blocks = Fields.get_blocks(plotID)
+		blocks = Fields.get_blocks_tup(plotID)
 		response = make_response(jsonify(blocks))
 		response.content_type = 'application/json'
 		return response
@@ -350,10 +350,12 @@ def sample_reg():
 		flash('Please log in')
 		return redirect(url_for('login'))
 	else:
+		location_form = LocationForm().update()
 		add_tissue_form = AddTissueForm()
 		add_storage_form = AddStorageForm()
 		sample_reg_form = SampleRegForm().update()
 		return render_template('sample_reg.html', 
+			location_form = location_form,
 			add_tissue_form = add_tissue_form,
 			add_storage_form = add_storage_form,
 			sample_reg_form = sample_reg_form,
@@ -361,7 +363,7 @@ def sample_reg():
 
 class tissues(MethodView):
 	def get(self):
-		tissues = Lists('Tissue').create_list('name','name')
+		tissues = Lists('Tissue').create_list_tup('name','name')
 		response = make_response(jsonify(tissues))
 		response.content_type = 'application/json'
 		return response
@@ -381,7 +383,7 @@ def add_tissue():
 
 class storage_methods(MethodView):
 	def get(self):
-		storage_methods = Lists('Storage').create_list('name','name')
+		storage_methods = Lists('Storage').create_list_tup('name','name')
 		response = make_response(jsonify(storage_methods))
 		response.content_type = 'application/json'
 		return response

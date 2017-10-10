@@ -20,10 +20,41 @@ update_blocks = function() {
 	}
 };
 
-$('#plot').change(update_blocks).change(function () {$('#block').show()});
-$('#farm').change(update_blocks).change(function () {$('#plot').show()});
-$('#region').change(update_blocks).change(function () {$('#farm').show()});
-$('#country').change(update_blocks).change(function () {$('#region').show()});
+//hide boxes that aren't relevant
+$('#country').change(update_blocks).change(function () {
+	if (this.value === "") {
+		$('#region').hide();
+		$('#farm').hide();
+		$('#plot').hide();
+		$('#block').hide();
+	} else {
+		$('#region').show();
+	}
+});
+$('#region').change(update_blocks).change(function () {
+	if (this.value === "") {
+		$('#farm').hide();
+		$('#plot').hide();
+		$('#block').hide();
+	} else {
+		$('#farm').show();
+	}
+});
+$('#farm').change(update_blocks).change(function () {
+	if (this.value === "") {
+		$('#plot').hide();
+		$('#block').hide();
+	} else {
+		$('#plot').show();
+	}
+});
+$('#plot').change(update_blocks).change(function () {
+	if (this.value === "") {
+		$('#block').hide();
+	} else {
+		$('#block').show();
+	}
+});
 
 //start hidden, only show when parent locale selected
 $('#region').hide();
@@ -33,8 +64,8 @@ $('#block').hide();
 
 //TRAITS
 //remove submit traits buttons (these are loaded with the traits forms)
-$('#submit_block_traits').remove()
-$('#submit_tree_traits').remove()
+$('#submit_block_traits').remove();
+$('#submit_tree_traits').remove();
 
 //also only display selected level traits
 $('#treeTraits').hide();
@@ -71,8 +102,8 @@ $('dl').each( function () {
 		else {
 			$(this).parent().next().find("input").prop("checked", false);
 		}
-	})
-})
+	});
+});
 
 //expand the general tab as defaults are set (and as example)
 $('#select_all_general').parent().next().show();
@@ -106,7 +137,6 @@ $('#submit_download').click(function(e) {
 			data: $("form").serialize(),
 			type: 'POST',
 			success: function(response) {
-				console.log(response);
 				if (response.hasOwnProperty('submitted')) {
 					flash_submitted = "<div id='download_flash' class='flash'>" + response.submitted + "</div>";
 					$("#download_flash").replaceWith(flash_submitted);

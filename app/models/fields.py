@@ -179,41 +179,51 @@ class Fields:
 	def get_farms(self, region):
 		self.region=region
 		with driver.session() as session:
-			return session.read_transaction(self._get_farms)
+			result = session.read_transaction(self._get_farms)
+			return [(record[0]['name']) for record in result]
 	def _get_farms(self, tx):
-		result = tx.run(Cypher.get_farms, 
+		return tx.run(Cypher.get_farms, 
 			country=self.country, 
 			region=self.region)
-		dict_result= [record[0] for record in result]
-		return [(node['name'], node['name']) for node in dict_result]
-	def get_plots(self, region, farm):
+	def get_plotIDs(self, region, farm):
 		self.region=region
 		self.farm=farm
 		with driver.session() as session:
-			return session.read_transaction(self._get_plots)
+			result = session.read_transaction(self._get_plots)
+			return [(str(record[0]['uid'])) for record in result]
+	def get_plots_tup(self, region, farm):
+		self.region=region
+		self.farm=farm
+		with driver.session() as session:
+			result = session.read_transaction(self._get_plots)
+			return [(str(record[0]['uid']), record[0]['name']) for record in result]
 	def _get_plots(self, tx):
-		result = tx.run(Cypher.get_plots, 
+		return tx.run(Cypher.get_plots, 
 			country=self.country, 
 			region=self.region, 
 			farm=self.farm)
-		dict_result= [record[0] for record in result]
-		return [(str(node['uid']), node['name']) for node in dict_result]
 	@classmethod #has plotID so doesn't need country
-	def get_blocks(cls, plotID):
+	def get_blockUIDs(cls, plotID):
 		cls.plotID = plotID
 		with driver.session() as session:
-			return session.read_transaction(cls._get_blocks)
+			result = session.read_transaction(cls._get_blocks)
+			return [(record[0]['uid']) for record in result]
+	@classmethod #has plotID so doesn't need country
+	def get_blocks_tup(cls, plotID):
+		cls.plotID = plotID
+		with driver.session() as session:
+			result = session.read_transaction(cls._get_blocks)
+			return [(record[0]['uid'], record[0]['name']) for record in result]
 	@classmethod #has plotID so doesn't need country
 	def _get_blocks(cls, tx):
-		result = tx.run(Cypher.get_blocks,
+		return tx.run(Cypher.get_blocks,
 			plotID = cls.plotID)
-		dict_result = [record[0] for record in result]
-		return [(node['uid'], node['name']) for node in dict_result]
 	@classmethod #has plotID so doesn't need country
 	def get_blocks_csv(cls, plotID):
 		cls.plotID = plotID
 		with driver.session() as session:
-			session.read_transaction(cls._get_blocks_csv)
+			result = session.read_transaction(cls._get_blocks_csv)
+			cls.id_list = [record[0] for record in result]
 		fieldnames = ['UID', 'PlotID', 'BlockID', 'Block', 'Plot', 'Farm', 'Region', 'Country']
 		blocks_csv = cStringIO.StringIO()
 		writer = csv.DictWriter(blocks_csv,
@@ -227,6 +237,6 @@ class Fields:
 		return blocks_csv
 	@classmethod #has plotID so doesn't need country
 	def _get_blocks_csv(cls, tx):
-		result=tx.run(Cypher.get_blocks_csv, 
+		return tx.run(Cypher.get_blocks_csv,
 			plotID = cls.plotID)
-		cls.id_list = [record[0] for record in result]
+		

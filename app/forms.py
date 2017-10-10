@@ -9,7 +9,7 @@ from collections import defaultdict
 #user 
 class RegistrationForm(FlaskForm):
 	strip_filter = lambda x: x.strip() if x else None
-	PARTNERS = Lists('Partner').create_list('name', 'fullname')
+	PARTNERS = Lists('Partner').create_list_tup('name', 'fullname')
 	partner = SelectField('Partner:', [InputRequired()], 
 		choices = sorted(tuple(PARTNERS), key=lambda tup: tup[1]))
 	username = StringField('Username:', [InputRequired(), Length(min=1, 
@@ -56,18 +56,20 @@ class LocationForm(FlaskForm):
 	@staticmethod
 	def update():
 		form = LocationForm()
-		COUNTRIES = sorted(set(Lists('Country').create_list('name','name')), key=lambda tup: tup[1])
+		COUNTRIES = sorted(set(Lists('Country').create_list_tup('name','name')), key=lambda tup: tup[1])
 		REGIONS = sorted(set(Lists('Country').get_connected('name', form.country.data, 'IS_IN')), key=lambda tup: tup[1])
 		FARMS = sorted(set(Fields(form.country.data).get_farms(form.region.data)), key=lambda tup: tup[1])
-		PLOTS = sorted(set(Fields(form.country.data).get_plots(form.region.data, form.farm.data)), key=lambda tup: tup[1])
-		BLOCKS = sorted(set(Fields.get_blocks(form.plot.data)), key=lambda tup: tup[1])
+		PLOTS = sorted(set(Fields(form.country.data).get_plots_tup(form.region.data, form.farm.data)), key=lambda tup: tup[1])
+		BLOCKS = sorted(set(Fields.get_blocks_tup(form.plot.data)), key=lambda tup: tup[1])
 		form.country.choices = [('','Select Country')] + COUNTRIES
-		form.region.choices = [('','Select Region')] + REGIONS
-		form.farm.choices = [('','Select Farm')] + FARMS
-		form.plot.choices = [('','Select Plot')] + PLOTS
+		form.region.choices = [('','Select Region')] + [(REGIONS[i], REGIONS[i]) for i, items in enumerate(REGIONS)]
+		form.farm.choices = [('','Select Farm')] + [(FARMS[i], FARMS[i]) for i, items in enumerate(FARMS)]
+		form.plot.choices = [('','Select Plot')] +  PLOTS
 		form.block.choices = [('','Select Block')] + BLOCKS
 		return form
 
+#created the below for download page, almost identical to the above but with optional validator rather than required.
+#could create custom validator depending on the view
 class OptionalLocationForm(FlaskForm):
 	id = "location_form"
 	country = SelectField('Country: ', [Optional()])
@@ -78,18 +80,17 @@ class OptionalLocationForm(FlaskForm):
 	@staticmethod
 	def update():
 		form = OptionalLocationForm()
-		COUNTRIES = sorted(set(Lists('Country').create_list('name','name')), key=lambda tup: tup[1])
+		COUNTRIES = sorted(set(Lists('Country').create_list_tup('name','name')), key=lambda tup: tup[1])
 		REGIONS = sorted(set(Lists('Country').get_connected('name', form.country.data, 'IS_IN')), key=lambda tup: tup[1])
 		FARMS = sorted(set(Fields(form.country.data).get_farms(form.region.data)), key=lambda tup: tup[1])
-		PLOTS = sorted(set(Fields(form.country.data).get_plots(form.region.data, form.farm.data)), key=lambda tup: tup[1])
-		BLOCKS = sorted(set(Fields.get_blocks(form.plot.data)), key=lambda tup: tup[1])
+		PLOTS = sorted(set(Fields(form.country.data).get_plots_tup(form.region.data, form.farm.data)), key=lambda tup: tup[1])
+		BLOCKS = sorted(set(Fields.get_blocks_tup(form.plot.data)), key=lambda tup: tup[1])
 		form.country.choices = [('','Select Country')] + COUNTRIES
-		form.region.choices = [('','Select Region')] + REGIONS
-		form.farm.choices = [('','Select Farm')] + FARMS
-		form.plot.choices = [('','Select Plot')] + PLOTS
+		form.region.choices = [('','Select Region')] + [(REGIONS[i], REGIONS[i]) for i, items in enumerate(REGIONS)]
+		form.farm.choices = [('','Select Farm')] + [(FARMS[i], FARMS[i]) for i, items in enumerate(FARMS)]
+		form.plot.choices = [('','Select Plot')] +  PLOTS
 		form.block.choices = [('','Select Block')] + BLOCKS
 		return form
-
 
 class AddCountry(FlaskForm):
 	id = "add_country"
@@ -236,10 +237,6 @@ class AddStorageForm(FlaskForm):
 
 class SampleRegForm(FlaskForm):
 	id = "sample_reg_form"
-	country = SelectField('Country: ', [InputRequired()])
-	region = SelectField('Region: ', [InputRequired()])
-	farm = SelectField('Farm: ', [InputRequired()])
-	plot = SelectField('Plot: ', [InputRequired()])
 	trees_start = 	IntegerField('Start TreeID',[InputRequired(), 
 		NumberRange(min=1, max=100000, message='')],
 		description= "Start TreeID")
@@ -256,19 +253,12 @@ class SampleRegForm(FlaskForm):
 	@staticmethod
 	def update():
 		form = SampleRegForm()
-		COUNTRIES = sorted(set(Lists('Country').create_list('name','name')), key=lambda tup: tup[1])
-		REGIONS = sorted(set(Lists('Country').get_connected('name', form.country.data, 'IS_IN')), key=lambda tup: tup[1])
-		FARMS = sorted(set(Fields(form.country.data).get_farms(form.region.data)), key=lambda tup: tup[1])
-		PLOTS = sorted(set(Fields(form.country.data).get_plots(form.region.data, form.farm.data)), key=lambda tup: tup[1])
-		TISSUES = sorted(set(Lists('Tissue').create_list('name', 'name')), key=lambda tup: tup[1])
-		STORAGE_TYPES = sorted(set(Lists('Storage').create_list('name', 'name')), key=lambda tup: tup[1])
-		form.country.choices = [('','Select Country')] + COUNTRIES
-		form.region.choices = [('','Select Region')] + REGIONS
-		form.farm.choices = [('','Select Farm')] + FARMS
-		form.plot.choices = [('','Select Plot')] + PLOTS
+		TISSUES = sorted(set(Lists('Tissue').create_list_tup('name', 'name')), key=lambda tup: tup[1])
+		STORAGE_TYPES = sorted(set(Lists('Storage').create_list_tup('name', 'name')), key=lambda tup: tup[1])
 		form.tissue.choices = [('','Select Tissue')] + TISSUES
 		form.storage.choices = [('','Select Storage')] + STORAGE_TYPES
 		return form
+
 
 #upload
 class UploadForm(FlaskForm):

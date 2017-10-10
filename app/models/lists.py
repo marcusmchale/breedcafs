@@ -28,29 +28,27 @@ class Lists:
 		Cypher_node_properties='MATCH (n: ' + node_label +') RETURN properties (n)'
 		result = tx.run(Cypher_node_properties)
 		return [record[0] for record in result]
-	#create tuple for forms: for given key pair (e.g. name, fullname)
-	#use set to only get unique values	
-	def create_list(self, key1, key2):
-		#node_label=self.node_label
-		#properties_dict = self.get_nodes()
+	def create_list(self, key):
+		return [(node[key]) for node in self.get_nodes()]
+	#lists of tups for forms
+	def create_list_tup(self, key1, key2):
 		return [(node[key1], node[key2]) for node in self.get_nodes()]
-	#gets nodes (defined by key:value of a property) connected by a relationship (rel)
+	#Finds node (defined by key:value of a property) and gets 'name' from nodes connected by a relationship with label 'rel'
 	def get_connected(self, key, value, rel):
 		self.key=key 
 		self.rel=rel
 		self.value=value
 		with driver.session() as session:
-			return session.read_transaction(self._get_connected)
+			result = session.read_transaction(self._get_connected)
+			return [(record[0]['name']) for record in result]
 	def _get_connected(self, tx):
 		key = self.key
 		rel = self.rel
 		value = self.value
 		node_label=self.node_label
-		Cypher_get_connected=('MATCH (n: ' + node_label +' {' + key + ':{value}}) <- [:' 
+		Cypher_get_connected=('MATCH (n: ' + node_label +' {' + key + ':$value}) <- [:' 
 			+ rel + '] - (r) RETURN properties (r)')
-		result = tx.run(Cypher_get_connected, value=self.value)
-		dict_result= [record[0] for record in result]
-		return [(node['name'], node['name']) for node in dict_result]
+		return tx.run(Cypher_get_connected, value=self.value)
 	#get selected nodes (forms)
 	def get_selected(self):
 		all_nodes = self.get_nodes()

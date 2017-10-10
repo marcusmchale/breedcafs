@@ -4,4 +4,5 @@ from lists import Lists
 from fields import Fields
 from chart import Chart
 from samples import Samples
+from download import Download
 from field_details import FieldDetails

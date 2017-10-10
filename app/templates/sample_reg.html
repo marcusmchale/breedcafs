@@ -6,10 +6,10 @@
 	<h3>Register samples</h3>
 		<form action="{{ url_for('sample_reg') }}" id="sample_reg" method="post">
 			{{ sample_reg_form.csrf_token }}
-			{{ render_field (sample_reg_form.country) }}
-			{{ render_field (sample_reg_form.region) }}
-			{{ render_field (sample_reg_form.farm) }}
-			{{ render_field (sample_reg_form.plot) }}
+			{{ render_field (location_form.country) }}
+			{{ render_field (location_form.region) }}
+			{{ render_field (location_form.farm) }}
+			{{ render_field (location_form.plot) }}
 			{{ render_field (sample_reg_form.trees_start) }}
 			{{ render_field (sample_reg_form.trees_end) }}
 			{{ render_field (sample_reg_form.replicates) }}
@@ -28,4 +28,3 @@
 <script src="{{ url_for('static', filename='jquery-ui-1.12.1.custom/jquery-ui.js') }}"></script>
 <script src="{{ url_for('static', filename='jquery_samples.js') }}"></script>
 {% endblock %}
-
