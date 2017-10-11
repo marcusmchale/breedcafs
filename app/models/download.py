@@ -81,31 +81,42 @@ class Download(User):
 					' <-[:CONTAINS_BLOCKS]-(plot:Plot) ')
 				query = tdp + frc
 			#and generate the return statement
-			response = ( ' RETURN {Trait : trait.name, '
-					' Details : trait.details, '
-					' Value : data.value, '
-					' UID : tree.uid ,'
-					' PlotID : plot.uid, '
-					' TreeID : tree.id, '
-					' Plot : plot.name, '
-					' Farm : farm.name, '
-					' Region : region.name, '
-					' Country : country.name } '
-				' ORDER BY block.uid ' )
+			response = ( 
+					#need a with statement to allow order by with COLLECT
+					' WITH '
+						' tree.uid as UID, '
+						' plot.uid as PlotID, '
+						' tree.id as TreeID, '
+						' block.name as Block, '
+						' plot.name as Plot, '
+						' farm.name as Farm, '
+						' region.name as Region, '
+						' country.name as Country, '
+						' COLLECT([trait.name, data.value]) as Traits '
+					' RETURN '
+						' { UID : UID ,'
+						' PlotID : PlotID, '
+						' TreeID : TreeID, '
+						' Block : Block, '
+						' Plot : Plot, '
+						' Farm : Farm, '
+						' Region : Region, '
+						' Country : Country, '
+						' Traits : Traits } '
+					' ORDER BY '
+						' PlotID, TreeID ' )
 			query = query + response
-			#create the list of fieldnames to use in the CSV later
-			fieldnames = ['Trait',
-				'Details',
-				'Value',
-				'UID',
+			#defining these as headers for tree data
+			index_fieldnames = [
+				'Country',
+				'Region',
+				'Farm', 
+				'Plot', 
+				'Block',
 				'PlotID',
 				'TreeID',
-				'Block',
-				'Plot', 
-				'Farm', 
-				'Region', 
-				'Country']
-		if level == 'block' and set(traits).issubset(set(BLOCKTRAITS)):
+				'UID']
+		elif level == 'block' and set(traits).issubset(set(BLOCKTRAITS)):
 			td = ( ' MATCH (trait:BlockTrait) '
 				' WHERE (trait.name) IN ' + str(traits) +
 				' WITH trait '
@@ -124,47 +135,63 @@ class Download(User):
 					' <-[:REGISTERED_BLOCK]-(:PlotBlocks)'
 					' <-[:CONTAINS_BLOCKS]-(plot:Plot) ' )
 			query = tdp + frc
-			response = (' RETURN {Trait : trait.name, '
-					' Details : trait.details, '
-					' Value : data.value, '
-					' UID : block.uid ,'
-					' PlotID : plot.uid, '
-					' BlockID : block.id, '
-					' Block : block.name, '
-					' Plot : plot.name, '
-					' Farm : farm.name, '
-					' Region : region.name, '
-					' Country : country.name } '
-				' ORDER BY block.uid ')
+			response = ( 
+					#need a with statement to allow order by with COLLECT
+					' WITH '
+						' block.uid as UID, '
+						' plot.uid as PlotID, '
+						' block.id as BlockID, '
+						' block.name as Block, '
+						' plot.name as Plot, '
+						' farm.name as Farm, '
+						' region.name as Region, '
+						' country.name as Country, '
+						' COLLECT([trait.name, data.value]) as Traits '
+					' RETURN '
+						' { UID : UID ,'
+						' PlotID : PlotID, '
+						' BlockID : BlockID, '
+						' Block : Block, '
+						' Plot : Plot, '
+						' Farm : Farm, '
+						' Region : Region, '
+						' Country : Country, '
+						' Traits : Traits }'
+					' ORDER BY '
+						' PlotID, BlockID ' )
 			query = query + response
-			#create the list of fieldnames to use in the CSV later
-			fieldnames = ['Trait',
-				'Details',
-				'Value',
-				'UID',
-				'PlotID',
-				'BlockID',
-				'Block',
-				'Plot', 
+			#defining these as headers for block data
+			index_fieldnames = [
+				'Country',
+				'Region',
 				'Farm', 
-				'Region', 
-				'Country']
-		result = tx.run(query,
+				'Plot', 
+				'PlotID',
+				'Block',
+				'BlockID',
+				'UID']
+		#perform transaction and store the result simplified (remove all the transaction metadata and just keep the result map)
+		result = [record[0] for record in tx.run(query,
 			country = country,
 			region = region,
 			farm = farm,
 			plotID = plotID,
 			blockUID = blockUID,
-			traits = traits)
-		result_dict = [record[0] for record in result]
-		#now create the csv file from this result
+			traits = traits)]
+		#expand the traits and values as key:value pairs
+		[[record.update({i[0]:i[1] for i in record['Traits']})] for record in result]
+		#now pop out the Traits key and add the returned trait names to a set of fieldnames
+		trait_fieldnames = set()
+		[[trait_fieldnames.add(i[0]) for i in record.pop('Traits')] for record in result]
+		#now create the csv file from result and fieldnames
+		fieldnames =  index_fieldnames + list(trait_fieldnames)
 		data_file = cStringIO.StringIO()
 		writer = csv.DictWriter(data_file, 
 		fieldnames=fieldnames, 
 		quoting=csv.QUOTE_ALL,
 		extrasaction='ignore')
 		writer.writeheader()
-		for i, item in enumerate(result_dict):
+		for i, item in enumerate(result):
 			writer.writerow(item)
 		data_file.seek(0)
 		return data_file
