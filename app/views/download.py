@@ -6,14 +6,14 @@ from flask import (redirect,
 	session, 
 	render_template, 
 	jsonify,
-	send_file)
+	send_from_directory)
 from app.models import (User, 
 	Download)
 from app.forms import (DownloadForm,
 	OptionalLocationForm, 
 	CreateTreeTraits, 
 	CreateBlockTraits)
-from app.emails import send_attachment
+from app.emails import send_email
 from datetime import datetime
 
 @app.route('/download', methods=['GET', 'POST'])
@@ -33,12 +33,15 @@ def download():
 			block_traits_form = block_traits_form,
 			title='Download')
 
-@app.route('/download/csv', methods=['GET', 'POST'])
-def download_csv():
+
+@app.route('/download/generate_csv', methods=['POST'])
+def generate_csv():
 	username = session['username']
 	download_form = DownloadForm()
 	location_form = OptionalLocationForm().update()
 	level = request.form['trait_level']
+	start_date = request.form['date_from']
+	end_date = request.form['date_to']
 	if level == 'tree':
 		traits_form = CreateTreeTraits()
 	elif level == 'block':
@@ -65,25 +68,25 @@ def download_csv():
 			traits = gen + agro + morph + photo + metab 
 		if level == 'block':
 			traits = b_gen + b_agro
+		#get selected data format
+		data_format = request.form['data_format']
 		#make the file
-		data_csv = Download(username).get_csv(country, region, farm, plotID, blockUID, level, traits)
+		filename = Download(username).get_csv(country, region, farm, plotID, blockUID, level, traits, data_format, start_date, end_date)
+		download_url = url_for('download_file', filename=filename)
 		recipients=[User(session['username']).find('')['email']]
-		subject = "BreedCAFS: Data requested"
-		body = "The requested data is attached"
-		html = render_template('emails/data_file.html')
-		send_attachment(subject, 
-			app.config['ADMINS'][0],  
+		subject = "BreedCAFS: Data file generated"
+		body = "The requested data is available at the following address: " + download_url
+		html = render_template('emails/data_file.html', download_url = filename)
+		send_email(subject, 
+			app.config['ADMINS'][0],
 			recipients, 
 			body, 
-			html, 
-			u'BreedCAFS_data_' + datetime.now().strftime('%Y%m%d') + '.csv', 
-			'text/csv', 
-			data_csv)
-		#return send_file(data_csv,
-		#	attachment_filename='BreedCAFS_data.csv',
-		#	as_attachment=True,
-		#	mimetype=('txt/csv'))
-		return jsonify({"submitted":"did you get it?"})
+			html)
+		return jsonify({'submitted':'Your file is ready for download: "<a href="' + download_url + '">' + filename + '</a>"'})
 	else:
 		errors = jsonify([download_form.errors, traits_form.errors])
 		return errors
+
+@app.route('/download/file/<filename>')
+def download_file(filename):
+	return send_from_directory(os.path.join(app.instance_path, app.config['DOWNLOAD_FOLDER']), filename, as_attachment = True)

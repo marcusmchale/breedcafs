@@ -67,7 +67,8 @@ $('#block').hide();
 $('#submit_block_traits').remove();
 $('#submit_tree_traits').remove();
 
-//also only display selected level traits
+//also load set trait level undefined by defauly and only display level traits when selected
+$('#trait_level').val('0');
 $('#treeTraits').hide();
 $('#blockTraits').hide();
 
@@ -113,11 +114,6 @@ $('#select_all_block_general').parent().next().show();
 $('#submit_download').click(function(e) {
 	e.preventDefault();
 	$(".flash").remove();
-	var sel_country = $("#country").find(":selected").val();
-	var sel_region = $("#region").find(":selected").val();
-	var sel_farm = $("#farm").find(":selected").val();
-	var sel_plot = $("#plot").find(":selected").val();
-	var sel_block = $("#block").find(":selected").val();
 	var sel_level = $("#trait_level").find(":selected").val();
 	wait_message = "Please wait for file to be generated"
 	flash_wait = "<div id='download_flash' class='flash'>" + wait_message + "</div>"
@@ -133,7 +129,7 @@ $('#submit_download').click(function(e) {
 		$("#download_flash").replaceWith(flash_select)
 	} else {
 		var submit_traits = $.ajax({
-			url: "/download/csv",
+			url: "/download/generate_csv",
 			data: $("form").serialize(),
 			type: 'POST',
 			success: function(response) {
@@ -160,3 +156,7 @@ $('#submit_download').click(function(e) {
 		});
 	}
 })
+
+//Render a calendar in jquery-ui for date selection
+$("#date_from").datepicker({ dateFormat: 'yy-mm-dd'});
+$("#date_to").datepicker({ dateFormat: 'yy-mm-dd'});

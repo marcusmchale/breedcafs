@@ -5,9 +5,13 @@
 	<h2>Fieldbook tools</h2>
 		<h3>Create {{ level }}_traits.trt</h3>
 			{% if level == 'tree' %}
-				{% include "traits_tree_form.html" %}
+				<form action="{{ url_for('select_traits', level='tree') }}" method="post">
+					{% include "traits_tree_form.html" %}
+				</form>
 			{% elif level == 'block' %}
+				<form action="{{ url_for('select_traits', level='block') }}" method="post">
 				{% include "traits_block_form.html" %}
+				</form>
 			{% endif %}
 </div>
 <script src="{{ url_for('static', filename='jquery_1.8.3_min.js') }}"></script>

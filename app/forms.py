@@ -259,7 +259,6 @@ class SampleRegForm(FlaskForm):
 		form.storage.choices = [('','Select Storage')] + STORAGE_TYPES
 		return form
 
-
 #upload
 class UploadForm(FlaskForm):
 	id = "upload_form"
@@ -272,4 +271,12 @@ class UploadForm(FlaskForm):
 class DownloadForm(FlaskForm):
 	trait_level = SelectField('Trait level', [InputRequired()],
 		choices = [('','Select Level'),('block','Block'), ('tree','Tree')])
-	submit_download = SubmitField('Generate data file')
+	date_from = DateField('Date start (YYYY-mm-dd): ',  [Optional()],
+		format='%Y-%m-%d',
+		description = 'Start date')
+	date_to = DateField('Date end (YYYY-mm-dd): ', [Optional()],
+		format='%Y-%m-%d',
+		description = 'End date')
+	data_format = SelectField('Data format', [InputRequired()],
+		choices = [('', 'Select Format'),('db','Database'),('table','Table')])
+	submit_download = SubmitField('Generate file')

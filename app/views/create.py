@@ -10,7 +10,6 @@ from flask import (session,
 	jsonify)
 from app.models import (Lists, 
 	Fields, 
-	FieldDetails, 
 	User, 
 	Samples)
 from app.forms import (LocationForm, 

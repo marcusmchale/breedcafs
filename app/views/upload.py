@@ -45,6 +45,7 @@ def upload_submit():
 							level = "block"
 						else: 
 							return jsonify({"submitted": "This file is not a regular BreedCAFS FieldBook database file"})
+				#add a value 
 			count = Upload(username, filename).submit(subtype, level)
 			return jsonify({"submitted": str(count[0]) + " new records submitted, " + str(count[1]) + " records already found"})
 		else:
