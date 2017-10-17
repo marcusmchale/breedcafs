@@ -4,6 +4,7 @@ from app import app
 from app.cypher import Cypher
 from config import uri, driver
 from flask import session
+from datetime import datetime
 
 class Samples:
 	def __init__ (self):
@@ -55,7 +56,9 @@ class Samples:
 			end = self.end,
 			replicates = self.replicates,
 			tissue = self.tissue,
-			storage=self.storage,
-			date=self.date,
+			storage = self.storage,
+			date = self.date,
+			#convert the date to epoch time (ms)
+			time = (datetime.strptime(self.date, '%Y-%m-%d')-datetime(1970,1,1)).total_seconds()*1000,
 			username = session['username'])
 		self.id_list = [record[0] for record in result]

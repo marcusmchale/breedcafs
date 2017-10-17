@@ -91,7 +91,7 @@ class Cypher():
 		' SET id.count=id.count+1 '
 		' MERGE (pb)-[:REGISTERED_BLOCK { '
 			' username:$username, '
-			' timestamp:timestamp()}]'
+			' time:timestamp()}]'
 			' ->(:Block {name:$block, uid:($plotID + "_B" + id.count), id:id.count}) '
 		' MERGE (pb)<-[:UPDATED {time : timestamp()}]-(u) '
 		' SET id._LOCK_ = false')
@@ -125,7 +125,7 @@ class Cypher():
 		' MERGE (pt)-[R:REGISTERED_TREE]'
 			'->(t:Tree {uid:(toString(p.uid) + "_T" + toString(id.count)), '
 			' id:id.count}) '
-		' ON CREATE SET R.username = $username, R.timestamp = timestamp()'
+		' ON CREATE SET R.username = $username, R.time = timestamp()'
 		' MERGE (u)-[:UPDATED {time:timestamp()}]-(pt)'
 		' SET id._LOCK_ = false '
 		' RETURN {UID:t.uid, '
@@ -151,8 +151,8 @@ class Cypher():
 		' MERGE (pt)-[R:REGISTERED_TREE] '
 		' ->(t:Tree {uid:(toString(p.uid) + "_T" + toString(id.count)), '
 			' id:id.count}) '
-			'<-[:CONTAINS_TREES]-(b)'
-		' ON CREATE SET R.username =$username, R.timestamp = timestamp()'
+			'<-[:CONTAINS_TREE]-(b)'
+		' ON CREATE SET R.username =$username, R.time = timestamp()'
 		' MERGE (u)-[:UPDATED {time:timestamp()}]-(pt)'
 		' SET id._LOCK_ = false '
 		' RETURN {UID:t.uid, '
@@ -168,7 +168,7 @@ class Cypher():
 		' -(r:Region)<-[:IS_IN]-(f:Farm)<-[:IS_IN]-'
 		' (p:Plot {uid: $plotID})-[:CONTAINS_TREES]->(pt:PlotTrees) '
 		' -[:REGISTERED_TREE]->(t:Tree) '
-		' OPTIONAL MATCH (t)<-[:CONTAINS_TREES]-(b:Block)'
+		' OPTIONAL MATCH (t)<-[:CONTAINS_TREE]-(b:Block)'
 		' OPTIONAL MATCH (t)<-[:DATA_FOR]-(d:Data) '
 			'<-[:SUBMISSIONS]-(:PlotTreeTraitData)<-[:PLOT_DATA]-(:TreeTrait {name:"name"})'
 		' WHERE t.id>=$start '
@@ -260,7 +260,12 @@ class Cypher():
 		' MERGE (t)-[:SAMPLED]->(ts:TreeSamples) '
 		' MERGE (ts)-[:REGISTERED_SAMPLE] '
 		' ->(s:Sample {uid:(p.uid + "_S" + id.count),'
-			' id:id.count, date:$date, tissue:$tissue, storage:$storage}) '
+			' id:id.count, '
+			' date:$date, '
+			' time:$time '
+			#' time:apoc.date.parse($date, "ms", "yyyy-MM-dd"), '
+			' tissue:$tissue, '
+			' storage:$storage}) '
 		' -[:SAMPLE_FROM_PLOT]->(ps)'
 		#track user submissions
 		' MERGE (user)-[:SUBMITTED_SAMPLES]-(ss:SampleSubmissions) '
@@ -292,6 +297,7 @@ class Cypher():
 		' MATCH (plot:Plot {uid:toInteger(head(split(csvLine.UID, "_")))}), '
 			' (tree:Tree {uid:csvLine.UID}),'
 			' (trait:TreeTrait {name:csvLine.trait}) '
+		' OPTIONAL MATCH (block:Block {name:csvLine.value}) '
 		# Data is split out to container node per plot per trait level
 		# once again to reduce the number of relationships when later searching
 		' MERGE (plot)-[:TRAIT_DATA]->(pt:PlotTreeTraitData)<-[:PLOT_DATA]-(trait) '
@@ -301,16 +307,22 @@ class Cypher():
 			' (d:Data {tree:csvLine.UID, '
 				' value:csvLine.value, '
 				' timeFB:csvLine.timestamp, '
+				#the below stores the time as epoch (ms) - same as neo4j timestamp() to allow simple math on date/time
+				' time:apoc.date.parse(csvLine.timestamp,"ms","yyyy-MM-dd HH:mm:sszzz"), '
 				' person:csvLine.person, '
 				' location:csvLine.location}) '
 				' -[:DATA_FOR]->(tree)'
 			' ON MATCH SET d.found="TRUE" '
 			#recording details of first submission
-			' ON CREATE SET d.found="FALSE", s.username=$username, s.timestamp=timestamp()'
+			' ON CREATE SET d.found="FALSE", s.username=$username, s.time=timestamp()'
 		# but to allow faster identification of a users submissions we store attempts to update a PlotTrait node
 		' MERGE (u)-[:UPDATED {time:timestamp()}]-(pt)'
+		# if tree data contained block info, link tree to block
+		' FOREACH (n IN CASE WHEN csvLine.trait = "block" THEN [1] ELSE [] END | '
+				' MERGE (tree)<-[:CONTAINS_TREE]-(block) '
+			' ) '
 		#And give the user feedback on their submission success
-		' RETURN d.found' )
+		' RETURN d.found ' )
 	upload_FB_block = ( ' MATCH (user:User {username : $username}) '
 		#so that users don't have a relationship for each submission
 		' MERGE (user)-[:SUBMITTED_DATA_TYPE]->(u:FieldBookSubmissions)'
@@ -330,12 +342,13 @@ class Cypher():
 			' (d:Data {block:csvLine.UID, '
 				' value:csvLine.value, '
 				' timeFB:csvLine.timestamp, '
+				' time:apoc.date.parse(csvLine.timestamp,"ms","yyyy-MM-dd HH:mm:sszzz"), '
 				' person:csvLine.person, '
 				' location:csvLine.location}) '
 				' -[:DATA_FOR]->(block)'
 			' ON MATCH SET d.found="TRUE" '
 			#recording details of first submission
-			' ON CREATE SET d.found="FALSE", s.username=$username, s.timestamp=timestamp()'
+			' ON CREATE SET d.found="FALSE", s.username=$username, s.time=timestamp()'
 		# but to allow faster identification of a users submissions we store attempts to update a PlotTrait node
 		' MERGE (u)-[:UPDATED {time:timestamp()}]-(pt)'
 		#And give the user feedback on their submission success

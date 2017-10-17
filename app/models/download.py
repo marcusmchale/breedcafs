@@ -12,7 +12,7 @@ from datetime import datetime
 class Download(User):
 	def __init__(self, username):
 		self.username=username
-	def get_csv(self, country, region, farm, plotID, blockUID, level, traits, data_format, start_date, end_date):
+	def get_csv(self, country, region, farm, plotID, blockUID, level, traits, data_format, start_time, end_time):
 		self.country = country
 		self.region = region
 		self.farm = farm
@@ -20,8 +20,8 @@ class Download(User):
 		self.blockUID = blockUID
 		traits = [i.encode('utf-8') for i in traits]
 		self.traits=traits
-		self.start_date = start_date
-		self.end_date = end_date
+		self.start_time = start_time
+		self.end_time = end_time
 		#build query strings - always be careful not to allow injection when doing this!!
 		#all of the input needs to be validated (in this case it is already done by WTForms checking against selectfield options)
 		#but as I am not entirely sure about the security of this layer I am adding another check of the values that are used to concatenate the string
@@ -64,18 +64,21 @@ class Download(User):
 			if plotID == "" :
 				tdp = td + ( ' <-[:REGISTERED_TREE]-(PlotTrees) '
 					' <-[:CONTAINS_TREES]-(plot:Plot) ' )
-				query = tdp + frc +	' OPTIONAL MATCH (tree)-[:CONTAINS_TREE]-(block:Block)'
+				query = tdp + frc 
+				optional_block = ' OPTIONAL MATCH (tree)-[:CONTAINS_TREE]-(block:Block)'
 			#if plotID is defined (but no blockUID)
 			elif blockUID == "" and plotID != "" :
 				tdp = td + ( ' <-[:REGISTERED_TREE]-(PlotTrees) '
 					' <-[:CONTAINS_TREES]-(plot:Plot {uid:$plotID}) ' )
-				query = tdp + frc +	' OPTIONAL MATCH (tree)-[:CONTAINS_TREE]-(block:Block)'
+				query = tdp + frc 
+				optional_block = ' OPTIONAL MATCH (tree)-[:CONTAINS_TREE]-(block:Block)'
 			#if blockID is defined
 			elif blockUID != "":
 				tdp = td + ( '<-[:CONTAINS_TREE]-(block:Block {uid:$blockUID}) '
 					' <-[:REGISTERED_BLOCK]-(:PlotBlocks) '
 					' <-[:CONTAINS_BLOCKS]-(plot:Plot) ')
 				query = tdp + frc
+				optional_block = ''
 			#and generate the return statement
 			if data_format == 'table':
 				response = ( 
@@ -120,9 +123,9 @@ class Download(User):
 						' Recorded_by: data.person '
 					'}'
 					)
-			query = query + response
 			#defining these as headers for tree data
 		elif level == 'block' and set(traits).issubset(set(BLOCKTRAITS)):
+			optional_block = ''
 			index_fieldnames = [
 				'Country',
 				'Region',
@@ -194,8 +197,17 @@ class Download(User):
 						' Recorded_by : data.person'
 					'}'
 					)
-			query = query + response
-		self.query = query
+		#add conditional for data between time range
+		if start_time != "" and end_time != "":
+			time_condition = ' WHERE data.time > $start_time AND data.time < $end_time '
+		elif start_time == "" and end_time != "":
+			time_condition = ' WHERE data.time < $end_time '
+		elif start_time != "" and end_time == "":
+			time_condition = ' WHERE data.time > $start_time '
+		else:
+			time_condition = ''
+		#finalise query
+		self.query = query + time_condition + optional_block + response
 		with driver.session() as session:
 			result = session.read_transaction(self._get_csv)
 		if data_format == 'table':
@@ -232,4 +244,6 @@ class Download(User):
 			farm = self.farm,
 			plotID = self.plotID,
 			blockUID = self.blockUID,
-			traits = self.traits)]
+			traits = self.traits,
+			start_time = self.start_time,
+			end_time = self.end_time)]
