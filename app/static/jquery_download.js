@@ -77,9 +77,13 @@ $('#trait_level').change(function () {
 		$('#treeTraits').show();
 		$('#blockTraits').hide();
 	}
-		if (this.value === 'block') {
+	if (this.value === 'block') {
 		$('#treeTraits').hide();
 		$('#blockTraits').show();
+	}
+	if (this.value === '') {
+		$('#treeTraits').hide();
+		$('#blockTraits').hide();
 	}
 })
 

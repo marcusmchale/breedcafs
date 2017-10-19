@@ -30,7 +30,7 @@ $("#submit_trees").click( function(e) {
 	remove_flash();
 	wait_message = "Please wait for trees to be registered and files generated"
 	flash_wait = "<div id='trees_flash' class='flash'>" + wait_message + "</div>"
-	$("#submit_trees").after(flash_wait)
+	$("form").append(flash_wait)
 	var submit_trees = $.ajax({
 		url: "/add_trees",
 		data: $("form").serialize(),
@@ -69,7 +69,7 @@ $("#custom_trees_csv").click( function(e) {
 	remove_flash();
 	wait_message = "Please wait for file to be generated";
 	flash_wait = "<div id='fields_flash' class='flash'>" + wait_message + "</div>";
-	$(this).after(flash_wait)
+	$('form').append(flash_wait)
 	var custom_trees_csv = $.ajax({
 		url: "/custom_trees_csv",
 		data: $("form").serialize(),

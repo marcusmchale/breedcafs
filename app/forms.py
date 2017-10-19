@@ -1,5 +1,5 @@
 from wtforms import StringField, PasswordField, BooleanField, SelectField, SelectMultipleField, IntegerField, SubmitField, DateField, DateTimeField, widgets
-from wtforms.validators import InputRequired, Optional, Email, EqualTo, NumberRange, Length
+from wtforms.validators import InputRequired, Optional, Email, EqualTo, NumberRange, Length, Regexp
 from flask_wtf import FlaskForm
 from flask_wtf.file import FileField, FileRequired
 from app import app
@@ -12,8 +12,9 @@ class RegistrationForm(FlaskForm):
 	PARTNERS = Lists('Partner').create_list_tup('name', 'fullname')
 	partner = SelectField('Partner:', [InputRequired()], 
 		choices = sorted(tuple(PARTNERS), key=lambda tup: tup[1]))
-	username = StringField('Username:', [InputRequired(), Length(min=1, 
-		max=20, message='Maximum 20 characters')],
+	username = StringField('Username:', [InputRequired(), 
+		Length(min=1, max=20, message='Maximum 20 characters'),
+		Regexp('([^\x00-\x7F]|\w)+', message='Username contains illegal characters')],
 		filters=[strip_filter],
 		description = "Enter a username")
 	email = StringField('Email Address:', [InputRequired(), Email(), Length(min=1, 
@@ -96,7 +97,9 @@ class AddCountry(FlaskForm):
 	id = "add_country"
 	strip_filter = lambda x: x.strip() if x else None
 	text_country = StringField('Country text input', 
-		[InputRequired(),Length(min=1, max=50, message='Maximum 50 characters')],
+		[InputRequired(),
+		Regexp('([^\x00-\x7F]|\w)+', message='Country name contains illegal characters'),
+		Length(min=1, max=50, message='Maximum 50 characters')],
 		filters=[strip_filter],
 		description = "Add new country")
 	submit_country = SubmitField('+')
@@ -105,7 +108,9 @@ class AddRegion(FlaskForm):
 	id = "add_region"
 	strip_filter = lambda x: x.strip() if x else None
 	text_region = StringField('Region text input', 
-		[InputRequired(),Length(min=1, max=50, message='Maximum 50 characters')],
+		[InputRequired(),
+		Regexp('([^\x00-\x7F]|\w)+', message='Region name contains illegal characters'),
+		Length(min=1, max=50, message='Maximum 50 characters')],
 		filters=[strip_filter],
 		description = "Add new region")
 	submit_region = SubmitField('+')
@@ -114,7 +119,9 @@ class AddFarm(FlaskForm):
 	id = "add_farm"
 	strip_filter = lambda x: x.strip() if x else None
 	text_farm = StringField('Farm text input', 
-		[InputRequired(),Length(min=1, max=50, message='Maximum 50 characters')],
+		[InputRequired(),
+		Regexp('([^\x00-\x7F]|\w)+', message='Farm name contains illegal characters'),
+		Length(min=1, max=50, message='Maximum 50 characters')],
 		filters=[strip_filter],
 		description = "Add new farm")
 	submit_farm = SubmitField('+')
@@ -123,7 +130,9 @@ class AddPlot(FlaskForm):
 	id = "add_plot"
 	strip_filter = lambda x: x.strip() if x else None
 	text_plot = StringField('Plot text input',
-		[InputRequired(),Length(min=1, max=50, message='Maximum 50 characters')],
+		[InputRequired(),
+		Regexp('([^\x00-\x7F]|\w)+', message='Plot name contains illegal characters'),
+		Length(min=1, max=50, message='Maximum 50 characters')],
 		filters=[strip_filter],
 		description = "Add new plot")
 	submit_plot = SubmitField('+')
@@ -133,20 +142,22 @@ class AddBlock(FlaskForm):
 	id = "add_block"
 	strip_filter = lambda x: x.strip() if x else None
 	text_block = StringField('Block text input',
-		[InputRequired(),Length(min=1, max=50, message='Maximum 50 characters')],
+		[InputRequired(),
+		Regexp('([^\x00-\x7F]|\w)+', message='Block name contains illegal characters'),
+		Length(min=1, max=50, message='Maximum 50 characters')],
 		filters=[strip_filter],
 		description = "Add new block")
 	submit_block = SubmitField('+')
 
 class FieldsForm(FlaskForm): #details of plot
 	id = "plots_csv_form"
-	email_checkbox = BooleanField('Email checkbox', default = 'TRUE')
+	email_checkbox = BooleanField('Email checkbox')
 	generate_blocks_csv = SubmitField('Generate blocks.csv')
-
 
 #Trees
 class AddTreesForm(FlaskForm):
 	id = "add_trees"
+	email_checkbox_add = BooleanField('Email checkbox add')
 	count = IntegerField('Number of trees: ',[InputRequired(), 
 		NumberRange(min=1, max=1000, message='Register from 1-1000 plants at a time')],
 		description= "Number of new trees")
@@ -154,6 +165,7 @@ class AddTreesForm(FlaskForm):
 
 class CustomTreesForm(FlaskForm):
 	id = "custom_trees_Form"
+	email_checkbox_custom = BooleanField('Email checkbox custom')
 	trees_start = 	IntegerField('Start TreeID',[InputRequired(), 
 		NumberRange(min=1, max=100000, message='')],
 		description= "Start TreeID")
@@ -169,6 +181,7 @@ class CreateBlockTraits(FlaskForm):
 	trait_dict = defaultdict(list)
 	for trait in TRAITS:
 		trait_dict[trait['group']].append((trait['name'], trait['details']))
+	email_checkbox = BooleanField('Email checkbox')
 	block_general = SelectMultipleField('general',
 		choices = sorted(trait_dict['general'], 
 		key=lambda tup: tup[1]), 
@@ -188,6 +201,7 @@ class CreateTreeTraits(FlaskForm):
 	trait_dict = defaultdict(list)
 	for trait in TRAITS:
 		trait_dict[trait['group']].append((trait['name'], trait['details']))
+	email_checkbox = BooleanField('Email checkbox')
 	general = SelectMultipleField('general',
 		choices = sorted(trait_dict['general'], 
 		key=lambda tup: tup[1]), 
@@ -221,7 +235,9 @@ class AddTissueForm(FlaskForm):
 	id = "add_tissue_form"
 	strip_filter = lambda x: x.strip() if x else None
 	text_tissue = StringField('Tissue type text',	
-		[InputRequired(), Length(min=1, max=100, message='Maximum 100 characters')],
+		[InputRequired(), 
+		Regexp('([^\x00-\x7F]|\w)+', message='Tissue name contains illegal characters'),
+		Length(min=1, max=100, message='Maximum 100 characters')],
 		filters=[strip_filter],
 		description = "Add new tissue")
 	submit_tissue = SubmitField('+')
@@ -230,13 +246,16 @@ class AddStorageForm(FlaskForm):
 	id = "add_storage_form"
 	strip_filter = lambda x: x.strip() if x else None
 	text_storage = StringField('Storage type text',	
-		[InputRequired(), Length(min=1, max=100, message='Maximum 100 characters')],
+		[InputRequired(), 
+		Regexp('([^\x00-\x7F]|\w)+', message='Storage name contains illegal characters'),
+		Length(min=1, max=100, message='Maximum 100 characters')],
 		filters=[strip_filter],
 		description = "Add new storage method")
 	submit_storage = SubmitField('+')
 
 class SampleRegForm(FlaskForm):
 	id = "sample_reg_form"
+	email_checkbox = BooleanField('Email checkbox')
 	trees_start = 	IntegerField('Start TreeID',[InputRequired(), 
 		NumberRange(min=1, max=100000, message='')],
 		description= "Start TreeID")

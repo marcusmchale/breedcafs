@@ -1,3 +1,4 @@
+import os
 import unicodecsv as csv 
 import cStringIO
 from app import app
@@ -34,19 +35,35 @@ class Samples:
 		self.tissue = tissue
 		self.storage = storage
 		self.date = date
-		with driver.session() as session:
-			session.write_transaction(self._add_samples)
+		#register samples and return index data
+		with driver.session() as neo4j_session:
+			neo4j_session.write_transaction(self._add_samples)
+		#create user download path if not found
+		if not os.path.isdir(os.path.join(app.instance_path, app.config['DOWNLOAD_FOLDER'], session['username'])):
+			os.mkdir(os.path.join(app.instance_path, app.config['DOWNLOAD_FOLDER'], session['username']))
+		#prepare variables to write the file
 		fieldnames= ['UID', 'PlotID', 'TreeID', 'TreeName', 'SampleID', 'Date', 'Tissue', 'Storage', 'Plot', 'Farm', 'Region', 'Country']
-		samples_csv = cStringIO.StringIO()
-		writer = csv.DictWriter(samples_csv,
-			fieldnames=fieldnames,
-			quoting=csv.QUOTE_ALL,
-			extrasaction='ignore')
-		writer.writeheader()
-		for sample in self.id_list:
-			writer.writerow(sample)
-		samples_csv.seek(0)
-		return samples_csv
+		time = datetime.now().strftime('%Y%m%d-%H%M%S')
+		first_sample_id = self.id_list[0]['SampleID']
+		last_sample_id = self.id_list[-1]['SampleID']
+		filename = time + '_plot_' + str(plotID) + '_S' + str(first_sample_id) + '_to_S' + str(last_sample_id) + '.csv'
+		file_path = os.path.join(app.instance_path, app.config['DOWNLOAD_FOLDER'], session['username'], filename)
+		#make the file
+		with open(file_path, 'w') as file:
+			writer = csv.DictWriter(file,
+				fieldnames=fieldnames,
+				quoting=csv.QUOTE_ALL,
+				extrasaction='ignore')
+			writer.writeheader()
+			for row in self.id_list:
+				writer.writerow(row)
+			file_size = file.tell()
+		#return file details
+		return { "filename":filename, 
+			"file_path":file_path, 
+			"file_size":file_size, 
+			"first_sample_id":first_sample_id, 
+			"last_sample_id":last_sample_id }
 	def _add_samples(self, tx):
 		tx.run(Cypher.sample_id_lock,
 			plotID = self.plotID)

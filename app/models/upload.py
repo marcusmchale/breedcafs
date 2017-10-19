@@ -26,7 +26,7 @@ class Upload(User):
 				elif self.level == 'block':
 					query = Cypher.upload_FB_block
 			for record in tx.run(query, username=self.username,
-				filename= ("file:///" + self.filename),
+				filename= ("file:///" + self.username + '/' + self.filename),
 				submission_type=self.submission_type):
 				if record['d.found'] == 'TRUE':
 					fcount = fcount + 1

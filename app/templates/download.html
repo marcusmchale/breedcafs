@@ -4,26 +4,28 @@
 <div class="text_body">
 	<h2> Select data to download</h2>
 		<form action="{{ url_for('download') }}" id="download" method="post">
-			<h3>Select subset by location</h3>
+			<h3>Location</h3>
 				<dt>{{ location_form.csrf_token }}</dt>
 				<dt>{{ location_form.country }}</dt>
 				<dt>{{ location_form.region }}</dt>
 				<dt>{{ location_form.farm }}</dt>
 				<dt>{{ location_form.plot }}</dt>
 				<dt>{{ location_form.block }}</dt>
-			<h3>Select level of data</h3>
-				<dt>{{ download_form.trait_level }}</dt>
-			<h3>Select traits to return data on</h3>
+			<h3>Date recorded</h3>
+				<dt>{{ download_form.date_from(placeholder="From date") }}</dt>
+				<dt>{{ download_form.date_to(placeholder="To date") }}</dt>
+			<h3>Level</h3>
+				<dt>{{ download_form.trait_level }}</dt> <br>
 				<div id= "blockTraits">
-					{% include "traits_block_form.html" %}
+					<h3>Block traits</h3>
+						{% include "traits_block_form.html" %}
 				</div>
 				<div id= "treeTraits">
+					<h3>Tree traits</h3>
 					{% include "traits_tree_form.html" %}
 				</div>
-			<dt>{{ download_form.date_from(placeholder="From date") }}</dt>
-			<dt>{{ download_form.date_to(placeholder="To date") }}</dt>
-			<dt>{{ download_form.data_format }}</dt> <br>				
-			<dt>{{ download_form.submit_download }}</dt>
+			<dt>{{ download_form.data_format }}</dt> <br>
+			<dt>{{ download_form.submit_download }} {{ render_field(block_traits_form.email_checkbox) }}</dt>
 		</form>
 </div>
 {% endblock %}

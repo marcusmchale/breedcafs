@@ -1,9 +1,11 @@
+import os
 import unicodecsv as csv 
 import cStringIO
 from app import app
 from app.cypher import Cypher
 from config import uri, driver
 from flask import session
+from datetime import datetime
 
 class Fields:
 	def __init__(self, country):
@@ -120,19 +122,34 @@ class Fields:
 		cls.plotID = plotID
 		cls.count = count
 		cls.blockUID = blockUID
-		with driver.session() as session:
-			session.write_transaction(cls._add_trees)
+		#register trees and return index data
+		with driver.session() as neo4j_session:
+			neo4j_session.write_transaction(cls._add_trees)
+		#create user download path if not found
+		if not os.path.isdir(os.path.join(app.instance_path, app.config['DOWNLOAD_FOLDER'], session['username'])):
+			os.mkdir(os.path.join(app.instance_path, app.config['DOWNLOAD_FOLDER'], session['username']))
+		#prepare variables to write the file
 		fieldnames = ['UID','PlotID','TreeID', 'Block', 'Plot', 'Farm', 'Region', 'Country']
-		trees_csv = cStringIO.StringIO()
-		writer = csv.DictWriter(trees_csv,
-			fieldnames=fieldnames,
-			quoting=csv.QUOTE_ALL,
-			extrasaction='ignore')
-		writer.writeheader()
-		for tree in cls.id_list:
-			writer.writerow(tree)
-		trees_csv.seek(0)
-		return trees_csv
+		time = datetime.now().strftime('%Y%m%d-%H%M%S')
+		first_tree_id = cls.id_list[0]['TreeID']
+		last_tree_id = cls.id_list[-1]['TreeID']
+		filename = time + '_plot_' + str(plotID) + '_T' + str(first_tree_id) + '_to_T' + str(last_tree_id) + '.csv'
+		file_path = os.path.join(app.instance_path, app.config['DOWNLOAD_FOLDER'], session['username'], filename)
+		#make the file
+		with open (file_path, 'w') as file:
+			writer = csv.DictWriter(file,
+				fieldnames=fieldnames,
+				quoting=csv.QUOTE_ALL,
+				extrasaction='ignore')
+			writer.writeheader()
+			for row in cls.id_list:
+				writer.writerow(row)
+			file_size = file.tell()
+		return { "filename":filename, 
+			"file_path":file_path, 
+			"file_size":file_size, 
+			"first_tree_id":first_tree_id, 
+			"last_tree_id":last_tree_id }
 	@classmethod #has plotID so doesn't need country
 	def _add_trees(cls, tx):
 		tx.run(Cypher.tree_id_lock,
@@ -141,7 +158,7 @@ class Fields:
 			result=tx.run(Cypher.trees_add, 
 				plotID = cls.plotID,
 				count = cls.count,
-				username= session['username'])
+				username = session['username'])
 			cls.id_list = [record[0] for record in result]
 		else:
 			result=tx.run(Cypher.block_trees_add, 
@@ -149,26 +166,34 @@ class Fields:
 				count = cls.count,
 				blockUID = cls.blockUID,
 				username = session['username'])
-#use name references instead of list position e.g. t.uid etc.
 			cls.id_list = [record[0] for record in result]
 	@classmethod #has plotID so doesn't need country
 	def get_trees(cls, plotID, start, end):
 		cls.plotID = plotID
 		cls.start = start
 		cls.end = end
-		with driver.session() as session:
-			session.read_transaction(cls._get_trees)
+		with driver.session() as neo4j_session:
+			neo4j_session.read_transaction(cls._get_trees)
+		#create user download path if not found
+		if not os.path.isdir(os.path.join(app.instance_path, app.config['DOWNLOAD_FOLDER'], session['username'])):
+			os.mkdir(os.path.join(app.instance_path, app.config['DOWNLOAD_FOLDER'], session['username']))
+		#prepare variables to write file
 		fieldnames = ['UID','PlotID','TreeID', 'TreeName', 'Block', 'Plot', 'Farm', 'Region', 'Country']
-		trees_csv = cStringIO.StringIO()
-		writer = csv.DictWriter(trees_csv,
-			fieldnames=fieldnames,
-			quoting=csv.QUOTE_ALL,
-			extrasaction='ignore')
-		writer.writeheader()
-		for tree in cls.id_list:
-			writer.writerow(tree)
-		trees_csv.seek(0)
-		return trees_csv
+		time = datetime.now().strftime('%Y%m%d-%H%M%S')
+		filename = time + '_plot_' + str(plotID) + '_T' + str(start) + '_to_T' + str(end) + '.csv'
+		file_path =  os.path.join(app.instance_path, app.config['DOWNLOAD_FOLDER'], session['username'], filename)
+		with open (file_path, 'w') as file:
+			writer = csv.DictWriter(file,
+				fieldnames=fieldnames,
+				quoting=csv.QUOTE_ALL,
+				extrasaction='ignore')
+			writer.writeheader()
+			for row in cls.id_list:
+				writer.writerow(row)
+			file_size = file.tell()
+		return { "filename":filename,
+			"file_path":file_path,
+			"file_size":file_size }
 	@classmethod #has plotID so doesn't need country
 	def _get_trees(cls, tx):
 		result=tx.run(Cypher.trees_get, 
@@ -219,22 +244,30 @@ class Fields:
 		return tx.run(Cypher.get_blocks,
 			plotID = cls.plotID)
 	@classmethod #has plotID so doesn't need country
-	def get_blocks_csv(cls, plotID):
+	def make_blocks_csv(cls, username, plotID):
 		cls.plotID = plotID
+		#get the block index data (country, region etc.)
 		with driver.session() as session:
 			result = session.read_transaction(cls._get_blocks_csv)
 			cls.id_list = [record[0] for record in result]
+		#create user download path if not found
+		if not os.path.isdir(os.path.join(app.instance_path, app.config['DOWNLOAD_FOLDER'], username)):
+			os.mkdir(os.path.join(app.instance_path, app.config['DOWNLOAD_FOLDER'], username))
+		#prepare the file
 		fieldnames = ['UID', 'PlotID', 'BlockID', 'Block', 'Plot', 'Farm', 'Region', 'Country']
-		blocks_csv = cStringIO.StringIO()
-		writer = csv.DictWriter(blocks_csv,
-			fieldnames=fieldnames,
-			quoting=csv.QUOTE_ALL,
-			extrasaction='ignore')
-		writer.writeheader()
-		for block in cls.id_list:
-			writer.writerow(block)
-		blocks_csv.seek(0)
-		return blocks_csv
+		time = datetime.now().strftime('%Y%m%d-%H%M%S')
+		filename = time + '_plot_' + str(plotID) + '_blocks.csv'
+		file_path = os.path.join(app.instance_path, app.config['DOWNLOAD_FOLDER'], username, filename)
+		with open (file_path, 'w') as file:
+			writer = csv.DictWriter(file,
+				fieldnames=fieldnames,
+				quoting=csv.QUOTE_ALL,
+				extrasaction='ignore')
+			writer.writeheader()
+			for row in cls.id_list:
+				writer.writerow(row)
+			file_size = file.tell()
+		return {"filename":filename, "file_path":file_path, "file_size":file_size}
 	@classmethod #has plotID so doesn't need country
 	def _get_blocks_csv(cls, tx):
 		return tx.run(Cypher.get_blocks_csv,

@@ -30,15 +30,16 @@ def upload_submit():
 			file = form.file.data
 			subtype = form.submission_type.data
 			if Upload(username, file.filename).allowed_file():
-				filename = username+time+secure_filename(file.filename)
-				file.save(os.path.join(app.instance_path, 
-					app.config['UPLOAD_FOLDER'], 
-					filename))
+				#create user upload path if not found
+				if not os.path.isdir(os.path.join(app.instance_path, app.config['UPLOAD_FOLDER'], username)):
+					os.mkdir(os.path.join(app.instance_path, app.config['UPLOAD_FOLDER'], username))
+				#prepare a secure filename to save with
+				filename = secure_filename(time+file.filename)
+				file_path = os.path.join(app.instance_path, app.config['UPLOAD_FOLDER'], username, filename)
+				file.save(file_path)
 				#check the first row of data conforms to expectations of submission type
-				with open(os.path.join(app.instance_path, 
-					app.config['UPLOAD_FOLDER'], 
-					filename)) as fp:
-					for i, line in enumerate(fp): #this is so don't have to load the whole file into memory, just line by line
+				with open(file_path) as file:
+					for i, line in enumerate(file): #this is so don't have to load the whole file into memory, just line by line
 						if i == 0: #first line check if contains UID header in first collumn (assuming quotation)
 							if line[1:4] != "UID": 
 								return jsonify({"submitted": "This file is not a regular BreedCAFS FieldBook database file"})

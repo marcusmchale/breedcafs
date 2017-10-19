@@ -37,9 +37,9 @@ def register():
 			subject = "BreedCAFS database confirmation."
 			recipients = [email]
 			confirm_url = url_for('confirm',token=token,_external=True)
-			body = "Your account on the BreedCAFS server was successfully created."
-			" Please visit the following link to activate your account:" + confirm_url
-			html = render_template('emails/activate.html', confirm_url=confirm_url)
+			body = ("Your account on the BreedCAFS server was successfully created. Your username is" + username +
+			" Please visit the following link to activate your account:" + confirm_url)
+			html = render_template('emails/activate.html', confirm_url=confirm_url, username = username)
 			send_email(subject, app.config['ADMINS'][0], recipients, body, html )
 			flash('Registration successful. Please check your email to confirm.')
 			return redirect(url_for('login'))
@@ -105,9 +105,9 @@ def password_reset():
 			subject = "BreedCAFS database password reset request"
 			recipients = [email]
 			confirm_url = url_for('confirm_password_reset', token=token,_external=True)
-			body = "Hi " + name + ". Someone recently requested to reset the password for your user account for the BreedCAFS database."
-			" If you would like to proceed then please visit the following address: " + confirm_url
-			" If this was not you then please contact an administrator."
+			body = ("Hi " + name + ". Someone recently requested to reset the password for your user account for the BreedCAFS database."
+			" If you would like to proceed then please visit the following address: " + confirm_url +
+			" As a reminder, your username for this account is " + username)
 			html = render_template('emails/password_reset.html', 
 				confirm_url=confirm_url, 
 				username=username,

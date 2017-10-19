@@ -1,17 +1,15 @@
 {% macro render_field(field) %}
 	{% if field.type in ['SelectField'] %}
 		<dd>{{ field(**kwargs)|safe }}
-	{% endif %}
-	{% if field.type in ['StringField'] %}
+	{% elif field.type in ['StringField'] %}
 		{{ field(placeholder=field.description)|safe }}
-	{% endif %}
-	{% if field.type in ['IntegerField'] %}
+	{% elif field.type in ['IntegerField'] %}
 		<dd>{{ field(placeholder=field.description)|safe }}
-	{% endif %}
-	{% if field.type in ['SubmitField'] %}
+	{% elif field.type in ['SubmitField'] %}
 		{{ field(**kwargs)|safe }}</dd>
-	{% endif %}
-	{% if field.type in ['DateTimeField', 'DateField'] %}
+	{% elif field.type in ['DateTimeField', 'DateField'] %}
 		<dd>{{field.label}} {{ field(placeholder=field.description)|safe }}</dd>
+	{% elif field.type in ['BooleanField'] %}
+		{{ field(placeholder=field.description)|safe }}<a>Email a copy</a><br>
 	{% endif %}
 {% endmacro %}

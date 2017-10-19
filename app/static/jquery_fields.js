@@ -29,7 +29,7 @@ $("#generate_blocks_csv").click( function(e) {
 	remove_flash();
 	wait_message = "Please wait for file to be generated";
 	flash_wait = "<div id='generate_blocks_flash' class='flash'>" + wait_message + "</div>";
-	$(this).after(flash_wait)
+	$("form").append(flash_wait)
 	var generate_blocks_csv = $.ajax({
 		url: "/generate_blocks_csv",
 		data: $("form").serialize(),

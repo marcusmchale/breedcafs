@@ -7,10 +7,12 @@
 			{% if level == 'tree' %}
 				<form action="{{ url_for('select_traits', level='tree') }}" method="post">
 					{% include "traits_tree_form.html" %}
+				{{ render_field(block_traits_form.email_checkbox) }}
 				</form>
 			{% elif level == 'block' %}
 				<form action="{{ url_for('select_traits', level='block') }}" method="post">
 				{% include "traits_block_form.html" %}
+				{{ render_field(block_traits_form.email_checkbox) }}
 				</form>
 			{% endif %}
 </div>

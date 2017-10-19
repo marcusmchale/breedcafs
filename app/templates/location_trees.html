@@ -13,12 +13,14 @@
 			<a>Optional:</a>{{ render_field (location_form.block) }}
 			<p>This can also be entered for each tree in Field-Book</p>
 			<br><a>Add trees to the selected plot</a><br>
-			{{ render_field (add_trees.count) }}
-			{{ render_field (add_trees.submit_trees) }}
+			{{ render_field (add_trees_form.count) }}
+			{{ render_field (add_trees_form.submit_trees) }}
+			{{ render_field (add_trees_form.email_checkbox_add) }}
 			<br><a>Download trees.csv for the selected plot:</a><br>
 			{{ render_field (custom_trees_form.trees_start) }}
 			{{ render_field (custom_trees_form.trees_end) }}
 			{{ render_field (custom_trees_form.custom_trees_csv) }}
+			{{ render_field (custom_trees_form.email_checkbox_custom) }}
 		</form>
 </div>
 {% endblock %}

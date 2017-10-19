@@ -78,7 +78,7 @@ $("#submit_samples").click( function(e) {
 	$(".flash").remove();
 	wait_message = "Please wait for samples to be registered and files generated"
 	flash_wait = "<div id='samples_flash' class='flash'>" + wait_message + "</div>"
-	$("#submit_samples").after(flash_wait)
+	$("form").append(flash_wait)
 	var submit_samples = $.ajax({
 		url: "/add_samples",
 		data: $("form").serialize(),

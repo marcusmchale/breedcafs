@@ -4,6 +4,7 @@ from app.cypher import Cypher
 from user import User
 from lists import Lists
 from config import uri, driver, ALLOWED_EXTENSIONS
+from flask import session
 import cStringIO
 import unicodecsv as csv
 from datetime import datetime
@@ -206,10 +207,11 @@ class Download(User):
 			time_condition = ' WHERE data.time > $start_time '
 		else:
 			time_condition = ''
-		#finalise query
+		#finalise query, get data 
 		self.query = query + time_condition + optional_block + response
-		with driver.session() as session:
-			result = session.read_transaction(self._get_csv)
+		with driver.session() as neo4j_session:
+			result = neo4j_session.read_transaction(self._get_csv)
+		#prepare data and variablesto make file
 		if data_format == 'table':
 			#expand the traits and values as key:value pairs
 			[[record.update({i[0]:i[1] for i in record['Traits']})] for record in result]
@@ -224,18 +226,26 @@ class Download(User):
 			fieldnames =  index_fieldnames + list(trait_fieldnames)
 		elif data_format == 'db':
 			fieldnames = index_fieldnames + ['Trait', 'Value', 'Location', 'Recorded_at', 'Recorded_by']
-		time = datetime.now().strftime('%Y%m%d-%H%M%S_')
-		filename = time + self.username + '.csv'
-		file_path = os.path.join(app.instance_path, app.config['DOWNLOAD_FOLDER'], filename)
-		with open(file_path,'w') as data_file:
-			writer = csv.DictWriter(data_file, 
+		#create the file
+		time = datetime.now().strftime('%Y%m%d-%H%M%S')
+		filename = time + '_data.csv'
+		file_path = os.path.join(app.instance_path, app.config['DOWNLOAD_FOLDER'], self.username, filename)
+		#create user download path if not found
+		if not os.path.isdir(os.path.join(app.instance_path, app.config['DOWNLOAD_FOLDER'], session['username'])):
+			os.mkdir(os.path.join(app.instance_path, app.config['DOWNLOAD_FOLDER'], session['username']))
+		#make the file
+		with open(file_path,'w') as file:
+			writer = csv.DictWriter(file, 
 				fieldnames=fieldnames, 
 				quoting=csv.QUOTE_ALL,
 				extrasaction='ignore')
 			writer.writeheader()
 			for i, item in enumerate(result):
 				writer.writerow(item)
-		return filename
+			file_size = file.tell()
+		return { "filename":filename,
+			"file_path":file_path,
+			"file_size":file_size }
 	def _get_csv(self, tx):
 		#perform transaction and return the simplified result (remove all the transaction metadata and just keep the result map)
 		return [record[0] for record in tx.run(self.query,

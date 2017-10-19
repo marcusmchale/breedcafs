@@ -4,10 +4,10 @@ from flask import (session,
 	request, 
 	redirect, 
 	url_for, 
-	render_template, 
-	send_file, 
+	render_template,
 	make_response, 
-	jsonify)
+	jsonify,
+	send_from_directory)
 from app.models import (Lists, 
 	Fields, 
 	User, 
@@ -26,7 +26,7 @@ from app.forms import (LocationForm,
 	AddStorageForm, 
 	CreateTreeTraits, 
 	CreateBlockTraits)
-from app.emails import send_attachment
+from app.emails import send_attachment, send_static_attachment, send_email
 from flask.views import MethodView
 from datetime import datetime
 
@@ -206,23 +206,50 @@ def generate_blocks_csv():
 		fields_form = FieldsForm()
 		if all([location_form.validate_on_submit(), fields_form.validate_on_submit()]):
 			plotID = int(request.form['plot'])
-			blocks_csv= Fields.get_blocks_csv(plotID)
-			recipients=[User(session['username']).find('')['email']]
-			subject = "BreedCAFS: Generate blocks.csv"
-			body = "You requested a blocks.csv file for blocks in plotID: " + str(plotID)
-			" These are described in the attached file that should be placed in the Field-Book field_import directory."
-			html = render_template('emails/generate_blocks.html',
-				plotID=plotID)
-			send_attachment(subject, 
-				app.config['ADMINS'][0], 
-				recipients, 
-				body, 
-				html,
-				u'BreedCAFS_plot_' + str(plotID) + '_blocks.csv',
-				'text/csv', 
-				blocks_csv)
+			#make the file and return a dictionary with filename, file_path and file_size
+			file_details = Fields.make_blocks_csv(session['username'], plotID)
+			#create a download url for the file
+			download_url = url_for('download_file', 
+				username = session['username'], 
+				filename=file_details['filename'], 
+				_external = True)
+			#if selected send an email copy of the file (or link to download if greater than ~5mb)
+			if request.form.get('email_checkbox'):
+				recipients=[User(session['username']).find('')['email']]
+				subject = "BreedCAFS: blocks.csv"
+				if file_details['file_size'] < 5000000:
+					body = ("You requested a blocks.csv file for blocks in plotID: " + str(plotID) +
+						" These are described in the attached file that should be placed in the Field-Book field_import directory.")
+					html = render_template('emails/generate_blocks_attachment.html',
+						plotID=plotID,
+						download_url = download_url)
+					send_static_attachment(subject, 
+						app.config['ADMINS'][0], 
+						recipients, 
+						body, 
+						html,
+						file_details['filename'],
+						'text/csv',
+						file_details['file_path'])
+					return jsonify({'submitted' : 'Your file is ready for download and a copy has been sent to your email as an attachment:'
+						+ '"<a href="' + download_url + '">' + file_details['filename'] + '</a>"'})
+				else:
+					body = ("You requested a blocks.csv file for blocks in plotID: " + str(plotID) +
+						" This file was larger than 5mb so is not attached to this email. "
+						" Please find the file at the following link:" + download_url)
+					html = render_template('emails/generate_blocks_link.html', 
+						plotID = plotID, 
+						download_url = download_url)
+					send_email(subject,
+						app.config['ADMINS'][0],
+						recipients,
+						body,
+						html)
+					return jsonify({'submitted' : 'Your file is ready for download and a link has been sent to your email address:'
+						+ '"<a href="' + download_url + '">' + file_details['filename'] + '</a>"'})
 			#return as jsonify so that can be interpreted the same way as error message
-			return jsonify({"submitted" : "Blocks.csv sent to your email address"})
+			else:
+				return jsonify({'submitted' : 'Your file is ready for download: "<a href="' + download_url + '">' + file_details['filename'] + '</a>"'})
 		else:
 			errors = jsonify([location_form.errors, fields_form.errors])
 			return errors
@@ -258,7 +285,7 @@ def location_trees():
 		return redirect(url_for('login'))
 	else:
 		location_form = LocationForm().update()
-		add_trees = AddTreesForm()
+		add_trees_form = AddTreesForm()
 		add_country = AddCountry()
 		add_region = AddRegion()
 		add_farm = AddFarm()
@@ -266,7 +293,7 @@ def location_trees():
 		custom_trees_form = CustomTreesForm()
 		return render_template('location_trees.html', 
 			location_form = location_form,
-			add_trees = add_trees, 
+			add_trees_form = add_trees_form, 
 			custom_trees_form = custom_trees_form,
 			title = 'Register trees and create trees.csv')
 
@@ -282,28 +309,64 @@ def add_trees():
 			plotID = int(request.form['plot'])
 			count = int(request.form['count'])
 			blockUID = request.form['block']
+			#register trees, make a file and return filename etc.
 			if blockUID == "":
-				trees_csv=Fields.add_trees(plotID, count)
+				file_details = Fields.add_trees(plotID, count)
 			else:
-				trees_csv=Fields.add_trees(plotID, count, blockUID)
-			recipients=[User(session['username']).find('')['email']]
-			subject = "BreedCAFS: Trees registered"
-			body = "You successfully registered " + str(count) + " trees in plotID: " + str(plotID) + "." 
-			" These trees now have unique IDs (UID) and are described in the attached file." 
-			" This file should be placed in the Field-Book field_import directory."
-			html = render_template('emails/add_trees.html', 
-				count=count,
-				plotID=plotID)
-			send_attachment(subject, 
-				app.config['ADMINS'][0],  
-				recipients, 
-				body, 
-				html, 
-				u'BreedCAFS_plot_' + str(plotID) + '_trees_registered_' + datetime.now().strftime('%Y%m%d') + '.csv', 
-				'text/csv', 
-				trees_csv)
-			#return as jsonify so that can be interpreted the same way as error message
-			return jsonify({"submitted" : str(count) + " trees registered and trees.csv emailed to your registered address"})
+				file_details = Fields.add_trees(plotID, count, blockUID)
+			#create a download url
+			download_url = url_for('download_file', 
+				username = session['username'], 
+				filename = file_details['filename'], 
+				_external = True)
+			if request.form.get('email_checkbox_add'):
+				recipients=[User(session['username']).find('')['email']]
+				subject = "BreedCAFS: Trees registered"
+				if file_details['file_size'] < 5000000:
+					body = ( "You successfully registered " + str(count) + " trees in plotID: " + str(plotID) + "."
+						+ " These trees were assigned IDs from " + str(file_details['first_tree_id']) + " to " + str(file_details['last_tree_id'])
+						+ " and are described in the attached file. This file should be placed in the Field-Book field_import directory."
+						+ " The file is also available for download at the following address: " + download_url )
+					html = render_template('emails/generate_blocks_attachment.html',
+						count=count,
+						plotID=plotID,
+						download_url = download_url)
+					send_static_attachment(subject, 
+						app.config['ADMINS'][0], 
+						recipients, 
+						body, 
+						html,
+						file_details['filename'],
+						'text/csv',
+						file_details['file_path'])
+					return jsonify({'submitted' : ('You successfully registered ' + str(count) + ' trees in plotID: ' + str(plotID) + '.'
+						+ ' These trees were assigned IDs from ' + str(file_details['first_tree_id']) + " to " + str(file_details['last_tree_id'])
+						+ ' and are described in this file:'
+						+ '"<a href="' + download_url + '">' + file_details['filename'] + '</a>'
+						+ ' This file has also been sent to your email address.')})
+				else:
+					body = ( "You successfully registered " + str(count) + " trees in plotID: " + str(plotID) + "."
+						+ " These trees were assigned IDs from " + str(file_details['first_tree_id']) + " to " + str(file_details['last_tree_id'])
+						+ " and are described in a file available at the following address: " + download_url )
+					html = render_template('emails/generate_blocks_attachment.html',
+						count=count,
+						plotID=plotID,
+						download_url = download_url)
+					send_email(subject,
+						app.config['ADMINS'][0],
+						recipients,
+						body,
+						html)
+					return jsonify({'submitted' : ('You successfully registered ' + str(count) + ' trees in plotID: ' + str(plotID) + '.'
+						+ ' These trees were assigned IDs from ' + str(file_details['first_tree_id']) + " to " + str(file_details['last_tree_id'])
+						+ ' and are described in this file:'
+						+ '"<a href="' + download_url + '">' + file_details['filename'] + '</a>'
+						+ ' This link has also been sent to your email address.')})
+			else:
+				return jsonify({'submitted' : 'You successfully registered ' + str(count) + ' trees in plotID ' + str(plotID)
+					+ ' These trees were assigned IDs from ' + str(file_details['first_tree_id']) + " to " + str(file_details['last_tree_id'])
+					+ ' and are described in this file: '
+					+ '<a href="' + download_url + '">' + file_details['filename'] + '</a>'})
 		else:
 			errors = jsonify([location_form.errors, add_trees_form.errors])
 			return errors
@@ -320,25 +383,55 @@ def custom_trees_csv():
 			plotID = int(request.form['plot'])
 			start = int(request.form['trees_start'])
 			end = int(request.form['trees_end'])
-			trees_csv=Fields.get_trees(plotID, start, end)
-			recipients=[User(session['username']).find('')['email']]
-			subject = "BreedCAFS: Custom trees.csv"
-			body = "You requested a custom trees.csv file for trees " + str(start) + " to " + str(end) + " in PlotID: " + str(plotID)
-			" These are described in the attached file. This file should be placed in the Field-Book field_import directory."
-			html = render_template('emails/custom_trees.html',
-				start=start,
-				end=end,
-				plotID=plotID)
-			send_attachment(subject, 
-				app.config['ADMINS'][0], 
-				recipients, 
-				body, 
-				html, 
-				u'BreedCAFS_' + str(plotID) + '_trees_' + str(start) + '-' + str(end) + '.csv', 
-				'text/csv', 
-				trees_csv)
-			#return as jsonify so that can be interpreted the same way as error message
-			return jsonify({"submitted" : "Trees.csv sent to your email address"})
+			#make the file and return filename, path, size
+			file_details = Fields.get_trees(plotID, start, end)
+			#create a download url
+			download_url = url_for('download_file', 
+				username = session['username'], 
+				filename = file_details['filename'], 
+				_external = True)
+			#send email if requested, as link if >5mb
+			if request.form.get('email_checkbox_add'):
+				recipients = [User(session['username']).find('')['email']]
+				subject = "BreedCAFS: Custom trees.csv"
+				if file_details['file_size'] < 5000000:
+					body = ("You requested a custom trees.csv file for trees " + str(start) + " to " + str(end) + " in PlotID: " + str(plotID)
+						+ " These are described in the attached file that should be placed in the Field-Book field_import directory."
+						+ " This file is also available for download at the following address: " + download_url )
+					html = render_template('emails/custom_trees.html',
+						start=start,
+						end=end,
+						plotID=plotID)
+					send_static_attachment(subject, 
+						app.config['ADMINS'][0], 
+						recipients, 
+						body, 
+						html, 
+						file_details['filename'], 
+						'text/csv',
+						file_details['file_path'])
+					return jsonify({'submitted' : ( 'Your file is ready for download: '
+						+ '"<a href="' + download_url + '">' + file_details['filename'] + '</a>'
+						+ ' This file has also been sent to your email address.')})
+				else:
+					body = ("You requested a custom trees.csv file for trees " + str(start) + " to " + str(end) + " in PlotID: " + str(plotID)
+						+ " This file should be placed in the Field-Book field_import directory "
+						+ " ans is available for download at the following address: " + download_url )
+					html = render_template('emails/custom_trees.html',
+						start=start,
+						end=end,
+						plotID=plotID)
+					send_email(subject, 
+						app.config['ADMINS'][0], 
+						recipients, 
+						body, 
+						html)
+					return jsonify({'submitted' : ('Your file is ready for downoad: '
+						+ '"<a href="' + download_url + '">' + file_details['filename'] + '</a>'
+						+ ' This link has also been sent to your email address.')})
+			else:
+				return jsonify({'submitted' : ('Your file is ready for download : '
+					+ '<a href="' + download_url + '">' + file_details['filename'] + '</a>')})
 		else:
 			errors = jsonify([location_form.errors, custom_trees_form.errors])
 			return errors
@@ -380,21 +473,52 @@ def create_trt(level):
 			#block traits
 			b_gen = request.form.getlist('block_general')
 			b_agro = request.form.getlist('block_agronomic')
+			#make a list of selected traits
 			selection = gen + agro + morph + photo + metab + b_agro + b_gen
-			trt=Lists(Level + 'Trait').create_trt(selection, 'name')
-			recipients=[User(session['username']).find('')['email']]
-			subject = "BreedCAFS: traits.trt"
-			body = "You generated a " + level + "_traits.trt file in the BreedCAFS database. The file is attached to this email. "
-			html = render_template('emails/create_traits.html')
-			send_attachment(subject, 
-				app.config['ADMINS'][0], 
-				recipients, 
-				body, 
-				html, 
-				u'BreedCAFS_' + level +'_traits_' + datetime.now().strftime('%Y%m%d') + '.trt', 
-				'text/csv', 
-				trt)
-			return jsonify({"submitted" : "Custom traits.trt sent to your email address"})
+			#make the trt file and return it's details (filename, file_path, file_size)
+			file_details = Lists(Level + 'Trait').create_trt(session['username'], selection, 'name', level)
+			download_url = url_for('download_file', 
+				username = session['username'], 
+				filename = file_details['filename'], 
+				_external = True)
+			#send email if requested and include as attachment if less than ~5mb
+			if request.form.get('email_checkbox'):
+				recipients=[User(session['username']).find('')['email']]
+				subject = "BreedCAFS: traits.trt"
+				if file_details['file_size'] < 5000000:
+					body = ("You requested a " + level + ".trt file from the BreedCAFS database. "
+						" The file is attached and also available for download at the following address:"
+						+ download_url)
+					html = render_template('emails/create_traits_attachment.html', 
+						level = level,
+						download_url = download_url)
+					send_static_attachment(subject, 
+						app.config['ADMINS'][0], 
+						recipients, 
+						body, 
+						html, 
+						file_details['filename'], 
+						'text/csv', 
+						file_details['file_path'])
+					return jsonify({'submitted' : 'Your file is ready for download and a copy has been sent to your email as an attachment:'
+						+ '"<a href="' + download_url + '">' + file_details['filename'] + '</a>"'})
+				else:
+					body = ("You requested a " + level + ".trt file from the BreedCAFS database. "
+						" This file was larger than 5mb so is not attached to this email. "
+						" Please find the file at the following link:" + download_url)
+					html = render_template('emails/create_traits_link.html',
+						level = level, 
+						download_url = download_url)
+					send_email(subject,
+						app.config['ADMINS'][0],
+						recipients,
+						body,
+						html)
+					return jsonify({'submitted' : 'Your file is ready for download and a link has been sent to your email address:'
+						+ '"<a href="' + download_url + '">' + file_details['filename'] + '</a>"'})
+			#return as jsonify so that can be interpreted the same way as error message
+			else:
+				return jsonify({'submitted' : 'Your file is ready for download: "<a href="' + download_url + '">' + file_details['filename'] + '</a>"'})
 		else:
 			return jsonify(form.errors)
 
@@ -487,30 +611,74 @@ def add_samples():
 			tissue = request.form['tissue']
 			storage = request.form['storage']
 			date = request.form['date_collected']
-			samples_csv = Samples().add_samples(plotID, start, end, replicates, tissue, storage, date)
-			recipients=[User(session['username']).find('')['email']]
-			subject = "BreedCAFS: Samples registered"
-			body = "You sucessfully registered " + str(replicates) + " replicates of " + str(tissue)
-			" samples stored in " + str(storage) + " on " + str(date) + " for trees from " + str(start) + " to " + str(end) + " in plotID: " + str(plotID)  + "." 
-			" These samples now have unique IDs (UID) and are described in the attached file." 
-			" Please use these ID's to label samples, track their movement and register data from analyses."
-			html = render_template('emails/add_samples.html', 
-				plotID=plotID,
-				start=start,
-				end=end,
-				replicates=replicates,
-				tissue=tissue,
-				storage=storage,
-				date=date)
-			send_attachment(subject,
-				app.config['ADMINS'][0],
-				recipients,
-				body,
-				html,
-				u'BreedCAFS_samples_' + datetime.now().strftime('%Y%m%d') + '.csv',
-				'text/csv',
-				samples_csv)
-			return jsonify({"submitted" : str(tissue) + " samples submitted and samples.csv sent to your registered email address"})
+			#register samples, make file describing index information and return filename etc.
+			file_details = Samples().add_samples(plotID, start, end, replicates, tissue, storage, date)
+			#create a download url
+			download_url = url_for('download_file', 
+				username = session['username'], 
+				filename = file_details['filename'], 
+				_external = True)
+			#if requested create email (and send as attachment if less than ~5mb)
+			if request.form.get('email_checkbox'):
+				recipients=[User(session['username']).find('')['email']]
+				subject = "BreedCAFS: Samples registered"
+				if file_details['file_size'] < 5000000:
+					body = ("You registered " + str(replicates) + " replicates of " + str(tissue)
+						+ " samples stored in " + str(storage) + " on " + str(date) + " for trees from " + str(start) + " to " + str(end) + " in plotID: " + str(plotID)  + "." 
+						+ " These samples now have unique IDs (UID) and are described in the attached file." 
+						+ " Please use these ID's to label samples, track their movement and register data from analyses."
+						+ " The file is also available for download at the following address: " + download_url)
+					html = render_template('emails/add_samples_attachment.html', 
+						plotID=plotID,
+						start=start,
+						end=end,
+						replicates=replicates,
+						tissue=tissue,
+						storage=storage,
+						date=date,
+						download_url = download_url)
+					send_static_attachment(subject,
+						app.config['ADMINS'][0],
+						recipients,
+						body,
+						html,
+						file_details['filename'],
+						'text/csv',
+						file_details['file_path'])
+					return jsonify({'submitted' : ('You successfully registered ' + str(tissue) + ' samples. '
+						+ 'These are described in the following file: '
+						+ '<a href="' + download_url + '">' + file_details['filename'] + '</a>.'
+						+ ' This file has also been sent to your email address ')})
+				else:
+					body = ("You registered " + str(replicates) + " replicates of " + str(tissue)
+						+ " samples stored in " + str(storage) + " on " + str(date) + " for trees from " + str(start) + " to " + str(end) + " in plotID: " + str(plotID)  + "." 
+						+ " These samples now have unique IDs (UID) and are described in the file available for download at the following address: " + download_url 
+						+ " Please use these ID's to label samples, track their movement and register data from analyses.")
+					html = render_template('emails/add_samples_link.html', 
+						plotID=plotID,
+						start=start,
+						end=end,
+						replicates=replicates,
+						tissue=tissue,
+						storage=storage,
+						date=date,
+						download_url = download_url)
+					send_static_attachment(subject,
+						app.config['ADMINS'][0],
+						recipients,
+						body,
+						html,
+						file_details['filename'],
+						'text/csv',
+						file_details['file_path'])
+					return jsonify({'submitted' : ('You successfully registered ' + str(tissue) + ' samples. '
+						+ 'These are described in the following file : ' 
+						+ '<a href="' + download_url + '">' + file_details['filename'] + '</a>.'
+						+ ' This link has also been sent to your email address. ')})
+			else:
+				return jsonify({'submitted' : 'You successfully registered ' + str(tissue) + ' samples. '
+					+ 'These are described in the following file : ' 
+					+ '<a href="' + download_url + '">' + file_details['filename'] + '</a>'})
 		else:
 			errors = jsonify(form.errors)
 			return errors

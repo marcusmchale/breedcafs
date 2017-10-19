@@ -25,15 +25,15 @@ $('dl').each( function () {
 $('#select_all_general').parent().next().show();
 
 //generate traits.csv
-$('#submit_traits').click( function(e) {
+$('#submit_block_traits,#submit_tree_traits').click( function(e) {
 	e.preventDefault();
 	level = $("form").attr('action').split('/').slice(-2,-1);
 	$(".flash").remove();
 	wait_message = "Please wait for file to be generated"
 	flash_wait = "<div id='traits_flash' class='flash'>" + wait_message + "</div>"
-	$("#submit_traits").after(flash_wait)
+	$("form").append(flash_wait)
 	trait_count = $("form input[type=checkbox]:checked").length - $('[id^=select_all_]:checked').length;
-	console.log(trait_count);
+	if ($("#email_checkbox").prop('checked') == true) {trait_count = trait_count -1};
 	if (trait_count > 64) {
 		$("#traits_flash").after("<div id='traits_flash' \
 			class='flash'>Caution: Field Book can only export up to 64 traits at a time\
