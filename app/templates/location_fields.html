@@ -2,8 +2,7 @@
 {% block body %}
 <div class="text_body">
 	{% from "_formhelpers_location_fields.html" import render_field %}
-	<h2>Fieldbook tools</h2>
-	<h3>Register fields</h3>
+	<h2>Register fields</h2>
 		<form action="{{ url_for('location_fields') }}" id="location_fields" method="post">
 			{{ location_form.csrf_token }}
 			{{ render_field (location_form.country) }}

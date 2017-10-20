@@ -1,7 +1,11 @@
 //update blockx (not in location form as different rendering on different pages (list dropbox))
 update_blocks = function() {
 	var sel_plot = $("#plot").find(":selected").val();
-	if (sel_plot !== "") {
+	if (sel_plot === "")  {
+		$("#block").empty();
+		$("#block").append($("<option></option>").attr("value", "").text("Select Block"))
+	}
+	else {
 		var request = $.ajax({
 			type: 'GET',
 			url: "/location/blocks/" + sel_plot + '/',
@@ -20,9 +24,6 @@ update_blocks = function() {
 };
 
 $('#plot').change(update_blocks);
-$('#farm').change(update_blocks);
-$('#region').change(update_blocks);
-$('#country').change(update_blocks);
 
 //register new trees
 $("#submit_trees").click( function(e) {
@@ -30,7 +31,7 @@ $("#submit_trees").click( function(e) {
 	remove_flash();
 	wait_message = "Please wait for trees to be registered and files generated"
 	flash_wait = "<div id='trees_flash' class='flash'>" + wait_message + "</div>"
-	$("form").append(flash_wait)
+	$(this).parent().after(flash_wait)
 	var submit_trees = $.ajax({
 		url: "/add_trees",
 		data: $("form").serialize(),
@@ -69,7 +70,7 @@ $("#custom_trees_csv").click( function(e) {
 	remove_flash();
 	wait_message = "Please wait for file to be generated";
 	flash_wait = "<div id='fields_flash' class='flash'>" + wait_message + "</div>";
-	$('form').append(flash_wait)
+	$(this).parent().after(flash_wait)
 	var custom_trees_csv = $.ajax({
 		url: "/custom_trees_csv",
 		data: $("form").serialize(),

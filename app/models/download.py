@@ -13,7 +13,17 @@ from datetime import datetime
 class Download(User):
 	def __init__(self, username):
 		self.username=username
-	def get_csv(self, country, region, farm, plotID, blockUID, level, traits, data_format, start_time, end_time):
+	def get_csv(self, 
+			country, 
+			region, 
+			farm, 
+			plotID, 
+			blockUID, 
+			level, 
+			traits, 
+			data_format, 
+			start_time, 
+			end_time):
 		self.country = country
 		self.region = region
 		self.farm = farm
@@ -226,7 +236,7 @@ class Download(User):
 			fieldnames =  index_fieldnames + list(trait_fieldnames)
 		elif data_format == 'db':
 			fieldnames = index_fieldnames + ['Trait', 'Value', 'Location', 'Recorded_at', 'Recorded_by']
-		#create the file
+		#create the file path
 		time = datetime.now().strftime('%Y%m%d-%H%M%S')
 		filename = time + '_data.csv'
 		file_path = os.path.join(app.instance_path, app.config['DOWNLOAD_FOLDER'], self.username, filename)

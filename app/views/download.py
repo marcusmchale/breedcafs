@@ -11,7 +11,7 @@ from flask import (redirect,
 from app.models import (User, 
 	Download)
 from app.forms import (DownloadForm,
-	OptionalLocationForm, 
+	LocationForm, 
 	CreateTreeTraits, 
 	CreateBlockTraits)
 from app.emails import send_email, send_static_attachment
@@ -23,7 +23,7 @@ def download():
 		flash('Please log in')
 		return redirect(url_for('login'))
 	else:
-		location_form = OptionalLocationForm().update()
+		location_form = LocationForm().update(optional=True)
 		download_form = DownloadForm()
 		tree_traits_form = CreateTreeTraits()
 		block_traits_form = CreateBlockTraits()
@@ -34,7 +34,6 @@ def download():
 			block_traits_form = block_traits_form,
 			title='Download')
 
-
 @app.route('/download/generate_csv', methods=['POST'])
 def generate_csv():
 	if 'username' not in session:
@@ -43,7 +42,7 @@ def generate_csv():
 	else:
 		username = session['username']
 		download_form = DownloadForm()
-		location_form = OptionalLocationForm().update()
+		location_form = LocationForm().update(optional=True)
 		level = request.form['trait_level']
 		start_date = request.form['date_from']
 		end_date = request.form['date_to']

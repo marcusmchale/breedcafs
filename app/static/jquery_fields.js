@@ -1,7 +1,10 @@
 //update blockx (not in location form as different rendering on different pages (list dropbox))
 update_blocks = function () {
 	var sel_plotID = $("#plot").find(":selected").val();
-	if (sel_plotID !== "") {
+	if (sel_plotID === "")  {
+		$('#blocks_list_div').remove()
+	}
+	else {
 		var request = $.ajax({
 			type: 'GET',
 			url: "/location/blocks/" + sel_plotID +"/",

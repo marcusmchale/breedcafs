@@ -15,11 +15,18 @@ update_countries = function() {
 			);
 		}
 	});
+	update_regions();
+	update_farms();
+	update_plots();
 }
 
 update_regions = function() {
-	var sel_country= $("#country").find(":selected").val();
-	if (sel_country !== "") {
+	var sel_country = $("#country").find(":selected").val();
+	if (sel_country === "") {
+		$("#region").empty();
+		$("#region").append($("<option></option>").attr("value", "").text("Select Region"))
+	}
+	else {
 		var request = $.ajax({
 			type: 'GET',
 			url: "/location/" + sel_country +'/',
@@ -35,12 +42,18 @@ update_regions = function() {
 			}
 		});
 	}
+	update_farms();
+	update_plots();
 }
 
 update_farms = function() {
 	var sel_country= $("#country").find(":selected").val();
 	var sel_region= $("#region").find(":selected").val();
-	if (sel_country !== "" && sel_region !== "" ) {
+	if (sel_region === "") {
+		$("#farm").empty();
+		$("#farm").append($("<option></option>").attr("value", "").text("Select Farm"))
+	}
+	else {
 		var request = $.ajax({
 			type: 'GET',
 			url: "/location/" + sel_country +'/' + sel_region + '/',
@@ -56,13 +69,18 @@ update_farms = function() {
 			}
 		});
 	}
+	update_plots();
 };
 
 update_plots = function() {
 	var sel_country = $("#country").find(":selected").val();
 	var sel_region = $("#region").find(":selected").val();
 	var sel_farm = $("#farm").find(":selected").val();
-	if (sel_country !== "" && sel_region !== "" && sel_farm !== "") {
+	if (sel_farm === "") {
+		$("#plot").empty();
+		$("#plot").append($("<option></option>").attr("value", "").text("Select Plot"))
+	}
+	else {
 		var request = $.ajax({
 			type: 'GET',
 			url: "/location/" + sel_country + '/' + sel_region + '/' + sel_farm + '/',
@@ -84,9 +102,9 @@ remove_flash = function() {
 	$(".flash").remove();
 }
 
-$( window ).load(update_countries).load(update_regions).load(update_farms).load(update_plots)
-$("#country").change(update_regions).change(update_farms).change(update_plots).change(remove_flash);
-$("#region").change(update_farms).change(update_plots).change(remove_flash);
+$( window ).load(update_countries)
+$("#country").change(update_regions).change(remove_flash);
+$("#region").change(update_farms).change(remove_flash);
 $("#farm").change(update_plots).change(remove_flash);
 $('#plot').change(remove_flash);
 

@@ -255,24 +255,29 @@ class Cypher():
 			'<-[:SUBMISSIONS]-(:PlotTreeTraitData)<-[:PLOT_DATA]-(:TreeTrait {name:"name"})'
 		#with $replicates
 		' UNWIND range(1, $replicates) as replicates '
-		#store the sample linked to its tree and plot incrementing with a plot level counter
+		#incrementing with a plot level counter
 		' SET id.count=id.count+1 '
+		#merge a PlotTissueStorage container node
+		#create storage property just to allow the creation of one per plot/tissue/storage combination
+			#in future won't actually look at that property, could equally delete it after creation
+			#surely there is a better way here
+		' MERGE (ps)<-[:PLOT_DATA]-(pts:PlotTissueStorage {storage:$storage})-[:TISSUE_TYPE]->(tissue)'
+		' MERGE (pts)-[:STORED_IN]->(storage) '
+		#store the sample linked to its tree and PlotTissueSamples container 
 		' MERGE (t)-[:SAMPLED]->(ts:TreeSamples) '
 		' MERGE (ts)-[:REGISTERED_SAMPLE] '
 		' ->(s:Sample {uid:(p.uid + "_S" + id.count),'
 			' id:id.count, '
 			' date:$date, '
 			' time:$time, '
-			#' time:apoc.date.parse($date, "ms", "yyyy-MM-dd"), '
-			' tissue:$tissue, '
-			' storage:$storage}) '
-		' -[:SAMPLE_FROM_PLOT]->(ps)'
+			#' time:apoc.date.parse($date, "ms", "yyyy-MM-dd"), '# this is now generated in the view by python (above)
+			#' tissue:$tissue, ' #this was redundant with the link to PlotTissueStorage container link
+			#' storage:$storage, '#this was redundant with the link to PlotTissueStorage container link
+			' replicates:$replicates}) '
+		' -[:SAMPLE_OF]->(pts) '
 		#track user submissions
 		' MERGE (user)-[:SUBMITTED_SAMPLES]-(ss:SampleSubmissions) '
-		' MERGE (ss)-[:UPDATED {time:timestamp()}]->(ps) '
-		#track tissue types and storage methods from plot
-		' MERGE (tissue)-[:COLLECTED_AT]->(ps) '
-		' MERGE (storage)-[:STORED_AT]->(ps) '
+		' MERGE (ss)-[:UPDATED {time:timestamp()}]->(pts) '
 		#return for csv
 		' RETURN {UID : s.uid, '
 			' PlotID : p.uid, '
@@ -353,12 +358,3 @@ class Cypher():
 		' MERGE (u)-[:UPDATED {time:timestamp()}]-(pt)'
 		#And give the user feedback on their submission success
 		' RETURN d.found' )
-
-
-
-
-
-
-
-
-

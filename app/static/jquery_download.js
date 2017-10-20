@@ -121,7 +121,7 @@ $('#submit_download').click(function(e) {
 	var sel_level = $("#trait_level").find(":selected").val();
 	wait_message = "Please wait for file to be generated"
 	flash_wait = "<div id='download_flash' class='flash'>" + wait_message + "</div>"
-	$(this).after(flash_wait);
+	$('form').append(flash_wait);
 	if ($('#trait_level').find(":selected").val() === "") {
 		select_level_message = "This field is required"
 		$('#trait_level').after("<div id='level_flash' class='flash'>" + select_level_message + "</div>")

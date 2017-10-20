@@ -78,20 +78,68 @@ $("#submit_samples").click( function(e) {
 	$(".flash").remove();
 	wait_message = "Please wait for samples to be registered and files generated"
 	flash_wait = "<div id='samples_flash' class='flash'>" + wait_message + "</div>"
-	$("form").append(flash_wait)
+	$(this).parent().after(flash_wait);
 	var submit_samples = $.ajax({
 		url: "/add_samples",
 		data: $("form").serialize(),
 		type: 'POST',
 		success: function(response) {
+			console.log(response);
 			if (response.hasOwnProperty('submitted')) {
 				flash_submitted = "<div id='samples_flash' class='flash'> " + response.submitted + " </div>";
 				$("#samples_flash").replaceWith(flash_submitted);
 			} else {
 				$("#samples_flash").remove();
-				for (var key in response){
-					if (response.hasOwnProperty(key)) {
-						flash = "<div id='flash_" + key + "' class='flash'>" + response[key][0] + "</div>";
+				for (var key in response[0]){
+					if (response[0].hasOwnProperty(key)) {
+						flash = "<div id='flash_" + key + "' class='flash'>" + response[0][key][0] + "</div>";
+						$('#' + key).after(flash);
+					}
+				}
+				//this response is an array from two forms so need two of these (alternatively could iterate over these...)
+				for (var key in response[1]){
+					if (response[1].hasOwnProperty(key)) {
+						flash = "<div id='flash_" + key + "' class='flash'>" + response[1][key][0] + "</div>";
+						$('#' + key).after(flash);
+					}
+				}
+			}
+		},
+		error: function(error) {
+		}
+	});
+})
+
+
+//custom samples csv
+
+$("#make_samples_csv").click( function(e) {
+	e.preventDefault();
+	$(".flash").remove();
+	wait_message = "Please wait for file to be generated"
+	flash_wait = "<div id='samples_flash' class='flash'>" + wait_message + "</div>"
+	$(this).parent().after(flash_wait);
+	var submit_samples = $.ajax({
+		url: "/get_samples",
+		data: $("form").serialize(),
+		type: 'POST',
+		success: function(response) {
+			console.log(response);
+			if (response.hasOwnProperty('submitted')) {
+				flash_submitted = "<div id='samples_flash' class='flash'> " + response.submitted + " </div>";
+				$("#samples_flash").replaceWith(flash_submitted);
+			} else {
+				$("#samples_flash").remove();
+				for (var key in response[0]){
+					if (response[0].hasOwnProperty(key)) {
+						flash = "<div id='flash_" + key + "' class='flash'>" + response[0][key][0] + "</div>";
+						$('#' + key).after(flash);
+					}
+				}
+				//this response is an array from two forms so need two of these (alternatively could iterate over these...)
+				for (var key in response[1]){
+					if (response[1].hasOwnProperty(key)) {
+						flash = "<div id='flash_" + key + "' class='flash'>" + response[1][key][0] + "</div>";
 						$('#' + key).after(flash);
 					}
 				}
@@ -104,3 +152,6 @@ $("#submit_samples").click( function(e) {
 
 //Render a calendar in jquery-ui for date selection
 $("#date_collected").datepicker({ dateFormat: 'yy-mm-dd'});
+$("#date_from").datepicker({ dateFormat: 'yy-mm-dd'});
+$("#date_to").datepicker({ dateFormat: 'yy-mm-dd'});
+

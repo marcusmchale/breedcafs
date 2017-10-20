@@ -35,6 +35,12 @@ Set up neo4j:
 			# `LOAD CSV` section of the manual for details.
 			dbms.directories.import=/var/www/breedcafs/instance/import
 
+	Add APOC plugin:
+		Download the latest version and place it in the neo4j plugins directory.
+		APOC is currently used for date parsing during CSV import
+
+
+
 Clone the breedcafs repository into the webserver directory:
 	cd /var/www
 	git clone https://github.com/marcusmchale/breedcafs

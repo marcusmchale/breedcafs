@@ -79,3 +79,154 @@ class Samples:
 			time = (datetime.strptime(self.date, '%Y-%m-%d')-datetime(1970,1,1)).total_seconds()*1000,
 			username = session['username'])
 		self.id_list = [record[0] for record in result]
+		#setting default values for args
+	def get_samples(self, 
+			country, 
+			region, 
+			farm,
+			plotID, 
+			trees_start, 
+			trees_end,
+			replicates, 
+			tissue, 
+			storage, 
+			start_time,
+			end_time,
+			samples_start,
+			samples_end):
+		self.country = country
+		self.region = region
+		self.farm = farm
+		self.plotID = plotID
+		self.trees_start = trees_start
+		self.trees_end = trees_end
+		self.replicates = replicates
+		self.tissue = tissue
+		self.storage = storage
+		self.start_time = start_time
+		self.end_time = end_time
+		self.samples_start = samples_start
+		self.samples_end = samples_end
+		#build the query
+		#match samples by location in the graph
+		q = ' MATCH (country:Country '
+		if country:
+			q = q + ' {name:$country} '
+		q = q + ')<-[:IS_IN]-(region:Region '
+		if region:
+			q = q + ' {name:$region} '
+		q = q + ')<-[:IS_IN]-(farm:Farm '
+		if farm:
+			q = q + '{name:$farm} '
+		q = q + ')<-[:IS_IN]-(plot:Plot '
+		if plotID:
+			q = q + ' {uid:$plotID}'
+		q = (q + ')<-[:SAMPLES_FROM]-(:PlotSamples) '
+			+ ' <-[:PLOT_DATA]-(pts:PlotTissueStorage) '
+			+ ' -[:TISSUE_TYPE]->(tissue:Tissue ')
+		# and tissue in the graph
+		if tissue:
+			q = q + ' {name:$tissue}'
+		# and storage in the graph
+		q = q + '), (pts)-[:STORED_IN]-(storage:Storage '
+		if storage:
+			q = q + ' {name:$storage} '
+		#and find the trees from these samples
+		q = (q + '), (sample)<-[:REGISTERED_SAMPLE]-(ts:TreeSamples) '
+			+ ' <-[:SAMPLED]-(tree:Tree) ')
+		#now parse out ranges of values provided, first from trees if provided a range, then from samples 
+		#not sure if there is an order to processing of where statments..but would be better to do trees first anyway i guess
+		if any ([trees_start, trees_end, start_time, end_time, samples_start, samples_end, replicates, storage]):
+			q = q + ' WHERE '
+			if trees_start:
+				q = q + ' tree.id >= $trees_start '
+				if any ([trees_end, start_time, end_time, samples_start, samples_end, replicates, storage]):
+					q = q + ' AND '
+			if trees_end:
+				q = q + ' tree.id <= $trees_end '
+				if any ([start_time, end_time, samples_start, samples_end, replicates, storage]):
+					q = q + ' AND '
+			if start_time:
+				q = q + ' sample.time > $start_time ' 
+				if any ([end_time, samples_start, samples_end, replicates, storage]):
+					q = q + ' AND '
+			if end_time:
+				q = q + ' sample.time < $end_time '
+				if any ([samples_start, samples_end, replicates, storage]):
+					q = q + ' AND '
+			if samples_start:
+				q = q + ' sample.id > $samples_start '
+				if any ([samples_end, replicates, storage]):
+					q = q + ' AND '
+			if samples_end:
+				q = q + ' sample.id < $samples_end '
+				if any ([replicates, storage]):
+					q = q + ' AND '
+			if replicates:
+				q = q + ' sample.replicates >= $replicates'
+				if storage:
+					q = q + ' AND '
+			if storage:
+				q = q + ' sample.storage = $storage'
+		#then get tree names if available
+		q = (q + ' OPTIONAL MATCH (tree)<-[:DATA_FOR]-(d:Data) '
+			+ '<-[:SUBMISSIONS]-(:PlotTreeTraitData)<-[:PLOT_DATA]-(:TreeTrait {name:"name"})')
+		# build the return statement
+		q = q + (' RETURN {UID: sample.uid, '
+			' PlotID : plot.uid, '
+			' TreeID : tree.id, '
+			' TreeName : d.value, '
+			' SampleID : sample.id, '
+			' Date : sample.date, '
+			' Tissue : tissue.name, '
+			' Storage : storage.name,'
+			' Plot : plot.name, '
+			' Farm : farm.name, '
+			' Region : region.name, '
+			' Country : country.name} ')
+		#and order by sample id
+		q = q + ' ORDER BY sample.id'
+		#register samples and return index data
+		self.query = q
+		with driver.session() as neo4j_session:
+			neo4j_session.read_transaction(self._get_samples)
+		#create user download path if not found
+		if not os.path.isdir(os.path.join(app.instance_path, app.config['DOWNLOAD_FOLDER'], session['username'])):
+			os.mkdir(os.path.join(app.instance_path, app.config['DOWNLOAD_FOLDER'], session['username']))
+		#prepare variables to write the file
+		fieldnames= ['UID', 'PlotID', 'TreeID', 'TreeName', 'SampleID', 'Date', 'Tissue', 'Storage', 'Plot', 'Farm', 'Region', 'Country']
+		time = datetime.now().strftime('%Y%m%d-%H%M%S')
+		filename = time + '_custom_samples.csv'
+		file_path = os.path.join(app.instance_path, app.config['DOWNLOAD_FOLDER'], session['username'], filename)
+		#make the file
+		with open(file_path, 'w') as file:
+			writer = csv.DictWriter(file,
+				fieldnames=fieldnames,
+				quoting=csv.QUOTE_ALL,
+				extrasaction='ignore')
+			writer.writeheader()
+			for row in self.id_list:
+				writer.writerow(row)
+			file_size = file.tell()
+		#return file details
+		return { "filename":filename, 
+			"file_path":file_path, 
+			"file_size":file_size }
+	def _get_samples(self, tx):
+		result = tx.run(self.query,
+			country = self.country,
+			region = self.region,
+			farm = self.farm,
+			plotID = self.plotID,
+			trees_start = self.trees_start,
+			trees_end = self.trees_end,
+			samples_start = self.samples_start,
+			samples_end = self.samples_end,
+			replicates = self.replicates,
+			start_time = self.start_time,
+			end_time = self.end_time,
+			tissue = self.tissue,
+			storage = self.storage)
+		self.id_list = [record[0] for record in result]
+		import pdb; pdb.set_trace()
+

@@ -49,13 +49,13 @@ class LoginForm(FlaskForm):
 
 class LocationForm(FlaskForm):
 	id = "location_form"
-	country = SelectField('Country: ', [InputRequired()])
-	region = SelectField('Region: ', [InputRequired()])
-	farm = SelectField('Farm: ', [InputRequired()])
-	plot = SelectField('Plot: ', [InputRequired()])	
-	block = SelectField('Block: ', [Optional()])
+	country = SelectField('Country')
+	region = SelectField('Region')
+	farm = SelectField('Farm')
+	plot = SelectField('Plot')	
+	block = SelectField('Block',  [Optional()])
 	@staticmethod
-	def update():
+	def update(optional = False):
 		form = LocationForm()
 		COUNTRIES = sorted(set(Lists('Country').create_list_tup('name','name')), key=lambda tup: tup[1])
 		REGIONS = sorted(set(Lists('Country').get_connected('name', form.country.data, 'IS_IN')), key=lambda tup: tup[1])
@@ -67,30 +67,16 @@ class LocationForm(FlaskForm):
 		form.farm.choices = [('','Select Farm')] + [(FARMS[i], FARMS[i]) for i, items in enumerate(FARMS)]
 		form.plot.choices = [('','Select Plot')] +  PLOTS
 		form.block.choices = [('','Select Block')] + BLOCKS
-		return form
-
-#created the below for download page, almost identical to the above but with optional validator rather than required.
-#could create custom validator depending on the view
-class OptionalLocationForm(FlaskForm):
-	id = "location_form"
-	country = SelectField('Country: ', [Optional()])
-	region = SelectField('Region: ', [Optional()])
-	farm = SelectField('Farm: ', [Optional()])
-	plot = SelectField('Plot: ', [Optional()])	
-	block = SelectField('Block: ', [Optional()])
-	@staticmethod
-	def update():
-		form = OptionalLocationForm()
-		COUNTRIES = sorted(set(Lists('Country').create_list_tup('name','name')), key=lambda tup: tup[1])
-		REGIONS = sorted(set(Lists('Country').get_connected('name', form.country.data, 'IS_IN')), key=lambda tup: tup[1])
-		FARMS = sorted(set(Fields(form.country.data).get_farms(form.region.data)), key=lambda tup: tup[1])
-		PLOTS = sorted(set(Fields(form.country.data).get_plots_tup(form.region.data, form.farm.data)), key=lambda tup: tup[1])
-		BLOCKS = sorted(set(Fields.get_blocks_tup(form.plot.data)), key=lambda tup: tup[1])
-		form.country.choices = [('','Select Country')] + COUNTRIES
-		form.region.choices = [('','Select Region')] + [(REGIONS[i], REGIONS[i]) for i, items in enumerate(REGIONS)]
-		form.farm.choices = [('','Select Farm')] + [(FARMS[i], FARMS[i]) for i, items in enumerate(FARMS)]
-		form.plot.choices = [('','Select Plot')] +  PLOTS
-		form.block.choices = [('','Select Block')] + BLOCKS
+		if optional == False:
+			form.country.validators = [InputRequired()]
+			form.region.validators = [InputRequired()]
+			form.farm.validators = [InputRequired()]
+			form.plot.validators = [InputRequired()]
+		else:
+			form.country.validators = [Optional()]
+			form.region.validators = [Optional()]
+			form.farm.validators = [Optional()]
+			form.plot.validators = [Optional()]
 		return form
 
 class AddCountry(FlaskForm):
@@ -159,7 +145,7 @@ class AddTreesForm(FlaskForm):
 	id = "add_trees"
 	email_checkbox_add = BooleanField('Email checkbox add')
 	count = IntegerField('Number of trees: ',[InputRequired(), 
-		NumberRange(min=1, max=1000, message='Register from 1-1000 plants at a time')],
+		NumberRange(min=1, max=10000, message='Register up to 10000 trees at a time')],
 		description= "Number of new trees")
 	submit_trees = SubmitField('Register new trees')
 
@@ -167,10 +153,10 @@ class CustomTreesForm(FlaskForm):
 	id = "custom_trees_Form"
 	email_checkbox_custom = BooleanField('Email checkbox custom')
 	trees_start = 	IntegerField('Start TreeID',[InputRequired(), 
-		NumberRange(min=1, max=100000, message='')],
+		NumberRange(min=1, max=1000000, message='')],
 		description= "Start TreeID")
 	trees_end = IntegerField('End TreeID',[InputRequired(), 
-		NumberRange(min=1, max=100000, message='')],
+		NumberRange(min=1, max=1000000, message='')],
 		description= "End TreeID")
 	custom_trees_csv = SubmitField('Custom trees.csv')
 
@@ -257,26 +243,60 @@ class SampleRegForm(FlaskForm):
 	id = "sample_reg_form"
 	email_checkbox = BooleanField('Email checkbox')
 	trees_start = 	IntegerField('Start TreeID',[InputRequired(), 
-		NumberRange(min=1, max=100000, message='')],
+		NumberRange(min=1, max=1000000, message='')],
 		description= "Start TreeID")
 	trees_end = IntegerField('End TreeID',[InputRequired(), 
-		NumberRange(min=1, max=100000, message='')],
+		NumberRange(min=1, max=1000000, message='')],
 		description= "End TreeID")
 	replicates = IntegerField('Replicates', [InputRequired(), 
-		NumberRange(min=1, max=10, message='')],
+		NumberRange(min=1, max=100, message='')],
 		description= "Replicates")
 	tissue = SelectField('Tissue: ', [InputRequired()])
 	storage = SelectField('Tissue: ', [InputRequired()])
-	date_collected = DateField('Date collected (YYYY-mm-dd): ', [InputRequired()], format='%Y-%m-%d')
+	date_collected = DateField('Date collected (YYYY-mm-dd): ', [InputRequired()], 
+		format='%Y-%m-%d',
+		description= 'Date collected (YYYY-mm-dd)')
 	submit_samples = SubmitField('Register samples')
 	@staticmethod
-	def update():
+	def update(optional = False):
 		form = SampleRegForm()
 		TISSUES = sorted(set(Lists('Tissue').create_list_tup('name', 'name')), key=lambda tup: tup[1])
 		STORAGE_TYPES = sorted(set(Lists('Storage').create_list_tup('name', 'name')), key=lambda tup: tup[1])
 		form.tissue.choices = [('','Select Tissue')] + TISSUES
 		form.storage.choices = [('','Select Storage')] + STORAGE_TYPES
+		if optional == False:
+			form.trees_start.validators = [InputRequired()]
+			form.trees_end.validators = [InputRequired()]
+			form.replicates.validators = [InputRequired()]
+			form.tissue.validators = [InputRequired()]
+			form.storage.validators = [InputRequired()]
+			form.date_collected.validators = [InputRequired()]
+		else:
+			form.trees_start.validators = [Optional()]
+			form.trees_end.validators = [Optional()]
+			form.replicates.validators = [Optional()]
+			form.tissue.validators = [Optional()]
+			form.storage.validators = [Optional()]
+			form.date_collected.validators = [Optional()]
 		return form
+
+class CustomSampleForm(FlaskForm):
+	id = "custom_sample_Form"
+	email_checkbox_custom = BooleanField('Email checkbox custom')
+	samples_start = IntegerField('Start SampleID', [Optional(), 
+		NumberRange(min=1, max=1000000000, message='')],
+		description= "Start SampleID")
+	samples_end = IntegerField('End SampleID', [Optional(), 
+		NumberRange(min=1, max=1000000000, message='')],
+		description= "End SampleID")
+	date_from = DateField('Date start (YYYY-mm-dd): ',  [Optional()],
+		format='%Y-%m-%d',
+		description = 'Start date')
+	date_to = DateField('Date end (YYYY-mm-dd): ', [Optional()],
+		format='%Y-%m-%d',
+		description = 'End date')
+	make_samples_csv = SubmitField('Custom samples.csv')
+
 
 #upload
 class UploadForm(FlaskForm):

@@ -21,6 +21,7 @@ from app.forms import (LocationForm,
 	FieldsForm, 
 	AddTreesForm, 
 	CustomTreesForm, 
+	CustomSampleForm,
 	SampleRegForm, 
 	AddTissueForm, 
 	AddStorageForm, 
@@ -533,11 +534,13 @@ def sample_reg():
 		add_tissue_form = AddTissueForm()
 		add_storage_form = AddStorageForm()
 		sample_reg_form = SampleRegForm().update()
+		custom_sample_form = CustomSampleForm()
 		return render_template('sample_reg.html', 
 			location_form = location_form,
 			add_tissue_form = add_tissue_form,
 			add_storage_form = add_storage_form,
 			sample_reg_form = sample_reg_form,
+			custom_sample_form = custom_sample_form,
 			title = 'Sample registration')
 
 class tissues(MethodView):
@@ -602,8 +605,9 @@ def add_samples():
 		flash('Please log in')
 		return redirect(url_for('login'))
 	else:
-		form=SampleRegForm().update()
-		if form.validate_on_submit():
+		location_form = LocationForm().update()
+		sample_form=SampleRegForm().update()
+		if all([location_form.validate_on_submit(), sample_form.validate_on_submit()]):
 			plotID = int(request.form['plot'])
 			start = int(request.form['trees_start'])
 			end = int(request.form['trees_end'])
@@ -680,5 +684,61 @@ def add_samples():
 					+ 'These are described in the following file : ' 
 					+ '<a href="' + download_url + '">' + file_details['filename'] + '</a>'})
 		else:
-			errors = jsonify(form.errors)
+			errors = jsonify([location_form.errors, sample_form.errors])
 			return errors
+
+
+@app.route('/get_samples', methods = ['GET','POST'])
+def get_samples():
+	if 'username' not in session:
+		flash('Please log in')
+		return redirect(url_for('login'))
+	else:
+		location_form = LocationForm().update(optional = True)
+		sample_form = SampleRegForm().update(optional = True)
+		custom_sample_form=CustomSampleForm()
+		if all([location_form.validate_on_submit(), sample_form.validate_on_submit(), custom_sample_form.validate_on_submit()]):
+			#get form values to filter by
+			country = request.form['country']
+			region = request.form['region']
+			farm = request.form['farm']
+			plotID = int(request.form['plot']) if request.form['plot'] else ""
+			trees_start = int(request.form['trees_start']) if request.form['trees_start'] else ""
+			trees_end = int(request.form['trees_end']) if request.form['trees_end'] else ""
+			replicates = request.form['replicates']
+			tissue = request.form['tissue']
+			storage = request.form['storage']
+			date_from = request.form['date_from']
+			date_to = request.form['date_to']
+			samples_start = int(request.form['samples_start']) if request.form['samples_start'] else ""
+			samples_end = int(request.form['samples_end']) if request.form['samples_end'] else ""
+			if date_from: 
+				start_time = int((datetime.strptime(date_from, '%Y-%m-%d')-datetime(1970,1,1)).total_seconds()*1000)
+			else:
+				start_time = ""
+			if date_to:
+				end_time = int((datetime.strptime(date_to, '%Y-%m-%d')-datetime(1970,1,1)).total_seconds()*1000)
+			else: end_time = ""
+			#build the file and return filename etc.
+			file_details = Samples().get_samples(country, 
+				region, 
+				farm,
+				plotID, 
+				trees_start, 
+				trees_end,
+				replicates, 
+				tissue, 
+				storage, 
+				start_time,
+				end_time,
+				samples_start,
+				samples_end)
+			#create a download url
+			download_url = url_for('download_file', 
+				username = session['username'], 
+				filename = file_details['filename'], 
+				_external = True)
+			return jsonify({'submitted' : ('Your custom list of samples is ready for download: '
+				+ '<a href="' + download_url + '">' + file_details['filename'] + '</a>')})
+
+
