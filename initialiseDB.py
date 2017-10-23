@@ -195,6 +195,6 @@ else:
 	with driver.session() as session:
 		session.write_transaction(Create('start').user)
 		session.write_transaction(Create('start').partners, PARTNERS)
-		session.write_transaction(Create('start').traits, 'instance/tree_traits.csv', 'Tree')
-		session.write_transaction(Create('start').traits, 'instance/block_traits.csv', 'Block')
+		session.write_transaction(Create('start').traits, 'traits/tree_traits.csv', 'Tree')
+		session.write_transaction(Create('start').traits, 'traits/block_traits.csv', 'Block')
 	print ('Complete')
