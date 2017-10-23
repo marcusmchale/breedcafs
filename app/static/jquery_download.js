@@ -73,6 +73,7 @@ $('#treeTraits').hide();
 $('#blockTraits').hide();
 
 $('#trait_level').change(function () {
+	$(".flash").remove();
 	if (this.value === 'tree') {
 		$('#treeTraits').show();
 		$('#blockTraits').hide();
@@ -85,6 +86,10 @@ $('#trait_level').change(function () {
 		$('#treeTraits').hide();
 		$('#blockTraits').hide();
 	}
+})
+
+$('#data_format').change(function () {
+	$(".flash").remove();
 })
 
 //Add select all checkboxes to the form

@@ -218,7 +218,7 @@ def generate_blocks_csv():
 			if request.form.get('email_checkbox'):
 				recipients=[User(session['username']).find('')['email']]
 				subject = "BreedCAFS: blocks.csv"
-				body = ("You requested a blocks.csv file for blocks in plotID: " + str(plotID) +
+				body = ("You requested a blocks.csv file for blocks in plotID: " + str(plotID)
 					+ " These are described in the attached file (if less than 5mb) that is also available for download at the following address: "
 					+ download_url )
 				html = render_template('emails/generate_blocks.html',
@@ -233,8 +233,8 @@ def generate_blocks_csv():
 						file_details['filename'],
 						'text/csv',
 						file_details['file_path'])
-					return jsonify({'submitted' : 'Your file is ready for download and a copy has been sent to your email as an attachment:'
-						+ '"<a href="' + download_url + '">' + file_details['filename'] + '</a>"'})
+					return jsonify({'submitted' : ('Your file is ready for download and a copy has been sent to your email as an attachment:'
+						+ '"<a href="' + download_url + '">' + file_details['filename'] + '</a>"')})
 				else:
 					send_email(subject,
 						app.config['ADMINS'][0],
@@ -379,7 +379,7 @@ def custom_trees_csv():
 				filename = file_details['filename'], 
 				_external = True)
 			#send email if requested, as link if >5mb
-			if request.form.get('email_checkbox_add'):
+			if request.form.get('email_checkbox_custom'):
 				recipients = [User(session['username']).find('')['email']]
 				subject = "BreedCAFS: Custom trees.csv"
 				body = ("You requested a custom trees.csv file for trees " + str(start) + " to " + str(end) + " in PlotID: " + str(plotID)
