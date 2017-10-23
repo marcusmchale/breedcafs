@@ -228,5 +228,4 @@ class Samples:
 			tissue = self.tissue,
 			storage = self.storage)
 		self.id_list = [record[0] for record in result]
-		import pdb; pdb.set_trace()
 

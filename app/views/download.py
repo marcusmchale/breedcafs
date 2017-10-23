@@ -93,11 +93,10 @@ def generate_csv():
 			if request.form.get('email_checkbox'):
 				recipients=[User(session['username']).find('')['email']]
 				subject = "BreedCAFS: Data file generated"
+				body = ('You requested data from the BreedCAFS database. The file is attached (if less than 5mb) and available at the following address: ' + download_url )
+				html = render_template('emails/data_file.html', 
+					download_url = download_url)
 				if file_details['file_size'] < 5000000:
-					body = ('The attached file contains data you requested from the BreedCAFS database.'
-						+ 'This file is also available at the following address: ' + download_url )
-					html = render_template('emails/data_file_attachment.html', 
-						download_url = download_url)
 					send_static_attachment(subject, 
 						app.config['ADMINS'][0],
 						recipients, 
@@ -109,9 +108,6 @@ def generate_csv():
 					return jsonify({'submitted':'Your file is ready for download: "<a href="' + download_url + '">' + file_details['filename'] + '</a>"'
 						+ ' A copy of this file has been sent to your email address'})
 				else:
-					body = ('The data you requested from the BreedCAFS database is available at the following address: ' + download_url )
-					html = render_template('emails/data_file_link.html', 
-						download_url = download_url)
 					send_email(subject,
 						app.config['ADMINS'][0],
 						recipients, 
