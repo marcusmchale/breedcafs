@@ -69,25 +69,34 @@ class Download(User):
 			td = ( ' MATCH (trait:TreeTrait) '
 				' WHERE (trait.name) IN ' + str(traits) +
 				' WITH trait '
-				' MATCH (trait)-[:PLOT_DATA]->(PlotTreeTraitData) '
-				' -[:SUBMISSIONS]->(data:Data)-[:DATA_FOR]->(tree:Tree) ' )
+				' MATCH (trait) '
+					' <-[:FOR_TRAIT]-(:PlotTrait) '
+					' <-[:FOR_TRAIT]-(tt:TreeTreeTrait), '
+					' (tt)<-[:DATA_FOR]-(data:Data), '
+					' (tt)-[:FROM_TREE]->(tree:Tree)'
+					 )
 			#if no plot selected
 			if plotID == "" :
-				tdp = td + ( ' <-[:REGISTERED_TREE]-(PlotTrees) '
-					' <-[:CONTAINS_TREES]-(plot:Plot) ' )
+				tdp = td + ( ' -[:IS_IN]->(PlotTrees) '
+					' -[:IS_IN]->(plot:Plot) ' )
 				query = tdp + frc 
-				optional_block = ' OPTIONAL MATCH (tree)-[:CONTAINS_TREE]-(block:Block)'
+				optional_block = ( ' OPTIONAL MATCH (tree) '
+					' -[:IS_IN]->(:BlockTrees) '
+					' -[:IS_IN]->(block:Block) ')
 			#if plotID is defined (but no blockUID)
 			elif blockUID == "" and plotID != "" :
-				tdp = td + ( ' <-[:REGISTERED_TREE]-(PlotTrees) '
-					' <-[:CONTAINS_TREES]-(plot:Plot {uid:$plotID}) ' )
+				tdp = td + ( ' -[:IS_IN]->(PlotTrees) '
+					' -[:IS_IN]->(plot:Plot {uid:$plotID}) ' )
 				query = tdp + frc 
-				optional_block = ' OPTIONAL MATCH (tree)-[:CONTAINS_TREE]-(block:Block)'
+				optional_block = ( ' OPTIONAL MATCH (tree) '
+					' -[:IS_IN]->(:BlockTrees) '
+					' -[:IS_IN]->(block:Block) ')
 			#if blockID is defined
 			elif blockUID != "":
-				tdp = td + ( '<-[:CONTAINS_TREE]-(block:Block {uid:$blockUID}) '
-					' <-[:REGISTERED_BLOCK]-(:PlotBlocks) '
-					' <-[:CONTAINS_BLOCKS]-(plot:Plot) ')
+				tdp = td + ( '-[:IS_IN]->(:BlockTrees) '
+					' -[:IS_IN]->(block:Block {uid:$blockUID}) '
+					' <-[:IS_IN]-(:PlotBlocks) '
+					' <-[:IS_IN]-(plot:Plot) ')
 				query = tdp + frc
 				optional_block = ''
 			#and generate the return statement
@@ -149,20 +158,23 @@ class Download(User):
 			td = ( ' MATCH (trait:BlockTrait) '
 				' WHERE (trait.name) IN ' + str(traits) +
 				' WITH trait '
-				' MATCH (trait)-[:PLOT_DATA]->(PlotBlockTraitData) '
-				' -[:SUBMISSIONS]->(data:Data) ' )
+				' MATCH (trait) '
+					' <-[:FOR_TRAIT]-(:PlotTrait) '
+					' <-[:FOR_TRAIT]-(bt:BlockBlockTrait), '
+					' (bt)<-[:DATA_FOR]-(data:Data), ' 
+					' (bt)-[:FROM_BLOCK]->(block:Block ' )
 			if blockUID != "" :
-				tdp = td + ( ' -[:DATA_FOR]->(block:Block {uid:$blockUID}) '
-					' <-[:REGISTERED_BLOCK]-(:PlotBlocks) '
-					' <-[:CONTAINS_BLOCKS]-(plot:Plot) ' )
-			if plotID != "" :
-				tdp = td + ( ' -[:DATA_FOR]->(block:Block) '
-					' <-[:REGISTERED_BLOCK]-(:PlotBlocks)'
-					' <-[:CONTAINS_BLOCKS]-(plot:Plot {uid:$plotID}) ' )
+				tdp = td + ( ' {uid:$blockUID}) '
+					' -[:IS_IN]->(:PlotBlocks) '
+					' -[:IS_IN]->(plot:Plot) ' )
+			elif blockUID =="" and plotID != "" :
+				tdp = td + ( ') '
+					' -[:IS_IN]->(:PlotBlocks)'
+					' -[:IS_IN]->(plot:Plot {uid:$plotID}) ' )
 			elif plotID == "" :
-				tdp = td + ( ' -[:DATA_FOR]->(block:Block) '
-					' <-[:REGISTERED_BLOCK]-(:PlotBlocks)'
-					' <-[:CONTAINS_BLOCKS]-(plot:Plot) ' )
+				tdp = td + ( ') '
+					' -[:IS_IN]->(:PlotBlocks)'
+					' -[:IS_IN]->(plot:Plot) ' )
 			query = tdp + frc
 			if data_format == 'table':
 				response = ( 

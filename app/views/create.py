@@ -336,7 +336,7 @@ def add_trees():
 						file_details['file_path'])
 					return jsonify({'submitted' : ('You successfully registered ' + str(count) + ' trees in plotID: ' + str(plotID) + '.'
 						+ ' These trees were assigned IDs from ' + str(file_details['first_tree_id']) + " to " + str(file_details['last_tree_id'])
-						+ ' and are described in this file:'
+						+ ' and are described in this file: '
 						+ '"<a href="' + download_url + '">' + file_details['filename'] + '</a>'
 						+ ' This file has also been sent to your email address.')})
 				else:
@@ -382,11 +382,12 @@ def custom_trees_csv():
 			if request.form.get('email_checkbox_custom'):
 				recipients = [User(session['username']).find('')['email']]
 				subject = "BreedCAFS: Custom trees.csv"
-				body = ("You requested a custom trees.csv file for trees " + str(start) + " to " + str(end) + " in PlotID: " + str(plotID)
+				body = ("You requested a custom trees.csv file for trees " + str(file_details['first_tree_id']) + " to " 
+					+ str(file_details['last_tree_id']) + " in PlotID: " + str(plotID)
 					+ " This file is attached (if less than 5mb) and available for download at the following address: " + download_url )
 				html = render_template('emails/custom_trees.html',
-					start=start,
-					end=end,
+					start= str(file_details['first_tree_id']),
+					end=str(file_details['last_tree_id']),
 					plotID=plotID)
 				if file_details['file_size'] < 5000000:
 					send_static_attachment(subject, 
@@ -663,7 +664,7 @@ def get_samples():
 			plotID = int(request.form['plot']) if request.form['plot'] else ""
 			trees_start = int(request.form['trees_start']) if request.form['trees_start'] else ""
 			trees_end = int(request.form['trees_end']) if request.form['trees_end'] else ""
-			replicates = request.form['replicates']
+			replicates = int(request.form['replicates']) if request.form['replicates'] else ""
 			tissue = request.form['tissue']
 			storage = request.form['storage']
 			date_from = request.form['date_from']
@@ -731,3 +732,6 @@ def get_samples():
 			else:
 				return jsonify({'submitted' : ('Your custom list of samples is ready for download: '
 					+ '<a href="' + download_url + '">' + file_details['filename'] + '</a>')})
+		else:
+			errors = jsonify([location_form.errors, sample_form.errors, custom_sample_form.errors])
+			return errors

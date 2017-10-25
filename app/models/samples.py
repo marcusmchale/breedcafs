@@ -121,53 +121,50 @@ class Samples:
 		q = q + ')<-[:IS_IN]-(plot:Plot '
 		if plotID:
 			q = q + ' {uid:$plotID}'
-		q = (q + ')<-[:SAMPLES_FROM]-(:PlotSamples) '
-			+ ' <-[:PLOT_DATA]-(pts:PlotTissueStorage) '
-			+ ' -[:TISSUE_TYPE]->(tissue:Tissue ')
-		# and tissue in the graph
+		q = (q + ')<-[:FROM_PLOT]-(:PlotSamples) '
+			+ ' <-[:FROM]-(pts:PlotTissueStorage) '
+			+ ' -[:COLLECTED_AS]->(TiSt:TissueStorage)'
+			+ ' -[:OF_TISSUE]->(tissue:Tissue ')
+		# and tissue 
 		if tissue:
 			q = q + ' {name:$tissue}'
-		# and storage in the graph
-		q = q + '), (pts)-[:STORED_IN]-(storage:Storage '
+		# and storage
+		q = q + '), (TiSt)-[:STORED_IN]-(storage:Storage '
 		if storage:
 			q = q + ' {name:$storage} '
 		#and find the trees from these samples
-		q = (q + '), (sample)<-[:REGISTERED_SAMPLE]-(ts:TreeSamples) '
-			+ ' <-[:SAMPLED]-(tree:Tree) ')
+		q = (q + '), (sample)-[:FROM_TREE]->(:TreeSamples) '
+			+ ' -[:FROM_TREE]-(tree:Tree) ')
 		#now parse out ranges of values provided, first from trees if provided a range, then from samples 
 		#not sure if there is an order to processing of where statments..but would be better to do trees first anyway i guess
-		if any ([trees_start, trees_end, start_time, end_time, samples_start, samples_end, replicates, storage]):
+		if any ([trees_start, trees_end, start_time, end_time, samples_start, samples_end, replicates]):
 			q = q + ' WHERE '
 			if trees_start:
 				q = q + ' tree.id >= $trees_start '
-				if any ([trees_end, start_time, end_time, samples_start, samples_end, replicates, storage]):
+				if any ([trees_end, start_time, end_time, samples_start, samples_end, replicates]):
 					q = q + ' AND '
 			if trees_end:
 				q = q + ' tree.id <= $trees_end '
-				if any ([start_time, end_time, samples_start, samples_end, replicates, storage]):
+				if any ([start_time, end_time, samples_start, samples_end, replicates]):
 					q = q + ' AND '
 			if start_time:
-				q = q + ' sample.time > $start_time ' 
-				if any ([end_time, samples_start, samples_end, replicates, storage]):
+				q = q + ' sample.time >= $start_time ' 
+				if any ([end_time, samples_start, samples_end, replicates]):
 					q = q + ' AND '
 			if end_time:
-				q = q + ' sample.time < $end_time '
-				if any ([samples_start, samples_end, replicates, storage]):
+				q = q + ' sample.time <= $end_time '
+				if any ([samples_start, samples_end, replicates]):
 					q = q + ' AND '
 			if samples_start:
-				q = q + ' sample.id > $samples_start '
-				if any ([samples_end, replicates, storage]):
+				q = q + ' sample.id >= $samples_start '
+				if any ([samples_end, replicates]):
 					q = q + ' AND '
 			if samples_end:
-				q = q + ' sample.id < $samples_end '
-				if any ([replicates, storage]):
+				q = q + ' sample.id <= $samples_end '
+				if replicates:
 					q = q + ' AND '
 			if replicates:
 				q = q + ' sample.replicates >= $replicates'
-				if storage:
-					q = q + ' AND '
-			if storage:
-				q = q + ' sample.storage = $storage'
 		#then get tree names if available
 		q = (q + ' OPTIONAL MATCH (tree)<-[:DATA_FOR]-(d:Data) '
 			+ '<-[:SUBMISSIONS]-(:PlotTreeTraitData)<-[:PLOT_DATA]-(:TreeTrait {name:"name"})')

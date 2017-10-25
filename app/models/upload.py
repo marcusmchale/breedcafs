@@ -28,9 +28,9 @@ class Upload(User):
 			for record in tx.run(query, username=self.username,
 				filename= ("file:///" + self.username + '/' + self.filename),
 				submission_type=self.submission_type):
-				if record['d.found'] == 'TRUE':
+				if record['d.found'] == True:
 					fcount = fcount + 1
-				elif record['d.found'] == 'FALSE':
+				elif record['d.found'] == False:
 					ncount = ncount + 1
 			return [ncount, fcount]
 			#could be doing this with result.consume().counters

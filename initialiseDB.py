@@ -73,9 +73,14 @@ class Create:
 	def user(self, tx):
 		username=self.username
 		user_create = tx.run(' MERGE (u:User {username:$username}) '
-			'ON MATCH SET u.found="TRUE" '
-			'ON CREATE SET u.found="FALSE" '
-			'RETURN u.found', 
+			' ON MATCH SET u.found="TRUE" '
+			' ON CREATE SET u.found="FALSE", u.time=timestamp() '
+			' MERGE (u)-[:SUBMITTED]->(sub:Submissions) '
+				' -[:SUBMITTED]->(locations:Locations) '
+				' -[:SUBMITTED]->(:Countries) '
+			' MERGE (sub)-[:SUBMITTED]->(:Partners)'
+			' MERGE (sub)-[:SUBMITTED]->(:Traits) '
+			' RETURN u.found', 
 			username=username)
 		for record in user_create:
 			if record['u.found'] == 'TRUE' :
@@ -84,22 +89,19 @@ class Create:
 				print ('Created: User ' + username)
 	def partners(self, tx, partners):
 		for partner in partners: 
-			partner_create = tx.run('MATCH (u:User {username : $username}) '
-				' MERGE (p:Partner {name:$name, fullname:$fullname}) '
-				' ON MATCH SET p.found="TRUE" '
-				' ON CREATE SET p.found="FALSE"'
-				' MERGE (u)-[s:SUBMITTED]->(p) '
-				' ON MATCH SET s.timeInt = timestamp() '
-				' ON CREATE SET s.timeInt = timestamp() '
-				' MERGE (c:Country {name : $based_in}) '
-				' ON MATCH SET c.found ="TRUE"'
-				' ON CREATE SET c.found ="FALSE"'
-				' MERGE (u)-[s2:SUBMITTED]->(c)'
-				' ON MATCH SET s2.timeInt = timestamp() '
-				' ON CREATE SET s2.timeInt = timestamp() '
+			partner_create = tx.run(' MATCH (:User {username : $username}) '
+					' -[:SUBMITTED]->(sub:Submissions), '
+				' (sub)-[:SUBMITTED]->(:Locations)-[:SUBMITTED]->(uc:Countries), '
+				' (sub)-[:SUBMITTED]->(up:Partners) '
+				' MERGE (up)-[s1:SUBMITTED]-(p:Partner {name:$name, fullname:$fullname}) '
+					' ON MATCH SET p.found="TRUE" '
+					' ON CREATE SET p.found="FALSE", s1.time= timestamp() '
+				' MERGE (uc)-[s2:SUBMITTED]-(c:Country {name : $based_in}) '
+					' ON MATCH SET c.found ="TRUE"'
+					' ON CREATE SET c.found ="FALSE", s2.time = timestamp() '
 				' MERGE (p)-[r:BASED_IN]->(c)'
-				' ON MATCH SET r.found="TRUE"'
-				' ON CREATE SET r.found="FALSE"'
+					' ON MATCH SET r.found="TRUE"'
+					' ON CREATE SET r.found="FALSE", r.time = timestamp()'
 				' RETURN p.found, c.found, r.found ',
 				username=self.username,
 				based_in=partner['BASED_IN'],
@@ -120,18 +122,17 @@ class Create:
 				else:
 					print ('Error with merger of partner ' + partner['name'] + 'and/or BASED_IN relationship' )
 			#separated operates_in call because list of operates_in relationships makes output confusing
-			operates_in = tx.run (' MATCH (p:Partner {name : $name}), '
-				' (u:User {username: $username})'
-				' UNWIND $operates_in AS x'
-				' MERGE (c:Country {name:x}) '
-				' ON MATCH SET c.found="TRUE" '
-				' ON CREATE SET c.found="FALSE" '
-				' MERGE (c)<-[s:SUBMITTED]-(u) '
-				' ON MATCH SET s.timeInt = timestamp() '
-				' ON CREATE SET s.timeInt = timestamp() '
-				' MERGE (c)<-[r:OPERATES_IN]-(p) '
-				' ON MATCH SET r.found="TRUE" '
-				' ON CREATE SET r.found="FALSE" '
+			operates_in = tx.run (' MATCH (:User {username: $username}) '
+				' -[:SUBMITTED]->(sub:Submissions), '
+				' (sub)-[:SUBMITTED]->(:Locations)-[:SUBMITTED]->(uc:Countries), '
+				' (sub)-[:SUBMITTED]->(:Partners)-[:SUBMITTED]-(p:Partner {name : $name}) '
+				' UNWIND $operates_in AS x '
+				' MERGE (uc)-[s:SUBMITTED]->(c:Country {name:x}) '
+					' ON MATCH SET c.found= "TRUE" '
+					' ON CREATE SET c.found= "FALSE", s.time = timestamp() '
+				' MERGE (p)-[r:OPERATES_IN]->(c) '
+					' ON MATCH SET r.found = "TRUE" '
+					' ON CREATE SET r.found = "FALSE", r.time = timestamp() '
 				' return p.name, c.name, c.found, r.found ',
 				username='start',
 				name=partner['name'],
@@ -150,29 +151,29 @@ class Create:
 			reader = csv.DictReader(traits_csv, delimiter=',', quotechar='"')
 			for trait in reader: 
 				trait_create = tx.run('MATCH (u:User {username:$username}) '
-				' MERGE (t:' + level +'Trait {group: $group, '
-					' name: $trait, '
-					' format: $format, '
-					' defaultValue: $defaultValue, '
-					' minimum: $minimum, '
-					' maximum: $maximum,'
-					' details: $details, '
-					' categories: $categories}) '
-				' ON MATCH SET t.found="TRUE" '
-				' ON CREATE SET t.found="FALSE" '
-				' MERGE (t)<-[s:SUBMITTED]-(u) '
-				' ON MATCH SET s.timeInt = timestamp() '
-				' ON CREATE SET s.timeInt = timestamp() '
-				' RETURN t.found',
-					username=self.username,
-					group=trait['group'],
-					trait=trait['name'],
-					format=trait['format'],
-					defaultValue=trait['defaultValue'],
-					minimum=trait['minimum'],
-					maximum=trait['maximum'],
-					details=trait['details'],
-					categories=trait['categories'])
+					' -[:SUBMITTED]->(:Submissions)-[:SUBMITTED]->(uts:Traits) '
+					' MERGE (uts)-[s1:SUBMITTED]-(ut:' + level + 'Traits) '
+						' ON CREATE SET s1.time = timestamp() '
+					' MERGE (ut)-[s2:SUBMITTED]->(t:' + level +'Trait {group: $group, '
+						' name: $trait, '
+						' format: $format, '
+						' defaultValue: $defaultValue, '
+						' minimum: $minimum, '
+						' maximum: $maximum,'
+						' details: $details, '
+						' categories: $categories}) '
+					' ON MATCH SET t.found="TRUE" '
+					' ON CREATE SET t.found="FALSE", s2.time=timestamp() '
+					' RETURN t.found',
+						username=self.username,
+						group=trait['group'],
+						trait=trait['name'],
+						format=trait['format'],
+						defaultValue=trait['defaultValue'],
+						minimum=trait['minimum'],
+						maximum=trait['maximum'],
+						details=trait['details'],
+						categories=trait['categories'])
 				for record in trait_create:
 					if record['t.found']=='TRUE':
 						print ('Found: ' + level + 'Trait ' + trait['name'])

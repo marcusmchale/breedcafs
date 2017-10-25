@@ -25,8 +25,7 @@ class User:
 			password = bcrypt.encrypt(self.password), 
 			email = self.email, 
 			name = self.name, 
-			partner = self.partner, 
-			confirmed = 'False')
+			partner = self.partner)
 	def remove(self, email):
 		self.email=email
 		try:
@@ -36,11 +35,10 @@ class User:
 		except:
 			return False
 	def _remove (self, tx):
-		tx.run(Cypher.user_del, username=self.username, 
-			email=self.email)
+		tx.run(Cypher.user_del,	email=self.email)
 	def check_confirmed(self, email):
 		user = self.find(email)
-		if user['confirmed'] == u'True':
+		if user['confirmed'] == True:
 			return True
 	def verify_password(self, password):
 		user = self.find('')

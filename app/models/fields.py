@@ -76,7 +76,7 @@ class Fields:
 			region=self.region, 
 			farm=self.farm, 
 			plot=self.plot):
-			return (record['name'])
+			return (record['plot'])
 	def add_plot(self, region, farm, plot):
 		self.region=region
 		self.farm=farm
@@ -102,7 +102,7 @@ class Fields:
 		for record in tx.run(Cypher.block_find, 
 			plotID = cls.plotID,
 			block = cls.block):
-			return (record['name'])
+			return (record['block'])
 	@classmethod #has plotID so doesn't need country
 	def add_block(cls, plotID, block):
 		cls.plotID=plotID
@@ -180,7 +180,9 @@ class Fields:
 		#prepare variables to write file
 		fieldnames = ['UID','PlotID','TreeID', 'TreeName', 'Block', 'Plot', 'Farm', 'Region', 'Country']
 		time = datetime.now().strftime('%Y%m%d-%H%M%S')
-		filename = time + '_plot_' + str(plotID) + '_T' + str(start) + '_to_T' + str(end) + '.csv'
+		first_tree_id = cls.id_list[0]['TreeID']
+		last_tree_id = cls.id_list[-1]['TreeID']
+		filename = time + '_plot_' + str(plotID) + '_T' + str(first_tree_id) + '_to_T' + str(last_tree_id) + '.csv'
 		file_path =  os.path.join(app.instance_path, app.config['DOWNLOAD_FOLDER'], session['username'], filename)
 		with open (file_path, 'w') as file:
 			writer = csv.DictWriter(file,
@@ -193,7 +195,9 @@ class Fields:
 			file_size = file.tell()
 		return { "filename":filename,
 			"file_path":file_path,
-			"file_size":file_size }
+			"file_size":file_size,
+			"first_tree_id":first_tree_id,
+			"last_tree_id":last_tree_id }
 	@classmethod #has plotID so doesn't need country
 	def _get_trees(cls, tx):
 		result=tx.run(Cypher.trees_get, 

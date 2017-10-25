@@ -242,18 +242,18 @@ class AddStorageForm(FlaskForm):
 class SampleRegForm(FlaskForm):
 	id = "sample_reg_form"
 	email_checkbox = BooleanField('Email checkbox')
-	trees_start = 	IntegerField('Start TreeID',[InputRequired(), 
-		NumberRange(min=1, max=1000000, message='')],
+	trees_start = 	IntegerField('Start TreeID',
+		[NumberRange(min=1, max=1000000, message='Maximum tree ID is 1000000')],
 		description= "Start TreeID")
-	trees_end = IntegerField('End TreeID',[InputRequired(), 
-		NumberRange(min=1, max=1000000, message='')],
+	trees_end = IntegerField('End TreeID',
+		[NumberRange(min=1, max=1000000, message='Maximum tree ID is 1000000')],
 		description= "End TreeID")
-	replicates = IntegerField('Replicates', [InputRequired(), 
-		NumberRange(min=1, max=100, message='')],
+	replicates = IntegerField('Replicates', 
+		[NumberRange(min=1, max=100, message='Maximum of 100 replicates per submission')],
 		description= "Replicates")
-	tissue = SelectField('Tissue: ', [InputRequired()])
-	storage = SelectField('Tissue: ', [InputRequired()])
-	date_collected = DateField('Date collected (YYYY-mm-dd): ', [InputRequired()], 
+	tissue = SelectField('Tissue: ')
+	storage = SelectField('Storage: ')
+	date_collected = DateField('Date collected (YYYY-mm-dd): ', 
 		format='%Y-%m-%d',
 		description= 'Date collected (YYYY-mm-dd)')
 	submit_samples = SubmitField('Register samples')
@@ -265,19 +265,19 @@ class SampleRegForm(FlaskForm):
 		form.tissue.choices = [('','Select Tissue')] + TISSUES
 		form.storage.choices = [('','Select Storage')] + STORAGE_TYPES
 		if optional == False:
-			form.trees_start.validators = [InputRequired()]
-			form.trees_end.validators = [InputRequired()]
-			form.replicates.validators = [InputRequired()]
-			form.tissue.validators = [InputRequired()]
-			form.storage.validators = [InputRequired()]
-			form.date_collected.validators = [InputRequired()]
+			form.trees_start.validators.append(InputRequired())
+			form.trees_end.validators.append(InputRequired())
+			form.replicates.validators.append(InputRequired())
+			form.tissue.validators.append(InputRequired())
+			form.storage.validators.append(InputRequired())
+			form.date_collected.validators.append(InputRequired())
 		else:
-			form.trees_start.validators = [Optional()]
-			form.trees_end.validators = [Optional()]
-			form.replicates.validators = [Optional()]
-			form.tissue.validators = [Optional()]
-			form.storage.validators = [Optional()]
-			form.date_collected.validators = [Optional()]
+			form.trees_start.validators.insert(0,Optional())
+			form.trees_end.validators.insert(0,Optional())
+			form.replicates.validators.insert(0,Optional())
+			form.tissue.validators.insert(0,Optional())
+			form.storage.validators.insert(0,Optional())
+			form.date_collected.validators.insert(0,Optional())
 		return form
 
 class CustomSampleForm(FlaskForm):
