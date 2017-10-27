@@ -42,7 +42,7 @@ class Samples:
 		if not os.path.isdir(os.path.join(app.instance_path, app.config['DOWNLOAD_FOLDER'], session['username'])):
 			os.mkdir(os.path.join(app.instance_path, app.config['DOWNLOAD_FOLDER'], session['username']))
 		#prepare variables to write the file
-		fieldnames= ['UID', 'PlotID', 'TreeID', 'TreeName', 'SampleID', 'Date', 'Tissue', 'Storage', 'Plot', 'Farm', 'Region', 'Country']
+		fieldnames= ['UID', 'PlotID', 'TreeID', 'TreeName', 'SampleID', 'Date', 'Tissue', 'Storage', 'Block', 'Plot', 'Farm', 'Region', 'Country']
 		time = datetime.now().strftime('%Y%m%d-%H%M%S')
 		first_sample_id = self.id_list[0]['SampleID']
 		last_sample_id = self.id_list[-1]['SampleID']
@@ -123,7 +123,7 @@ class Samples:
 			q = q + ' {uid:$plotID}'
 		q = (q + ')<-[:FROM_PLOT]-(:PlotSamples) '
 			+ ' <-[:FROM]-(pts:PlotTissueStorage) '
-			+ ' -[:COLLECTED_AS]->(TiSt:TissueStorage)'
+			+ ' -[:COLLECTED_AS]->(TiSt:TissueStorage) '
 			+ ' -[:OF_TISSUE]->(tissue:Tissue ')
 		# and tissue 
 		if tissue:
@@ -166,8 +166,18 @@ class Samples:
 			if replicates:
 				q = q + ' sample.replicates >= $replicates'
 		#then get tree names if available
-		q = (q + ' OPTIONAL MATCH (tree)<-[:DATA_FOR]-(d:Data) '
-			+ '<-[:SUBMISSIONS]-(:PlotTreeTraitData)<-[:PLOT_DATA]-(:TreeTrait {name:"name"})')
+
+		#get tree name
+		q = (q + ' OPTIONAL MATCH (tree)'
+				' <-[:FROM_TREE]-(treename:TreeTreeTrait)'
+				' -[:FOR_TRAIT]->(:PlotTrait) '
+				' -[:FOR_TRAIT]->(:TreeTrait {name:"name"}) '
+			' OPTIONAL MATCH (treename) '
+				' <-[:DATA_FOR]-(d:Data) ' )
+		# get block name
+		q = (q + ' OPTIONAL MATCH (tree) '
+			' -[:IS_IN]->(:BlockTrees) '
+			' -[:IS_IN]->(block:Block) ')
 		# build the return statement
 		q = q + (' RETURN {UID: sample.uid, '
 			' PlotID : plot.uid, '
@@ -176,7 +186,8 @@ class Samples:
 			' SampleID : sample.id, '
 			' Date : sample.date, '
 			' Tissue : tissue.name, '
-			' Storage : storage.name,'
+			' Storage : storage.name, '
+			' Block : block.name, '
 			' Plot : plot.name, '
 			' Farm : farm.name, '
 			' Region : region.name, '
