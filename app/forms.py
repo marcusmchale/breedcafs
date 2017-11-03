@@ -26,9 +26,12 @@ class RegistrationForm(FlaskForm):
 	password = PasswordField('New Password:', [InputRequired(), Length(min=6, max=100,
 		message='Passwords must be at least 6 characters')],
 		description = "Please choose a secure password for this site")
-	def update(self):
+	@staticmethod
+	def update():
+		form = RegistrationForm()
 		PARTNERS = Lists('Partner').create_list_tup('name', 'fullname')
-		self.partner.choices = sorted(tuple(PARTNERS), key=lambda tup: tup[1])
+		form.partner.choices = sorted(tuple(PARTNERS), key=lambda tup: tup[1])
+		return form
 
 class PasswordResetRequestForm(FlaskForm):
 	email = StringField('Email Address:', [InputRequired(), Email(), Length(min=1, 
@@ -173,15 +176,18 @@ class CreateBlockTraits(FlaskForm):
 		option_widget=widgets.CheckboxInput(),
 		widget=widgets.ListWidget(prefix_label=False)
 		)
-	def update(self):
+	@staticmethod
+	def update():
+		form = CreateBlockTraits()
 		TRAITS = Lists('BlockTrait').get_nodes()
 		trait_dict = defaultdict(list)
 		for trait in TRAITS:
 			trait_dict[trait['group']].append((trait['name'], trait['details']))
-		self.block_general.choices = sorted(trait_dict['general'], 
+		form.block_general.choices = sorted(trait_dict['general'], 
 			key=lambda tup: tup[1])
-		self.block_general.default= ['location']
-		self.block_agronomic.choices = sorted(trait_dict['agronomic'], key=lambda tup: tup[1])
+		form.block_general.default= ['location']
+		form.block_agronomic.choices = sorted(trait_dict['agronomic'], key=lambda tup: tup[1])
+		return form
 
 
 class CreateTreeTraits(FlaskForm):
@@ -207,18 +213,20 @@ class CreateTreeTraits(FlaskForm):
 		option_widget=widgets.CheckboxInput(),
 		widget=widgets.ListWidget(prefix_label=False)
 		)	
-	def update(self):
+	@staticmethod
+	def update():
+		form = CreateTreeTraits()
 		TRAITS = Lists('TreeTrait').get_nodes()
 		trait_dict = defaultdict(list)
 		for trait in TRAITS:
 			trait_dict[trait['group']].append((trait['name'], trait['details']))
-		self.general.choices = sorted(trait_dict['general'], 
-			key=lambda tup: tup[1]), 
-		self.general.default = ['location','variety','hybrid_parent1','hybrid_parent2','date']
-		self.agronomic.choices = sorted(trait_dict['agronomic'], key=lambda tup: tup[1])
-		self.morphological.choices = sorted(trait_dict['morphological'], key=lambda tup: tup[1])
-		self.photosynthetic.choices = sorted(trait_dict['photosynthetic'], key=lambda tup: tup[1])
-		self.morphological.choices = sorted(trait_dict['metabolomic'], key=lambda tup: tup[1])
+		form.general.choices = sorted(trait_dict['general'], key=lambda tup: tup[1])
+		form.general.default = ['location','variety','hybrid_parent1','hybrid_parent2','date']
+		form.agronomic.choices = sorted(trait_dict['agronomic'], key=lambda tup: tup[1])
+		form.morphological.choices = sorted(trait_dict['morphological'], key=lambda tup: tup[1])
+		form.photosynthetic.choices = sorted(trait_dict['photosynthetic'], key=lambda tup: tup[1])
+		form.metabolomic.choices = sorted(trait_dict['metabolomic'], key=lambda tup: tup[1])
+		return form
 
 #Samples
 class AddTissueForm(FlaskForm):

@@ -96,8 +96,8 @@ class Download(User):
 			elif blockUID != "":
 				tdp = td + ( '-[:IS_IN]->(:BlockTrees) '
 					' -[:IS_IN]->(block:Block {uid:$blockUID}) '
-					' <-[:IS_IN]-(:PlotBlocks) '
-					' <-[:IS_IN]-(plot:Plot) ')
+					' -[:IS_IN]->(:PlotBlocks) '
+					' -[:IS_IN]->(plot:Plot) ')
 				query = tdp + frc
 				optional_block = ''
 			#and generate the return statement
@@ -234,6 +234,9 @@ class Download(User):
 		self.query = query + time_condition + optional_block + response
 		with get_driver().session() as neo4j_session:
 			result = neo4j_session.read_transaction(self._get_csv)
+		#check if any data found, if not return none
+		if len(result) == 0:
+			return None
 		#prepare data and variablesto make file
 		if data_format == 'table':
 			#expand the traits and values as key:value pairs

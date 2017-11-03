@@ -252,6 +252,9 @@ def generate_blocks_csv():
 				plotID = int(request.form['plot'])
 				#make the file and return a dictionary with filename, file_path and file_size
 				file_details = Fields.make_blocks_csv(session['username'], plotID)
+				#if result = none then no data was found
+				if file_details == None:
+					return jsonify({'submitted' : "No entries found that match your selection"})
 				#create a download url for the file
 				download_url = url_for('download_file', 
 					username = session['username'], 
@@ -432,6 +435,9 @@ def custom_trees_csv():
 				end = int(request.form['trees_end'])
 				#make the file and return filename, path, size
 				file_details = Fields.get_trees(plotID, start, end)
+				#if result = none then no data was found
+				if file_details == None:
+					return jsonify({'submitted' : "No entries found that match your selection"})
 				#create a download url
 				download_url = url_for('download_file', 
 					username = session['username'], 
@@ -487,8 +493,8 @@ def select_traits(level):
 		return redirect(url_for('login'))
 	else:
 		try:
-			tree_traits_form = CreateTreeTraits()
-			block_traits_form = CreateBlockTraits()
+			tree_traits_form = CreateTreeTraits().update()
+			block_traits_form = CreateBlockTraits().update()
 			return render_template('traits.html', 
 				level = level,
 				tree_traits_form = tree_traits_form,
@@ -506,10 +512,10 @@ def create_trt(level):
 	else:
 		try:
 			if level == 'tree':
-				form = CreateTreeTraits()
+				form = CreateTreeTraits().update()
 				Level = 'Tree'
 			elif level == 'block':
-				form = CreateBlockTraits()
+				form = CreateBlockTraits().update()
 				Level = 'Block'
 			if form.validate_on_submit():
 				#tree traits
@@ -525,6 +531,9 @@ def create_trt(level):
 				selection = gen + agro + morph + photo + metab + b_agro + b_gen
 				#make the trt file and return it's details (filename, file_path, file_size)
 				file_details = Lists(Level + 'Trait').create_trt(session['username'], selection, 'name', level)
+				#if result = none then no data was found
+				if file_details == None:
+					return jsonify({'submitted' : "No entries found that match your selection"})
 				download_url = url_for('download_file', 
 					username = session['username'], 
 					filename = file_details['filename'], 
@@ -682,6 +691,9 @@ def add_samples():
 				date = request.form['date_collected']
 				#register samples, make file describing index information and return filename etc.
 				file_details = Samples().add_samples(plotID, start, end, replicates, tissue, storage, date)
+				#if result = none then no data was found
+				if file_details == None:
+					return jsonify({'submitted' : "No entries found that match your selection"})
 				#create a download url
 				download_url = url_for('download_file', 
 					username = session['username'], 
@@ -787,6 +799,9 @@ def get_samples():
 					end_time,
 					samples_start,
 					samples_end)
+				#if result = none then no data was found
+				if file_details == None:
+					return jsonify({'submitted' : "No entries found that match your selection"})
 				#create a download url
 				download_url = url_for('download_file', 
 					username = session['username'], 

@@ -175,6 +175,9 @@ class Fields:
 		cls.end = end
 		with get_driver().session() as neo4j_session:
 			neo4j_session.read_transaction(cls._get_trees)
+		#check if any data found, if not return none
+		if len(cls.id_list) == 0:
+			return None
 		#create user download path if not found
 		if not os.path.isdir(os.path.join(app.instance_path, app.config['DOWNLOAD_FOLDER'], session['username'])):
 			os.mkdir(os.path.join(app.instance_path, app.config['DOWNLOAD_FOLDER'], session['username']))
@@ -255,6 +258,9 @@ class Fields:
 		with get_driver().session() as neo4j_session:
 			result = neo4j_session.read_transaction(cls._get_blocks_csv)
 			cls.id_list = [record[0] for record in result]
+		#check if any data found, if not return none
+		if len(cls.id_list) == 0:
+			return None
 		#create user download path if not found
 		if not os.path.isdir(os.path.join(app.instance_path, app.config['DOWNLOAD_FOLDER'], username)):
 			os.mkdir(os.path.join(app.instance_path, app.config['DOWNLOAD_FOLDER'], username))

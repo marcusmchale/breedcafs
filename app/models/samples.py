@@ -122,7 +122,7 @@ class Samples:
 		if plotID:
 			q = q + ' {uid:$plotID}'
 		q = (q + ')<-[:FROM_PLOT]-(:PlotSamples) '
-			+ ' <-[:FROM]-(pts:PlotTissueStorage) '
+			+ ' <-[:FROM_PLOT]-(pts:PlotTissueStorage) '
 			+ ' -[:COLLECTED_AS]->(TiSt:TissueStorage) '
 			+ ' -[:OF_TISSUE]->(tissue:Tissue ')
 		# and tissue 
@@ -134,7 +134,7 @@ class Samples:
 			q = q + ' {name:$storage} '
 		#and find the trees from these samples
 		q = (q + '), (sample)-[:FROM_TREE]->(:TreeSamples) '
-			+ ' -[:FROM_TREE]-(tree:Tree) ')
+			+ ' -[:FROM_TREE]->(tree:Tree) ')
 		#now parse out ranges of values provided, first from trees if provided a range, then from samples 
 		#not sure if there is an order to processing of where statments..but would be better to do trees first anyway i guess
 		if any ([trees_start, trees_end, start_time, end_time, samples_start, samples_end, replicates]):
@@ -165,8 +165,6 @@ class Samples:
 					q = q + ' AND '
 			if replicates:
 				q = q + ' sample.replicates >= $replicates'
-		#then get tree names if available
-
 		#get tree name
 		q = (q + ' OPTIONAL MATCH (tree)'
 				' <-[:FROM_TREE]-(treename:TreeTreeTrait)'
@@ -198,6 +196,8 @@ class Samples:
 		self.query = q
 		with get_driver().session() as neo4j_session:
 			neo4j_session.read_transaction(self._get_samples)
+		if len(self.id_list) == 0:
+			return None
 		#create user download path if not found
 		if not os.path.isdir(os.path.join(app.instance_path, app.config['DOWNLOAD_FOLDER'], session['username'])):
 			os.mkdir(os.path.join(app.instance_path, app.config['DOWNLOAD_FOLDER'], session['username']))

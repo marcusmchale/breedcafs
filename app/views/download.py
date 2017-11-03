@@ -26,8 +26,8 @@ def download():
 		try:	
 			location_form = LocationForm().update(optional=True)
 			download_form = DownloadForm()
-			tree_traits_form = CreateTreeTraits()
-			block_traits_form = CreateBlockTraits()
+			tree_traits_form = CreateTreeTraits().update()
+			block_traits_form = CreateBlockTraits().update()
 			return render_template('download.html', 
 				download_form = download_form,
 				location_form = location_form,
@@ -52,9 +52,9 @@ def generate_csv():
 			start_date = request.form['date_from']
 			end_date = request.form['date_to']
 			if level == 'tree':
-				traits_form = CreateTreeTraits()
+				traits_form = CreateTreeTraits().update()
 			elif level == 'block':
-				traits_form = CreateBlockTraits()
+				traits_form = CreateBlockTraits().update()
 			if all([download_form.validate_on_submit(), traits_form.validate_on_submit(), location_form.validate_on_submit()]):
 				country = request.form['country']
 				region = request.form['region']
@@ -90,6 +90,9 @@ def generate_csv():
 					end_time = ""
 				#make the file and return file details
 				file_details = Download(username).get_csv(country, region, farm, plotID, blockUID, level, traits, data_format, start_time, end_time)
+				#if result = none then no data was found
+				if file_details == None:
+					return jsonify({'submitted' : "No entries found that match your selection"})
 				#create a download url
 				download_url = url_for('download_file', 
 					username = session['username'], 
