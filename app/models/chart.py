@@ -1,6 +1,6 @@
 from app import app
 from app.cypher import Cypher
-from config import uri, driver
+from neo4j_driver import get_driver
 from datetime import datetime
 from flask import jsonify
 #Get dicts of values matching a node in the database then generate list for forms
@@ -19,8 +19,8 @@ class Chart:
 		epoch = datetime.utcfromtimestamp(0)
 		self.starttime =  ((datetime.strptime(startdate, '%Y-%m-%d')-epoch).total_seconds())*1000
 		self.endtime =  ((datetime.strptime(enddate, '%Y-%m-%d')-epoch).total_seconds())*1000
-		with driver.session() as session:
-			records = session.read_transaction(self._get_submissions_range)
+		with get_driver().session() as neo4j_session:
+			records = neo4j_session.read_transaction(self._get_submissions_range)
 		#collect all nodes/rels from records into lists of dicts
 		nodes=[]
 		rels=[]
@@ -37,8 +37,8 @@ class Chart:
 		return [record for record in tx.run(Cypher.get_plots_treecount)]
 	#get lists of submitted nodes (rels and directly linked nodes too) in json format
 	def get_plots_treecount(self):
-		with driver.session() as session:
-			records = session.read_transaction(self._get_plots_treecount)
+		with get_driver().session() as neo4j_session:
+			records = neo4j_session.read_transaction(self._get_plots_treecount)
 		#collect all nodes/rels from records into nested dict
 		nested={'name':'nodes','label':'root_node','children':[]}
 		for record in records:

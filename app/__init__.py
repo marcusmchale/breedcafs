@@ -6,7 +6,9 @@ app = Flask(__name__, instance_relative_config=True)
 app.config.from_object('config')
 app.config.from_pyfile('config.py')
 
+from neo4j.v1 import GraphDatabase, ServiceUnavailable
 from app import views
+
 
 #these are the variable view rules for retrieving lists
 app.add_url_rule('/location/countries/', 

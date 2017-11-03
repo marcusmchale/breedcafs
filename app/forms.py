@@ -9,9 +9,7 @@ from collections import defaultdict
 #user 
 class RegistrationForm(FlaskForm):
 	strip_filter = lambda x: x.strip() if x else None
-	PARTNERS = Lists('Partner').create_list_tup('name', 'fullname')
-	partner = SelectField('Partner:', [InputRequired()], 
-		choices = sorted(tuple(PARTNERS), key=lambda tup: tup[1]))
+	partner = SelectField('Partner:', [InputRequired()])
 	username = StringField('Username:', [InputRequired(), 
 		Length(min=1, max=20, message='Maximum 20 characters'),
 		Regexp('([^\x00-\x7F]|\w)+', message='Username contains illegal characters')],
@@ -28,6 +26,9 @@ class RegistrationForm(FlaskForm):
 	password = PasswordField('New Password:', [InputRequired(), Length(min=6, max=100,
 		message='Passwords must be at least 6 characters')],
 		description = "Please choose a secure password for this site")
+	def update(self):
+		PARTNERS = Lists('Partner').create_list_tup('name', 'fullname')
+		self.partner.choices = sorted(tuple(PARTNERS), key=lambda tup: tup[1])
 
 class PasswordResetRequestForm(FlaskForm):
 	email = StringField('Email Address:', [InputRequired(), Email(), Length(min=1, 
@@ -163,58 +164,61 @@ class CustomTreesForm(FlaskForm):
 #Traits
 class CreateBlockTraits(FlaskForm):
 	id = "block_traits_form"
-	TRAITS = Lists('BlockTrait').get_nodes()
-	trait_dict = defaultdict(list)
-	for trait in TRAITS:
-		trait_dict[trait['group']].append((trait['name'], trait['details']))
 	email_checkbox = BooleanField('Email checkbox')
 	block_general = SelectMultipleField('general',
-		choices = sorted(trait_dict['general'], 
-		key=lambda tup: tup[1]), 
-		default= ['location'],
 		option_widget=widgets.CheckboxInput(),
 		widget=widgets.ListWidget(prefix_label=False)
 		)
 	block_agronomic = SelectMultipleField('agronomic',
-		choices = sorted(trait_dict['agronomic'], key=lambda tup: tup[1]), 
 		option_widget=widgets.CheckboxInput(),
 		widget=widgets.ListWidget(prefix_label=False)
 		)
+	def update(self):
+		TRAITS = Lists('BlockTrait').get_nodes()
+		trait_dict = defaultdict(list)
+		for trait in TRAITS:
+			trait_dict[trait['group']].append((trait['name'], trait['details']))
+		self.block_general.choices = sorted(trait_dict['general'], 
+			key=lambda tup: tup[1])
+		self.block_general.default= ['location']
+		self.block_agronomic.choices = sorted(trait_dict['agronomic'], key=lambda tup: tup[1])
+
 
 class CreateTreeTraits(FlaskForm):
 	id = "tree_traits_form"
-	TRAITS = Lists('TreeTrait').get_nodes()
-	trait_dict = defaultdict(list)
-	for trait in TRAITS:
-		trait_dict[trait['group']].append((trait['name'], trait['details']))
 	email_checkbox = BooleanField('Email checkbox')
 	general = SelectMultipleField('general',
-		choices = sorted(trait_dict['general'], 
-		key=lambda tup: tup[1]), 
-		default= ['location','variety','hybrid_parent1','hybrid_parent2','date'],
 		option_widget=widgets.CheckboxInput(),
 		widget=widgets.ListWidget(prefix_label=False)
 		)
 	agronomic = SelectMultipleField('agronomic',
-		choices = sorted(trait_dict['agronomic'], key=lambda tup: tup[1]), 
 		option_widget=widgets.CheckboxInput(),
 		widget=widgets.ListWidget(prefix_label=False)
 		)	
 	morphological = SelectMultipleField('morphological',
-		choices = sorted(trait_dict['morphological'], key=lambda tup: tup[1]), 
 		option_widget=widgets.CheckboxInput(),
 		widget=widgets.ListWidget(prefix_label=False)
 		)	
 	photosynthetic = SelectMultipleField('photosynthetic',
-		choices = sorted(trait_dict['photosynthetic'], key=lambda tup: tup[1]), 
 		option_widget=widgets.CheckboxInput(),
 		widget=widgets.ListWidget(prefix_label=False)
 		)
 	metabolomic = SelectMultipleField('metabolomic',
-		choices = sorted(trait_dict['metabolomic'], key=lambda tup: tup[1]), 
 		option_widget=widgets.CheckboxInput(),
 		widget=widgets.ListWidget(prefix_label=False)
 		)	
+	def update(self):
+		TRAITS = Lists('TreeTrait').get_nodes()
+		trait_dict = defaultdict(list)
+		for trait in TRAITS:
+			trait_dict[trait['group']].append((trait['name'], trait['details']))
+		self.general.choices = sorted(trait_dict['general'], 
+			key=lambda tup: tup[1]), 
+		self.general.default = ['location','variety','hybrid_parent1','hybrid_parent2','date']
+		self.agronomic.choices = sorted(trait_dict['agronomic'], key=lambda tup: tup[1])
+		self.morphological.choices = sorted(trait_dict['morphological'], key=lambda tup: tup[1])
+		self.photosynthetic.choices = sorted(trait_dict['photosynthetic'], key=lambda tup: tup[1])
+		self.morphological.choices = sorted(trait_dict['metabolomic'], key=lambda tup: tup[1])
 
 #Samples
 class AddTissueForm(FlaskForm):

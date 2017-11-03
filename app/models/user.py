@@ -1,15 +1,15 @@
 from app import app
 from app.cypher import Cypher
 from passlib.hash import bcrypt
-from config import uri, driver
+from neo4j_driver import get_driver
 
 class User:
 	def __init__(self, username):
 		self.username=username
 	def find(self, email):
 		self.email=email
-		with driver.session() as session:
-			return session.read_transaction(self._find)
+		with get_driver().session() as neo4j_session:
+			return neo4j_session.read_transaction(self._find)
 	def _find (self, tx):
 		for record in tx.run(Cypher.user_find, username=self.username, email=self.email):
 			return (record['user'])
@@ -18,8 +18,8 @@ class User:
 		self.email=email
 		self.name=name
 		self.partner=partner
-		with driver.session() as session:
-			session.write_transaction(self._register)
+		with get_driver().session() as neo4j_session:
+			neo4j_session.write_transaction(self._register)
 	def _register (self, tx):
 		tx.run(Cypher.user_register, username=self.username,
 			password = bcrypt.encrypt(self.password), 
@@ -29,8 +29,8 @@ class User:
 	def remove(self, email):
 		self.email=email
 		try:
-			with driver.session() as session:
-				session.write_transaction(self._remove)
+			with get_driver().session() as neo4j_session:
+				neo4j_session.write_transaction(self._remove)
 			return True
 		except:
 			return False
@@ -49,15 +49,15 @@ class User:
 #These are classmethods as they don't need a username
 	@classmethod
 	def confirm_email(cls, email):
-		with driver.session() as session:
-			session.write_transaction(cls._confirm_email, email=email)
+		with get_driver().session() as neo4j_session:
+			neo4j_session.write_transaction(cls._confirm_email, email=email)
 	@classmethod
 	def _confirm_email(cls, tx, email):
 		tx.run(Cypher.confirm_email, email=email)
 	@classmethod
 	def password_reset(cls, email, password):
-		with driver.session() as session:
-			session.write_transaction(cls._password_reset, email=email, password=password)
+		with get_driver().session() as neo4j_session:
+			neo4j_session.write_transaction(cls._password_reset, email=email, password=password)
 	@classmethod		
 	def _password_reset(cls, tx, email, password):
 		tx.run(Cypher.password_reset, email=email, password=bcrypt.encrypt(password))

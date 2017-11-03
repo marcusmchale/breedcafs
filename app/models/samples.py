@@ -3,7 +3,7 @@ import unicodecsv as csv
 import cStringIO
 from app import app
 from app.cypher import Cypher
-from config import uri, driver
+from neo4j_driver import get_driver
 from flask import session
 from datetime import datetime
 
@@ -12,8 +12,8 @@ class Samples:
 		pass
 	def add_tissue(self, tissue):
 		self.tissue = tissue
-		with driver.session() as session:
-			session.write_transaction(self._add_tissue)
+		with get_driver().session() as neo4j_session:
+			neo4j_session.write_transaction(self._add_tissue)
 	def _add_tissue(self, tx):
 		tx.run(Cypher.tissue_add,
 			tissue = self.tissue,
@@ -21,8 +21,8 @@ class Samples:
 # should really reduce these calls down to a common function, lots of repitition here!!
 	def add_storage(self, storage):
 		self.storage = storage
-		with driver.session() as session:
-			session.write_transaction(self._add_storage)
+		with get_driver().session() as neo4j_session:
+			neo4j_session.write_transaction(self._add_storage)
 	def _add_storage(self, tx):
 		tx.run(Cypher.storage_add,
 			storage = self.storage,
@@ -36,7 +36,7 @@ class Samples:
 		self.storage = storage
 		self.date = date
 		#register samples and return index data
-		with driver.session() as neo4j_session:
+		with get_driver().session() as neo4j_session:
 			neo4j_session.write_transaction(self._add_samples)
 		#create user download path if not found
 		if not os.path.isdir(os.path.join(app.instance_path, app.config['DOWNLOAD_FOLDER'], session['username'])):
@@ -196,7 +196,7 @@ class Samples:
 		q = q + ' ORDER BY sample.id'
 		#register samples and return index data
 		self.query = q
-		with driver.session() as neo4j_session:
+		with get_driver().session() as neo4j_session:
 			neo4j_session.read_transaction(self._get_samples)
 		#create user download path if not found
 		if not os.path.isdir(os.path.join(app.instance_path, app.config['DOWNLOAD_FOLDER'], session['username'])):

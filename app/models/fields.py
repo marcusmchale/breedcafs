@@ -3,31 +3,32 @@ import unicodecsv as csv
 import cStringIO
 from app import app
 from app.cypher import Cypher
-from config import uri, driver
+from neo4j_driver import get_driver
 from flask import session
 from datetime import datetime
+from neo4j_driver import get_driver
 
 class Fields:
 	def __init__(self, country):
 		self.country=country
 	def find_country(self):
-		with driver.session() as session:
-			return session.read_transaction(self._find_country)
+		with get_driver().session() as neo4j_session:
+			return neo4j_session.read_transaction(self._find_country)
 	def _find_country (self, tx):
 		for record in tx.run(Cypher.country_find, 
 			country=self.country):
 			return (record['country'])
 	def add_country(self):
-		with driver.session() as session:
-			session.write_transaction(self._add_country)
+		with get_driver().session() as neo4j_session:
+			neo4j_session.write_transaction(self._add_country)
 	def _add_country (self, tx):
 		tx.run(Cypher.country_add, 
 			country = self.country, 
 			username=session['username'])
 	def find_region(self, region):
 		self.region=region
-		with driver.session() as session:
-			return session.read_transaction(self._find_region)
+		with get_driver().session() as neo4j_session:
+			return neo4j_session.read_transaction(self._find_region)
 	def _find_region (self, tx):
 		for record in tx.run(Cypher.region_find, 
 			country=self.country, 
@@ -35,8 +36,8 @@ class Fields:
 			return (record['region'])
 	def add_region(self, region):
 		self.region=region
-		with driver.session() as session:
-			session.write_transaction(self._add_region)
+		with get_driver().session() as neo4j_session:
+			neo4j_session.write_transaction(self._add_region)
 	def _add_region (self, tx):
 		tx.run(Cypher.region_add, 
 			country = self.country, 
@@ -45,8 +46,8 @@ class Fields:
 	def find_farm(self, region, farm):
 		self.region=region
 		self.farm=farm
-		with driver.session() as session:
-			return session.read_transaction(self._find_farm)
+		with get_driver().session() as neo4j_session:
+			return neo4j_session.read_transaction(self._find_farm)
 	def _find_farm (self, tx):
 		for record in tx.run(Cypher.farm_find, 
 			country=self.country, 
@@ -56,8 +57,8 @@ class Fields:
 	def add_farm(self, region, farm):
 		self.region=region
 		self.farm=farm
-		with driver.session() as session:
-			session.write_transaction(self._add_farm)
+		with get_driver().session() as neo4j_session:
+			neo4j_session.write_transaction(self._add_farm)
 	def _add_farm (self, tx):
 		tx.run(Cypher.farm_add, 
 			country = self.country, 
@@ -68,8 +69,8 @@ class Fields:
 		self.region=region
 		self.farm=farm
 		self.plot=plot
-		with driver.session() as session:
-			return session.read_transaction(self._find_plot)
+		with get_driver().session() as neo4j_session:
+			return neo4j_session.read_transaction(self._find_plot)
 	def _find_plot (self, tx):
 		for record in tx.run(Cypher.plot_find, 
 			country=self.country, 
@@ -81,8 +82,8 @@ class Fields:
 		self.region=region
 		self.farm=farm
 		self.plot=plot
-		with driver.session() as session:
-			session.write_transaction(self._add_plot)
+		with get_driver().session() as neo4j_session:
+			neo4j_session.write_transaction(self._add_plot)
 	def _add_plot (self, tx):
 		tx.run(Cypher.plot_id_lock)
 		tx.run(Cypher.plot_add, 
@@ -95,8 +96,8 @@ class Fields:
 	def find_block(cls, plotID, block):
 		cls.plotID = plotID
 		cls.block = block
-		with driver.session() as session:
-			return session.read_transaction(cls._find_block)
+		with get_driver().session() as neo4j_session:
+			return neo4j_session.read_transaction(cls._find_block)
 	@classmethod #has plotID so doesn't need country
 	def _find_block(cls, tx):
 		for record in tx.run(Cypher.block_find, 
@@ -107,8 +108,8 @@ class Fields:
 	def add_block(cls, plotID, block):
 		cls.plotID=plotID
 		cls.block=block
-		with driver.session() as session:
-			session.write_transaction(cls._add_block)
+		with get_driver().session() as neo4j_session:
+			neo4j_session.write_transaction(cls._add_block)
 	@classmethod #has plotID so doesn't need country
 	def _add_block (cls, tx):
 		tx.run(Cypher.block_id_lock,
@@ -123,7 +124,7 @@ class Fields:
 		cls.count = count
 		cls.blockUID = blockUID
 		#register trees and return index data
-		with driver.session() as neo4j_session:
+		with get_driver().session() as neo4j_session:
 			neo4j_session.write_transaction(cls._add_trees)
 		#create user download path if not found
 		if not os.path.isdir(os.path.join(app.instance_path, app.config['DOWNLOAD_FOLDER'], session['username'])):
@@ -172,7 +173,7 @@ class Fields:
 		cls.plotID = plotID
 		cls.start = start
 		cls.end = end
-		with driver.session() as neo4j_session:
+		with get_driver().session() as neo4j_session:
 			neo4j_session.read_transaction(cls._get_trees)
 		#create user download path if not found
 		if not os.path.isdir(os.path.join(app.instance_path, app.config['DOWNLOAD_FOLDER'], session['username'])):
@@ -207,8 +208,8 @@ class Fields:
 		cls.id_list = [record[0] for record in result]
 	def get_farms(self, region):
 		self.region=region
-		with driver.session() as session:
-			result = session.read_transaction(self._get_farms)
+		with get_driver().session() as neo4j_session:
+			result = neo4j_session.read_transaction(self._get_farms)
 			return [(record[0]['name']) for record in result]
 	def _get_farms(self, tx):
 		return tx.run(Cypher.get_farms, 
@@ -217,14 +218,14 @@ class Fields:
 	def get_plotIDs(self, region, farm):
 		self.region=region
 		self.farm=farm
-		with driver.session() as session:
-			result = session.read_transaction(self._get_plots)
+		with get_driver().session() as neo4j_session:
+			result = neo4j_session.read_transaction(self._get_plots)
 			return [(str(record[0]['uid'])) for record in result]
 	def get_plots_tup(self, region, farm):
 		self.region=region
 		self.farm=farm
-		with driver.session() as session:
-			result = session.read_transaction(self._get_plots)
+		with get_driver().session() as neo4j_session:
+			result = neo4j_session.read_transaction(self._get_plots)
 			return [(str(record[0]['uid']), record[0]['name']) for record in result]
 	def _get_plots(self, tx):
 		return tx.run(Cypher.get_plots, 
@@ -234,14 +235,14 @@ class Fields:
 	@classmethod #has plotID so doesn't need country
 	def get_blockUIDs(cls, plotID):
 		cls.plotID = plotID
-		with driver.session() as session:
-			result = session.read_transaction(cls._get_blocks)
+		with get_driver().session() as neo4j_session:
+			result = neo4j_session.read_transaction(cls._get_blocks)
 			return [(record[0]['uid']) for record in result]
 	@classmethod #has plotID so doesn't need country
 	def get_blocks_tup(cls, plotID):
 		cls.plotID = plotID
-		with driver.session() as session:
-			result = session.read_transaction(cls._get_blocks)
+		with get_driver().session() as neo4j_session:
+			result = neo4j_session.read_transaction(cls._get_blocks)
 			return [(record[0]['uid'], record[0]['name']) for record in result]
 	@classmethod #has plotID so doesn't need country
 	def _get_blocks(cls, tx):
@@ -251,8 +252,8 @@ class Fields:
 	def make_blocks_csv(cls, username, plotID):
 		cls.plotID = plotID
 		#get the block index data (country, region etc.)
-		with driver.session() as session:
-			result = session.read_transaction(cls._get_blocks_csv)
+		with get_driver().session() as neo4j_session:
+			result = neo4j_session.read_transaction(cls._get_blocks_csv)
 			cls.id_list = [record[0] for record in result]
 		#create user download path if not found
 		if not os.path.isdir(os.path.join(app.instance_path, app.config['DOWNLOAD_FOLDER'], username)):

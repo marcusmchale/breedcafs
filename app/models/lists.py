@@ -4,7 +4,7 @@ import cStringIO
 from app import app
 from app.cypher import Cypher
 from passlib.hash	import bcrypt
-from config import uri, driver
+from neo4j_driver import get_driver
 from datetime import datetime
 #Get dicts of values matching a node in the database then generate list for forms
 #careful with any node_label functions to prevent injection - don't allow user input assigned node_labels
@@ -13,8 +13,8 @@ class Lists:
 		self.node_label=node_label
 	def find_node(self, name):
 		self.name = name
-		with driver.session() as session:
-			return session.read_transaction(self._find_node)
+		with get_driver().session() as neo4j_session:
+			return neo4j_session.read_transaction(self._find_node)
 	def _find_node(self, tx):
 		node_label = self.node_label
 		name = self.name
@@ -23,8 +23,8 @@ class Lists:
 			return record
 	#get lists of all nodes with properties as dict
 	def get_nodes(self):
-		with driver.session() as session:
-			return session.read_transaction(self._node_properties)
+		with get_driver().session() as neo4j_session:
+			return neo4j_session.read_transaction(self._node_properties)
 	def _node_properties(self, tx):
 		node_label=self.node_label
 		Cypher_node_properties='MATCH (n: ' + node_label +') RETURN properties (n)'
@@ -40,8 +40,8 @@ class Lists:
 		self.key=key 
 		self.rel=rel
 		self.value=value
-		with driver.session() as session:
-			result = session.read_transaction(self._get_connected)
+		with get_driver().session() as neo4j_session:
+			result = neo4j_session.read_transaction(self._get_connected)
 			return [(record[0]['name']) for record in result]
 	def _get_connected(self, tx):
 		key = self.key

@@ -3,7 +3,8 @@ from app import app
 from app.cypher import Cypher
 from user import User
 from lists import Lists
-from config import uri, driver, ALLOWED_EXTENSIONS
+from config import ALLOWED_EXTENSIONS
+from neo4j_driver import get_driver
 from flask import session
 import cStringIO
 import unicodecsv as csv
@@ -231,7 +232,7 @@ class Download(User):
 			time_condition = ''
 		#finalise query, get data 
 		self.query = query + time_condition + optional_block + response
-		with driver.session() as neo4j_session:
+		with get_driver().session() as neo4j_session:
 			result = neo4j_session.read_transaction(self._get_csv)
 		#prepare data and variablesto make file
 		if data_format == 'table':

@@ -1,4 +1,4 @@
-from app import app
+from app import app, ServiceUnavailable
 from flask import flash, redirect, url_for, render_template, session
 
 @app.route('/help', methods=['GET'])

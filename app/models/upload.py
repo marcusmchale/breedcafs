@@ -1,7 +1,8 @@
 from app import app
 from app.cypher import Cypher
 from user import User
-from config import uri, driver, ALLOWED_EXTENSIONS
+from config import ALLOWED_EXTENSIONS
+from neo4j_driver import get_driver
 
 
 #User class related (all uploads are tied to a user) yet more specifically regarding uploads
@@ -15,8 +16,8 @@ class Upload(User):
 	def submit(self, submission_type, level):
 		self.submission_type=submission_type
 		self.level = level
-		with driver.session() as session:
-			return session.write_transaction(self._submit)
+		with get_driver().session() as neo4j_session:
+			return neo4j_session.write_transaction(self._submit)
 	def _submit(self, tx):
 			fcount=0
 			ncount=0
