@@ -87,8 +87,8 @@ svg {
 					fill:black;
 					}
 
-.Country, .Region, .Farm, .Plot{
-					stroke: green;
+.Country, .Region, .Farm, .Plot, .Block{
+					stroke: black;
 					fill: green ;
 					fill-opacity:0.4
 					}
@@ -112,13 +112,18 @@ svg {
 					fill-opacity:1;
 					}
 
-.Tree{
-					stroke: brown;
+.Trees{
+					stroke: black;
 					fill: brown;
 					fill-opacity:0.8
 					}
+.Samples{
+					stroke: black;
+					fill: yellow;
+					fill-opacity:0.8
+					}
 .Trait{
-					stroke: orange;
+					stroke: black;
 					fill: orange;
 					fill-opacity:0.8
 					}

@@ -9,10 +9,12 @@ class Chart:
 	def __init__(self):
 		pass
 	def _get_submissions_range(self, tx):
-		return [record for record in tx.run(Cypher.get_submissions_range, 
+		result = [record for record in tx.run(Cypher.get_submissions_range, 
 			username=self.username, 
 			starttime=self.starttime, 
 			endtime=self.endtime)]
+		import pdb; pdb.set_trace()
+		return result
 	#get lists of submitted nodes (rels and directly linked nodes too) in json format
 	def get_submissions_range(self, username, startdate, enddate):
 		self.username=username

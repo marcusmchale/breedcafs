@@ -168,7 +168,7 @@ class CustomTreesForm(FlaskForm):
 class CreateBlockTraits(FlaskForm):
 	id = "block_traits_form"
 	email_checkbox = BooleanField('Email checkbox')
-	block_general = SelectMultipleField('general',
+	block_general = SelectMultipleField('general', 
 		option_widget=widgets.CheckboxInput(),
 		widget=widgets.ListWidget(prefix_label=False)
 		)

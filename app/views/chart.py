@@ -11,13 +11,13 @@ def json_submissions():
 		yesterday=(datetime.now()-timedelta(days=1)).strftime("%Y-%m-%d")
 		return Chart().get_submissions_range(session['username'],yesterday,tomorrow)
 	except (ServiceUnavailable):
-				flash("Database unavailable")
-				return redirect(url_for('index'))
+		flash("Database unavailable")
+		return redirect(url_for('index'))
 
 @app.route("/json_plots_treecount")
 def json_plots_treecount():
 	try:
 		return Chart().get_plots_treecount()
 	except (ServiceUnavailable):
-				flash("Database unavailable")
-				return redirect(url_for('index'))
+		flash("Database unavailable")
+		return redirect(url_for('index'))

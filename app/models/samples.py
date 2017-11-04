@@ -196,6 +196,7 @@ class Samples:
 		self.query = q
 		with get_driver().session() as neo4j_session:
 			neo4j_session.read_transaction(self._get_samples)
+		#check if any data found, if not return none
 		if len(self.id_list) == 0:
 			return None
 		#create user download path if not found
