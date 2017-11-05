@@ -19,9 +19,8 @@
 	<svg width=500 height=500></svg>
 </div>
 <script src="{{ url_for('static', filename='jquery_1.8.3_min.js') }}"></script>
-<script src="{{ url_for('static', filename='jquery_upload.js') }}"></script>
 <script src="{{ url_for('static', filename='d3.v4.min.js') }}"></script>
 <script src="{{ url_for('static', filename='d3-selection-multi.v1.min.js') }}"></script>
-<script> var data = "/json_submissions"</script>
+<script src="{{ url_for('static', filename='jquery_upload.js') }}"></script>
 <script src="{{ url_for('static', filename='d3_node_link.js') }}"></script>
 {% endblock %}

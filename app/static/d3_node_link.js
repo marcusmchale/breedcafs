@@ -11,12 +11,14 @@ var simulation = d3.forceSimulation()
 	.force("charge", d3.forceManyBody().strength(-100).distanceMin(10).distanceMax(300))
 	.force("center", d3.forceCenter(width / 2, height / 2));
 
-// load graph (nodes,links) json from /graph endpoint
-d3.json(data, function(error, graph) {
-	if (error) throw error;
-	console.log(data);
-	update(graph.links, graph.nodes);
-})
+var load_graph = function() {
+	// load graph (nodes,links) json from /graph endpoint
+	var data = "/json_submissions";
+	d3.json(data, function(error, graph) {
+		if (error) throw error;
+		update(graph.links, graph.nodes);
+	})
+}
 
 function update(links, nodes){
 	link = svg.selectAll(".link")
@@ -85,3 +87,7 @@ function dragged(d) {
 	d.fx = d3.event.x;
 	d.fy = d3.event.y;
 }
+
+
+
+load_graph();

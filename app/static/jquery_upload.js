@@ -17,10 +17,11 @@ $('#upload_submit').click( function(e) {
 		processData: false,
 		contentType: false,
 		success: function(response) {
-			console.log(response);
 			if (response.hasOwnProperty('submitted')) {
 				flash_submitted = "<div id='upload_submit_flash' class='flash'> " + response.submitted + " </div>";
 				$("#upload_submit_flash").replaceWith(flash_submitted);
+				$('svg').empty();
+				load_graph();
 			} else {
 				$("#upload_submit_flash").remove();
 				for (var key in response){
@@ -32,7 +33,6 @@ $('#upload_submit').click( function(e) {
 			}
 		},
 		error: function(error) {
-			console.log(error);
 		}
 	})
 	$("#upload_submit").show();
