@@ -252,7 +252,7 @@ class Download(User):
 							record[i[0]].append(str(i[1]))
 					else:
 						record.update({i[0]:str(i[1])})
-#the below line only returned the last measurement of the trait, now the above returns as a list.
+			#the below line only returned the last measurement of the trait, now the above returns as a list.
 			#[[record.update({i[0]:i[1]}) for i in record['Traits']] for record in result]
 			#the below line was here and it worked but I have no idea how, in the python shell if gives a syntax error..
 			#[[record.update({i[0]:i[1] for i in record['Traits']})] for record in result] 
