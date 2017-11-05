@@ -142,7 +142,8 @@ class Download(User):
 						' Location : data.location, '
 						' Recorded_at : data.timeFB, '
 						' Recorded_by: data.person '
-					'}'
+					' } '
+					' ORDER BY plot.uid, tree.id, trait.name, data.timeFB '
 					)
 			#defining these as headers for tree data
 		elif level == 'block' and set(traits).issubset(set(BLOCKTRAITS)):
@@ -219,7 +220,8 @@ class Download(User):
 						' Location : data.location, '
 						' Recorded_at : data.timeFB, '
 						' Recorded_by : data.person'
-					'}'
+					' } '
+					' ORDER BY plot.uid, block.id, trait.name, data.timeFB '
 					)
 		#add conditional for data between time range
 		if start_time != "" and end_time != "":
@@ -240,7 +242,20 @@ class Download(User):
 		#prepare data and variablesto make file
 		if data_format == 'table':
 			#expand the traits and values as key:value pairs
-			[[record.update({i[0]:i[1] for i in record['Traits']})] for record in result]
+			for record in result:
+				for i in record["Traits"]:
+					if i[0] in record:
+						if isinstance(record[i[0]] , list):
+							record[i[0]].append(str(i[1]))
+						else:
+							record.update({i[0]:[record[i[0]]]})
+							record[i[0]].append(str(i[1]))
+					else:
+						record.update({i[0]:str(i[1])})
+#the below line only returned the last measurement of the trait, now the above returns as a list.
+			#[[record.update({i[0]:i[1]}) for i in record['Traits']] for record in result]
+			#the below line was here and it worked but I have no idea how, in the python shell if gives a syntax error..
+			#[[record.update({i[0]:i[1] for i in record['Traits']})] for record in result] 
 				#now pop out the Traits key and add the returned trait names to a set of fieldnames
 				#trait_fieldnames = set()
 				#[[trait_fieldnames.add(i[0]) for i in record.pop('Traits')] for record in result]
