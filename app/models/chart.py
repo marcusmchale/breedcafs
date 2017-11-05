@@ -13,7 +13,6 @@ class Chart:
 			username=self.username, 
 			starttime=self.starttime, 
 			endtime=self.endtime)]
-		import pdb; pdb.set_trace()
 		return result
 	#get lists of submitted nodes (rels and directly linked nodes too) in json format
 	def get_submissions_range(self, username, startdate, enddate):
