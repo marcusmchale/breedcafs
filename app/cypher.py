@@ -10,7 +10,7 @@ class Cypher():
 		'RETURN user ')
 	confirm_email = ('MATCH (user:User {email : $email}) '
 		' SET user.confirmed = true ')
-	password_reset = ('MATCH (user:User {email = $email}) '
+	password_reset = ('MATCH (user:User {email : $email}) '
 		' SET user.password = $password ')
 	user_register = ('MATCH (partner:Partner {name:$partner}) '
 		' CREATE ' 
