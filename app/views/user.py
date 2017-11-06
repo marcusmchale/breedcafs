@@ -111,7 +111,7 @@ def password_reset():
 				flash('This email is not registered')
 				return redirect(url_for('password_reset'))
 			user = User("").find(email)
-			if user['confirmed'] == u'True':
+			if user['confirmed'] == True:
 				name = user['name']
 				username = user['username']
 				ts = URLSafeTimedSerializer(app.config['SECRET_KEY'])
