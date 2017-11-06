@@ -19,7 +19,7 @@ svg {
 					margin: 10%;
 					margin-top: 5%;
 					padding: 2%;
-					width: 75%; 
+					min-width: 75%; 
 					border: 5px 
 					solid #6f4e37; 
 					background: #ffffea;
@@ -30,7 +30,7 @@ svg {
 					}
 .header				{
 					padding: 10px;
-					width:95%;
+					min-width:95%;
 					display: flex;
 					flex-wrap: wrap;
 					justify-content: space-evenly;
@@ -54,7 +54,7 @@ svg {
 .metanav			{ font-size: 0.8em; 
 					padding: 0.3em;}
 .flash				{
-					width: 95%; 
+					min-width: 95%; 
 					background: #E1F0B7; 
 					padding: 0.5em; 
 					border: 1px solid #627138; }
@@ -63,8 +63,9 @@ svg {
 .utils				{
 					display: flex;
 					flex-wrap: nowrap;
-					width:22%;
+					min-width:22%;
 					padding: 5px; 
+					margin: 10%;
 					}
 
 .root_node			{

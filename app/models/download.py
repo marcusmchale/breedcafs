@@ -241,7 +241,7 @@ class Download(User):
 			return None
 		#prepare data and variablesto make file
 		if data_format == 'table':
-			#expand the traits and values as key:value pairs
+			#expand the traits and values as key:value pairs (each measure as an item in a list if more than one)
 			for record in result:
 				for i in record["Traits"]:
 					if i[0] in record:
