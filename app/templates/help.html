@@ -2,30 +2,69 @@
 {% block body %}
 <div class="text_body">
 <h1>Field-book</h1>
-<p>To assist field data collection and ensure standardised reporting, the BreedCAFS database tools support use of the <a href="http://wheatgenetics.org/field-book">Field Book</a> app for Android mobile devices. <br><br>To collect data with Field-Book you need two files, one that describes the trees (fields.csv), and another that describes the traits to be measured (traits.trt). Tools to generate both of these files are provided on this site.<br></p>
+<p>To assist field data collection and ensure standardised reporting, the BreedCAFS database tools support use of the <a href="http://wheatgenetics.org/field-book">Field Book</a> app for Android mobile devices. <br><br>To collect data with Field-Book you need two files, one that describes the "fields", or in our case blocks/trees (a .csv file), and another that describes the traits to be measured (a .trt file). Tools to generate both of these files are provided on this site.<br></p>
 
-<h2>Registering fields and trees</h2>
-	<p>Visit <a href="/create"> Create</a> => <a href="/location_trees">Register Trees</a>. <br>
-	Here you can add new Countries, Regions, Farms and Plots to the database. Trees can then be registered and will be assigned unique ID's in the database. A fields.csv file will be generated and a copy will emailed to your user address. This fields.csv file is to be placed in Field-Book's field_import directory.	Subsequently, custom fields.csv files for any given plot can be generated for a range of supplied TreeIDs. <br><br>You can see the number of trees registered within each location in the tree chart provided.
-	</p>
+<h2>Registration and unique identifiers</h2>
+	<h3>Fields</h3>
+		<p>Visit <a href="/create"> Create</a> => <a href="/location_fields">Register fields</a>. <br>
+		Here you can add new Countries, Regions, Farms and Plots to the database. Country names must be unique, while Region, Farm and Plot must be unique within their parent location. Each plot is assigned a unique identifier (an integer incrementing with each additional plot) from which subsequent Block, Tree and Sample IDs will be incremented.<br>
+		Blocks are then able to be registered to each plot to assign their unique identifier. This includes the plot ID and a number that increments per plot, e.g. 1_B2 is the unique ID for block 2 in plot 1. Blocks are best added here so that subsequent trees may be registered directly into a block, however the block name may also be entered per tree later in Field Book.<br>
+		This information can then be exported into a "fields.csv" file for Field Book, in this case named "blocks.csv". This file contains the unique ID (UID) of each block, alongside the plot and block ID integers as well as the names for the block, plot, farm, region and country.<br>
+		Create a blocks.csv for each plot and use these to collect data in Field Book (see below)
+		</p>
+	<h3>Trees</h3>
+		<p>Visit <a href="/create"> Create</a> => <a href="/location_trees">Register trees</a>. <br>
+		Once plots have been registered, trees can be registered to assign their unique identifiers. If possible it is best to register the trees within a block at this point, though as mentioned above, the block can be later assigned using Field Book.<br>
+		As for blocks, the tree identifier includes the plot ID and a number that increments per tree, e.g. 1_T2 is the unique ID for tree 2 in plot 1.<br>
+		When you register trees this information is exported to a "fields.csv" file for Field Book, in this case we call it a "trees.csv" file, though it is to be handled in the same way as the "fields.csv file". This file contains the unique ID (UID) of each tree, alongside the plot and tree ID integers as well as the names for the block (if assigned), plot, farm, region and country.<br>
+		A custom trees.csv file may also be generated at any time for a selected plot and a supplied range of tree ID integers.<br>	
+		To assist with cases where trees are already assigned identifiers within each BreedCAFS team, trees can be assigned custom names using Field Book. These will be registered into the database when data is later uploaded and made available in these custom trees.csv file.
+		Create a trees.csv for each plot and use these to collect data in Field Book (see below)
+		</p>
+	<h3>Samples</h3>
+		<p>To assist in the identification and tracking of samples, a similar facility is provided to register and create unique ID's for samples. This form allows you to specify the plot, the range of tree ID integers, the number of replicate samples to be collected, the tissue type and storage method and the date they are to be collected. Where the tissue type and/or storage method is not already registered in the database you may add these here.<br>
+		A "samples.csv" file will be generated containing; a unique identifier (UID), the plot, tree and sample ID integers, the custom tree name (if assigned), the date, tissue and storage entered in the form, the names of the Block (if entered), Plot, Farm, Region and Country.<br>
+		A custom samples.csv file can also be generated. This will filter the database based on the selection in the registration form and further allows selection of a range of dates and/or tree ID integers.<br>
+		The samples.csv files can be used to identify the origin and details of individual samples in all further work. Internally, groups will likely partition these samples into sub-samples/aliquots according to their own demands. However, subsequent data generated from these samples should be registered in the database against these sample IDs <i>(methods yet to be determined) <i>.</p>
 
 <h2>Selecting traits</h2>
-	<p>Visit <a href="/create"> Create</a> => <a href="/traits">Create traits.trt</a>. <br>
-	Here you can select from a range of traits for which you may be collecting data. At the bottom of the list is a button labeled "Create". Click this to have a traits.trt file generated for the selected traits and emailed to your registered address.
+	<p>Visit <a href="/create"> Create</a> => Select <a href="/traits/block">block</a>/<a href="/traits/tree">tree</a>traits.<br>
+	Here you can select from a range of traits for which you may be collecting data in Field Book. The traits are grouped into various classes allowing you to select all within this class with a checkbox. Click on the text of the class (e.g. "agronomic") to expand/collapse the list, allowing you to select individual traits.<br>
+	At the bottom of the traits list is a button labeled "Create". Click this to generate a traits.trt file for the selected traits.
 
-<h2>Using Field-Book</h2>
-	<p> In the menu set person and location <p>
+<h2>Field-Book Setup</h2>
+	<p>Install Field Book from the Play Store. Search for "Field Book" by WheatGenetics.<br>
+	Once installed you will need to place the "fields" and "traits" files (see above) into the appropriate directories. This can be acheived by many methods, including by downloading the files directly from this site onto your device then using your device file manager. <i>The Field Book app also provides a facility to use the "Dropbox" service to import these files.</i></p>
+	<ul>
+		<li>Place the blocks.csv and/or trees.csv files into Field-Book's field import directory (/fieldBook/field_import).</li>
+		<li>Place the traits.trt into Field-Book's trait directory (/fieldBook/trait).</li>
+	</ul>
 
-<h2>Uploading data from Field Book</h2>
-	<p>From the  Field Book app click the icon in the top left => select "Settings" => then "Export".<br>
-	  - Under "Format" check the box for "Database"<br>
-	  - Under "Field columns" select "Only unique identifier"<br>
-	  - Under "Traits" select "All traits"<br>
-	  - Then click "OK"</p>
+<h2>Data collection</h2>
+	<ul>
+		<li>Launch the app and in the menu set person and location.</li>
+		<li>Select Fields => Add (plus symbol) => Local => Select your blocks.csv or trees.csv</li>
+			<ul>
+				<li>As Unique identifier select UID</li>
+				<li>As primary and secondary order select either BlockID or TreeID as appropriate to the file and the order in which you would like to collect data from these trees.</li>
+			</ul>
+		<li>Select Traits => List (three dots at top right) => Import/Export => Import ==> Select your block.trt or tree.trt as appropriate</li>
+		<li>Once these are imported you can switch between traits without losing data recorded from these traits.
+		<li>Be careful to select the approp:riate traits before collecting data (blocks vs trees).
+	</ul>
+	<p>	Note that each unique identifier coming from the fields file (blocks.csv or trees.csv) can not be duplicated. If you wish to update your fields file (consolidating multiple files into one using the custom file feature) make sure to upload all collected data to this site (see below) as all data collected against those unique identifiers will be removed from your device. Then you may delete the old fields file and replace it with the new custom version. Alternatively, if you are adding a new block of trees you may simply wish to leave these in a separate fields file.</p>
+
+<h2>Exporting data from Field Book</h2>
+	<p>From the  Field Book app click the icon in the top left => select "Settings" => then "Export".<br></p>
+		<ul>
+			<li>Under "Format" check the box for "Database"</li>
+			<li>Under "Field columns" select "Only unique identifier" <i>(either option will work)</i></li>
+			<li>Under "Traits" select "All traits"<br>
+			<li>Then click "OK"</li>
+		<ul>
 	<img src="static/fieldbook.png">
-
-	<p>Note: <br>
-	  - a maximum of 64 traits may be exported at once. If you need to collect information on more than 64 traits then this may be exported as multiple files by selecting the active traits in Field Book.<br>
-	  - 
+	<p>Depending on your device this may prompt you to share the file, at which point you may save it locally or even email it to yourself.</p><br>
+	<p>To then upload this file to the BreedCAFS database tools visit <a href="/upload"> Upload</a>. Select the submission type <i>(currently only Field Book submissions are supported)</i> then select the file with "Browse..." and click "Upload". You will receive a confirmation of the number of data points registered (and the number already found).</p><br>
+	<p>Note, a maximum of 64 traits may be exported at once. If you need to collect information on more than 64 traits then this may be exported as multiple files by selecting the active traits in Field Book</p><br>
 </div>
 {% endblock %}
