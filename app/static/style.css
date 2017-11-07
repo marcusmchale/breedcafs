@@ -45,6 +45,9 @@ svg {
 					padding: 2%;
 					}	
 .text_body			{
+					display: flex;
+					flex-direction: column;
+					flex: 1;
 					padding: 0.8em; 
 					}
 
@@ -54,7 +57,8 @@ svg {
 .metanav			{ font-size: 0.8em; 
 					padding: 0.3em;}
 .flash				{
-					min-width: 95%; 
+					flex: 0 1 95%;
+					margin: 1%;
 					background: #E1F0B7; 
 					padding: 0.5em; 
 					border: 1px solid #627138; }
