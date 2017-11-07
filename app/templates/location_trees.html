@@ -2,7 +2,7 @@
 {% block body %}
 <div class="text_body">
 	{% from "_formhelpers_location_trees.html" import render_field %}
-	<h2>Register fields</h2>
+	<h2>Register trees</h2>
 		<form action="{{ url_for('location_trees') }}" id="location_trees" method="post">
 			{{ location_form.csrf_token }}
 			{{ render_field (location_form.country) }}
