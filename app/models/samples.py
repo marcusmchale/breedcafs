@@ -123,20 +123,22 @@ class Samples:
 			q = q + ' {uid:$plotID}'
 		q = (q + ')<-[:FROM_PLOT]-(:PlotSamples) '
 			+ ' <-[:FROM_PLOT]-(pts:PlotTissueStorage) '
-			+ ' -[:COLLECTED_AS]->(TiSt:TissueStorage) '
+			+ ' <-[:FROM_PLOT]-(sample),')
+		#collect the Tissue/Storage container
+		q = (q + ' (pts)-[:COLLECTED_AS]->(TiSt:TissueStorage) '
 			+ ' -[:OF_TISSUE]->(tissue:Tissue ')
-		# and tissue 
+		# and if tissue specified filter by tissue
 		if tissue:
 			q = q + ' {name:$tissue}'
-		# and storage
+		# and same for storage
 		q = q + '), (TiSt)-[:STORED_IN]-(storage:Storage '
 		if storage:
 			q = q + ' {name:$storage} '
-		#and find the trees from these samples
+		# find the tree from each samples
 		q = (q + '), (sample)-[:FROM_TREE]->(:TreeSamples) '
 			+ ' -[:FROM_TREE]->(tree:Tree) ')
 		#now parse out ranges of values provided, first from trees if provided a range, then from samples 
-		#not sure if there is an order to processing of where statments..but would be better to do trees first anyway i guess
+		#not sure if there is an order to processing of where statements..but would be better to do trees first anyway i guess
 		if any ([trees_start, trees_end, start_time, end_time, samples_start, samples_end, replicates]):
 			q = q + ' WHERE '
 			if trees_start:

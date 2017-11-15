@@ -62,6 +62,9 @@ def delete_database(tx):
 #	shutil.rmtree("/var/lib/neo4j/data/databases/graph.db/")
 	tx.run('MATCH (n) OPTIONAL MATCH (n)-[r]-() DELETE n,r')
 
+
+
+
 class Create:
 	def __init__ (self, username):
 		self.username=username
@@ -183,6 +186,12 @@ class Create:
 						print ('Created: '+ level + 'Trait ' + trait['name'])
 					else:
 						print ('Error with merger of ' + level +'Trait ' + trait['name'])
+
+#Check the breedcafs user exists in the database:
+with drivers.session() as session:
+	session.write_transaction(database_user)
+
+
 if not confirm('Are you sure you want to proceed? This is should probably only be run when setting up the database'):
 	sys.exit()
 else:

@@ -15,7 +15,6 @@ auth = ('neo4j', passwd)
 driver = GraphDatabase.driver(uri, auth=auth)
 
 
-
 def add_database_user(tx):
 	username = os.environ['NEO4J_USERNAME']
 	password = os.environ['NEO4J_PASSWORD']
