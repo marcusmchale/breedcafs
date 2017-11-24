@@ -69,24 +69,31 @@ $('#submit_tree_traits').remove();
 
 //also load set trait level undefined by defauly and only display level traits when selected
 $('#trait_level').val('0');
-$('#treeTraits').hide();
-$('#blockTraits').hide();
+$('#sample_traits,#tree_traits,#block_traits,#plot_traits').hide();
 
 $('#trait_level').change(function () {
 	$(".flash").remove();
-	if (this.value === 'tree') {
-		$('#treeTraits').show();
-		$('#blockTraits').hide();
-	}
-	if (this.value === 'block') {
-		$('#treeTraits').hide();
-		$('#blockTraits').show();
-	}
 	if (this.value === '') {
-		$('#treeTraits').hide();
-		$('#blockTraits').hide();
+		$('#sample_traits,#tree_traits,#block_traits,#plot_traits').hide();
+	}
+	else if (this.value === 'sample') {
+		$('#tree_traits,#block_traits,#plot_traits').hide();
+		$('#sample_traits').show();
+	}
+	else if (this.value === 'tree') {
+		$('#sample_traits,#block_traits,#plot_traits').hide();
+		$('#tree_traits').show();
+	}
+	else if (this.value === 'block') {
+		$('#sample_traits,#tree_traits,#plot_traits').hide();
+		$('#block_traits').show();
+	}
+	else if (this.value === 'plot') {
+		$('#sample_traits,#tree_traits,#block_traits').hide();
+		$('#plot_traits').show();
 	}
 })
+
 
 $('#data_format').change(function () {
 	$(".flash").remove();
@@ -131,7 +138,7 @@ $('#submit_download').click(function(e) {
 		select_level_message = "This field is required"
 		$('#trait_level').after("<div id='level_flash' class='flash'>" + select_level_message + "</div>")
 	}
-	trait_count = $('#' + sel_level + 'Traits').find('input[type=checkbox]:checked').length - $('#' + sel_level + 'Traits').find('[id^=select_all_]:checked').length;	
+	trait_count = $('#' + sel_level + '_traits').find('input[type=checkbox]:checked').length - $('#' + sel_level + '_traits').find('[id^=select_all_]:checked').length;	
 	if (trait_count === 0) {
 		select_message = "Please select traits to include in traits.trt"
 		flash_select = "<div id='traits_flash' class='flash'>" + select_message + "</div>"

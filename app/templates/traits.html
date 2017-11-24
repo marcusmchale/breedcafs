@@ -3,17 +3,11 @@
 <div class="text_body">
 	{% from "_formhelpers.html" import render_field %}
 	<h2>Create {{ level }} traits file</h2>
-		{% if level == 'tree' %}
-			<form action="{{ url_for('select_traits', level='tree') }}" method="post">
-				{% include "traits_tree_form.html" %}
-			{{ render_field(block_traits_form.email_checkbox) }}
-			</form>
-		{% elif level == 'block' %}
-			<form action="{{ url_for('select_traits', level='block') }}" method="post">
-			{% include "traits_block_form.html" %}
-			{{ render_field(block_traits_form.email_checkbox) }}
-			</form>
-		{% endif %}
+		<form action="{{ url_for('select_traits', level = level) }}" method="	post">
+			{% include 'traits_form.html' %}
+		<input id="submit_traits" type="submit" value="Create">
+		{{ render_field(traits_form.email_checkbox) }}
+		</form>
 </div>
 <script src="{{ url_for('static', filename='jquery_1.8.3_min.js') }}"></script>
 <script src="{{ url_for('static', filename='jquery_traits.js') }}"></script>

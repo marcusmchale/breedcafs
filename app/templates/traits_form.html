@@ -1,0 +1,41 @@
+{% set levels = ['sample','tree','block','plot'] %}
+
+{% if level in levels %}
+	{{ traits_form.csrf_token }}
+	{% for field in traits_form %}
+		{%  if field.type == 'SelectMultipleField' %}
+			{% if field.choices is not none %}
+				<dl>{{ render_field(field) }}</dl>
+			{% endif %}
+		{% endif %}
+	{% endfor %}
+{% endif %}
+
+<!-- render all forms on download page and hide those that aren't selected -->
+
+{% if level == 'all' %}
+	{% for level in levels %}
+		{% if level == 'sample' %}
+			{% set traits_form = sample_traits_form %}
+		{% endif %}
+		{% if level == 'tree' %}
+			{% set traits_form = tree_traits_form %}
+		{% endif %}
+		{% if level == 'block' %}
+			{% set traits_form = block_traits_form %}
+		{% endif %}
+		{% if level == 'plot' %}
+			{% set traits_form = plot_traits_form %}
+		{% endif %}
+		<div id= "{{ level }}_traits">
+			{{ traits_form.csrf_token }}
+			{% for field in traits_form %}
+				{%  if field.type == 'SelectMultipleField' %}
+					{% if field.choices is not none %}
+						<dl>{{ render_field(field) }}</dl>
+					{% endif %}
+				{% endif %}
+			{% endfor %}
+		</div>
+	{% endfor %}
+{% endif %}

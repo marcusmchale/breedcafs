@@ -1,5 +1,4 @@
-import os
-from app import app
+from app import app, os
 from app.cypher import Cypher
 from user import User
 from lists import Lists
@@ -37,8 +36,15 @@ class Download(User):
 		#build query strings - always be careful not to allow injection when doing this!!
 		#all of the input needs to be validated (in this case it is already done by WTForms checking against selectfield options)
 		#but as I am not entirely sure about the security of this layer I am adding another check of the values that are used to concatenate the string
-		TREETRAITS = Lists('TreeTrait').create_list('name')
-		BLOCKTRAITS = Lists('BlockTrait').create_list('name')
+		if level == 'sample':
+			node_label = 'SampleTrait'
+		if level == 'tree':
+			node_label = 'TreeTrait'
+		if level == 'block':
+			node_label = 'BlockTrait'			
+		if level == 'plot':
+			node_label = 'PlotTrait'
+		TRAITS = Lists(node_label).create_list('name')
 		#this section first as not dependent on level but part of query build
 		if country == "" :
 			frc = (' -[:IS_IN]->(farm:Farm) '
@@ -57,7 +63,7 @@ class Download(User):
 				' -[:IS_IN]->(region:Region {name:$region}) '
 				' -[:IS_IN]->(country:Country {name:$country}) ')
 		#then level dependent stuff
-		if level == 'tree' and set(traits).issubset(set(TREETRAITS)):
+		if level == 'tree' and set(traits).issubset(set(TRAITS)):
 			index_fieldnames = [
 				'Country',
 				'Region',
@@ -146,7 +152,7 @@ class Download(User):
 					' ORDER BY plot.uid, tree.id, trait.name, data.timeFB '
 					)
 			#defining these as headers for tree data
-		elif level == 'block' and set(traits).issubset(set(BLOCKTRAITS)):
+		elif level == 'block' and set(traits).issubset(set(TRAITS)):
 			optional_block = ''
 			index_fieldnames = [
 				'Country',
@@ -261,7 +267,7 @@ class Download(User):
 				#[[trait_fieldnames.add(i[0]) for i in record.pop('Traits')] for record in result]
 			#replaced the above with using the fieldnames of traits from the form, this will provide a predictable output from a user perspective )
 			#will also allow me to do all this as a stream once the files get larger - thanks Tony for this advice
-			if set(traits).issubset(set(BLOCKTRAITS)) or set(traits).issubset(set(TREETRAITS)):
+			if set(traits).issubset(set(TRAITS)):
 				trait_fieldnames = traits
 			#now create the csv file from result and fieldnames
 			fieldnames =  index_fieldnames + list(trait_fieldnames)

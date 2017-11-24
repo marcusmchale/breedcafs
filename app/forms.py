@@ -1,4 +1,4 @@
-from wtforms import StringField, PasswordField, BooleanField, SelectField, SelectMultipleField, IntegerField, SubmitField, DateField, DateTimeField, widgets
+from wtforms import StringField, PasswordField, BooleanField, SelectField, SelectMultipleField, IntegerField, SubmitField, DateField, DateTimeField, widgets, FieldList
 from wtforms.validators import InputRequired, Optional, Email, EqualTo, NumberRange, Length, Regexp
 from flask_wtf import FlaskForm
 from flask_wtf.file import FileField, FileRequired
@@ -164,70 +164,6 @@ class CustomTreesForm(FlaskForm):
 		description= "End TreeID")
 	custom_trees_csv = SubmitField('Custom trees.csv')
 
-#Traits
-class CreateBlockTraits(FlaskForm):
-	id = "block_traits_form"
-	email_checkbox = BooleanField('Email checkbox')
-	block_general = SelectMultipleField('general', 
-		option_widget=widgets.CheckboxInput(),
-		widget=widgets.ListWidget(prefix_label=False)
-		)
-	block_agronomic = SelectMultipleField('agronomic',
-		option_widget=widgets.CheckboxInput(),
-		widget=widgets.ListWidget(prefix_label=False)
-		)
-	@staticmethod
-	def update():
-		form = CreateBlockTraits()
-		TRAITS = Lists('BlockTrait').get_nodes()
-		trait_dict = defaultdict(list)
-		for trait in TRAITS:
-			trait_dict[trait['group']].append((trait['name'], trait['details']))
-		form.block_general.choices = sorted(trait_dict['general'], 
-			key=lambda tup: tup[1])
-		form.block_general.default= ['location']
-		form.block_agronomic.choices = sorted(trait_dict['agronomic'], key=lambda tup: tup[1])
-		return form
-
-
-class CreateTreeTraits(FlaskForm):
-	id = "tree_traits_form"
-	email_checkbox = BooleanField('Email checkbox')
-	general = SelectMultipleField('general',
-		option_widget=widgets.CheckboxInput(),
-		widget=widgets.ListWidget(prefix_label=False)
-		)
-	agronomic = SelectMultipleField('agronomic',
-		option_widget=widgets.CheckboxInput(),
-		widget=widgets.ListWidget(prefix_label=False)
-		)	
-	morphological = SelectMultipleField('morphological',
-		option_widget=widgets.CheckboxInput(),
-		widget=widgets.ListWidget(prefix_label=False)
-		)	
-	photosynthetic = SelectMultipleField('photosynthetic',
-		option_widget=widgets.CheckboxInput(),
-		widget=widgets.ListWidget(prefix_label=False)
-		)
-	metabolomic = SelectMultipleField('metabolomic',
-		option_widget=widgets.CheckboxInput(),
-		widget=widgets.ListWidget(prefix_label=False)
-		)	
-	@staticmethod
-	def update():
-		form = CreateTreeTraits()
-		TRAITS = Lists('TreeTrait').get_nodes()
-		trait_dict = defaultdict(list)
-		for trait in TRAITS:
-			trait_dict[trait['group']].append((trait['name'], trait['details']))
-		form.general.choices = sorted(trait_dict['general'], key=lambda tup: tup[1])
-		form.general.default = ['location','variety','hybrid_parent1','hybrid_parent2','date']
-		form.agronomic.choices = sorted(trait_dict['agronomic'], key=lambda tup: tup[1])
-		form.morphological.choices = sorted(trait_dict['morphological'], key=lambda tup: tup[1])
-		form.photosynthetic.choices = sorted(trait_dict['photosynthetic'], key=lambda tup: tup[1])
-		form.metabolomic.choices = sorted(trait_dict['metabolomic'], key=lambda tup: tup[1])
-		return form
-
 #Samples
 class AddTissueForm(FlaskForm):
 	id = "add_tissue_form"
@@ -321,7 +257,7 @@ class UploadForm(FlaskForm):
 #download
 class DownloadForm(FlaskForm):
 	trait_level = SelectField('Trait level', [InputRequired()],
-		choices = [('','Select Level'),('block','Block'), ('tree','Tree')])
+		choices = [('','Select Level'),('sample','Sample'),('tree','Tree'),('block','Block'),('plot','Plot')])
 	date_from = DateField('Date start (YYYY-mm-dd): ',  [Optional()],
 		format='%Y-%m-%d',
 		description = 'Start date')
@@ -331,3 +267,48 @@ class DownloadForm(FlaskForm):
 	data_format = SelectField('Data format', [InputRequired()],
 		choices = [('', 'Select Format'),('db','Database'),('table','Table')])
 	submit_download = SubmitField('Generate file')
+
+#traits
+class CreateTraits(FlaskForm):
+	email_checkbox = BooleanField('Email checkbox')
+	def __init__(self, *args, **kwargs):
+		super(CreateTraits, self).__init__(*args, **kwargs)
+		#the updates are methods so that flask can load while the database is unavailable
+		#list the basic levels of trait
+		levels = ['sample','tree','block','plot']
+		#create an empty nested dictionary (level:group:[traits])
+		self.levels_groups_traits = defaultdict(lambda: defaultdict(list))
+		#fill this dictionary 
+		for level in levels:
+			if level == 'sample':
+				node_label = 'SampleTrait'
+			elif level == 'tree':
+				node_label = 'TreeTrait'
+			elif level == 'block':
+				node_label = 'BlockTrait'
+			elif level == 'plot':
+				node_label = 'PlotTrait'
+			#get a list of dictionaries of properties from each trait node at this level
+			traits = Lists(node_label).get_nodes()
+			#merge this into our nested defaultdict[level] with group as key and list of traits as value
+			for trait in traits:
+				self.levels_groups_traits[level][trait['group']].append((trait['name'], trait['details']))
+			#and create empty attributes for each group
+			for group in self.levels_groups_traits[level]:
+				setattr(CreateTraits, group, SelectMultipleField(group,
+					option_widget = widgets.CheckboxInput(),
+					widget = widgets.ListWidget(prefix_label=False)))
+	def update(self, level):
+		#create a form instance
+		form = CreateTraits(prefix = level)
+		#need to replacce the prefix that FlaskForm generates with nothing for matching to dictionary, generate the string here to match for the replace
+		prefix = level + '-'
+		#give it a relevant ID
+		id = level + "_traits_form"
+		#dynamically add the group choices to the form instance
+		for field in form:
+			#the recursive part here is just to add the prefix to the item to compare against the fieldnames
+			if field.name[len(prefix):] in self.levels_groups_traits[level]:
+				field.choices = self.levels_groups_traits[level][field.name[len(prefix):]]
+		return form
+

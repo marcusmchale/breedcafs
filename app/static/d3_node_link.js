@@ -15,12 +15,20 @@ var load_graph = function() {
 	// load graph (nodes,links) json from /graph endpoint
 	var data = "/json_submissions";
 	d3.json(data, function(error, graph) {
+		console.log(error);
+		console.log(graph);
 		if (error) throw error;
+		else if (graph.hasOwnProperty('status')) {
+			console.log('status report');
+			$("svg").replaceWith("<div class='flash'>" + graph.status + "</div>")
+		}
+		else {
 		update(graph.links, graph.nodes);
+		}
 	})
 }
 
-function update(links, nodes){
+var update = function(links, nodes){
 	link = svg.selectAll(".link")
 	.data(links)
 	.enter()
@@ -61,7 +69,7 @@ function update(links, nodes){
 		.links(links)
 }
 
-function ticked() {
+var ticked = function() {
 	node
 		.attr("transform", function(d) { 
 			return "translate(" 
@@ -77,13 +85,13 @@ function ticked() {
 		.attr("y2", function(d) { return d.target.y; });
 }
 
-function dragstarted(d) {
+var dragstarted = function(d) {
 	if (!d3.event.active) simulation.alphaTarget(0.3).restart()
 	d.fx = d.x;
 	d.fy = d.y;
 }
 
-function dragged(d) {
+var dragged = function(d) {
 	d.fx = d3.event.x;
 	d.fy = d3.event.y;
 }

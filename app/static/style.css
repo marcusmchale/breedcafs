@@ -1,14 +1,13 @@
 @import url("/static/jquery-ui-1.12.1.custom/jquery-ui.css");
-
 body { 
 	background-color: #ffe7d0;
 	}
 h1,h2,h3,a 	{ 
 	text-decoration: none; 
 	color: #6f4e37;
-	font-family: serif}
-h1, h2, {
-	border-bottom: 2px solid #eee;
+	font-family: serif;}
+h2 {
+	border-bottom: 2px solid #6f4e37;
 	padding: 3px; }
 h3	{ 
 	padding: 3px; }

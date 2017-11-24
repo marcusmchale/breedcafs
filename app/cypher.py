@@ -357,6 +357,40 @@ class Cypher():
 		' } '
 		' ORDER BY s.id '
 		)
+	upload_FB_sample = (
+		# load in the csv
+		' LOAD CSV WITH HEADERS FROM $filename as csvLine '
+		# And identify the plots and traits assessed
+		' MATCH (plot:Plot {uid:toInteger(head(split(csvLine.UID, "_")))}), '
+				' (sample:Sample {uid:csvLine.UID}),'
+				' (trait:SampleTrait {name:csvLine.trait}), '
+			' (:User {username : $username}) '
+				' -[:SUBMITTED]->(submissions:Submissions) '
+				' -[:SUBMITTED]->(:DataSub) '
+				' -[:SUBMITTED]->(fb:FieldBook), '
+		# Create per plot per trait node
+		' MERGE (plot)<-[:FROM_PLOT]-(pt:PlotTrait)-[:FOR_TRAIT]->(trait) '
+		# Also per tree per PlotTrait node
+		' MERGE (tree)<-[:FROM_TREE]-(st:SampleSampleTrait)-[:FOR_TRAIT]->(pt)'
+		#Merge the data point linking to SampleTrait node
+		' MERGE (d:Data {tree:csvLine.UID, '
+					' value:csvLine.value, '
+					' timeFB:csvLine.timestamp, '
+					#the below converts the time to epoch (ms) - same as neo4j timestamp() to allow simple math on date/time
+					' time:apoc.date.parse(csvLine.timestamp,"ms","yyyy-MM-dd HH:mm:sszzz"), '
+					' person:csvLine.person, '
+					' location:csvLine.location}) '
+				' -[:DATA_FOR]->(st) '
+			#storing whether found or not for user feedback
+			' ON CREATE SET d.found = false '
+			' ON MATCH SET d.found = true '
+		#track user submissions through successive UserPlotTrait then UserTreeTrait containers
+		' MERGE (fb)-[:SUBMITTED]->(upt:UserPlotTrait)<-[:CONTRIBUTED_BY]-(pt) '
+		' MERGE (upt)-[:SUBMITTED]->(ust:UserSampleTrait)<-[:CONTRIBUTED_BY]-(st) '
+		' MERGE (ust)-[s1:SUBMITTED]->(d) '
+			' ON CREATE SET s1.time = timestamp() '
+		#And give the user feedback on their submission success
+		' RETURN d.found ' )
 	upload_FB_tree = (
 		# load in the csv
 		' LOAD CSV WITH HEADERS FROM $filename as csvLine '

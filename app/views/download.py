@@ -12,8 +12,7 @@ from app.models import (User,
 	Download)
 from app.forms import (DownloadForm,
 	LocationForm, 
-	CreateTreeTraits, 
-	CreateBlockTraits)
+	CreateTraits)
 from app.emails import send_email, send_static_attachment
 from datetime import datetime
 
@@ -26,13 +25,18 @@ def download():
 		try:	
 			location_form = LocationForm().update(optional=True)
 			download_form = DownloadForm()
-			tree_traits_form = CreateTreeTraits().update()
-			block_traits_form = CreateBlockTraits().update()
+			sample_traits_form = CreateTraits().update('sample')
+			tree_traits_form = CreateTraits().update('tree')
+			block_traits_form = CreateTraits().update('block')
+			plot_traits_form = CreateTraits().update('plot')
 			return render_template('download.html', 
 				download_form = download_form,
 				location_form = location_form,
+				sample_traits_form = sample_traits_form,
 				tree_traits_form = tree_traits_form,
 				block_traits_form = block_traits_form,
+				plot_traits_form = plot_traits_form,
+				level = 'all',
 				title='Download')
 		except (ServiceUnavailable):
 			flash("Database unavailable")
@@ -51,10 +55,7 @@ def generate_csv():
 			level = request.form['trait_level']
 			start_date = request.form['date_from']
 			end_date = request.form['date_to']
-			if level == 'tree':
-				traits_form = CreateTreeTraits().update()
-			elif level == 'block':
-				traits_form = CreateBlockTraits().update()
+			traits_form = CreateTraits().update(level)
 			if all([download_form.validate_on_submit(), traits_form.validate_on_submit(), location_form.validate_on_submit()]):
 				country = request.form['country']
 				region = request.form['region']
@@ -63,20 +64,8 @@ def generate_csv():
 				if plotID != "" :
 					plotID = int(plotID)
 				blockUID = request.form['block']
-				#tree traits
-				gen = request.form.getlist('general')
-				agro = request.form.getlist('agronomic')
-				morph = request.form.getlist('morphological')
-				photo = request.form.getlist('photosynthetic')
-				metab = request.form.getlist('metabolomic')
-				#block traits
-				b_gen = request.form.getlist('block_general')
-				b_agro = request.form.getlist('block_agronomic')
-				#concatenate lists of traits
-				if level == 'tree':
-					traits = gen + agro + morph + photo + metab 
-				if level == 'block':
-					traits = b_gen + b_agro
+				#selected traits of current level as flat list
+				traits = [item for sublist in [request.form.getlist(i) for i in request.form if all([ i.startswith(level + '-'), 'csrf_token' not in i])] for item in sublist]
 				#get selected data format
 				data_format = request.form['data_format']
 				#convert the date to epoch time (ms)

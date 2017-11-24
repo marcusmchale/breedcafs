@@ -25,8 +25,7 @@ from app.forms import (LocationForm,
 	SampleRegForm, 
 	AddTissueForm, 
 	AddStorageForm, 
-	CreateTreeTraits, 
-	CreateBlockTraits)
+	CreateTraits)
 from app.emails import send_attachment, send_static_attachment, send_email
 from flask.views import MethodView
 from datetime import datetime
@@ -493,12 +492,10 @@ def select_traits(level):
 		return redirect(url_for('login'))
 	else:
 		try:
-			tree_traits_form = CreateTreeTraits().update()
-			block_traits_form = CreateBlockTraits().update()
+			traits_form = CreateTraits().update(level)
 			return render_template('traits.html', 
 				level = level,
-				tree_traits_form = tree_traits_form,
-				block_traits_form = block_traits_form,
+				traits_form = traits_form,
 				title='Select traits for ' + level + '_traits.trt')
 		except (ServiceUnavailable):
 				flash("Database unavailable")
@@ -511,26 +508,21 @@ def create_trt(level):
 		return redirect(url_for('login'))
 	else:
 		try:
-			if level == 'tree':
-				form = CreateTreeTraits().update()
-				Level = 'Tree'
+			form = CreateTraits().update(level)
+			if level == 'sample':
+				node_label = 'SampleTrait'
+			elif level == 'tree':
+				node_label = 'TreeTrait'
 			elif level == 'block':
-				form = CreateBlockTraits().update()
-				Level = 'Block'
+				node_label = 'BlockTrait'
+			elif level == 'plot':
+				node_label = 'PlotTrait'
 			if form.validate_on_submit():
-				#tree traits
-				gen = request.form.getlist('general')
-				agro = request.form.getlist('agronomic')
-				morph = request.form.getlist('morphological')
-				photo = request.form.getlist('photosynthetic')
-				metab = request.form.getlist('metabolomic')
-				#block traits
-				b_gen = request.form.getlist('block_general')
-				b_agro = request.form.getlist('block_agronomic')
-				#make a list of selected traits
-				selection = gen + agro + morph + photo + metab + b_agro + b_gen
+				#selected traits
+				#just a fancy flattening of the list
+				selection = [item for sublist in [request.form.getlist(i) for i in request.form if i[len(level)+1:] != 'csrf_token'] for item in sublist]
 				#make the trt file and return it's details (filename, file_path, file_size)
-				file_details = Lists(Level + 'Trait').create_trt(session['username'], selection, 'name', level)
+				file_details = Lists(node_label).create_trt(session['username'], selection, 'name', level)
 				#if result = none then no data was found
 				if file_details == None:
 					return jsonify({'submitted' : "No entries found that match your selection"})

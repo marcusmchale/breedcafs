@@ -1,12 +1,12 @@
 This all depends on a working neo4j install. For development we perform setup in a virtual environment. 
-An instance folder containing a config file is required but not available in the github repo. 
-This file contains the following and you can request a (redacted) copy from marcus or build your own:
-	SECRET-KEY 
-	ALLOWED_EMAILS
-	ADMINS
-	UPLOAD-FOLDER
-	DOWNLOAD-FOLDER
-	MAIL-SERVER (and associated values)
+An instance folder is required but not available in the github repo, this should contain:
+	config.py
+		SECRET-KEY 
+		ALLOWED_EMAILS
+		ADMINS
+		UPLOAD-FOLDER
+		DOWNLOAD-FOLDER
+		MAIL-SERVER (and associated values)
 
 SETUP:
 
@@ -96,9 +96,21 @@ Configure apache2:
 		export FLASK_APP=run.py
 		flask run
 
-Setup mail server:
-	On Ubuntu:
-		sudo apt-get update
-		sudo apt-get install postfix
-		...still need to set this up - need domain name.
+
+Redis:
+	This is needed as an in memory data store for asynchronous tasks (like uploading large files)
+	Install:
+		On fedora 25:
+			sudo dnf install redis
+	Run:
+		On fedora 25:
+			sudo systemctl start redis
+
+
+
+Celery: 
+	This is the python worker that schedules asynchronous jobs on the server
+	#run for testing
+		celery -A app.models worker --loglevel info
+
 

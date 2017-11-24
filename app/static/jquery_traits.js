@@ -25,9 +25,9 @@ $('dl').each( function () {
 $('#select_all_general').parent().next().show();
 
 //generate traits.csv
-$('#submit_block_traits,#submit_tree_traits').click( function(e) {
+$('#submit_traits').click( function(e) {
 	e.preventDefault();
-	level = $("form").attr('action').split('/').slice(-2,-1);
+	level = String($("form").attr('action').split('/').slice(-2,-1));
 	$(".flash").remove();
 	wait_message = "Please wait for file to be generated"
 	flash_wait = "<div id='traits_flash' class='flash'>" + wait_message + "</div>"
@@ -45,6 +45,7 @@ $('#submit_block_traits,#submit_tree_traits').click( function(e) {
 		flash_select = "<div id='traits_flash' class='flash'>" + select_message + "</div>"
 		$("#traits_flash").replaceWith(flash_select)
 	} else {
+		console.log($("form").serialize())
 		var submit_traits = $.ajax({
 			url: "/traits/" + level + "/create_trt",
 			data: $("form").serialize(),

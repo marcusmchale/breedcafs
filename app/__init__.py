@@ -1,14 +1,21 @@
 # -*- coding: utf-8 -*-
 
+import os, logging
+from celery import Celery
 from flask import Flask
 
 app = Flask(__name__, instance_relative_config=True)
 app.config.from_object('config')
 app.config.from_pyfile('config.py')
 
-from neo4j.v1 import GraphDatabase, ServiceUnavailable
-from app import views
+#celery for scheduling large uploads
+celery = Celery(app , backend = app.config['CELERY_RESULT_BACKEND'], broker= app.config['CELERY_BROKER_URL'])
 
+
+from neo4j.v1 import GraphDatabase, ServiceUnavailable
+from neo4j.util import watch
+
+from app import views
 
 #these are the variable view rules for retrieving lists
 app.add_url_rule('/location/countries/', 
@@ -38,3 +45,4 @@ app.add_url_rule('/sample_reg/tissues/',
 app.add_url_rule('/sample_reg/storage_methods/', 
 	view_func=views.storage_methods.as_view('storage_methods'), 
 	methods=['GET'])
+

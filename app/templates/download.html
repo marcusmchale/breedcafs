@@ -16,14 +16,9 @@
 				<dt>{{ download_form.date_to(placeholder="To date") }}</dt>
 			<h3>Level</h3>
 				<dt>{{ download_form.trait_level }}</dt> <br>
-				<div id= "blockTraits">
-					<h3>Block traits</h3>
-						{% include "traits_block_form.html" %}
-				</div>
-				<div id= "treeTraits">
-					<h3>Tree traits</h3>
-					{% include "traits_tree_form.html" %}
-				</div>
+<!-- render all the traits forms and hide those that aren't relevant (the fields have prefixes so not name shadowning -->
+			<h3>Traits</h3>
+				{% include 'traits_form.html' %}
 			<dt>{{ download_form.data_format }}</dt> <br>
 			<dt>{{ download_form.submit_download }} {{ render_field(block_traits_form.email_checkbox) }}</dt>
 		</form>
