@@ -245,7 +245,7 @@ class Cypher():
 		' OPTIONAL MATCH (t)-[:IS_IN]->(:BlockTrees)-[:IS_IN]->(b:Block)'
 		' OPTIONAL MATCH (t)'
 			' <-[:FROM_TREE]-(treename:TreeTreeTrait)'
-			' -[:FOR_TRAIT]->(:PlotTrait) '
+			' -[:FOR_TRAIT]->(:PlotTreeTrait) '
 			' -[:FOR_TRAIT]->(:TreeTrait {name:"name"}) '
 		' OPTIONAL MATCH (treename) '
 			' <-[:DATA_FOR]-(d:Data) '
@@ -304,7 +304,7 @@ class Cypher():
 		#get tree name
 		' OPTIONAL MATCH (t)'
 			' <-[:FROM_TREE]-(treename:TreeTreeTrait)'
-			' -[:FOR_TRAIT]->(:PlotTrait) '
+			' -[:FOR_TRAIT]->(:PlotTreeTrait) '
 			' -[:FOR_TRAIT]->(:TreeTrait {name:"name"}) '
 		' OPTIONAL MATCH (treename) '
 			' <-[:DATA_FOR]-(d:Data) '
@@ -369,8 +369,8 @@ class Cypher():
 				' -[:SUBMITTED]->(:DataSub) '
 				' -[:SUBMITTED]->(fb:FieldBook), '
 		# Create per plot per trait node
-		' MERGE (plot)<-[:FROM_PLOT]-(pt:PlotTrait)-[:FOR_TRAIT]->(trait) '
-		# Also per tree per PlotTrait node
+		' MERGE (plot)<-[:FROM_PLOT]-(pt:PlotSampleTrait)-[:FOR_TRAIT]->(trait) '
+		# Also per tree per PlotSampleTrait node
 		' MERGE (tree)<-[:FROM_TREE]-(st:SampleSampleTrait)-[:FOR_TRAIT]->(pt)'
 		#Merge the data point linking to SampleTrait node
 		' MERGE (d:Data {tree:csvLine.UID, '
@@ -405,8 +405,8 @@ class Cypher():
 			' (submissions)-[:SUBMITTED]->(:Items) '
 				' -[:SUBMITTED]->(blocks:Blocks)'
 		# Create per plot per trait node
-		' MERGE (plot)<-[:FROM_PLOT]-(pt:PlotTrait)-[:FOR_TRAIT]->(trait) '
-		# Also per tree per PlotTrait node
+		' MERGE (plot)<-[:FROM_PLOT]-(pt:PlotTreeTrait)-[:FOR_TRAIT]->(trait) '
+		# Also per tree per PlotTreeTrait node
 		' MERGE (tree)<-[:FROM_TREE]-(tt:TreeTreeTrait)-[:FOR_TRAIT]->(pt)'
 		#Merge the data point linking to TreeTrait node
 		' MERGE (d:Data {tree:csvLine.UID, '
@@ -461,8 +461,8 @@ class Cypher():
 				' -[:SUBMITTED]->(:DataSub) '
 				' -[:SUBMITTED]->(fb:FieldBook)'
 		# Crete per plot per trait node
-		' MERGE (plot)<-[:FROM_PLOT]-(pt:PlotTrait)-[:FOR_TRAIT]-(trait) '
-		# Also per block per PlotTrait node
+		' MERGE (plot)<-[:FROM_PLOT]-(pt:PlotBlockTrait)-[:FOR_TRAIT]-(trait) '
+		# Also per block per PlotBlockTrait node
 		' MERGE (block)<-[:FROM_BLOCK]-(bt:BlockBlockTrait)-[:FOR_TRAIT]->(pt)'
 		# Merge the data point linking to the blocktrait node
 		' MERGE (d:Data {block:csvLine.UID, '
@@ -611,7 +611,7 @@ class Cypher():
 		#tree data
 		' MATCH (:User {username:$username})-[:SUBMITTED*..10] '
 		' ->(data:Data)-[:DATA_FOR]->(:TreeTreeTrait) '
-		' -[:FOR_TRAIT]->(pt:PlotTrait) '
+		' -[:FOR_TRAIT]->(pt:PlotTreeTrait) '
 		' -[r:FOR_TRAIT]->(treetrait:TreeTrait) '
 		' MATCH (pt)-[:FROM_PLOT]-(plot:Plot) '
 		' RETURN '
@@ -629,7 +629,7 @@ class Cypher():
 		#block data
 		' MATCH (:User {username:$username})-[:SUBMITTED*..10] '
 		' ->(data:Data)-[:DATA_FOR]->(:BlockBlockTrait) '
-		' -[:FOR_TRAIT]->(pt:PlotTrait) '
+		' -[:FOR_TRAIT]->(pt:PlotBlockTrait) '
 		' -[r:FOR_TRAIT]->(blocktrait:BlockTrait) '
 		' MATCH (pt)-[:FROM_PLOT]-(plot:Plot) '
 		' RETURN '

@@ -77,7 +77,7 @@ class Download(User):
 				' WHERE (trait.name) IN ' + str(traits) +
 				' WITH trait '
 				' MATCH (trait) '
-					' <-[:FOR_TRAIT]-(:PlotTrait) '
+					' <-[:FOR_TRAIT]-(:PlotTreeTrait) '
 					' <-[:FOR_TRAIT]-(tt:TreeTreeTrait), '
 					' (tt)<-[:DATA_FOR]-(data:Data), '
 					' (tt)-[:FROM_TREE]->(tree:Tree)'
@@ -167,7 +167,7 @@ class Download(User):
 				' WHERE (trait.name) IN ' + str(traits) +
 				' WITH trait '
 				' MATCH (trait) '
-					' <-[:FOR_TRAIT]-(:PlotTrait) '
+					' <-[:FOR_TRAIT]-(:PlotBlockTrait) '
 					' <-[:FOR_TRAIT]-(bt:BlockBlockTrait), '
 					' (bt)<-[:DATA_FOR]-(data:Data), ' 
 					' (bt)-[:FROM_BLOCK]->(block:Block ' )

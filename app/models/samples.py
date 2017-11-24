@@ -170,7 +170,7 @@ class Samples:
 		#get tree name
 		q = (q + ' OPTIONAL MATCH (tree)'
 				' <-[:FROM_TREE]-(treename:TreeTreeTrait)'
-				' -[:FOR_TRAIT]->(:PlotTrait) '
+				' -[:FOR_TRAIT]->(:PlotSampleTrait) '
 				' -[:FOR_TRAIT]->(:TreeTrait {name:"name"}) '
 			' OPTIONAL MATCH (treename) '
 				' <-[:DATA_FOR]-(d:Data) ' )
