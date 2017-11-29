@@ -92,48 +92,41 @@ class Fields:
 			farm = self.farm, 
 			plot = self.plot, 
 			username = session['username'])
-	@classmethod #has plotID so doesn't need country
-	def find_block(cls, plotID, block):
-		cls.plotID = plotID
-		cls.block = block
+	@staticmethod #has plotID so doesn't need country
+	def find_block(plotID, block):
 		with get_driver().session() as neo4j_session:
-			return neo4j_session.read_transaction(cls._find_block)
-	@classmethod #has plotID so doesn't need country
-	def _find_block(cls, tx):
+			return neo4j_session.read_transaction(Fields._find_block, plotID, block)
+	@staticmethod #has plotID so doesn't need country
+	def _find_block(tx, plotID, block):
 		for record in tx.run(Cypher.block_find, 
-			plotID = cls.plotID,
-			block = cls.block):
+			plotID = plotID,
+			block = block):
 			return (record['block'])
-	@classmethod #has plotID so doesn't need country
-	def add_block(cls, plotID, block):
-		cls.plotID=plotID
-		cls.block=block
+	@staticmethod #has plotID so doesn't need country
+	def add_block(plotID, block):
 		with get_driver().session() as neo4j_session:
-			neo4j_session.write_transaction(cls._add_block)
-	@classmethod #has plotID so doesn't need country
-	def _add_block (cls, tx):
+			neo4j_session.write_transaction(Fields._add_block, plotID, block)
+	@staticmethod #has plotID so doesn't need country
+	def _add_block (tx, plotID, block):
 		tx.run(Cypher.block_id_lock,
-			plotID = cls.plotID)
+			plotID = plotID)
 		tx.run(Cypher.block_add, 
-			plotID = cls.plotID,
-			block = cls.block,
+			plotID = plotID,
+			block = block,
 			username = session['username'])
-	@classmethod #has plotID so doesn't need country
-	def add_trees(cls, plotID, count, blockUID=None):
-		cls.plotID = plotID
-		cls.count = count
-		cls.blockUID = blockUID
+	@staticmethod #has plotID so doesn't need country
+	def add_trees(plotID, count, blockUID=None):
 		#register trees and return index data
 		with get_driver().session() as neo4j_session:
-			neo4j_session.write_transaction(cls._add_trees)
+			id_list = neo4j_session.write_transaction(Fields._add_trees, plotID, count, blockUID)
 		#create user download path if not found
 		if not os.path.isdir(os.path.join(app.instance_path, app.config['DOWNLOAD_FOLDER'], session['username'])):
 			os.mkdir(os.path.join(app.instance_path, app.config['DOWNLOAD_FOLDER'], session['username']))
 		#prepare variables to write the file
 		fieldnames = ['UID','PlotID','TreeID', 'Block', 'Plot', 'Farm', 'Region', 'Country']
 		time = datetime.now().strftime('%Y%m%d-%H%M%S')
-		first_tree_id = cls.id_list[0]['TreeID']
-		last_tree_id = cls.id_list[-1]['TreeID']
+		first_tree_id = id_list[0]['TreeID']
+		last_tree_id = id_list[-1]['TreeID']
 		filename = time + '_plot_' + str(plotID) + '_T' + str(first_tree_id) + '_to_T' + str(last_tree_id) + '.csv'
 		file_path = os.path.join(app.instance_path, app.config['DOWNLOAD_FOLDER'], session['username'], filename)
 		#make the file
@@ -143,7 +136,7 @@ class Fields:
 				quoting=csv.QUOTE_ALL,
 				extrasaction='ignore')
 			writer.writeheader()
-			for row in cls.id_list:
+			for row in id_list:
 				writer.writerow(row)
 			file_size = file.tell()
 		return { "filename":filename, 
@@ -151,32 +144,28 @@ class Fields:
 			"file_size":file_size, 
 			"first_tree_id":first_tree_id, 
 			"last_tree_id":last_tree_id }
-	@classmethod #has plotID so doesn't need country
-	def _add_trees(cls, tx):
+	@staticmethod #has plotID so doesn't need country
+	def _add_trees(tx, plotID, count, blockUID):
 		tx.run(Cypher.tree_id_lock,
-			plotID = cls.plotID)
-		if cls.blockUID == None:
-			result=tx.run(Cypher.trees_add, 
-				plotID = cls.plotID,
-				count = cls.count,
+			plotID = plotID)
+		if blockUID == None:
+			result = tx.run(Cypher.trees_add, 
+				plotID = plotID,
+				count = count,
 				username = session['username'])
-			cls.id_list = [record[0] for record in result]
 		else:
 			result=tx.run(Cypher.block_trees_add, 
-				plotID = cls.plotID,
-				count = cls.count,
-				blockUID = cls.blockUID,
+				plotID = plotID,
+				count = count,
+				blockUID = blockUID,
 				username = session['username'])
-			cls.id_list = [record[0] for record in result]
-	@classmethod #has plotID so doesn't need country
-	def get_trees(cls, plotID, start, end):
-		cls.plotID = plotID
-		cls.start = start
-		cls.end = end
+		return [record[0] for record in result]
+	@staticmethod #has plotID so doesn't need country
+	def get_trees(plotID, start, end):
 		with get_driver().session() as neo4j_session:
-			neo4j_session.read_transaction(cls._get_trees)
+			id_list = neo4j_session.read_transaction(Fields._get_trees, plotID, start, end)
 		#check if any data found, if not return none
-		if len(cls.id_list) == 0:
+		if len(id_list) == 0:
 			return None
 		#create user download path if not found
 		if not os.path.isdir(os.path.join(app.instance_path, app.config['DOWNLOAD_FOLDER'], session['username'])):
@@ -184,8 +173,8 @@ class Fields:
 		#prepare variables to write file
 		fieldnames = ['UID','PlotID','TreeID', 'TreeName', 'Block', 'Plot', 'Farm', 'Region', 'Country']
 		time = datetime.now().strftime('%Y%m%d-%H%M%S')
-		first_tree_id = cls.id_list[0]['TreeID']
-		last_tree_id = cls.id_list[-1]['TreeID']
+		first_tree_id = id_list[0]['TreeID']
+		last_tree_id = id_list[-1]['TreeID']
 		filename = time + '_plot_' + str(plotID) + '_T' + str(first_tree_id) + '_to_T' + str(last_tree_id) + '.csv'
 		file_path =  os.path.join(app.instance_path, app.config['DOWNLOAD_FOLDER'], session['username'], filename)
 		with open (file_path, 'w') as file:
@@ -194,7 +183,7 @@ class Fields:
 				quoting=csv.QUOTE_ALL,
 				extrasaction='ignore')
 			writer.writeheader()
-			for row in cls.id_list:
+			for row in id_list:
 				writer.writerow(row)
 			file_size = file.tell()
 		return { "filename":filename,
@@ -202,13 +191,13 @@ class Fields:
 			"file_size":file_size,
 			"first_tree_id":first_tree_id,
 			"last_tree_id":last_tree_id }
-	@classmethod #has plotID so doesn't need country
-	def _get_trees(cls, tx):
-		result=tx.run(Cypher.trees_get, 
-			plotID = cls.plotID,
-			start = cls.start,
-			end = cls.end)
-		cls.id_list = [record[0] for record in result]
+	@staticmethod #has plotID so doesn't need country
+	def _get_trees(tx, plotID, start, end):
+		result = tx.run(Cypher.trees_get, 
+			plotID = plotID,
+			start = start,
+			end = end)
+		return [record[0] for record in result]
 	def get_farms(self, region):
 		self.region=region
 		with get_driver().session() as neo4j_session:
@@ -235,31 +224,66 @@ class Fields:
 			country=self.country, 
 			region=self.region, 
 			farm=self.farm)
-	@classmethod #has plotID so doesn't need country
-	def get_blockUIDs(cls, plotID):
-		cls.plotID = plotID
-		with get_driver().session() as neo4j_session:
-			result = neo4j_session.read_transaction(cls._get_blocks)
-			return [(record[0]['uid']) for record in result]
-	@classmethod #has plotID so doesn't need country
-	def get_blocks_tup(cls, plotID):
-		cls.plotID = plotID
-		with get_driver().session() as neo4j_session:
-			result = neo4j_session.read_transaction(cls._get_blocks)
-			return [(record[0]['uid'], record[0]['name']) for record in result]
-	@classmethod #has plotID so doesn't need country
-	def _get_blocks(cls, tx):
-		return tx.run(Cypher.get_blocks,
-			plotID = cls.plotID)
-	@classmethod #has plotID so doesn't need country
-	def make_blocks_csv(cls, username, plotID):
-		cls.plotID = plotID
+	#this may not have country specified so is class method
+	@staticmethod
+	def make_plots_csv(username, query, parameters):
 		#get the block index data (country, region etc.)
 		with get_driver().session() as neo4j_session:
-			result = neo4j_session.read_transaction(cls._get_blocks_csv)
-			cls.id_list = [record[0] for record in result]
+			result = neo4j_session.read_transaction(Fields._get_plots_csv, query, parameters)
+			id_list = [record[0] for record in result]
 		#check if any data found, if not return none
-		if len(cls.id_list) == 0:
+		if len(id_list) == 0:
+			return None
+		#create user download path if not found
+		if not os.path.isdir(os.path.join(app.instance_path, app.config['DOWNLOAD_FOLDER'], username)):
+			os.mkdir(os.path.join(app.instance_path, app.config['DOWNLOAD_FOLDER'], username))
+		#prepare the file
+		fieldnames = ['UID', 'Plot', 'Farm', 'Region', 'Country']
+		time = datetime.now().strftime('%Y%m%d-%H%M%S')
+		if 'farm' in parameters:
+			filename = time + '_' + parameters['farm'] + '_plots.csv'
+		elif 'region' in parameters:
+			filename = time + '_' + parameters['region'] + '_plots.csv'
+		elif 'country' in parameters:
+			filename = time + '_' + parameters['country'] + '_plots.csv'
+		else:
+			filename = time + '_plots.csv'
+		file_path = os.path.join(app.instance_path, app.config['DOWNLOAD_FOLDER'], username, filename)
+		with open (file_path, 'w') as file:
+			writer = csv.DictWriter(file,
+				fieldnames=fieldnames,
+				quoting=csv.QUOTE_ALL,
+				extrasaction='ignore')
+			writer.writeheader()
+			for row in id_list:
+				writer.writerow(row)
+			file_size = file.tell()
+		return {"filename":filename, "file_path":file_path, "file_size":file_size}
+	@staticmethod
+	def _get_plots_csv(tx, query, parameters):
+		return tx.run(query, parameters)
+	@staticmethod #has plotID so doesn't need country
+	def get_blockUIDs(plotID):
+		with get_driver().session() as neo4j_session:
+			result = neo4j_session.read_transaction(Fields._get_blocks, plotID)
+			return [(record[0]['uid']) for record in result]
+	@staticmethod #has plotID so doesn't need country
+	def get_blocks_tup(plotID):
+		with get_driver().session() as neo4j_session:
+			result = neo4j_session.read_transaction(Fields._get_blocks, plotID)
+			return [(record[0]['uid'], record[0]['name']) for record in result]
+	@staticmethod #has plotID so doesn't need country
+	def _get_blocks(tx, plotID):
+		return tx.run(Cypher.get_blocks,
+			plotID = plotID)
+	@staticmethod #has plotID so doesn't need country
+	def make_blocks_csv(username, plotID):
+		#get the block index data (country, region etc.)
+		with get_driver().session() as neo4j_session:
+			result = neo4j_session.read_transaction(Fields._get_blocks_csv, plotID)
+			id_list = [record[0] for record in result]
+		#check if any data found, if not return none
+		if len(id_list) == 0:
 			return None
 		#create user download path if not found
 		if not os.path.isdir(os.path.join(app.instance_path, app.config['DOWNLOAD_FOLDER'], username)):
@@ -275,12 +299,12 @@ class Fields:
 				quoting=csv.QUOTE_ALL,
 				extrasaction='ignore')
 			writer.writeheader()
-			for row in cls.id_list:
+			for row in id_list:
 				writer.writerow(row)
 			file_size = file.tell()
 		return {"filename":filename, "file_path":file_path, "file_size":file_size}
-	@classmethod #has plotID so doesn't need country
-	def _get_blocks_csv(cls, tx):
+	@staticmethod #has plotID so doesn't need country
+	def _get_blocks_csv(tx, plotID):
 		return tx.run(Cypher.get_blocks_csv,
-			plotID = cls.plotID)
+			plotID = plotID)
 		

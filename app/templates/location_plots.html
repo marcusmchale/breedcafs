@@ -2,8 +2,8 @@
 {% block body %}
 <div class="text_body">
 	{% from "_formhelpers_location_fields.html" import render_field %}
-	<h2>Register fields</h2>
-		<form action="{{ url_for('location_fields') }}" id="location_fields" method="post">
+	<h2>Register plots</h2>
+		<form action="{{ url_for('location_plots') }}" id="location_plots" method="post">
 			{{ location_form.csrf_token }}
 			{{ render_field (location_form.country) }}
 			{{ render_field (add_country.text_country) }} 
@@ -17,12 +17,9 @@
 			{{ render_field (location_form.plot) }}
 			{{ render_field (add_plot.text_plot) }} 
 			{{ render_field (add_plot.submit_plot) }}
-			<br><br><a>Add block to the selected plot</a><br><br>
-			{{ render_field (add_block.text_block) }}
-			{{ render_field (add_block.submit_block) }}
 			<br><br><br>
-			{{ render_field (fields_form.generate_blocks_csv) }}
-			{{ render_field (fields_form.email_checkbox) }}
+			{{ render_field (plots_form.generate_plots_csv) }}
+			{{ render_field (plots_form.email_checkbox) }}
 		</form>
 </div>
 {% endblock %}
@@ -36,5 +33,5 @@
 <script src="{{ url_for('static', filename='d3_tree.js') }}"></script>
 <script src="{{ url_for('static', filename='jquery_1.8.3_min.js') }}"></script>
 <script src="{{ url_for('static', filename='jquery_location.js') }}"></script>
-<script src="{{ url_for('static', filename='jquery_fields.js') }}"></script>
+<script src="{{ url_for('static', filename='jquery_plots.js') }}"></script>
 {% endblock %}

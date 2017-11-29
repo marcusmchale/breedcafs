@@ -1,10 +1,17 @@
 {% extends "layout.html" %}	
 {% block body %}
 <div class="text_body">
-	<h2>Fields</h2>
+	<h2>Plots</h2>
 		<dl>
-			<dt><a href="{{ url_for('location_fields') }}">Register fields</a></dt>
-			<dd>Register field locations and export blocks.csv for Field-Book</dd>
+			<dt><a href="{{ url_for('location_plots') }}">Register plots</a></dt>
+			<dd>Register plots and export plots.csv for Field-Book</dd>
+			<dt><a href="{{ url_for('select_traits', level='plot') }}">Select plot traits</a></dt>
+			<dd>Create a custom plot_traits.trt for import to Field-Book</dd>
+		</dl>
+	<h2>Blocks</h2>
+		<dl>
+			<dt><a href="{{ url_for('location_blocks') }}">Register blocks</a></dt>
+			<dd>Register blocks and export blocks.csv for Field-Book</dd>	
 			<dt><a href="{{ url_for('select_traits', level='block') }}">Select block traits</a></dt>
 			<dd>Create a custom block_traits.trt for import to Field-Book</dd>
 		</dl>
@@ -19,6 +26,9 @@
 		<dl>
 			<dt><a href="{{ url_for('sample_reg') }}">Register samples</a></dt>
 			<dd>Register samples and export sample ID's</dd>
+			<dt><a href="{{ url_for('select_traits', level='sample') }}">Select sample traits</a></dt>
+			<dd>Create a custom sample_traits.trt for import to Field-Book</dd>
 		</dl>
+
 </div>
 {% endblock %}

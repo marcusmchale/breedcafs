@@ -68,32 +68,23 @@ def confirm(token):
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
-	try: 
-		form = LoginForm()
-		if form.validate_on_submit():
-			username = form.username.data.lower()
-			password = form.password.data
-	# username 'start' is created when initialiseDB is run, just hiding it here.
-			if username == 'start':
-				flash ('Username not registered')
-				return redirect(url_for('index')) 
-			if not User(username).find(''):
-				flash ('Username not registered')
-				return redirect(url_for('index'))
-			if not User(username).check_confirmed(''):
-				flash ('Please check your email to confirm registration')
-				return redirect(url_for('login'))
-			if not User(username).verify_password(password):
-				flash('Please check your password')
-				return redirect(url_for('login'))
-			else:
-				session['username'] = username
-				flash('Logged in.')
-				return redirect(url_for('index'))
-		return render_template('login.html', form=form, title='Login')
-	except (ServiceUnavailable):
-		flash("Database unavailable")
-		return redirect(url_for('index'))
+#this view handles service unavailable at the model level (in User.login)
+	form = LoginForm()
+	if form.validate_on_submit():
+		username = form.username.data.lower()
+		password = form.password.data
+		ip_address = request.remote_addr
+		#login:
+		login_response = User(username).login(password, ip_address)
+		if 'success' in login_response:
+			session['username'] = username
+			flash('Logged in.')
+			return redirect(url_for('index'))
+		else:
+			flash (login_response['error'])
+			return redirect(url_for('login'))
+	return render_template('login.html', form=form, title='Login')
+
 
 @app.route('/logout', methods=['GET'])
 def logout():

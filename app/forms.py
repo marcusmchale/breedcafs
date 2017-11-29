@@ -1,10 +1,29 @@
-from wtforms import StringField, PasswordField, BooleanField, SelectField, SelectMultipleField, IntegerField, SubmitField, DateField, DateTimeField, widgets, FieldList
+from wtforms import (StringField, 
+	PasswordField, 
+	BooleanField, 
+	SelectField, 
+	SelectMultipleField, 
+	IntegerField, 
+	SubmitField, 
+	DateField, 
+	DateTimeField, 
+	widgets, 
+	FieldList, 
+	ValidationError)
 from wtforms.validators import InputRequired, Optional, Email, EqualTo, NumberRange, Length, Regexp
 from flask_wtf import FlaskForm
 from flask_wtf.file import FileField, FileRequired
 from app import app
 from app.models import Lists, Fields
 from collections import defaultdict
+from safe import check
+
+#custom validators
+def safe_password_check(form, field):
+	if bool(check(field.data)):
+		pass
+	else:
+		raise ValidationError('Please chose a more complex password')
 
 #user 
 class RegistrationForm(FlaskForm):
@@ -23,8 +42,8 @@ class RegistrationForm(FlaskForm):
 		max=100, message='Maximum 100 characters')],
 		filters=[strip_filter],
 		description = "Enter your full name")
-	password = PasswordField('New Password:', [InputRequired(), Length(min=6, max=100,
-		message='Passwords must be at least 6 characters')],
+	password = PasswordField('New Password:', [InputRequired(), Length(min=8, max=100,
+		message='Passwords must be at least 8 characters'), safe_password_check],
 		description = "Please choose a secure password for this site")
 	@staticmethod
 	def update():
@@ -38,9 +57,7 @@ class PasswordResetRequestForm(FlaskForm):
 		max=100, message='Maximum 100 characters')])
 
 class PasswordResetForm(FlaskForm):
-	password = PasswordField('New Password:', [InputRequired(), EqualTo('confirm', 
-		message='Passwords must match'), Length(min=1, max=100, message='Maximum 100 characters')])
-	confirm = PasswordField('Repeat Password:')
+	password = PasswordField('New Password:', [InputRequired(), Length(min=8, max=100, message='Passwords must be at least 8 characters'), safe_password_check])
 
 class LoginForm(FlaskForm):
 	username = StringField('Username:', [InputRequired()])
@@ -76,7 +93,7 @@ class LocationForm(FlaskForm):
 			form.region.validators = [InputRequired()]
 			form.farm.validators = [InputRequired()]
 			form.plot.validators = [InputRequired()]
-		else:
+		elif optional == True:
 			form.country.validators = [Optional()]
 			form.region.validators = [Optional()]
 			form.farm.validators = [Optional()]
@@ -127,7 +144,13 @@ class AddPlot(FlaskForm):
 		description = "Add new plot")
 	submit_plot = SubmitField('+')
 
-#Fields/Plots
+#Plots
+class PlotsForm(FlaskForm): #details of plot
+	id = "plots_csv_form"
+	email_checkbox = BooleanField('Email checkbox')
+	generate_plots_csv = SubmitField('Generate plots.csv')
+
+#Blocks
 class AddBlock(FlaskForm):
 	id = "add_block"
 	strip_filter = lambda x: x.strip() if x else None
@@ -139,8 +162,8 @@ class AddBlock(FlaskForm):
 		description = "Add new block")
 	submit_block = SubmitField('+')
 
-class FieldsForm(FlaskForm): #details of plot
-	id = "plots_csv_form"
+class BlocksForm(FlaskForm): #details of plot
+	id = "blocks_csv_form"
 	email_checkbox = BooleanField('Email checkbox')
 	generate_blocks_csv = SubmitField('Generate blocks.csv')
 

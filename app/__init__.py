@@ -2,15 +2,24 @@
 
 import os, logging
 from celery import Celery
+from redis import StrictRedis
 from flask import Flask
 
 app = Flask(__name__, instance_relative_config=True)
 app.config.from_object('config')
 app.config.from_pyfile('config.py')
 
+#configure logging
+logging.basicConfig(filename='logs/breedcafs.log', 
+	level = logging.DEBUG,
+	format = '%(asctime)s %(levelname)-8s %(message)s',
+	datefmt= '%Y-%m-%d %H:%M:%S')
+
 #celery for scheduling large uploads
 celery = Celery(app , backend = app.config['CELERY_RESULT_BACKEND'], broker= app.config['CELERY_BROKER_URL'])
 
+#and also use redis (not just with celery) for basic local datastore like login attempts and caching
+redis_store = StrictRedis(host= 'localhost', port = 6379, db=0)
 
 from neo4j.v1 import GraphDatabase, ServiceUnavailable
 from neo4j.util import watch

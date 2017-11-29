@@ -114,7 +114,6 @@ class Cypher():
 		' MERGE (id)-[:COUNTED]->(plot) '
 		' SET id._LOCK_ = false' )
 ##ITEM PROCEDURES
-#block procedures
 	#no longer need fill path as have unique plotID
 	get_blocks = ('MATCH (b:Block) '
 			' -[:IS_IN]->(:PlotBlocks) '

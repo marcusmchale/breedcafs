@@ -1,0 +1,32 @@
+{% extends "layout.html" %}	
+{% block body %}
+<div class="text_body">
+	{% from "_formhelpers_location_fields.html" import render_field %}
+	<h2>Register blocks</h2>
+		<form action="{{ url_for('location_blocks') }}" id="location_blocks" method="post">
+			{{ location_form.csrf_token }}
+			{{ render_field (location_form.country) }}
+			{{ render_field (location_form.region) }}
+			{{ render_field (location_form.farm) }}
+			{{ render_field (location_form.plot) }}
+			<br><br><a>Add block to the selected plot</a><br><br>
+			{{ render_field (add_block_form.text_block) }}
+			{{ render_field (add_block_form.submit_block) }}
+			<br><br><br>
+			{{ render_field (blocks_form.generate_blocks_csv) }}
+			{{ render_field (blocks_form.email_checkbox) }}
+		</form>
+</div>
+{% endblock %}
+{% block chart %}
+<div class="chart">
+	<p>Registered plots and counts of trees (click to expand/collapse)</p>
+	<svg width=500 height=500></svg>
+</div>
+<script>jsonData = "/json_plots_treecount";</script>
+<script src="{{ url_for('static', filename='d3.v4.min.js') }}"></script>
+<script src="{{ url_for('static', filename='d3_tree.js') }}"></script>
+<script src="{{ url_for('static', filename='jquery_1.8.3_min.js') }}"></script>
+<script src="{{ url_for('static', filename='jquery_location.js') }}"></script>
+<script src="{{ url_for('static', filename='jquery_blocks.js') }}"></script>
+{% endblock %}

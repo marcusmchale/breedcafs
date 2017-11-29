@@ -65,8 +65,8 @@ def delete_database(tx):
 class Create:
 	def __init__ (self, username):
 		self.username=username
-	@classmethod
-	def constraints(self, tx, constraints):
+	@staticmethod
+	def constraints(tx, constraints):
 		for constraint in constraints:
 			node=constraint['node']
 			prop=constraint['property']

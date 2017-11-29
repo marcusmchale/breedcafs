@@ -17,8 +17,9 @@ from app.forms import (LocationForm,
 	AddRegion, 
 	AddFarm, 
 	AddPlot, 
+	PlotsForm, 
 	AddBlock, 
-	FieldsForm, 
+	BlocksForm, 
 	AddTreesForm, 
 	CustomTreesForm, 
 	CustomSampleForm,
@@ -38,7 +39,8 @@ def create():
 	else:
 		return render_template('create.html', title='Create')
 
-#Locations as tuples for forms
+
+#endpoints to get locations as tuples for forms
 class countries(MethodView):
 	def get(self):
 		if 'username' not in session:
@@ -212,45 +214,66 @@ def add_plot():
 				flash("Database unavailable")
 				return redirect(url_for('index'))
 
-@app.route('/add_block', methods=["POST"])
-def add_block():
+@app.route('/location_plots', methods=['GET', 'POST'])
+def location_plots():
 	if 'username' not in session:
 		flash('Please log in')
 		return redirect(url_for('login'))
 	else:
 		try:
 			location_form = LocationForm().update()
-			add_block_form = AddBlock()
-			if all([location_form.validate_on_submit(), add_block_form.validate_on_submit()]):
-				plotID = int(request.form['plot'])
-				text_block = request.form['text_block']
-				if plotID in ['','None']:
-					return jsonify({"submitted": "Please select a plot to register a new block"})
-				elif Fields.find_block(plotID, text_block):
-					return jsonify({"submitted": "Block already found: " + str(text_block)})
-				else:
-					Fields.add_block(plotID, text_block)
-					return jsonify({"submitted" : "Plot submitted: " + str(text_block)})
-			else:
-				errors = jsonify([location_form.errors, add_block_form.errors])
-				return errors
+			add_country = AddCountry()
+			add_region = AddRegion()
+			add_farm = AddFarm()
+			add_plot = AddPlot()
+			plots_form = PlotsForm()
+			return render_template('location_plots.html', 
+				location_form = location_form,
+				add_country = add_country, 
+				add_region = add_region, 
+				add_farm = add_farm, 
+				add_plot = add_plot,
+				plots_form = plots_form,
+				title = 'Register fields and submit details')
 		except (ServiceUnavailable):
 				flash("Database unavailable")
 				return redirect(url_for('index'))
 
-@app.route('/generate_blocks_csv', methods=["POST"])
-def generate_blocks_csv():
+@app.route('/generate_plots_csv', methods=["POST"])
+def generate_plots_csv():
 	if 'username' not in session:
 		flash('Please log in')
 		return redirect(url_for('login'))
 	else:
 		try:
-			location_form = LocationForm().update()
-			fields_form = FieldsForm()
-			if all([location_form.validate_on_submit(), fields_form.validate_on_submit()]):
-				plotID = int(request.form['plot'])
+			location_form = LocationForm().update(optional = True)
+			plots_form = PlotsForm()
+			if all([location_form.validate_on_submit(), plots_form.validate_on_submit()]):
+				farm = request.form['farm']
+				region = request.form['region']
+				country = request.form['country']
+				parameters = {}
+				query = 'MATCH (p:Plot)-[:IS_IN]->(f:Farm '
+				if farm != '':
+					query = query + '{name: $farm}'
+					parameters['farm'] = farm
+				query = query +  ')-[:IS_IN]-(r:Region '
+				if region != '':
+					query = query + '{name: $region}'
+					parameters['region'] = region
+				query = query + ')-[:IS_IN]->(c:Country'
+				if country != '':
+					query = query + '{name: $country}'
+					parameters['country'] = country
+				query = query + (') RETURN {'
+					' UID : p.uid, '
+					' Plot : p.name, '
+					' Farm : f.name, '
+					' Region : r.name, '
+					' Country : c.name }'
+					' ORDER BY p.uid' )
 				#make the file and return a dictionary with filename, file_path and file_size
-				file_details = Fields.make_blocks_csv(session['username'], plotID)
+				file_details = Fields.make_plots_csv(session['username'], query, parameters)
 				#if result = none then no data was found
 				if file_details == None:
 					return jsonify({'submitted' : "No entries found that match your selection"})
@@ -298,29 +321,108 @@ def generate_blocks_csv():
 				flash("Database unavailable")
 				return redirect(url_for('index'))
 
-@app.route('/location_fields', methods=['GET', 'POST'])
-def location_fields():
+@app.route('/add_block', methods=["POST"])
+def add_block():
 	if 'username' not in session:
 		flash('Please log in')
 		return redirect(url_for('login'))
 	else:
 		try:
 			location_form = LocationForm().update()
-			add_country = AddCountry()
-			add_region = AddRegion()
-			add_farm = AddFarm()
-			add_plot = AddPlot()
-			add_block = AddBlock()
-			fields_form = FieldsForm()
-			return render_template('location_fields.html', 
+			add_block_form = AddBlock()
+			if all([location_form.validate_on_submit(), add_block_form.validate_on_submit()]):
+				plotID = int(request.form['plot'])
+				text_block = request.form['text_block']
+				if plotID in ['','None']:
+					return jsonify({"submitted": "Please select a plot to register a new block"})
+				elif Fields.find_block(plotID, text_block):
+					return jsonify({"submitted": "Block already found: " + str(text_block)})
+				else:
+					Fields.add_block(plotID, text_block)
+					return jsonify({"submitted" : "Plot submitted: " + str(text_block)})
+			else:
+				errors = jsonify([location_form.errors, add_block_form.errors])
+				return errors
+		except (ServiceUnavailable):
+				flash("Database unavailable")
+				return redirect(url_for('index'))
+
+@app.route('/location_blocks', methods=['GET', 'POST'])
+def location_blocks():
+	if 'username' not in session:
+		flash('Please log in')
+		return redirect(url_for('login'))
+	else:
+		try:
+			location_form = LocationForm().update()
+			add_block_form = AddBlock()
+			blocks_form = BlocksForm()
+			return render_template('location_blocks.html', 
 				location_form = location_form,
-				add_country = add_country, 
-				add_region = add_region, 
-				add_farm = add_farm, 
-				add_plot = add_plot,
-				add_block = add_block,
-				fields_form = fields_form,
-				title = 'Register fields and submit details')
+				blocks_form = blocks_form,
+				add_block_form = add_block_form,
+				title = 'Register blocks and create blocks.csv')
+		except (ServiceUnavailable):
+				flash("Database unavailable")
+				return redirect(url_for('index'))
+
+
+@app.route('/generate_blocks_csv', methods=["POST"])
+def generate_blocks_csv():
+	if 'username' not in session:
+		flash('Please log in')
+		return redirect(url_for('login'))
+	else:
+		try:
+			location_form = LocationForm().update()
+			blocks_form = BlocksForm()
+			if all([location_form.validate_on_submit(), blocks_form.validate_on_submit()]):
+				plotID = int(request.form['plot'])
+				#make the file and return a dictionary with filename, file_path and file_size
+				file_details = Fields.make_blocks_csv(session['username'], plotID)
+				#if result = none then no data was found
+				if file_details == None:
+					return jsonify({'submitted' : "No entries found that match your selection"})
+				#create a download url for the file
+				download_url = url_for('download_file', 
+					username = session['username'], 
+					filename=file_details['filename'], 
+					_external = True)
+				#if selected send an email copy of the file (or link to download if greater than ~5mb)
+				if request.form.get('email_checkbox'):
+					recipients=[User(session['username']).find('')['email']]
+					subject = "BreedCAFS: blocks.csv"
+					body = ("You requested a blocks.csv file for blocks in plotID: " + str(plotID)
+						+ " These are described in the attached file (if less than 5mb) that is also available for download at the following address: "
+						+ download_url )
+					html = render_template('emails/generate_blocks.html',
+						plotID=plotID,
+						download_url = download_url)
+					if file_details['file_size'] < 5000000:
+						send_static_attachment(subject, 
+							app.config['ADMINS'][0], 
+							recipients, 
+							body, 
+							html,
+							file_details['filename'],
+							'text/csv',
+							file_details['file_path'])
+						return jsonify({'submitted' : ('Your file is ready for download and a copy has been sent to your email as an attachment:'
+							+ '"<a href="' + download_url + '">' + file_details['filename'] + '</a>"')})
+					else:
+						send_email(subject,
+							app.config['ADMINS'][0],
+							recipients,
+							body,
+							html)
+						return jsonify({'submitted' : 'Your file is ready for download and a link has been sent to your email address:'
+							+ '"<a href="' + download_url + '">' + file_details['filename'] + '</a>"'})
+				#return as jsonify so that can be interpreted the same way as error message
+				else:
+					return jsonify({'submitted' : 'Your file is ready for download: "<a href="' + download_url + '">' + file_details['filename'] + '</a>"'})
+			else:
+				errors = jsonify([location_form.errors, fields_form.errors])
+				return errors
 		except (ServiceUnavailable):
 				flash("Database unavailable")
 				return redirect(url_for('index'))
