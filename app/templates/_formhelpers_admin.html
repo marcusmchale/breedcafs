@@ -1,0 +1,14 @@
+{% macro render_field(field) %}
+	{% if field.type in ['BooleanField'] %}
+		{{ field(placeholder=field.description)|safe }}<a>Email a copy</a><br>
+	{% else %}
+	<h3 id="{{ field.name }}">{{ field.label }}</h3>
+		{% if field.errors %}
+			{% for error in field.errors %}
+				<a>{{ error }}</a>
+			{% endfor %}
+		{% endif %}
+	</dt>
+	<dd>{{ field(**kwargs)|safe }}</dd>
+	{% endif %}
+{% endmacro %}

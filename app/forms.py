@@ -1,3 +1,4 @@
+from flask import jsonify
 from wtforms import (StringField, 
 	PasswordField, 
 	BooleanField, 
@@ -14,7 +15,7 @@ from wtforms.validators import InputRequired, Optional, Email, EqualTo, NumberRa
 from flask_wtf import FlaskForm
 from flask_wtf.file import FileField, FileRequired
 from app import app
-from app.models import Lists, Fields
+from app.models import Lists, Fields, User
 from collections import defaultdict
 from safe import check
 
@@ -51,6 +52,43 @@ class RegistrationForm(FlaskForm):
 		PARTNERS = Lists('Partner').create_list_tup('name', 'fullname')
 		form.partner.choices = sorted(tuple(PARTNERS), key=lambda tup: tup[1])
 		return form
+
+#user administration
+class UserAdminForm(FlaskForm):
+	confirmed_users = SelectMultipleField('Confirmed users',
+		option_widget = widgets.CheckboxInput(), 
+		widget = widgets.TableWidget(with_table_tag=False))
+	unconfirmed_users = SelectMultipleField('Unconfirmed users', 
+		option_widget = widgets.CheckboxInput(), 
+		widget = widgets.TableWidget(with_table_tag=False))
+	@staticmethod
+	def update(user, access):
+		form = UserAdminForm()
+		form.confirmed_users.choices = []
+		form.unconfirmed_users.choices = []
+		#had a problem with the below encoding the value as a string/json -
+		# should address this but needed to implement in jquery side anyway so just using it there 
+		#i.e. (jquery_admin.js populates the list with string values)
+		#
+		#users = [record[0] for record in User.get_users_for_admin(user, access)]
+		#for user in users:
+		#	user_table = "<td>" + user['Name'] + "</td><td>" + user['Partner'] + "</td>"
+		#	if user['Confirmed'] == True:
+		#		form.confirmed_users.choices.append(({"username":user['Username'], "partner":user['Partner']}, user_table))
+		#	elif user['Confirmed'] == False:
+		#		form.unconfirmed_users.choices.append(({"username":user['Username'], "partner":user['Partner']}, user_table))
+		return form
+
+
+class PartnerAdminForm(FlaskForm):
+	partner_admins = SelectMultipleField('Partner admins',
+		option_widget = widgets.CheckboxInput(), 
+		widget = widgets.TableWidget(with_table_tag=False),
+		choices = [])
+	not_partner_admins = SelectMultipleField('Not partner admins',
+		option_widget = widgets.CheckboxInput(), 
+		widget = widgets.TableWidget(with_table_tag=False),
+		choices = [])
 
 class PasswordResetRequestForm(FlaskForm):
 	email = StringField('Email Address:', [InputRequired(), Email(), Length(min=1, 

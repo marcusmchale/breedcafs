@@ -1,9 +1,22 @@
 from app import app, ServiceUnavailable
-from flask import request, session, redirect, url_for, render_template, flash
+from flask import (request, 
+	session, 
+	redirect, 
+	url_for,
+	render_template, 
+	flash, 
+	jsonify,
+	json)
 from itsdangerous import URLSafeTimedSerializer
 from app.models import User
-from app.forms import RegistrationForm, LoginForm, PasswordResetRequestForm, PasswordResetForm
+from app.forms import (RegistrationForm, 
+	UserAdminForm,
+	PartnerAdminForm,
+	LoginForm, 
+	PasswordResetRequestForm, 
+	PasswordResetForm)
 from app.emails import send_email
+from collections import defaultdict
 
 #token generation
 @app.route('/register', methods=['GET','POST'])
@@ -78,6 +91,7 @@ def login():
 		login_response = User(username).login(password, ip_address)
 		if 'success' in login_response:
 			session['username'] = username
+			session['access'] = login_response['access']
 			flash('Logged in.')
 			return redirect(url_for('index'))
 		else:
@@ -89,6 +103,7 @@ def login():
 @app.route('/logout', methods=['GET'])
 def logout():
 	session.pop('username', None)
+	session.pop('access', None)
 	flash('Logged out.')
 	return redirect(url_for('index'))
 
@@ -147,3 +162,174 @@ def confirm_password_reset(token):
 	except (ServiceUnavailable):
 		flash("Database unavailable")
 		return redirect(url_for('index'))
+
+#catchall admin route, redirects for global vs partner admins
+@app.route('/admin', methods=['GET', 'POST'])
+def admin():
+	if 'global_admin' in session['access']:
+		return render_template('admin_choice.html')
+	elif 'partner_admin' in session['access']:
+		return redirect(url_for('user_admin'))
+	else:
+		flash('You attempted to access a restricted page')
+		return redirect(url_for('index'))
+
+#a route for the basic user admin available to partner_admins
+@app.route('/admin/user_admin', methods=['GET', 'POST'])
+def user_admin():
+	try:
+		if 'global_admin' in session['access']:
+			form = UserAdminForm().update(session['username'],'global_admin')
+		elif 'partner_admin' in session['access']:
+			form = UserAdminForm().update(session['username'],'partner_admin')
+		else:
+			return redirect(url_for('index'))
+		return render_template('user_admin.html',
+			form = form)
+	except (ServiceUnavailable):
+		flash("Database unavailable")
+		return redirect(url_for('index'))
+
+#a route for partner admin only available to global admins
+@app.route('/admin/partner_admin', methods=['GET', 'POST'])
+def partner_admin():
+	if 'global_admin' in session['access']:
+		try:
+			form = PartnerAdminForm()
+			return render_template('partner_admin.html', form=form)
+		except (ServiceUnavailable):
+			flash("Database unavailable")
+			return redirect(url_for('index'))
+	else:
+		flash ('You attempted to access a restricted page')
+		return redirect(url_for('index'))
+
+#endpoint to get lists of users in html table format to populate the form on user_admin page
+@app.route('/admin/users', methods = ['GET'])
+def admin_users():
+	if 'username' not in session:
+		flash('Please log in')
+		return redirect(url_for('login'))
+	else:
+		if 'global_admin' in session['access']:
+			users = [record[0] for record in User.get_users_for_admin(session['username'], 'global_admin')]
+		elif 'partner_admin' in session['access']:
+			users = [record[0] for record in User.get_users_for_admin(session['username'], 'partner_admin')]
+		else:
+			flash('User access to this page is restricted to administrators')
+			return redirect(url_for('index'))
+		user_lists = defaultdict(list)
+		for user in enumerate(users):
+			if user[1]['Confirmed'] == True:
+				row = ('<tr><th><label for="confirmed_users-' 
+					+ str(user[0]) + '"></label></th><td>'
+					+ user[1]['Name'] + '</td><td>'
+					+ user[1]['Partner'] + '</td><td><input id="confirmed_users-'
+					+ str(user[0]) + '" name="confirmed_users" value=\'{"username":"' + user[1]['Username'] 
+					+ '", "partner":"' + user[1]["Partner"]
+					+ '"}\' type="checkbox"></td></tr>')
+				user_lists['confirmed'].append(row)
+			if user[1]['Confirmed'] == False:
+				row = ('<tr><th><label for="unconfirmed_users-' 
+					+ str(user[0]) + '"></label></th><td>'
+					+ user[1]['Name'] + '</td><td>'
+					+ user[1]['Partner'] + '</td><td><input id="unconfirmed_users-'
+					+ str(user[0]) + '" name="unconfirmed_users" value=\'{"username":"' 
+					+ user[1]['Username'] 
+					+ '", "partner":"' 
+					+ user[1]["Partner"]
+					+ '"}\' type="checkbox"></td></tr>')
+				user_lists['unconfirmed'].append(row)
+		return jsonify(user_lists)
+
+#endpoint to flip confirm attribute on affiliated relationship for selected users
+@app.route('/admin/confirm_users', methods = ['POST'])
+def confirm_users():
+	if 'username' not in session:
+		flash('Please log in')
+		return redirect(url_for('login'))
+	else:
+		if set(session['access']).intersection(set(['global_admin','partner_admin'])):
+			try:
+				if 'global_admin' in session['access']:
+					form = UserAdminForm().update(session['username'],'global_admin')
+				elif 'partner_admin' in session['access']:
+					form = UserAdminForm().update(session['username'],'partner_admin')
+				#make list of both, the function toggles TRUE/FALSE for confirmed 
+				confirm_list = request.form.getlist('unconfirmed_users') + request.form.getlist('confirmed_users')
+				if confirm_list:
+					for i, item in enumerate(confirm_list):
+						confirm_list[i] = json.loads(item)
+					users = User.admin_confirm_users(session['username'], session['access'], confirm_list)
+					return jsonify({'success':[record[0] for record in users]})
+				else:
+					return jsonify({'error':'No users selected'})
+			except (ServiceUnavailable):
+				flash("Database unavailable")
+				return redirect(url_for('admin'))
+		else:
+			flash('You attempted to access a restricted page')
+			return redirect(url_for('index'))
+
+
+#endpoint to get list of current partner_admins (relationship ADMIN_FOR exists with property confirmed= true)
+@app.route('/admin/partner_admins', methods = ['GET'])
+def admin_partner_admins():
+	if 'username' not in session:
+		flash('Please log in')
+		return redirect(url_for('login'))
+	else:
+		if 'global_admin' in session['access']:
+			users = [record[0] for record in User.admin_get_partner_admins()]
+		else:
+			flash('You attempted to access a restricted page')
+			return redirect(url_for('index'))
+		user_lists = defaultdict(list)
+		for user in enumerate(users):
+			if user[1]['Confirmed'] == True:
+				row = ('<tr><th><label for="partner_admins-' 
+					+ str(user[0]) + '"></label></th><td>'
+					+ user[1]['Name'] + '</td><td>'
+					+ user[1]['Partner'] + '</td><td><input id="partner_admins-'
+					+ str(user[0]) + '" name="partner_admins" value=\'{"username":"' + user[1]['Username'] 
+					+ '", "partner":"' + user[1]["Partner"]
+					+ '"}\' type="checkbox"></td></tr>')
+				user_lists['partner_admins'].append(row)
+			if user[1]['Confirmed'] == False:
+				row = ('<tr><th><label for="not_partner_admins-' 
+					+ str(user[0]) + '"></label></th><td>'
+					+ user[1]['Name'] + '</td><td>'
+					+ user[1]['Partner'] + '</td><td><input id="not_partner_admins-'
+					+ str(user[0]) + '" name="not_partner_admins" value=\'{"username":"' 
+					+ user[1]['Username'] 
+					+ '", "partner":"' 
+					+ user[1]["Partner"]
+					+ '"}\' type="checkbox"></td></tr>')
+				user_lists['not_partner_admins'].append(row)
+		return jsonify(user_lists)
+
+#endpoint to select partner_admins (where relationship ADMIN_FOR exists flip property confirmed = true/false)
+@app.route('/admin/confirm_partner_admins', methods = ['POST'])
+def confirm_partner_admins():
+	if 'username' not in session:
+		flash('Please log in')
+		return redirect(url_for('login'))
+	else:
+		if 'global_admin' in session['access']:
+			try:
+				form = PartnerAdminForm()
+				#make list of both, the function toggles TRUE/FALSE for confirmed 
+				admins = request.form.getlist('partner_admins') + request.form.getlist('not_partner_admins')
+				if admins:
+					for i, item in enumerate(admins):
+						admins[i] = json.loads(item)
+					users = User.admin_confirm_admins(admins)
+					return jsonify({'success':[record[0] for record in users]})
+				else:
+					return jsonify({'error':'No users selected'})
+			except (ServiceUnavailable):
+				flash("Database unavailable")
+				return redirect(url_for('admin'))
+		else:
+			flash('User access to this page is restricted to administrators')
+			return redirect(url_for('index'))

@@ -19,8 +19,9 @@ class Cypher():
 					' email : $email, '
 					' name : $name, '
 					' time : timestamp(), '
+					' access : [user], '
 					' confirmed : false}) '
-				' -[r:AFFILIATED] -> (partner), '
+				' -[r:AFFILIATED {confirmed : false, admin : false}] -> (partner), '
 			' (user)-[:SUBMITTED]->(sub:Submissions), '
 			' (sub)-[:SUBMITTED]->(locations:Locations), '
 				' (locations)-[:SUBMITTED]->(:Countries), '
@@ -35,8 +36,64 @@ class Cypher():
 				'(data)-[:SUBMITTED]->(:FieldBook)'
 			' ')
 	user_del = ( ' MATCH (u:User {email:$email, confirmed: false}) '
-		' OPTIONAL MATCH (u)-[:SUBMITTED*]->(n) '
+		' OPTIONAL MATCH (u)-[:SUBMITTED*..3]->(n) '
 		' DETACH DELETE u,n ' )
+	partner_admin_users = ( 'MATCH (:User {username : $username}) '
+		' -[:AFFILIATED {admin: true}]->(p:Partner)<-[a:AFFILIATED]-(u:User) ' 
+		' RETURN {'
+			' Username : u.username, '
+			' Email : u.email, '
+			' Name : u.name, '
+			' Partner : p.name, '
+			' PartnerFullName : p.fullname, '
+			' Confirmed : a.confirmed '
+			' } ' )
+	global_admin_users = ( 'MATCH (u:User)-[a:AFFILIATED]->(p:Partner) '
+		' RETURN {'
+			' Username : u.username, '
+			' Email : u.email, '
+			' Name : u.name, '
+			' Partner : p.name, '
+			' PartnerFullName : p.fullname, '
+			' Confirmed : a.confirmed '
+			' } ' )
+	#these functions toggle the confirmed status so do both confirm/unconfirm operations
+	partner_confirm_users = ( ' MATCH (user:User {username: $username}) '
+		' -[:AFFILIATED {admin : true}]->(p:Partner) '
+		' WHERE "partner_admin" in user.access'
+		' MATCH (p)<-[a:AFFILIATED]-(u:User) '
+		' UNWIND $confirm_list as confirm '
+		' WITH p,a,u '
+		' WHERE p.name = confirm["partner"] '
+		' AND u.username = confirm["username"]'
+		' SET a.confirmed = NOT a.confirmed '
+		' RETURN u.name'
+		)
+	global_confirm_users = ( 
+		' MATCH (p:Partner)<-[a:AFFILIATED]-(u:User) '
+		' UNWIND $confirm_list as confirm '
+		' WITH p,a,u '
+		' WHERE p.name = confirm["partner"] '
+		' AND u.username = confirm["username"]'
+		' SET a.confirmed = NOT a.confirmed '
+		' RETURN u.name '
+		)
+	partner_admins = ( ' MATCH (u:User)-[a:AFFILIATED]->(p:Partner) '
+		' RETURN {'
+			' Username : u.username, '
+			' Email : u.email, '
+			' Name : u.name, '
+			' Partner : p.name, '
+			' PartnerFullName : p.fullname, '
+			' Confirmed : a.admin '
+			' } ' )
+	confirm_admins = ( ' MATCH (p:Partner)<-[a:AFFILIATED]-(u:User) '
+		' UNWIND $admins as admin '
+		' WITH p,a,u '
+		' WHERE p.name = admin["partner"] '
+		' AND u.username = admin["username"] '
+		' SET a.admin = NOT a.admin '
+		' RETURN u.name ' )
 ##LOCATION PROCEDURES
 #country procedures
 	country_find = ( 'MATCH (country:Country {name : $country}) '
@@ -496,7 +553,8 @@ class Cypher():
 			' C.name, R.name, F.name, P.name, P.uid, T.count ' )
 	get_submissions_range = ( 
 		# gets arguments to filter by time from last SUBMITTED relationship
-		#>=$starttime  <=$endtime
+		# currently not using these though
+		# >=$starttime  <=$endtime
 		#regions
 		' MATCH (:User {username:$username})-[:SUBMITTED*..10] '
 			' ->(region:Region)-[r:IS_IN]->(country:Country) '

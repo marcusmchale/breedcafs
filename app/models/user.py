@@ -1,5 +1,5 @@
 from app import app, logging, celery, redis_store, ServiceUnavailable
-from flask import request
+from flask import request, jsonify
 from app.cypher import Cypher
 from passlib.hash import bcrypt
 from neo4j_driver import get_driver
@@ -43,12 +43,6 @@ class User:
 		user = self.find(email)
 		if user['confirmed'] == True:
 			return True
-	def verify_password(self, password):
-		user = self.find('')
-		if user:
-			return bcrypt.verify(password, user['password'])
-		else:
-			return False
 	#single transaction for login
 	def login(self, password, ip_address):
 		#Need to handle brute force attacks.
@@ -86,7 +80,7 @@ class User:
 			if user:
 				if user['confirmed'] == True:
 					if bcrypt.verify(password, user['password']):
-						return {'success':'Logged in'}			
+						return {'success':'Logged in', 'access':user['access']}			
 					else:
 						#handle bad login attempts here, 
 						redis_store.zadd('bad_logins_user_' + self.username, now, now)
@@ -100,7 +94,6 @@ class User:
 		except (ServiceUnavailable):
 			logging.error('Neo4j database is unavailable')
 			return {'error':'The database is unavailable, please try again later.'}
-		
 #These are classmethods as they don't need a username
 	@staticmethod
 	def confirm_email(email):
@@ -116,3 +109,44 @@ class User:
 	@staticmethod		
 	def _password_reset(tx, email, password):
 		tx.run(Cypher.password_reset, email=email, password=bcrypt.encrypt(password))
+	#this retrieves the list of users the input user is able to administrate
+	@staticmethod
+	def get_users_for_admin(user, access):
+		with get_driver().session() as neo4j_session:
+			return neo4j_session.read_transaction(User._get_users_for_admin, user, access)
+	@staticmethod
+	def _get_users_for_admin(tx, user, access):
+		#if have global admin, retrieves all user accounts
+		if 'global_admin' in access:
+			users = tx.run(Cypher.global_admin_users)
+		#else if have partner_admin retrieves just those users that registered with a partner for which the current user has "admin_for" relationship with
+		elif 'partner_admin' in access:
+			users = tx.run(Cypher.partner_admin_users, user)
+		return users
+	#this confirms/unconfirms lists of users
+	@staticmethod
+	def admin_confirm_users(username, access, confirm_list):
+		with get_driver().session() as neo4j_session:
+			return neo4j_session.write_transaction(User._admin_confirm_users, username, access, confirm_list)
+	@staticmethod
+	def _admin_confirm_users(tx, username, access, confirm_list):
+		if 'global_admin' in access:
+			query = Cypher.global_confirm_users
+		elif 'partner_admin' in access:
+			query = Cypher.partner_confirm_users
+		return tx.run(query, username = username, confirm_list = confirm_list)
+	#the below are global_admin only functions to manage partner_admins
+	@staticmethod
+	def admin_get_partner_admins():
+		with get_driver().session() as neo4j_session:
+			return neo4j_session.read_transaction(User._admin_get_partner_admins)
+	@staticmethod
+	def _admin_get_partner_admins(tx):
+		return tx.run(Cypher.partner_admins)
+	@staticmethod
+	def admin_confirm_admins(admins):
+		with get_driver().session() as neo4j_session:
+			return neo4j_session.write_transaction(User._admin_confirm_admins, admins)
+	@staticmethod
+	def _admin_confirm_admins(tx, admins):
+		return tx.run(Cypher.confirm_admins, admins = admins)

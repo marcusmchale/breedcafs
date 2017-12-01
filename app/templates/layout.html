@@ -25,6 +25,9 @@
 				<a href="{{ url_for('upload') }}"><img src="{{ url_for('static', filename='upload.svg') }}"></a>
 				<a href="{{ url_for('download') }}"><img src="{{ url_for('static', filename='download_espresso.svg') }}"></a>
 				<a href="{{ url_for('help') }}"><img src="{{ url_for('static', filename='help.svg') }}"></a>
+				{% if ('global_admin' in session.access) or ('partner_admin' in session.access) %}
+					<a href="{{ url_for('admin') }}"><img src = "{{ url_for('static', filename='admin.svg') }}"> </a>
+				{% endif %}
 			</div>
 			{% endif %}
 		</div>

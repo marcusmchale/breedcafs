@@ -1,0 +1,22 @@
+{% extends "layout.html" %}	
+{% block body %}
+<div class="text_body">
+	{% from "_formhelpers_admin.html" import render_field %}
+	<h2>User admin</h2>
+		<form action="{{ url_for('user_admin') }}" method="post">
+			{{ form.csrf_token }}
+			<table>
+				<tr><th></th><th>Name</th><th>Institute</th></tr>
+				{{ render_field(form.unconfirmed_users) }}
+			</table>
+			<br><br>
+			<table>
+				<tr><th></th><th>Name</th><th>Institute</th></tr>
+				{{ render_field(form.confirmed_users) }}
+			</table>
+			<input id="admin_submit" type="submit" value="Confirm/Unconfirm selected users">
+		</form>
+</div>
+<script src="{{ url_for('static', filename='jquery_1.8.3_min.js') }}"></script>
+<script src="{{ url_for('static', filename='jquery_user_admin.js') }}"></script>
+{% endblock %}

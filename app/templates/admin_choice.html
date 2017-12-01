@@ -1,0 +1,11 @@
+{% extends "layout.html" %}	
+{% block body %}
+<div class="text_body">
+	{% from "_formhelpers_admin.html" import render_field %}
+	<h2>Global Administration</h2>
+	 <a href={{url_for('user_admin')}}>User admin</a>
+	 <a href={{url_for('partner_admin')}}>Partner admin</a>
+</div>
+<script src="{{ url_for('static', filename='jquery_1.8.3_min.js') }}"></script>
+<script src="{{ url_for('static', filename='jquery_admin.js') }}"></script>
+{% endblock %}
