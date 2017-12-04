@@ -12,8 +12,8 @@ update_admins = function () {
 		//remove table entries
 		$("td").parent().remove();
 		//make the new rows from data
-		$("#partner_admins").next().next("table").find('tr').after(data['partner_admins'])
-		$("#not_partner_admins").next().next("table").find('tr').after(data['not_partner_admins'])
+		$("#admin").find('tr').after(data['partner_admins'])
+		$("#non-admin").find('tr').after(data['not_partner_admins'])
 	})
 }
 
@@ -31,7 +31,6 @@ $('#submit').click( function(e) {
 			if (response.hasOwnProperty('success')) {
 				flash_submitted = "<div id='submit_flash' class='flash'>Updated users: " + response.success + "</div>";
 				$("#submit_flash").replaceWith(flash_submitted);
-				update_admins();
 			}
 			if (response.hasOwnProperty('error')) {
 				flash_submitted = "<div id='submit_flash' class='flash'>" + response.error + "</div>";
@@ -42,4 +41,5 @@ $('#submit').click( function(e) {
 			console.log(error);
 		}
 	});
+	admin_confirm_users.done(update_admins());
 })

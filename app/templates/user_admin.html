@@ -5,17 +5,25 @@
 	<h2>User admin</h2>
 		<form action="{{ url_for('user_admin') }}" method="post">
 			{{ user_admin_form.csrf_token }}
+			<h3>New users</h3>
+			<p>Please only add one email address per user</p>
 			{{ render_field(add_user_email_form.user_email)}}
 			{{ render_field(add_user_email_form.submit_user_email)}}
-			<table>
-				<tr><th></th><th>Name</th><th>Institute</th></tr>
-				{{ render_field(user_admin_form.unconfirmed_users) }}
-			</table>
+			<div id ='unconfirmed'>
+				<table>
+					<tr><th></th><th>Name</th><th>Institute</th></tr>
+					{{ render_field(user_admin_form.unconfirmed_users) }}
+					<p>These users have access to data they submitted</p>
+				</table>
+			</div>
 			<br><br>
-			<table>
-				<tr><th></th><th>Name</th><th>Institute</th></tr>
-				{{ render_field(user_admin_form.confirmed_users) }}
-			</table>
+			<div id = 'confirmed'>
+				<table>
+					<tr><th></th><th>Name</th><th>Institute</th></tr>
+					{{ render_field(user_admin_form.confirmed_users) }}
+					<p>These users have access to data submitted by the institute</p>
+				</table>
+			</div>
 			<input id="admin_submit" type="submit" value="Confirm/Unconfirm selected users">
 		</form>
 </div>

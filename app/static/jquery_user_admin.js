@@ -12,12 +12,12 @@ update_users = function () {
 		//remove table entries
 		$("td").parent().remove();
 		//make the new rows from data
-		$("#unconfirmed_users").next().next("table").find('tr').after(data['unconfirmed'])
-		$("#confirmed_users").next().next("table").find('tr').after(data['confirmed'])
+		$("#confirmed").find('tr').after(data['unconfirmed']);
+		$("#unconfirmed").find('tr').after(data['confirmed']);
 	})
 }
 
-//update_users();
+update_users();
 
 
 $('#submit_user_email').click( function(e) {
@@ -44,9 +44,29 @@ $('#submit_user_email').click( function(e) {
 			console.log(error);
 		}
 	});
+	update_user_allowed_emails()
 })
 
 
+//add a div containing elements from the  user allowed emails list
+update_user_allowed_emails = function () {
+	var user_allowed_emails = $.ajax({
+		type: 'GET',
+		url: "/admin/get_user_allowed_emails",
+	});
+	user_allowed_emails.done(function(data){
+		$("#allowed_email_list").remove();
+		$('#unconfirmed').before("<div id=allowed_email_list><br><br><a>Email addresses you have added <br>(that haven't yet registered):</a><ul id=allowed_email_list></ul></div>");
+		var allowed_emails = [].concat(data).sort();
+		for (var i=0; i < allowed_emails.length; i++) {
+			$("#allowed_email_list").append('<li>' + allowed_emails[i] + '</li>')
+		}			
+	})
+}
+
+update_user_allowed_emails();
+
+//allow user confirmation/ remove access
 $('#admin_submit').click( function(e) {
 	e.preventDefault();
 	remove_flash();
@@ -61,7 +81,6 @@ $('#admin_submit').click( function(e) {
 			if (response.hasOwnProperty('success')) {
 				flash_submitted = "<div id='submit_flash' class='flash'>Updated users: " + response.success + "</div>";
 				$("#submit_flash").replaceWith(flash_submitted);
-				update_users();
 			}
 			if (response.hasOwnProperty('error')) {
 				flash_submitted = "<div id='submit_flash' class='flash'>" + response.error + "</div>";
@@ -72,25 +91,6 @@ $('#admin_submit').click( function(e) {
 			console.log(error);
 		}
 	});
+	admin_confirm_users.done(update_users());
 })
 
-//add a div containing elements from the  user allowed emails list
-
-
-//update blockx (not in location form as different rendering on different pages (list dropbox))
-update_user_allowed_emails = function () {
-	var user_allowed_emails = $.ajax({
-		type: 'GET',
-		url: "/admin/get_user_allowed_emails",
-	});
-	user_allowed_emails.done(function(data){
-		$('form').before("<div id=allowed_email_list><a>Your allowed emails list:</a><ul id=allowed_email_list></ul></div>");
-		$("#allowed_email_list").empty();
-		var allowed_emails = [].concat(data).sort();
-		for (var i=0; i < allowed_emails.length; i++) {
-			$("#allowed_email_list").append('<li>' + allowed_emails[i] + '</li>')
-		}			
-	})
-}
-
-update_user_allowed_emails();

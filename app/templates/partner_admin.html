@@ -5,15 +5,19 @@
 	<h2>Partner admin</h2>
 		<form action="{{ url_for('partner_admin') }}" method="post">
 			{{ form.csrf_token }}
-			<table>
-				<tr><th></th><th>Name</th><th>Institute</th></tr>
-				{{ render_field(form.partner_admins) }}
-			</table>
+			<div id = 'admin'>
+				<table>
+					<tr><th></th><th>Name</th><th>Institute</th></tr>
+					{{ render_field(form.partner_admins) }}
+				</table>
+			</div>
 			<br><br>
-			<table>
-				<tr><th></th><th>Name</th><th>Institute</th></tr>
-				{{ render_field(form.not_partner_admins) }}
-			</table>
+			<div id = 'non-admin'>
+				<table>
+					<tr><th></th><th>Name</th><th>Institute</th></tr>
+					{{ render_field(form.not_partner_admins) }}
+				</table>
+			</div>
 			<input id="submit" type="submit" value="Add/remove partner admin privilege">
 		</form>
 
