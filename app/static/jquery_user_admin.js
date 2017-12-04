@@ -63,6 +63,10 @@ $('#admin_submit').click( function(e) {
 				$("#submit_flash").replaceWith(flash_submitted);
 				update_users();
 			}
+			if (response.hasOwnProperty('error')) {
+				flash_submitted = "<div id='submit_flash' class='flash'>" + response.error + "</div>";
+				$("#submit_flash").replaceWith(flash_submitted);
+			}
 		},
 		error: function (error) {
 			console.log(error);
