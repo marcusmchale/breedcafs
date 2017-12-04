@@ -1,5 +1,13 @@
 class Cypher():
 #user procedures
+	allowed_emails = ( ' MATCH (e:Emails) '
+		' RETURN e.allowed ' )
+	user_allowed_emails = ( ' MATCH (u:User) '
+		' WITH COLLECT (DISTINCT u.email) as registered_emails '
+		' MATCH (:User {username : $username}) '
+		' -[:SUBMITTED]->(:Submissions) '
+		' -[:SUBMITTED]->(e:Emails) '
+		' RETURN FILTER (n in e.allowed WHERE NOT n in registered_emails) as user_allowed' )
 	user_find = ('MATCH (user:User) '
 	' WHERE user.username = $username '
 	' OR user.email = $email '
@@ -19,10 +27,11 @@ class Cypher():
 					' email : $email, '
 					' name : $name, '
 					' time : timestamp(), '
-					' access : [user], '
+					' access : ["user"], '
 					' confirmed : false}) '
 				' -[r:AFFILIATED {confirmed : false, admin : false}] -> (partner), '
 			' (user)-[:SUBMITTED]->(sub:Submissions), '
+			' (sub)-[:SUBMITTED]->(:Emails {allowed :[]}),'
 			' (sub)-[:SUBMITTED]->(locations:Locations), '
 				' (locations)-[:SUBMITTED]->(:Countries), '
 				' (locations)-[:SUBMITTED]->(:Regions), '
@@ -35,6 +44,16 @@ class Cypher():
 			' (sub)-[:SUBMITTED]->(data:DataSub), '
 				'(data)-[:SUBMITTED]->(:FieldBook)'
 			' ')
+	add_allowed_email = ( ' MATCH (all:Emails) '
+		' WITH all.allowed as allowed_emails '
+		' UNWIND allowed_emails as email '
+		' WITH collect(DISTINCT email) as set '
+		' WHERE NOT $email IN set '
+		' MATCH (:User {username : $username}) '
+		' -[:SUBMITTED]->(:Submissions) '
+		' -[:SUBMITTED]->(e:Emails) '
+		' SET e.allowed = e.allowed + [$email] '
+		' RETURN $email ' )
 	user_del = ( ' MATCH (u:User {email:$email, confirmed: false}) '
 		' OPTIONAL MATCH (u)-[:SUBMITTED*..3]->(n) '
 		' DETACH DELETE u,n ' )

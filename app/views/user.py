@@ -12,6 +12,7 @@ from app.models import User
 from app.forms import (RegistrationForm, 
 	UserAdminForm,
 	PartnerAdminForm,
+	AddUserEmail,
 	LoginForm, 
 	PasswordResetRequestForm, 
 	PasswordResetForm)
@@ -29,7 +30,9 @@ def register():
 			email = form.email.data.lower()
 			name = form.name.data
 			partner = form.partner.data
-			if not email in app.config['ALLOWED_EMAILS']:
+			#get list of allowed emails
+			allowed_emails = User.get_allowed_emails()
+			if not email in allowed_emails:
 				flash('This email is not registered with BreedCAFS.')
 				return redirect(url_for('register'))
 			if User(username).find(email):
@@ -110,10 +113,12 @@ def logout():
 @app.route('/password_reset', methods=['GET', 'POST'])
 def password_reset():
 	try:
+		#get list of allowed emails
+		allowed_emails = User.get_allowed_emails()
 		form=PasswordResetRequestForm()
 		if form.validate_on_submit():
 			email = form.email.data.lower()
-			if not email in app.config['ALLOWED_EMAILS']:
+			if not email in allowed_emails:
 				flash('This email is not registered')
 				return redirect(url_for('password_reset'))
 			user = User("").find(email)
@@ -179,23 +184,62 @@ def admin():
 def user_admin():
 	try:
 		if 'global_admin' in session['access']:
-			form = UserAdminForm().update(session['username'],'global_admin')
+			add_user_email_form = AddUserEmail()
+			user_admin_form = UserAdminForm().update(session['username'],'global_admin')
 		elif 'partner_admin' in session['access']:
-			form = UserAdminForm().update(session['username'],'partner_admin')
+			user_admin_form = UserAdminForm().update(session['username'],'partner_admin')
 		else:
+			flash ('You attempted to access a restricted page')
 			return redirect(url_for('index'))
 		return render_template('user_admin.html',
-			form = form)
+			user_admin_form = user_admin_form,
+			add_user_email_form = add_user_email_form)
 	except (ServiceUnavailable):
 		flash("Database unavailable")
 		return redirect(url_for('index'))
+
+#route to add new allowed users, the email is added to the current users own list
+@app.route('/admin/add_allowed_email', methods=['POST'])
+def add_allowed_user():
+	try:
+		if not set(session['access']).intersection(set(['global_admin','partner_admin'])):
+			flash ('You attempted to access a restricted page')
+			return redirect(url_for('index'))
+		else: 
+			add_user_email_form = AddUserEmail()
+			if add_user_email_form.validate_on_submit():
+				username = session['username']
+				email = request.form['user_email'].lower()
+				result = User(username).add_allowed_email(email)
+				if result:
+					return jsonify({'success':result})
+				else:
+					return jsonify({'error':'This email address is already allowed '})
+			else:
+				return jsonify({'error':add_user_email_form.errors["user_email"]})
+	except (ServiceUnavailable):
+		flash ("Database unavailable")
+		return redirect(url_for('index'))
+
+@app.route('/admin/get_user_allowed_emails')
+def get_user_allowed_emails():
+	try: 
+		if not set(session['access']).intersection(set(['global_admin','partner_admin'])):
+			flash ('You attempted to access a restricted page')
+			return redirect(url_for('index'))
+		else: 
+			return User(session['username']).get_user_allowed_emails()
+	except (ServiceUnavailable):
+		flash ("Database unavailable")
+		return redirect(url_for('index'))
+
 
 #a route for partner admin only available to global admins
 @app.route('/admin/partner_admin', methods=['GET', 'POST'])
 def partner_admin():
 	if 'global_admin' in session['access']:
 		try:
-			form = PartnerAdminForm()
+			form = PartnerAdminForm().update()
 			return render_template('partner_admin.html', form=form)
 		except (ServiceUnavailable):
 			flash("Database unavailable")
@@ -256,14 +300,17 @@ def confirm_users():
 				elif 'partner_admin' in session['access']:
 					form = UserAdminForm().update(session['username'],'partner_admin')
 				#make list of both, the function toggles TRUE/FALSE for confirmed 
-				confirm_list = request.form.getlist('unconfirmed_users') + request.form.getlist('confirmed_users')
-				if confirm_list:
-					for i, item in enumerate(confirm_list):
-						confirm_list[i] = json.loads(item)
-					users = User.admin_confirm_users(session['username'], session['access'], confirm_list)
-					return jsonify({'success':[record[0] for record in users]})
+				if form.validate_on_submit():
+					confirm_list = request.form.getlist('unconfirmed_users') + request.form.getlist('confirmed_users')
+					if confirm_list:
+						for i, item in enumerate(confirm_list):
+							confirm_list[i] = json.loads(item)
+						users = User.admin_confirm_users(session['username'], session['access'], confirm_list)
+						return jsonify({'success':[record[0] for record in users]})
+					else:
+						return jsonify({'error':'No users selected'})
 				else:
-					return jsonify({'error':'No users selected'})
+					return jsonify({'error':'Unexpected form values'})
 			except (ServiceUnavailable):
 				flash("Database unavailable")
 				return redirect(url_for('admin'))
@@ -317,16 +364,17 @@ def confirm_partner_admins():
 	else:
 		if 'global_admin' in session['access']:
 			try:
-				form = PartnerAdminForm()
+				form = PartnerAdminForm().update()
 				#make list of both, the function toggles TRUE/FALSE for confirmed 
-				admins = request.form.getlist('partner_admins') + request.form.getlist('not_partner_admins')
-				if admins:
-					for i, item in enumerate(admins):
-						admins[i] = json.loads(item)
-					users = User.admin_confirm_admins(admins)
-					return jsonify({'success':[record[0] for record in users]})
-				else:
-					return jsonify({'error':'No users selected'})
+				if form.validate_on_submit():
+					admins = request.form.getlist('partner_admins') + request.form.getlist('not_partner_admins')
+					if admins:
+						for i, item in enumerate(admins):
+							admins[i] = json.loads(item)
+						users = User.admin_confirm_admins(admins)
+						return jsonify({'success':[record[0] for record in users]})
+					else:
+						return jsonify({'error':'No users selected'})
 			except (ServiceUnavailable):
 				flash("Database unavailable")
 				return redirect(url_for('admin'))

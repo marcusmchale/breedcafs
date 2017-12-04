@@ -1,6 +1,10 @@
 {% macro render_field(field) %}
 	{% if field.type in ['BooleanField'] %}
 		{{ field(placeholder=field.description)|safe }}<a>Email a copy</a><br>
+	{% elif field.type in ['StringField'] %}
+		{{ field(placeholder=field.description)|safe }}
+	{% elif field.type in ['SubmitField'] %}
+		{{ field(**kwargs)|safe }}</dd>
 	{% else %}
 	<h3 id="{{ field.name }}">{{ field.label }}</h3>
 		{% if field.errors %}

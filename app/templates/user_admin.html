@@ -4,15 +4,17 @@
 	{% from "_formhelpers_admin.html" import render_field %}
 	<h2>User admin</h2>
 		<form action="{{ url_for('user_admin') }}" method="post">
-			{{ form.csrf_token }}
+			{{ user_admin_form.csrf_token }}
+			{{ render_field(add_user_email_form.user_email)}}
+			{{ render_field(add_user_email_form.submit_user_email)}}
 			<table>
 				<tr><th></th><th>Name</th><th>Institute</th></tr>
-				{{ render_field(form.unconfirmed_users) }}
+				{{ render_field(user_admin_form.unconfirmed_users) }}
 			</table>
 			<br><br>
 			<table>
 				<tr><th></th><th>Name</th><th>Institute</th></tr>
-				{{ render_field(form.confirmed_users) }}
+				{{ render_field(user_admin_form.confirmed_users) }}
 			</table>
 			<input id="admin_submit" type="submit" value="Confirm/Unconfirm selected users">
 		</form>

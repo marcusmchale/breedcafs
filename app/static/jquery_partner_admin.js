@@ -9,7 +9,6 @@ update_admins = function () {
 		url: "/admin/partner_admins"
 	});
 	request.done(function(data){
-		console.log(data);
 		//remove table entries
 		$("td").parent().remove();
 		//make the new rows from data
@@ -17,8 +16,6 @@ update_admins = function () {
 		$("#not_partner_admins").next().next("table").find('tr').after(data['not_partner_admins'])
 	})
 }
-
-update_admins();
 
 $('#submit').click( function(e) {
 	e.preventDefault();

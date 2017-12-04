@@ -16,6 +16,40 @@ class User:
 	def _find (self, tx):
 		for record in tx.run(Cypher.user_find, username=self.username, email=self.email):
 			return (record['user'])
+	@staticmethod
+	def get_allowed_emails():
+		try:
+			with get_driver().session() as neo4j_session:
+				return set([item for sublist in [i['e.allowed'] for i in neo4j_session.read_transaction(User._get_allowed_emails)] for item in sublist])
+		except (ServiceUnavailable):
+			logging.error('Get allowed emails failed due to service unavailable')
+			return {'error':'The database is unavailable, please try again later.'}
+	@staticmethod
+	def _get_allowed_emails(tx):
+		return tx.run(Cypher.allowed_emails)
+	def get_user_allowed_emails(self):
+		try:
+			with get_driver().session() as neo4j_session:
+				result = neo4j_session.read_transaction(self._get_user_allowed_emails)
+				return jsonify([record[0] for record in result][0])
+		except (ServiceUnavailable):
+			logging.error('Get user allowed email failed due to service unavailable')
+			return {'error':'The database is unavailable, please try again later.'}
+	def _get_user_allowed_emails(self, tx):
+		return tx.run(Cypher.user_allowed_emails, username = self.username)
+	def add_allowed_email(self, email):
+		self.email = email
+		try:
+			with get_driver().session() as neo4j_session:
+				result = neo4j_session.write_transaction(self._add_allowed_email)
+				return [record[0] for record in result]
+		except (ServiceUnavailable):
+			logging.error('Add allowed email failed due to service unavailable')
+			return {'error':'The database is unavailable, please try again later.'}
+	def _add_allowed_email(self, tx):
+		return tx.run(Cypher.add_allowed_email, 
+			username = self.username, 
+			email = self.email)
 	def register(self, password, email, name, partner):
 		self.password=password
 		self.email=email

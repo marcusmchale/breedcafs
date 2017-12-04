@@ -4,6 +4,8 @@
 import sys
 import os
 import csv
+#get the preliminary list of allowed emails from instance/config
+from instance import config
 #import shutil
 from neo4j.v1 import GraphDatabase
 
@@ -13,6 +15,7 @@ auth = (os.environ['NEO4J_USERNAME'], os.environ['NEO4J_PASSWORD'])
 driver = GraphDatabase.driver(uri, auth=auth)
 
 #inputs
+ALLOWED_EMAILS = config.ALLOWED_EMAILS
 
 PARTNERS = ({'OPERATES_IN':['France', 'Vietnam','Cameroon', 'Costa Rica', 'French Guiana', 'El Salvador'], 'BASED_IN':'France', 'name':'CIRAD', 'fullname':'Centre de Coopération Internationale en Recherche Agronomique pour le Développement'},
 {'OPERATES_IN':None, 'BASED_IN':'France', 'name':'Eurofins', 'fullname':'Eurofins Analytics'},
@@ -37,8 +40,10 @@ PARTNERS = ({'OPERATES_IN':['France', 'Vietnam','Cameroon', 'Costa Rica', 'Frenc
 
 CONSTRAINTS = ({'node':'User', 'property':'username', 'constraint':'IS UNIQUE'},
 	{'node':'Partner', 'property':'name', 'constraint':'IS UNIQUE'},
+	{'node':'SampleTrait', 'property':'name', 'constraint':'IS UNIQUE'},
 	{'node':'TreeTrait', 'property':'name', 'constraint':'IS UNIQUE'},
 	{'node':'BlockTrait', 'property':'name', 'constraint':'IS UNIQUE'},
+	{'node':'PlotTrait', 'property':'name', 'constraint':'IS UNIQUE'},
 	{'node':'Plot', 'property':'uid', 'constraint':'IS UNIQUE'},
 	{'node':'Block', 'property':'uid', 'constraint':'IS UNIQUE'},
 	{'node':'Tree', 'property':'uid', 'constraint':'IS UNIQUE'},
@@ -80,10 +85,12 @@ class Create:
 			' MERGE (u)-[:SUBMITTED]->(sub:Submissions) '
 				' -[:SUBMITTED]->(locations:Locations) '
 				' -[:SUBMITTED]->(:Countries) '
-			' MERGE (sub)-[:SUBMITTED]->(:Partners)'
+			' MERGE (sub)-[:SUBMITTED]->(:Partners) '
 			' MERGE (sub)-[:SUBMITTED]->(:Traits) '
+			' MERGE (sub)-[:SUBMITTED]->(:Emails {allowed : $allowed_emails})'
 			' RETURN u.found', 
-			username=username)
+			username=username,
+			allowed_emails = ALLOWED_EMAILS)
 		for record in user_create:
 			if record['u.found'] == 'TRUE' :
 				print ('Found: User ' + username)

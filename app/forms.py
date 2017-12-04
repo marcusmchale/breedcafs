@@ -36,7 +36,7 @@ class RegistrationForm(FlaskForm):
 		filters=[strip_filter],
 		description = "Enter a username")
 	email = StringField('Email Address:', [InputRequired(), Email(), Length(min=1, 
-		max=100, message='Maximum 100 characters')],
+		max=254, message='Maximum 100 characters')],
 		filters = [strip_filter],
 		description = "Enter your email address")
 	name = StringField('Full Name:', [InputRequired(), Length(min=1, 
@@ -53,46 +53,66 @@ class RegistrationForm(FlaskForm):
 		form.partner.choices = sorted(tuple(PARTNERS), key=lambda tup: tup[1])
 		return form
 
+class AddUserEmail(FlaskForm):
+	user_email = StringField('Add user email address:', [InputRequired(), Email(), Length(min=1, 
+		max=254, message='Maximum 100 characters')],
+		description = 'Add new allowed email')
+	submit_user_email = SubmitField('+')
+
 #user administration
 class UserAdminForm(FlaskForm):
-	confirmed_users = SelectMultipleField('Confirmed users',
+	confirmed_users = SelectMultipleField('Confirmed users', 
+		[Optional()],
 		option_widget = widgets.CheckboxInput(), 
 		widget = widgets.TableWidget(with_table_tag=False))
-	unconfirmed_users = SelectMultipleField('Unconfirmed users', 
+	unconfirmed_users = SelectMultipleField('Unconfirmed users',
+		[Optional()],
 		option_widget = widgets.CheckboxInput(), 
 		widget = widgets.TableWidget(with_table_tag=False))
 	@staticmethod
 	def update(user, access):
 		form = UserAdminForm()
 		form.confirmed_users.choices = []
-		form.unconfirmed_users.choices = []
-		#had a problem with the below encoding the value as a string/json -
-		# should address this but needed to implement in jquery side anyway so just using it there 
-		#i.e. (jquery_admin.js populates the list with string values)
-		#
-		#users = [record[0] for record in User.get_users_for_admin(user, access)]
-		#for user in users:
-		#	user_table = "<td>" + user['Name'] + "</td><td>" + user['Partner'] + "</td>"
-		#	if user['Confirmed'] == True:
-		#		form.confirmed_users.choices.append(({"username":user['Username'], "partner":user['Partner']}, user_table))
-		#	elif user['Confirmed'] == False:
-		#		form.unconfirmed_users.choices.append(({"username":user['Username'], "partner":user['Partner']}, user_table))
+		form.unconfirmed_users.choices =[]
+		users = [record[0] for record in User.get_users_for_admin(user, access)]
+		for user in users:
+			user_table = "<td>" + user['Name'] + "</td><td>" + user['Partner'] + "</td>"
+			if user['Confirmed'] == True:
+				form.confirmed_users.choices.append(('{"username":"' + user['Username'] + '", "partner":"' + user['Partner'] + '"}', user_table))
+			elif user['Confirmed'] == False:
+				form.unconfirmed_users.choices.append(('{"username":"' + user['Username'] + '", "partner":"' + user['Partner'] + '"}', user_table))
 		return form
 
 
+#
+##NEED TO ADD CHOICES FOR VALIDATION TO WORK!
 class PartnerAdminForm(FlaskForm):
 	partner_admins = SelectMultipleField('Partner admins',
+		[Optional()],
 		option_widget = widgets.CheckboxInput(), 
-		widget = widgets.TableWidget(with_table_tag=False),
-		choices = [])
+		widget = widgets.TableWidget(with_table_tag=False))
 	not_partner_admins = SelectMultipleField('Not partner admins',
+		[Optional()],
 		option_widget = widgets.CheckboxInput(), 
-		widget = widgets.TableWidget(with_table_tag=False),
-		choices = [])
+		widget = widgets.TableWidget(with_table_tag=False))
+	@staticmethod
+	def update():
+		form = PartnerAdminForm()
+		form.partner_admins.choices = []
+		form.not_partner_admins.choices =[]
+		users = [record[0] for record in User.admin_get_partner_admins()]
+		for user in users:
+			user_table = "<td>" + user['Name'] + "</td><td>" + user['Partner'] + "</td>"
+			if user['Confirmed'] == True:
+				form.partner_admins.choices.append(('{"username":"' + user['Username'] + '", "partner":"' + user['Partner'] + '"}', user_table))
+			elif user['Confirmed'] == False:
+				form.not_partner_admins.choices.append(('{"username":"' + user['Username'] + '", "partner":"' + user['Partner'] + '"}', user_table))
+		return form
+
 
 class PasswordResetRequestForm(FlaskForm):
 	email = StringField('Email Address:', [InputRequired(), Email(), Length(min=1, 
-		max=100, message='Maximum 100 characters')])
+		max=254, message='Maximum 100 characters')])
 
 class PasswordResetForm(FlaskForm):
 	password = PasswordField('New Password:', [InputRequired(), Length(min=8, max=100, message='Passwords must be at least 8 characters'), safe_password_check])
