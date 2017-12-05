@@ -1,0 +1,17 @@
+{% extends "layout.html" %}	
+{% block body %}
+<div class="text_body">
+	<h2>User</h2>
+<!--choosse affiliate -->
+		{% from "_formhelpers_admin.html" import render_field %}
+		<form action="{{ url_for('user') }}" method="post">
+			{{ affiliation_form.csrf_token }}
+			{{ render_field(affiliation_form.affiliations)}}
+			{{ render_field(affiliation_form.partners)}}
+			{{ render_field(affiliation_form.submit_affiliations)}}
+		</form>
+	<p>Affiliations selected here (and listed in current affiliations) are available for confirmation by an administrator at the partner institute. Once confirmed, you will have access to data from that institute, and likewise, data you submit will be available to other confirmed members of that institute. If you mistakenly registered an affiliation you are able to remove it, but only if this affiliation is not already confirmed by the partner.</p>
+</div>
+<script src="{{ url_for('static', filename='jquery_1.8.3_min.js') }}"></script>
+<script src="{{ url_for('static', filename='jquery_user.js') }}"></script>
+{% endblock %}

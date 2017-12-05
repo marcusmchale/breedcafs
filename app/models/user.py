@@ -16,6 +16,30 @@ class User:
 	def _find (self, tx):
 		for record in tx.run(Cypher.user_find, username=self.username, email=self.email):
 			return (record['user'])
+	def get_user_affiliations(self):
+		with get_driver().session() as neo4j_session:
+			confirmed = []
+			pending = []
+			for record in neo4j_session.read_transaction(self._get_user_affiliations):
+				if record['confirmed'] == True:
+					confirmed.append((record['p.name'], record['p.fullname']))
+				elif record['confirmed'] == False:
+					pending.append((record['p.name'], record['p.fullname']))
+			return jsonify({'confirmed':confirmed, 'pending':pending})
+	def _get_user_affiliations(self, tx):
+		return tx.run (Cypher.user_affiliations, username = self.username)
+	def add_affiliations(self, partners):
+		with get_driver().session() as neo4j_session:
+			return [record['p.name'] for record in neo4j_session.write_transaction(self._add_affiliations, partners)]
+	def _add_affiliations(self, tx, partners):
+		return tx.run(Cypher.add_affiliations, 
+			username = self.username, 
+			partners = partners)
+	def remove_affiliations(self, partners):
+		with get_driver().session() as neo4j_session:
+			return [record['p.name'] for record in  neo4j_session.write_transaction(self._remove_affiliations, partners)]
+	def _remove_affiliations(self, tx, partners):
+		return tx.run(Cypher.remove_affiliations, username = self.username, partners = partners)
 	@staticmethod
 	def get_allowed_emails():
 		try:

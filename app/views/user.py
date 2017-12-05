@@ -8,9 +8,10 @@ from flask import (request,
 	jsonify,
 	json)
 from itsdangerous import URLSafeTimedSerializer
-from app.models import User
+from app.models import User, Lists
 from app.forms import (RegistrationForm, 
 	UserAdminForm,
+	AffiliationForm,
 	PartnerAdminForm,
 	AddUserEmail,
 	LoginForm, 
@@ -168,8 +169,55 @@ def confirm_password_reset(token):
 		flash("Database unavailable")
 		return redirect(url_for('index'))
 
+@app.route('/user', methods=['GET', 'POST'])
+def user():
+	if 'username' not in session:
+		flash('Please log in')
+		return redirect(url_for('login'))
+	else:
+		affiliation_form = AffiliationForm().update(session['username'])
+		return render_template('user.html', 
+			affiliation_form = affiliation_form)
+
+@app.route('/user/get_affiliations', methods=['GET'])
+def get_affiliations():
+	if 'username' not in session:
+		flash('Please log in')
+		return redirect(url_for('login'))
+	else:
+		affiliations = User(session['username']).get_user_affiliations()
+		confirmed = set(affiliations['confirmed'])
+		pending = set(affiliations['pending'])
+		other = set(Lists('Partner').create_list_tup('name', 'fullname')) - confirmed - pending
+		return jsonify({'confirmed':sorted(tuple(confirmed), key=lambda tup: tup[1]),
+			'pending':sorted(tuple(pending), key=lambda tup: tup[1]),
+			'other':sorted(tuple(other), key=lambda tup: tup[1])})
+
+@app.route('/user/add_affiliations', methods=['POST'])
+def add_affiliations():
+	if 'username' not in session:
+		flash('Please log in')
+		return redirect(url_for('login'))
+	else:
+		affiliation_form = AffiliationForm().update(session['username'])
+		if affiliation_form.validate_on_submit():
+			to_remove = request.form.getlist('affiliations')
+			if to_remove:
+				remove_result = User(session['username']).remove_affiliations(to_remove)
+			else:
+				remove_result = []
+			to_add = request.form.getlist('partners')
+			if to_add:
+				add_result = User(session['username']).add_affiliations(to_add)
+			else:
+				add_result = []
+			return jsonify({'success':'Updated affiliations',
+				'remove_result':remove_result,
+				'add_result':add_result
+				})
+
 #catchall admin route, redirects for global vs partner admins
-@app.route('/admin', methods=['GET', 'POST'])
+@app.route('/admin', methods=['GET'])
 def admin():
 	if 'global_admin' in session['access']:
 		return render_template('admin_choice.html')

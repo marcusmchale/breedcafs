@@ -12,12 +12,10 @@ update_users = function () {
 		//remove table entries
 		$("td").parent().remove();
 		//make the new rows from data
-		$("#confirmed").find('tr').after(data['unconfirmed']);
-		$("#unconfirmed").find('tr').after(data['confirmed']);
+		$("#confirmed").find('tr').after(data['confirmed']);
+		$("#unconfirmed").find('tr').after(data['unconfirmed']);
 	})
 }
-
-update_users();
 
 
 $('#submit_user_email').click( function(e) {
@@ -27,7 +25,7 @@ $('#submit_user_email').click( function(e) {
 	flash_wait = "<div id='submit_flash' class='flash'>" + wait_message + "</div>";
 	$(this).after(flash_wait)
 	var admin_add_user_email = $.ajax({
-		url: "/admin/add_allowed_email",
+		url: "/admin/add_affiliations",
 		data: $("form").serialize(),
 		type: 'POST',
 		success: function(response) {

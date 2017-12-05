@@ -3,7 +3,7 @@
 <div class="text_body">
 	{% from "_formhelpers.html" import render_field %}
 	<h2>Create {{ level }} traits file</h2>
-		<form action="{{ url_for('select_traits', level = level) }}" method="	post">
+		<form action="{{ url_for('select_traits', level = level) }}" method="post">
 			{% include 'traits_form.html' %}
 		<input id="submit_traits" type="submit" value="Create">
 		{{ render_field(traits_form.email_checkbox) }}

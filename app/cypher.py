@@ -12,6 +12,25 @@ class Cypher():
 	' WHERE user.username = $username '
 	' OR user.email = $email '
 	' RETURN user ')
+	user_affiliations = (' MATCH (u:User {username : $username}) '
+		' -[a:AFFILIATED]->(p:Partner) '
+		' RETURN p.name, p.fullname, a.confirmed ')
+	add_affiliations = ( ' UNWIND $partners as partner '
+		' MATCH (u:User {username : $username}) '
+		' MATCH (p:Partner {name : partner}) '
+		' MERGE (u)-[a:AFFILIATED { '
+			' admin : false, '
+			' confirm_timestamp : [], '
+			' confirmed : false '
+		' }]->(p) '
+		' ON CREATE SET a.add_timestamp = timestamp() '
+		' RETURN p.name ')
+	remove_affiliations = (	' UNWIND $partners as partner '
+		' MATCH (u:User {username: $username}) '
+		' -[a:AFFILIATED]->(p:Partner {name:partner}) '
+		' WHERE size(a.confirm_timestamp) = 0 '
+		' DELETE a '
+		' RETURN p.name ')
 	username_find = ('MATCH (user:User {username : $username}) '
 		' RETURN user ')
 	email_find = ('MATCH (user:User {email : $email} '
@@ -29,7 +48,11 @@ class Cypher():
 					' time : timestamp(), '
 					' access : ["user"], '
 					' confirmed : false}) '
-				' -[r:AFFILIATED {confirmed : false, admin : false}] -> (partner), '
+				' -[r:AFFILIATED { '
+					' confirmed : false, '
+					' confirm_timestamp = [], '
+					' admin : false '
+				'}] -> (partner), '
 			' (user)-[:SUBMITTED]->(sub:Submissions), '
 			' (sub)-[:SUBMITTED]->(:Emails {allowed :[]}),'
 			' (sub)-[:SUBMITTED]->(locations:Locations), '
@@ -86,6 +109,7 @@ class Cypher():
 		' WHERE p.name = confirm["partner"] '
 		' AND u.username = confirm["username"]'
 		' SET a.confirmed = NOT a.confirmed '
+		' SET a.confirm_timestamp = a.confirm_timestamp + timestamp() '
 		' RETURN u.name'
 		)
 	global_confirm_users = ( 
@@ -95,6 +119,7 @@ class Cypher():
 		' WHERE p.name = confirm["partner"] '
 		' AND u.username = confirm["username"]'
 		' SET a.confirmed = NOT a.confirmed '
+		' SET a.confirm_timestamp = a.confirm_timestamp + timestamp() '
 		' RETURN u.name '
 		)
 	partner_admins = ( ' MATCH (u:User)-[a:AFFILIATED]->(p:Partner) '

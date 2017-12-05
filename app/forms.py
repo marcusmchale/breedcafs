@@ -53,6 +53,33 @@ class RegistrationForm(FlaskForm):
 		form.partner.choices = sorted(tuple(PARTNERS), key=lambda tup: tup[1])
 		return form
 
+#allow unconfirmed affiliations to be removed, but not once confirmed
+class AffiliationForm(FlaskForm):
+	confirmed = SelectMultipleField('Current affiliations',
+		[Optional()],
+		option_widget = widgets.CheckboxInput(), 
+		widget = widgets.ListWidget(prefix_label=False))
+	pending = SelectMultipleField('Pending confirmation',
+		[Optional()],
+		option_widget = widgets.CheckboxInput(), 
+		widget = widgets.ListWidget(prefix_label=False))
+	other = SelectMultipleField('Other partners',
+		[Optional()],
+		option_widget = widgets.CheckboxInput(), 
+		widget = widgets.ListWidget(prefix_label=False))
+	submit_affiliations = SubmitField('Add/remove affiliations')
+	@staticmethod
+	def update(username):
+		form = AffiliationForm()
+		affiliations = User(username).get_user_affiliations()
+		confirmed = set(affiliations['confirmed'])
+		pending = set(affiliations['pending'])
+		other = set(Lists('Partner').create_list_tup('name', 'fullname')) - confirmed - pending
+		form.confirmed.choices = sorted(tuple(confirmed), key=lambda tup: tup[1])
+		form.pending.choices = sorted(tuple(pending), key=lambda tup: tup[1]),
+		form.other.choices = sorted(tuple(other), key=lambda tup: tup[1]),
+		return form
+
 class AddUserEmail(FlaskForm):
 	user_email = StringField('Add user email address:', [InputRequired(), Email(), Length(min=1, 
 		max=254, message='Maximum 100 characters')],
@@ -83,9 +110,6 @@ class UserAdminForm(FlaskForm):
 				form.unconfirmed_users.choices.append(('{"username":"' + user['Username'] + '", "partner":"' + user['Partner'] + '"}', user_table))
 		return form
 
-
-#
-##NEED TO ADD CHOICES FOR VALIDATION TO WORK!
 class PartnerAdminForm(FlaskForm):
 	partner_admins = SelectMultipleField('Partner admins',
 		[Optional()],
@@ -108,7 +132,6 @@ class PartnerAdminForm(FlaskForm):
 			elif user['Confirmed'] == False:
 				form.not_partner_admins.choices.append(('{"username":"' + user['Username'] + '", "partner":"' + user['Partner'] + '"}', user_table))
 		return form
-
 
 class PasswordResetRequestForm(FlaskForm):
 	email = StringField('Email Address:', [InputRequired(), Email(), Length(min=1, 
