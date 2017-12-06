@@ -55,10 +55,6 @@ class RegistrationForm(FlaskForm):
 
 #allow unconfirmed affiliations to be removed, but not once confirmed
 class AffiliationForm(FlaskForm):
-	confirmed = SelectMultipleField('Current affiliations',
-		[Optional()],
-		option_widget = widgets.CheckboxInput(), 
-		widget = widgets.ListWidget(prefix_label=False))
 	pending = SelectMultipleField('Pending confirmation',
 		[Optional()],
 		option_widget = widgets.CheckboxInput(), 
@@ -75,9 +71,8 @@ class AffiliationForm(FlaskForm):
 		confirmed = set(affiliations['confirmed'])
 		pending = set(affiliations['pending'])
 		other = set(Lists('Partner').create_list_tup('name', 'fullname')) - confirmed - pending
-		form.confirmed.choices = sorted(tuple(confirmed), key=lambda tup: tup[1])
-		form.pending.choices = sorted(tuple(pending), key=lambda tup: tup[1]),
-		form.other.choices = sorted(tuple(other), key=lambda tup: tup[1]),
+		form.pending.choices = sorted(tuple(pending), key=lambda tup: tup[1])
+		form.other.choices = sorted(tuple(other), key=lambda tup: tup[1])
 		return form
 
 class AddUserEmail(FlaskForm):

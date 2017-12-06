@@ -71,15 +71,18 @@ def upload_submit():
 					sample_file.seek(0)
 					sample_dict.next() #skip the header row
 					uid = sample_dict.next()['UID']
-					lvl = uid[uid.index("_") +1]
-					if lvl == "S":
-						level = "sample"
-					elif lvl == "T":
-						level = "tree"
-					elif lvl == "B":
-						level = "block"
-					else: 
-						return jsonify({"submitted": "This file is not a regular BreedCAFS FieldBook database file"})
+					if uid.isdigit():
+						level = "plot"
+					else:
+						lvl = uid[uid.index("_") +1]
+						if lvl == "S":
+							level = "sample"
+						elif lvl == "T":
+							level = "tree"
+						elif lvl == "B":
+							level = "block"
+						else: 
+							return jsonify({"submitted": "This file is not a regular BreedCAFS FieldBook database file"})
 				#as an asynchonous function with celery, result will be stored in redis and accessible from the status/task_id endpoint
 				task = async_submit.apply_async(args=[username, filename, subtype, level])
 				return jsonify({'submitted': ('File has been uploaded and will be merged into the database. '

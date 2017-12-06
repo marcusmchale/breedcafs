@@ -201,12 +201,12 @@ def add_affiliations():
 	else:
 		affiliation_form = AffiliationForm().update(session['username'])
 		if affiliation_form.validate_on_submit():
-			to_remove = request.form.getlist('affiliations')
+			to_remove = request.form.getlist('pending')
 			if to_remove:
 				remove_result = User(session['username']).remove_affiliations(to_remove)
 			else:
 				remove_result = []
-			to_add = request.form.getlist('partners')
+			to_add = request.form.getlist('other')
 			if to_add:
 				add_result = User(session['username']).add_affiliations(to_add)
 			else:

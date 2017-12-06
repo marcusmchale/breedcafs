@@ -15,8 +15,6 @@ var load_graph = function() {
 	// load graph (nodes,links) json from /graph endpoint
 	var data = "/json_submissions";
 	d3.json(data, function(error, graph) {
-		console.log(error);
-		console.log(graph);
 		if (error) throw error;
 		else if (graph.hasOwnProperty('status')) {
 			console.log('status report');

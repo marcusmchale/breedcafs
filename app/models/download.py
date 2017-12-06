@@ -45,6 +45,15 @@ class Download(User):
 		if level == 'plot':
 			node_label = 'PlotTrait'
 		TRAITS = Lists(node_label).create_list('name')
+		#First I limit the data nodes to those submitted by members of an affiliated institute
+		user_data_query = (' MATCH (:User {username: $username}) '
+			' -[:AFFILIATED {confirmed :true}] '
+			' ->(p:Partner) '
+			' WITH p '			
+			' MATCH (p)<-[:AFFILIATED {data_shared :true}] '
+			' -(u:User) '
+			' -[:SUBMITTED*..6]->(data:Data) '
+			' WITH data' )
 		#this section first as not dependent on level but part of query build
 		if country == "" :
 			frc = (' -[:IS_IN]->(farm:Farm) '
@@ -75,11 +84,11 @@ class Download(User):
 				'UID']
 			td = ( ' MATCH (trait:TreeTrait) '
 				' WHERE (trait.name) IN ' + str(traits) +
-				' WITH trait '
+				' WITH data, trait '
 				' MATCH (trait) '
 					' <-[:FOR_TRAIT]-(:PlotTreeTrait) '
 					' <-[:FOR_TRAIT]-(tt:TreeTreeTrait), '
-					' (tt)<-[:DATA_FOR]-(data:Data), '
+					' (tt)<-[:DATA_FOR]-(data), '
 					' (tt)-[:FROM_TREE]->(tree:Tree)'
 					 )
 			#if no plot selected
@@ -165,11 +174,11 @@ class Download(User):
 				'UID']
 			td = ( ' MATCH (trait:BlockTrait) '
 				' WHERE (trait.name) IN ' + str(traits) +
-				' WITH trait '
+				' WITH data, trait '
 				' MATCH (trait) '
 					' <-[:FOR_TRAIT]-(:PlotBlockTrait) '
 					' <-[:FOR_TRAIT]-(bt:BlockBlockTrait), '
-					' (bt)<-[:DATA_FOR]-(data:Data), ' 
+					' (bt)<-[:DATA_FOR]-(data), ' 
 					' (bt)-[:FROM_BLOCK]->(block:Block ' )
 			if blockUID != "" :
 				tdp = td + ( ' {uid:$blockUID}) '
@@ -239,9 +248,9 @@ class Download(User):
 		else:
 			time_condition = ''
 		#finalise query, get data 
-		self.query = query + time_condition + optional_block + response
+		query = user_data_query + query + time_condition + optional_block + response
 		with get_driver().session() as neo4j_session:
-			result = neo4j_session.read_transaction(self._get_csv)
+			result = neo4j_session.read_transaction(self._get_csv, query)
 		#check if any data found, if not return none
 		if len(result) == 0:
 			return None
@@ -293,9 +302,10 @@ class Download(User):
 		return { "filename":filename,
 			"file_path":file_path,
 			"file_size":file_size }
-	def _get_csv(self, tx):
+	def _get_csv(self, tx, query):
 		#perform transaction and return the simplified result (remove all the transaction metadata and just keep the result map)
-		return [record[0] for record in tx.run(self.query,
+		return [record[0] for record in tx.run(query,
+			username = self.username,
 			country = self.country,
 			region = self.region,
 			farm = self.farm,

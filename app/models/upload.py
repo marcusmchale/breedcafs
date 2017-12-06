@@ -42,6 +42,8 @@ def _submit(tx, username, filename, submission_type, level):
 					query = Cypher.upload_FB_tree
 				elif level == 'block':
 					query = Cypher.upload_FB_block
+				elif level == 'plot':
+					query = Cypher.upload_FB_plot
 		fcount=0
 		ncount=0
 		for record in tx.run(query, 

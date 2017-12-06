@@ -21,11 +21,17 @@ class User:
 			confirmed = []
 			pending = []
 			for record in neo4j_session.read_transaction(self._get_user_affiliations):
+				if record['data_shared'] == True:
+					fullname = record['p.fullname'] + " *"
+				else:
+					fullname = record['p.fullname']
 				if record['confirmed'] == True:
-					confirmed.append((record['p.name'], record['p.fullname']))
+					confirmed.append((record['p.name'], fullname))
 				elif record['confirmed'] == False:
-					pending.append((record['p.name'], record['p.fullname']))
-			return jsonify({'confirmed':confirmed, 'pending':pending})
+					if record['admin_email']:
+						fullname = fullname + ' <br>Contact: ' + record['admin_email']
+					pending.append((record['p.name'], fullname))
+			return {'confirmed':confirmed, 'pending':pending}
 	def _get_user_affiliations(self, tx):
 		return tx.run (Cypher.user_affiliations, username = self.username)
 	def add_affiliations(self, partners):
