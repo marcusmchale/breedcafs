@@ -27,11 +27,12 @@ class Chart:
 			nodes=[]
 			rels=[]
 			for record in records:
-					nodes.extend(({'id':record['d_id'],'label':record['d_label'],'name':record['d_name']},
-						{'id':record['n_id'],'label':record['n_label'],'name':record['n_name']}))
-					rels.append({'id':record['r_id'],'source':record['r_start'],'type':record['r_type'],'target':record['r_end']})
+				nodes.extend(({'id':record['d_id'],'label':record['d_label'],'name':record['d_name']},
+					{'id':record['n_id'],'label':record['n_label'],'name':record['n_name']}))
+				rels.append({'id':record['r_id'],'source':record['r_start'],'type':record['r_type'],'target':record['r_end']})
 			#then uniquify
-			nodes={node['id']:node for node in nodes}.values()
+			#also using empty string for name in cypher query where source/destination node is already established, so remove empties here
+			nodes={node['id']:node for node in nodes if node['name']}.values()
 			rels={rel['id']:rel for rel in rels}.values()
 			#and create the d3 input
 			return jsonify({"nodes":nodes, "links":rels})

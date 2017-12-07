@@ -46,14 +46,15 @@ class Download(User):
 			node_label = 'PlotTrait'
 		TRAITS = Lists(node_label).create_list('name')
 		#First I limit the data nodes to those submitted by members of an affiliated institute
-		user_data_query = (' MATCH (:User {username: $username}) '
+		user_data_query = ( 
+			' MATCH (:User {username: $username}) '
 			' -[:AFFILIATED {confirmed :true}] '
-			' ->(p:Partner) '
-			' WITH p '			
-			' MATCH (p)<-[:AFFILIATED {data_shared :true}] '
-			' -(u:User) '
+			' ->(partner:Partner) '
+			' WITH partner '			
+			' MATCH (partner)<-[:AFFILIATED {data_shared :true}] '
+			' -(user:User) '
 			' -[:SUBMITTED*..6]->(data:Data) '
-			' WITH data' )
+			' WITH user, partner, data' )
 		#this section first as not dependent on level but part of query build
 		if country == "" :
 			frc = (' -[:IS_IN]->(farm:Farm) '
@@ -72,8 +73,108 @@ class Download(User):
 				' -[:IS_IN]->(region:Region {name:$region}) '
 				' -[:IS_IN]->(country:Country {name:$country}) ')
 		#then level dependent stuff
+		if level == 'sample' and set(traits).issubset(set(TRAITS)):
+			index_fieldnames = [
+				'User',
+				'Partner',
+				'Country',
+				'Region',
+				'Farm', 
+				'Plot', 
+				'Block',
+				'PlotID',
+				'TreeID',
+				'SampleID',
+				'UID']
+			td = ( ' MATCH (trait:SampleTrait) '
+				' WHERE (trait.name) IN ' + str(traits) +
+				' WITH user, partner, data, trait '
+				' MATCH (trait) '
+					' <-[:FOR_TRAIT]-(:PlotSampleTrait) '
+					' <-[:DATA_FOR]-(tst:TreeSampleTrait) '
+					' <-[:DATA_FOR]-(sst:SampleSampleTrait) '
+					' <-[:DATA_FOR]-(data), '
+					' (sst)-[:FROM_SAMPLE]->(sample:Sample), '
+					' (tst)-[:FROM_TREE]->(tree:Tree) '
+				)
+			#if no plot selected
+			if plotID == "" :
+				tdp = td + ( ' -[:IS_IN]->(PlotTrees) '
+					' -[:IS_IN]->(plot:Plot) ' )
+				query = tdp + frc 
+				optional_block = ( ' OPTIONAL MATCH (tree) '
+					' -[:IS_IN]->(:BlockTrees) '
+					' -[:IS_IN]->(block:Block) ' )
+			#if plotID is defined (but no blockUID)
+			elif blockUID == "" and plotID != "" :
+				tdp = td + ( ' -[:IS_IN]->(PlotTrees) '
+					' -[:IS_IN]->(plot:Plot {uid:$plotID}) ' )
+				query = tdp + frc 
+				optional_block = ( ' OPTIONAL MATCH (tree) '
+					' -[:IS_IN]->(:BlockTrees) '
+					' -[:IS_IN]->(block:Block) ')
+			#if blockID is defined
+			elif blockUID != "":
+				tdp = td + ( '-[:IS_IN]->(:BlockTrees) '
+					' -[:IS_IN]->(block:Block {uid:$blockUID}) '
+					' -[:IS_IN]->(:PlotBlocks) '
+					' -[:IS_IN]->(plot:Plot) ')
+				query = tdp + frc
+				optional_block = ''
+			#and generate the return statement
+			if data_format == 'table':
+				response = ( 
+					#need a with statement to allow order by with COLLECT
+					' WITH '
+						' sample.uid as UID, '
+						' sample.id as SampleID, '
+						' plot.uid as PlotID, '
+						' tree.id as TreeID, '
+						' block.name as Block, '
+						' plot.name as Plot, '
+						' farm.name as Farm, '
+						' region.name as Region, '
+						' country.name as Country, '
+						' COLLECT([trait.name, data.value]) as Traits '
+					' RETURN '
+						' { UID : UID ,'
+						' PlotID : PlotID, '
+						' TreeID : TreeID, '
+						' SampleID : SampleID, '
+						' Block : Block, '
+						' Plot : Plot, '
+						' Farm : Farm, '
+						' Region : Region, '
+						' Country : Country, '
+						' Traits : Traits } '
+					' ORDER BY '
+						' PlotID, SampleID ' )
+			elif data_format == 'db':
+				response = (
+					' RETURN {'
+						' User : user.name, '
+						' Partner : partner.name,'
+						' Country : country.name, ' 
+						' Region : region.name, '
+						' Farm : farm.name, '
+						' Plot : plot.name, '
+						' Block : block.name, '
+						' PlotID : plot.uid, '
+						' TreeID : tree.id, '
+						' SampleID : sample.id, '
+						' UID : sample.uid, '
+						' Trait : trait.name, '
+						' Value : data.value, '
+						' Location : data.location, '
+						' Recorded_at : data.timeFB, '
+						' Recorded_by: data.person '
+					' } '
+					' ORDER BY plot.uid, sample.id, trait.name, data.timeFB '
+					)
 		if level == 'tree' and set(traits).issubset(set(TRAITS)):
 			index_fieldnames = [
+				'User',
+				'Partner',
 				'Country',
 				'Region',
 				'Farm', 
@@ -84,11 +185,11 @@ class Download(User):
 				'UID']
 			td = ( ' MATCH (trait:TreeTrait) '
 				' WHERE (trait.name) IN ' + str(traits) +
-				' WITH data, trait '
+				' WITH user, partner, data, trait '
 				' MATCH (trait) '
 					' <-[:FOR_TRAIT]-(:PlotTreeTrait) '
-					' <-[:FOR_TRAIT]-(tt:TreeTreeTrait), '
-					' (tt)<-[:DATA_FOR]-(data), '
+					' <-[:DATA_FOR]-(tt:TreeTreeTrait) '
+					' <-[:DATA_FOR]-(data), '
 					' (tt)-[:FROM_TREE]->(tree:Tree)'
 					 )
 			#if no plot selected
@@ -144,6 +245,8 @@ class Download(User):
 			elif data_format == 'db':
 				response = (
 					' RETURN {'
+						' User : user.name, '
+						' Partner : partner.name,'
 						' Country : country.name, ' 
 						' Region : region.name, '
 						' Farm : farm.name, '
@@ -160,10 +263,11 @@ class Download(User):
 					' } '
 					' ORDER BY plot.uid, tree.id, trait.name, data.timeFB '
 					)
-			#defining these as headers for tree data
 		elif level == 'block' and set(traits).issubset(set(TRAITS)):
 			optional_block = ''
 			index_fieldnames = [
+				'User',
+				'Partner',
 				'Country',
 				'Region',
 				'Farm', 
@@ -174,11 +278,11 @@ class Download(User):
 				'UID']
 			td = ( ' MATCH (trait:BlockTrait) '
 				' WHERE (trait.name) IN ' + str(traits) +
-				' WITH data, trait '
+				' WITH user, partner, data, trait '
 				' MATCH (trait) '
 					' <-[:FOR_TRAIT]-(:PlotBlockTrait) '
-					' <-[:FOR_TRAIT]-(bt:BlockBlockTrait), '
-					' (bt)<-[:DATA_FOR]-(data), ' 
+					' <-[:DATA_FOR]-(bt:BlockBlockTrait) '
+					' <-[:DATA_FOR]-(data), ' 
 					' (bt)-[:FROM_BLOCK]->(block:Block ' )
 			if blockUID != "" :
 				tdp = td + ( ' {uid:$blockUID}) '
@@ -222,6 +326,8 @@ class Download(User):
 			elif data_format == 'db':
 				response = (
 					' RETURN { '
+						' User : user.name, '
+						' Partner : partner.name,'
 						' Country : country.name, ' 
 						' Region : region.name, '
 						' Farm : farm.name, '
