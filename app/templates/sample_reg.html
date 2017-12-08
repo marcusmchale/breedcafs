@@ -23,10 +23,10 @@
 			<dt>{{ render_field (sample_reg_form.submit_samples) }}
 				{{ render_field (sample_reg_form.email_checkbox) }}</dt>
 			<br>
-			<h3>Create list</h3>
-			<p>The resulting list is also filtered with values from the above form,
-			 	except the date collected which is entered as a range below. 
-				Replicates is treated as a minimum number of replicates registered</p>
+			<h3>Create custom samples.csv</h3>
+			<p>The resulting file is filtered with values from the above form,
+			 	excluding the date collected which can be entered as a range below. 
+				Replicates number is treated as a minimum number of replicates registered. </p>
 			<dt>{{ render_field (custom_sample_form.date_from) }}
 				{{ render_field (custom_sample_form.date_to) }}</dt>
 			<dt>{{ render_field (custom_sample_form.samples_start) }}
