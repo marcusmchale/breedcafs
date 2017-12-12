@@ -9,7 +9,7 @@ Flask==0.12.2
 Flask-Mail==0.9.1
 Flask-WTF==0.14.2
 itsdangerous==0.24
-Jinja2==2.9.6
+Jinja2==2.10
 kombu==4.1.0
 MarkupSafe==1.0
 neo4j-driver==1.4.0
@@ -17,6 +17,7 @@ passlib==1.7.1
 pycparser==2.18
 pytz==2017.3
 redis==2.10.6
+Safe==0.4
 six==1.10.0
 unicodecsv==0.14.1
 vine==1.1.4
