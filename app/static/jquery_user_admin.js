@@ -25,7 +25,7 @@ $('#submit_user_email').click( function(e) {
 	flash_wait = "<div id='submit_flash' class='flash'>" + wait_message + "</div>";
 	$(this).after(flash_wait)
 	var admin_add_user_email = $.ajax({
-		url: "/admin/add_affiliations",
+		url: "/admin/add_allowed_email",
 		data: $("form").serialize(),
 		type: 'POST',
 		success: function(response) {

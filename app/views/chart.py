@@ -7,7 +7,7 @@ from datetime import datetime, timedelta
 @app.route("/json_submissions")
 def json_submissions():
 	tomorrow=(datetime.now()+timedelta(days=1)).strftime("%Y-%m-%d")
-	yesterday=(datetime.now()-timedelta(days=1)).strftime("%Y-%m-%d")
+	yesterday=(datetime.now()-timedelta(days=7)).strftime("%Y-%m-%d")
 	return Chart().get_submissions_range(session['username'],yesterday,tomorrow)
 
 

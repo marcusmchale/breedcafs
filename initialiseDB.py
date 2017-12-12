@@ -49,7 +49,9 @@ CONSTRAINTS = ({'node':'User', 'property':'username', 'constraint':'IS UNIQUE'},
 	{'node':'Tree', 'property':'uid', 'constraint':'IS UNIQUE'},
 	{'node':'Sample', 'property':'uid', 'constraint':'IS UNIQUE'},
 	{'node':'Counter', 'property':'uid', 'constraint':'IS UNIQUE'},
-	{'node':'Country', 'property':'name', 'constraint':'IS UNIQUE'})
+	{'node':'Country', 'property':'name', 'constraint':'IS UNIQUE'},
+	{'node':'Storage', 'property':'name', 'constraint':'IS UNIQUE'},
+	{'node':'Tissue', 'property':'name', 'constraint':'IS UNIQUE'})
 
 #functions
 def confirm(question):

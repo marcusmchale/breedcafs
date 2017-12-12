@@ -30,9 +30,15 @@ class Chart:
 				nodes.extend(({'id':record['d_id'],'label':record['d_label'],'name':record['d_name']},
 					{'id':record['n_id'],'label':record['n_label'],'name':record['n_name']}))
 				rels.append({'id':record['r_id'],'source':record['r_start'],'type':record['r_type'],'target':record['r_end']})
+			#connect counters to block/plot
+			for node in nodes:
+				if str(node['id']).endswith('_count_node'):
+					rels.append({'source':node['id'], 
+						'type':'FROM_COUNTER', 
+						'id':(node['id'] + '_' + node['id'].split('_')[0]),
+						'target': int(node['id'].split('_')[0])})
 			#then uniquify
-			#also using empty string for name in cypher query where source/destination node is already established, so remove empties here
-			nodes={node['id']:node for node in nodes if node['name']}.values()
+			nodes={node['id']:node for node in nodes}.values()
 			rels={rel['id']:rel for rel in rels}.values()
 			#and create the d3 input
 			return jsonify({"nodes":nodes, "links":rels})

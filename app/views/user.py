@@ -34,7 +34,7 @@ def register():
 			#get list of allowed emails
 			allowed_emails = User.get_allowed_emails()
 			if not email in allowed_emails:
-				flash('This email is not registered with BreedCAFS.')
+				flash('This email is not registered, please contact your BreedCAFS partner administrator.')
 				return redirect(url_for('register'))
 			if User(username).find(email):
 				if User(username).check_confirmed(email):
