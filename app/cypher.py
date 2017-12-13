@@ -362,14 +362,14 @@ class Cypher():
 			' <-[:DATA_FOR]-(d:Data) '
 		' RETURN { UID : tree.uid, '
 			' PlotID : p.uid, '
-			' TreeID : t.id, '
+			' TreeID : tree.id, '
 			' TreeName : d.value, '
 			' Block : b.name, '
 			' Plot : p.name, '
 			' Farm : f.name, '
 			' Region : r.name, '
 			' Country : c.name } '
-		' ORDER BY t.id ' )
+		' ORDER BY tree.id ' )
 #sample procedures
 	#these are unique in allowing users to submit other than locations/items/data
 	#not sure if good idea, check with Benoit if can get list of tissues and storage procedures instead
