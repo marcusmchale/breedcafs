@@ -89,6 +89,6 @@ $('#admin_submit').click( function(e) {
 			console.log(error);
 		}
 	});
-	admin_confirm_users.done(update_users());
+	admin_confirm_users.done(update_users);
 })
 
