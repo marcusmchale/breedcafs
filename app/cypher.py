@@ -360,7 +360,7 @@ class Cypher():
 			' -[:FOR_TRAIT]->(:TreeTrait {name:"name"}) '
 		' OPTIONAL MATCH (ttt) '
 			' <-[:DATA_FOR]-(d:Data) '
-		' RETURN { UID : t.uid, '
+		' RETURN { UID : tree.uid, '
 			' PlotID : p.uid, '
 			' TreeID : t.id, '
 			' TreeName : d.value, '
