@@ -16,3 +16,5 @@ def get_driver():
 	watch("neo4j.bolt", logging.INFO, open("logs/neo4j_driver.log", 'w+'))
 	return Driver_holder.driver
 
+
+

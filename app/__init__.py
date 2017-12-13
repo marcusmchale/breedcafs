@@ -10,7 +10,7 @@ app.config.from_object('config')
 app.config.from_pyfile('config.py')
 
 #configure logging
-logging.basicConfig(filename='logs/breedcafs.log', 
+logging.basicConfig(filename=app.config['BREEDCAFS_LOG'], 
 	level = logging.DEBUG,
 	format = '%(asctime)s %(levelname)-8s %(message)s',
 	datefmt= '%Y-%m-%d %H:%M:%S')
