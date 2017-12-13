@@ -24,7 +24,7 @@ def safe_password_check(form, field):
 	if bool(check(field.data)):
 		pass
 	else:
-		raise ValidationError('Please chose a more complex password')
+		raise ValidationError('Please choose a more complex password')
 
 #user 
 class RegistrationForm(FlaskForm):
