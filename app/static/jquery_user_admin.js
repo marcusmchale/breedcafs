@@ -37,12 +37,12 @@ $('#submit_user_email').click( function(e) {
 				flash_submitted = "<div id='submit_flash' class='flash'>" + response.error + "</div>";
 				$("#submit_flash").replaceWith(flash_submitted);
 			}
+			update_user_allowed_emails();
 		},
 		error: function (error) {
 			console.log(error);
 		}
 	});
-	update_user_allowed_emails()
 })
 
 
@@ -79,6 +79,7 @@ $('#admin_submit').click( function(e) {
 			if (response.hasOwnProperty('success')) {
 				flash_submitted = "<div id='submit_flash' class='flash'>Updated users: " + response.success + "</div>";
 				$("#submit_flash").replaceWith(flash_submitted);
+				update_users();
 			}
 			if (response.hasOwnProperty('error')) {
 				flash_submitted = "<div id='submit_flash' class='flash'>" + response.error + "</div>";
@@ -89,6 +90,5 @@ $('#admin_submit').click( function(e) {
 			console.log(error);
 		}
 	});
-	admin_confirm_users.done(update_users);
 })
 
