@@ -188,8 +188,10 @@ def get_affiliations():
 		affiliations = User(session['username']).get_user_affiliations()
 		confirmed = set(affiliations['confirmed'])
 		pending = set(affiliations['pending'])
-		other = set(Lists('Partner').create_list_tup('name', 'fullname')) - confirmed - pending
+		other = (set(Lists('Partner').create_list_tup('name', 'fullname')) - confirmed - pending
 		#also remove the one that had an asterix concatenated
+			- set([(i[0],i[1][:-2]) for i in pending if i[1].endswith(' *')])
+			- set([(i[0],i[1][:-2]) for i in confirmed if i[1].endswith(' *')]))
 		return jsonify({'confirmed':sorted(tuple(confirmed), key=lambda tup: tup[1]),
 			'pending':sorted(tuple(pending), key=lambda tup: tup[1]),
 			'other':sorted(tuple(other), key=lambda tup: tup[1])})
