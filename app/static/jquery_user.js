@@ -51,6 +51,7 @@ $('#submit_affiliations').click( function(e) {
 			if (response.hasOwnProperty('success')) {
 				flash_submitted = "<div id='submit_flash' class='flash'>" + response.success + "</div>";
 				$("#submit_flash").replaceWith(flash_submitted);
+				update_partners();
 			}
 			if (response.hasOwnProperty('error')) {
 				flash_submitted = "<div id='submit_flash' class='flash'>" + response.error + "</div>";
@@ -61,5 +62,4 @@ $('#submit_affiliations').click( function(e) {
 			console.log(error);
 		}
 	});
-	update_partners();
 })
