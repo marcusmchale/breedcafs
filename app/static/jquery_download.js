@@ -23,34 +23,34 @@ update_blocks = function() {
 //hide boxes that aren't relevant
 $('#country').change(update_blocks).change(function () {
 	if (this.value === "") {
-		$('#region').hide();
-		$('#farm').hide();
-		$('#plot').hide();
-		$('#block').hide();
+		$('#region').hide().val("");
+		$('#farm').hide().val("");
+		$('#plot').hide().val("");
+		$('#block').hide().val("");
 	} else {
 		$('#region').show();
 	}
 });
 $('#region').change(update_blocks).change(function () {
 	if (this.value === "") {
-		$('#farm').hide();
-		$('#plot').hide();
-		$('#block').hide();
+		$('#farm').hide().val("");
+		$('#plot').hide().val("");
+		$('#block').hide().val("");
 	} else {
 		$('#farm').show();
 	}
 });
 $('#farm').change(update_blocks).change(function () {
 	if (this.value === "") {
-		$('#plot').hide();
-		$('#block').hide();
+		$('#plot').hide().val("");
+		$('#block').hide().val("");
 	} else {
 		$('#plot').show();
 	}
 });
 $('#plot').change(update_blocks).change(function () {
 	if (this.value === "") {
-		$('#block').hide();
+		$('#block').hide().val("");
 	} else {
 		$('#block').show();
 	}
