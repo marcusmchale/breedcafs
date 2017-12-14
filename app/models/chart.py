@@ -6,8 +6,9 @@ from flask import jsonify
 #Get dicts of values matching a node in the database then generate list for forms
 
 class Chart:
-	def __init__(self):
-		pass
+	#def __init__(self):
+	#	pass
+	new = 'test'
 	def _get_submissions_range(self, tx):
 		result = [record for record in tx.run(Cypher.get_submissions_range, 
 			username=self.username, 

@@ -75,11 +75,24 @@ class AffiliationForm(FlaskForm):
 		form.other.choices = sorted(tuple(other), key=lambda tup: tup[1])
 		return form
 
-class AddUserEmail(FlaskForm):
+class AddUserEmailForm(FlaskForm):
 	user_email = StringField('Add user email address:', [InputRequired(), Email(), Length(min=1, 
 		max=254, message='Maximum 100 characters')],
 		description = 'Add new allowed email')
 	submit_user_email = SubmitField('+')
+
+
+class RemoveUserEmailForm(FlaskForm):
+	emails_list = SelectMultipleField('Allowed emails:',
+		[Optional()],
+		option_widget = widgets.CheckboxInput(), 
+		widget = widgets.ListWidget(prefix_label=False))
+	remove_user_email = SubmitField('Remove selected emails')
+	@staticmethod
+	def update(username):
+		form = RemoveUserEmailForm()
+		form.emails_list.choices = [(i,i) for i in User(username).get_user_allowed_emails()]
+		return form
 
 #user administration
 class UserAdminForm(FlaskForm):

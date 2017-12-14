@@ -45,12 +45,12 @@ $("#submit_tissue").click( function(e) {
 			success: function(response) {
 				flash = "<div id='tissue_flash' class='flash'> " + response + " </div>"
 				$("#submit_tissue").after(flash)
+				update_tissues();
 			},
 			error: function(error) {
 				console.log(error);
 			}
 		});
-	submit_tissue.done(update_tissues);
 })
 
 
@@ -64,12 +64,12 @@ $("#submit_storage").click( function(e) {
 			success: function(response) {
 				flash = "<div id='storage_flash' class='flash'> " + response + " </div>"
 				$("#submit_storage").after(flash)
+				update_storage();
 			},
 			error: function(error) {
 				console.log(error);
 			}
 		});
-	submit_storage.done(update_storage);
 })
 
 //register new samples

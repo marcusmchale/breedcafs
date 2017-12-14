@@ -9,6 +9,8 @@
 			<p>Please only add one email address per user</p>
 			{{ render_field(add_user_email_form.user_email)}}
 			{{ render_field(add_user_email_form.submit_user_email)}}
+			{{ render_field(remove_user_email_form.emails_list)}}
+			{{ render_field(remove_user_email_form.remove_user_email)}}
 			<div id ='unconfirmed'>
 				<table>
 					<tr><th></th><th>Name</th><th>Institute</th></tr>

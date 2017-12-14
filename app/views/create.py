@@ -221,7 +221,7 @@ def location_plots():
 		return redirect(url_for('login'))
 	else:
 		try:
-			location_form = LocationForm().update()
+			location_form = LocationForm.update()
 			add_country = AddCountry()
 			add_region = AddRegion()
 			add_farm = AddFarm()
@@ -246,7 +246,7 @@ def generate_plots_csv():
 		return redirect(url_for('login'))
 	else:
 		try:
-			location_form = LocationForm().update(optional = True)
+			location_form = LocationForm.update(optional = True)
 			plots_form = PlotsForm()
 			if all([location_form.validate_on_submit(), plots_form.validate_on_submit()]):
 				farm = request.form['farm']
@@ -315,7 +315,7 @@ def generate_plots_csv():
 				else:
 					return jsonify({'submitted' : 'Your file is ready for download: "<a href="' + download_url + '">' + file_details['filename'] + '</a>"'})
 			else:
-				errors = jsonify([location_form.errors, fields_form.errors])
+				errors = jsonify([location_form.errors, plots_form.errors])
 				return errors
 		except (ServiceUnavailable):
 				flash("Database unavailable")
@@ -328,7 +328,7 @@ def add_block():
 		return redirect(url_for('login'))
 	else:
 		try:
-			location_form = LocationForm().update()
+			location_form = LocationForm.update()
 			add_block_form = AddBlock()
 			if all([location_form.validate_on_submit(), add_block_form.validate_on_submit()]):
 				plotID = int(request.form['plot'])
@@ -354,7 +354,7 @@ def location_blocks():
 		return redirect(url_for('login'))
 	else:
 		try:
-			location_form = LocationForm().update()
+			location_form = LocationForm.update()
 			add_block_form = AddBlock()
 			blocks_form = BlocksForm()
 			return render_template('location_blocks.html', 
@@ -374,7 +374,7 @@ def generate_blocks_csv():
 		return redirect(url_for('login'))
 	else:
 		try:
-			location_form = LocationForm().update()
+			location_form = LocationForm.update()
 			blocks_form = BlocksForm()
 			if all([location_form.validate_on_submit(), blocks_form.validate_on_submit()]):
 				plotID = int(request.form['plot'])
@@ -421,7 +421,7 @@ def generate_blocks_csv():
 				else:
 					return jsonify({'submitted' : 'Your file is ready for download: "<a href="' + download_url + '">' + file_details['filename'] + '</a>"'})
 			else:
-				errors = jsonify([location_form.errors, fields_form.errors])
+				errors = jsonify([location_form.errors, blocks_form.errors])
 				return errors
 		except (ServiceUnavailable):
 				flash("Database unavailable")
@@ -435,7 +435,7 @@ def location_trees():
 		return redirect(url_for('login'))
 	else:
 		try:
-			location_form = LocationForm().update()
+			location_form = LocationForm.update()
 			add_trees_form = AddTreesForm()
 			add_country = AddCountry()
 			add_region = AddRegion()
@@ -458,7 +458,7 @@ def add_trees():
 		return redirect(url_for('login'))
 	else:
 		try:
-			location_form = LocationForm().update()
+			location_form = LocationForm.update()
 			add_trees_form = AddTreesForm()
 			if all([location_form.validate_on_submit(), add_trees_form.validate_on_submit()]):
 				plotID = int(request.form['plot'])
@@ -528,7 +528,7 @@ def custom_trees_csv():
 		return redirect(url_for('login'))
 	else:
 		try:
-			location_form = LocationForm().update()
+			location_form = LocationForm.update()
 			custom_trees_form = CustomTreesForm()
 			if all([location_form.validate_on_submit(), custom_trees_form.validate_on_submit()]):
 				plotID = int(request.form['plot'])
@@ -678,10 +678,10 @@ def sample_reg():
 		return redirect(url_for('login'))
 	else:
 		try:
-			location_form = LocationForm().update()
+			location_form = LocationForm.update()
 			add_tissue_form = AddTissueForm()
 			add_storage_form = AddStorageForm()
-			sample_reg_form = SampleRegForm().update()
+			sample_reg_form = SampleRegForm.update()
 			custom_sample_form = CustomSampleForm()
 			return render_template('sample_reg.html', 
 				location_form = location_form,
@@ -773,8 +773,8 @@ def add_samples():
 		return redirect(url_for('login'))
 	else:
 		try:
-			location_form = LocationForm().update()
-			sample_form=SampleRegForm().update()
+			location_form = LocationForm.update()
+			sample_form = SampleRegForm.update()
 			if all([location_form.validate_on_submit(), sample_form.validate_on_submit()]):
 				plotID = int(request.form['plot'])
 				start = int(request.form['trees_start'])

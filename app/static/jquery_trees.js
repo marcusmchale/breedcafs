@@ -40,6 +40,7 @@ $("#submit_trees").click( function(e) {
 			if (response.hasOwnProperty('submitted')) {
 				flash_submitted = "<div id='trees_flash' class='flash'>" + response.submitted + "</div>";
 				$("#trees_flash").replaceWith(flash_submitted);
+				load_chart();
 			} else {
 				$("#trees_flash").remove();
 				for (var key in response[0]){
@@ -61,7 +62,6 @@ $("#submit_trees").click( function(e) {
 			console.log(error);
 		}
 	});
-	submit_trees.done(load_chart);
 })
 
 //get custom trees.csv

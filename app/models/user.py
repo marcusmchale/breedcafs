@@ -1,5 +1,4 @@
 from app import app, logging, celery, redis_store, ServiceUnavailable
-from flask import request, jsonify
 from app.cypher import Cypher
 from passlib.hash import bcrypt
 from neo4j_driver import get_driver
@@ -61,7 +60,7 @@ class User:
 		try:
 			with get_driver().session() as neo4j_session:
 				result = neo4j_session.read_transaction(self._get_user_allowed_emails)
-				return jsonify([record[0] for record in result][0])
+				return [record[0] for record in result][0]
 		except (ServiceUnavailable):
 			logging.error('Get user allowed email failed due to service unavailable')
 			return {'error':'The database is unavailable, please try again later.'}
@@ -78,6 +77,19 @@ class User:
 			return {'error':'The database is unavailable, please try again later.'}
 	def _add_allowed_email(self, tx):
 		return tx.run(Cypher.add_allowed_email, 
+			username = self.username, 
+			email = self.email)
+	def remove_allowed_email(self, email):
+		self.email = email
+		try:
+			with get_driver().session() as neo4j_session:
+				result = neo4j_session.write_transaction(self._remove_allowed_email)
+				return [record[0] for record in result]
+		except (ServiceUnavailable):
+			logging.error('Remove allowed email failed due to service unavailable')
+			return {'error':'The database is unavailable, please try again later.'}
+	def _remove_allowed_email(self, tx):
+		return tx.run(Cypher.remove_allowed_email, 
 			username = self.username, 
 			email = self.email)
 	def register(self, password, email, name, partner):

@@ -84,6 +84,11 @@ class Cypher():
 		' -[:SUBMITTED]->(e:Emails) '
 		' SET e.allowed = e.allowed + [$email] '
 		' RETURN $email ' )
+	remove_allowed_email = ( ' MATCH (:User {username : $username}) '
+		' -[:SUBMITTED]->(:Submissions) '
+		' -[:SUBMITTED]->(e:Emails) '
+		' SET e.allowed = FILTER (n in e.allowed WHERE NOT n IN $email) '
+		' RETURN $email ' )
 	user_del = ( ' MATCH (u:User {email:$email, confirmed: false}) '
 		' OPTIONAL MATCH (u)-[:SUBMITTED*..3]->(n) '
 		' DETACH DELETE u,n ' )

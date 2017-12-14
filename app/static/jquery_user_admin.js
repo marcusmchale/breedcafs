@@ -32,12 +32,12 @@ $('#submit_user_email').click( function(e) {
 			if (response.hasOwnProperty('success')) {
 				flash_submitted = "<div id='submit_flash' class='flash'>Added email to allowed list: " + response.success + "</div>";
 				$("#submit_flash").replaceWith(flash_submitted);
+				update_user_allowed_emails();
 			}
 			if (response.hasOwnProperty('error')) {
 				flash_submitted = "<div id='submit_flash' class='flash'>" + response.error + "</div>";
 				$("#submit_flash").replaceWith(flash_submitted);
 			}
-			update_user_allowed_emails();
 		},
 		error: function (error) {
 			console.log(error);
@@ -46,23 +46,49 @@ $('#submit_user_email').click( function(e) {
 })
 
 
-//add a div containing elements from the  user allowed emails list
+
+$('#remove_user_email').click( function(e) {
+	e.preventDefault();
+	remove_flash();
+	wait_message = "Please wait for email to be removed from the list of allowed emails";
+	flash_wait = "<div id='submit_flash' class='flash'>" + wait_message + "</div>";
+	$(this).after(flash_wait)
+	var admin_remove_user_email = $.ajax({
+		url: "/admin/remove_allowed_email",
+		data: $("form").serialize(),
+		type: 'POST',
+		success: function(response) {
+			if (response.hasOwnProperty('success')) {
+				flash_submitted = "<div id='submit_flash' class='flash'>Removed email from allowed list: " + response.success + "</div>";
+				$("#submit_flash").replaceWith(flash_submitted);
+				update_user_allowed_emails();
+			}
+			if (response.hasOwnProperty('error')) {
+				flash_submitted = "<div id='submit_flash' class='flash'>" + response.error + "</div>";
+				$("#submit_flash").replaceWith(flash_submitted);
+			}
+		},
+		error: function (error) {
+			console.log(error);
+		}
+	});
+})
+
+
+//update the  user allowed emails list
 update_user_allowed_emails = function () {
 	var user_allowed_emails = $.ajax({
 		type: 'GET',
 		url: "/admin/get_user_allowed_emails",
 	});
 	user_allowed_emails.done(function(data){
-		$("#allowed_email_list").remove();
-		$('#unconfirmed').before("<div id=allowed_email_list><br><br><a>Email addresses you have added <br>(that haven't yet registered):</a><ul id=allowed_email_list></ul></div>");
+		$("#emails_list").empty();
 		var allowed_emails = [].concat(data).sort();
 		for (var i=0; i < allowed_emails.length; i++) {
-			$("#allowed_email_list").append('<li>' + allowed_emails[i] + '</li>')
+			$("#emails_list").append('<li><input id="emails_list-' + i + '" name="emails_list" value="' + allowed_emails[i] + '" type="checkbox"</li>' + '<label for="emails_list-' + i + '">' + allowed_emails[i] + '</label>')
 		}			
 	})
 }
-
-update_user_allowed_emails();
 
 //allow user confirmation/ remove access
 $('#admin_submit').click( function(e) {
