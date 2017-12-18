@@ -150,6 +150,15 @@ $("#make_samples_csv").click( function(e) {
 	});
 })
 
+//button to reset form values
+$("#make_samples_csv").after('<input id="reset_form_button" name="Reset Form" value="Clear Form" type="submit")>')
+
+$("#reset_form_button").click( function(e) {
+	e.preventDefault();
+	$("#sample_reg").find('input:text').val('');
+	$("#sample_reg").find('select').val('');
+	})
+
 //Render a calendar in jquery-ui for date selection
 $("#date_collected").datepicker({ dateFormat: 'yy-mm-dd'});
 $("#date_from").datepicker({ dateFormat: 'yy-mm-dd'});
