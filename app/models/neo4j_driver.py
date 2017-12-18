@@ -1,4 +1,5 @@
-from app import (os,
+from app import (app,
+	os,
 	GraphDatabase, 
 	ServiceUnavailable, 
 	watch, 
