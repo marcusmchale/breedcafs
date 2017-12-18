@@ -53,8 +53,8 @@ class Download(User):
 			' WITH partner '			
 			' MATCH (partner)<-[:AFFILIATED {data_shared :true}] '
 			' -(user:User) '
-			' -[:SUBMITTED*..6]->(data:Data) '
-			' WITH user, partner, data' )
+			' -[:SUBMITTED*5]->(data:Data) '
+			' WITH user.name as user_name, partner.name as partner_name, data' )
 		#this section first as not dependent on level but part of query build
 		if country == "" :
 			frc = (' -[:IS_IN]->(farm:Farm) '
@@ -88,7 +88,7 @@ class Download(User):
 				'UID']
 			td = ( ' MATCH (trait:SampleTrait) '
 				' WHERE (trait.name) IN ' + str(traits) +
-				' WITH user, partner, data, trait '
+				' WITH user_name, partner_name, data, trait '
 				' MATCH (trait) '
 					' <-[:FOR_TRAIT]-(:PlotSampleTrait) '
 					' <-[:DATA_FOR]-(tst:TreeSampleTrait) '
@@ -152,8 +152,8 @@ class Download(User):
 			elif data_format == 'db':
 				response = (
 					' RETURN {'
-						' User : user.name, '
-						' Partner : partner.name,'
+						' User : user_name, '
+						' Partner : partner_name,'
 						' Country : country.name, ' 
 						' Region : region.name, '
 						' Farm : farm.name, '
@@ -185,7 +185,7 @@ class Download(User):
 				'UID']
 			td = ( ' MATCH (trait:TreeTrait) '
 				' WHERE (trait.name) IN ' + str(traits) +
-				' WITH user, partner, data, trait '
+				' WITH user_name, partner_name, data, trait '
 				' MATCH (trait) '
 					' <-[:FOR_TRAIT]-(:PlotTreeTrait) '
 					' <-[:DATA_FOR]-(tt:TreeTreeTrait) '
@@ -245,8 +245,8 @@ class Download(User):
 			elif data_format == 'db':
 				response = (
 					' RETURN {'
-						' User : user.name, '
-						' Partner : partner.name,'
+						' User : user_name, '
+						' Partner : partner_name,'
 						' Country : country.name, ' 
 						' Region : region.name, '
 						' Farm : farm.name, '
@@ -278,7 +278,7 @@ class Download(User):
 				'UID']
 			td = ( ' MATCH (trait:BlockTrait) '
 				' WHERE (trait.name) IN ' + str(traits) +
-				' WITH user, partner, data, trait '
+				' WITH user_name, partner_name, data, trait '
 				' MATCH (trait) '
 					' <-[:FOR_TRAIT]-(:PlotBlockTrait) '
 					' <-[:DATA_FOR]-(bt:BlockBlockTrait) '
@@ -326,8 +326,8 @@ class Download(User):
 			elif data_format == 'db':
 				response = (
 					' RETURN { '
-						' User : user.name, '
-						' Partner : partner.name,'
+						' User : user_name, '
+						' Partner : partner_name,'
 						' Country : country.name, ' 
 						' Region : region.name, '
 						' Farm : farm.name, '
@@ -343,6 +343,62 @@ class Download(User):
 						' Recorded_by : data.person'
 					' } '
 					' ORDER BY plot.uid, block.id, trait.name, data.timeFB '
+					)
+		elif level == 'plot' and set(traits).issubset(set(TRAITS)):
+			optional_block = ''
+			index_fieldnames = [
+				'User',
+				'Partner',
+				'Country',
+				'Region',
+				'Farm', 
+				'Plot', 
+				'UID']
+			tdp = ( ' MATCH (trait:PlotTrait) '
+				' WHERE (trait.name) IN ' + str(traits) +
+				' WITH user_name, partner_name, data, trait '
+				' MATCH (trait) '
+					' <-[:FOR_TRAIT]-(ppt:PlotPlotTrait) '
+					' <-[:DATA_FOR]-(data), ' 
+					' (ppt)-[:FROM_PLOT]->(plot:Plot) ' )
+			query = tdp + frc
+			if data_format == 'table':
+				response = ( 
+					#need a with statement to allow order by with COLLECT
+					' WITH '
+						' plot.uid as UID, '
+						' plot.name as Plot, '
+						' farm.name as Farm, '
+						' region.name as Region, '
+						' country.name as Country, '
+						' COLLECT([trait.name, data.value]) as Traits '
+					' RETURN {'
+						' UID : UID ,'
+						' Plot : Plot, '
+						' Farm : Farm, '
+						' Region : Region, '
+						' Country : Country, '
+						' Traits : Traits '
+					'}'
+					' ORDER BY '
+						' PlotID ' )
+			elif data_format == 'db':
+				response = (
+					' RETURN { '
+						' User : user_name, '
+						' Partner : partner_name,'
+						' Country : country.name, ' 
+						' Region : region.name, '
+						' Farm : farm.name, '
+						' Plot : plot.name, '
+						' UID : plot.uid, '
+						' Trait : trait.name, '
+						' Value : data.value, '
+						' Location : data.location, '
+						' Recorded_at : data.timeFB, '
+						' Recorded_by : data.person'
+					' } '
+					' ORDER BY plot.uid, trait.name, data.timeFB '
 					)
 		#add conditional for data between time range
 		if start_time != "" and end_time != "":
