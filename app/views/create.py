@@ -285,12 +285,11 @@ def generate_plots_csv():
 				#if selected send an email copy of the file (or link to download if greater than ~5mb)
 				if request.form.get('email_checkbox'):
 					recipients=[User(session['username']).find('')['email']]
-					subject = "BreedCAFS: blocks.csv"
-					body = ("You requested a blocks.csv file for blocks in plotID: " + str(plotID)
-						+ " These are described in the attached file (if less than 5mb) that is also available for download at the following address: "
+					subject = "BreedCAFS: plots.csv"
+					body = ("You requested the attached plots.csv file from the BreedCAFS database tools. "
+						+ " This file is also available for download at the following address: "
 						+ download_url )
-					html = render_template('emails/generate_blocks.html',
-						plotID=plotID,
+					html = render_template('emails/generate_plots.html',
 						download_url = download_url)
 					if file_details['file_size'] < 5000000:
 						send_static_attachment(subject, 
