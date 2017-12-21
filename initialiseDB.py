@@ -8,6 +8,8 @@ import csv
 from instance import config
 #import shutil
 from neo4j.v1 import GraphDatabase
+#for grouper function
+from itertools import izip_longest as zip_longest
 
 #neo4j config
 uri = "bolt://localhost:7687"
@@ -38,6 +40,8 @@ PARTNERS = ({'OPERATES_IN':['France', 'Vietnam','Cameroon', 'Costa Rica', 'Frenc
 {'OPERATES_IN':None, 'BASED_IN':'Sweden', 'name':'Arvid', 'fullname':'Arvid Nordquist HAB'},
 {'OPERATES_IN':None, 'BASED_IN':'Vietnam', 'name':'AGI', 'fullname':'Agricultural Genetics Institute'})
 
+VARIETIES = config.VARIETIES
+
 CONSTRAINTS = ({'node':'User', 'property':'username', 'constraint':'IS UNIQUE'},
 	{'node':'Partner', 'property':'name', 'constraint':'IS UNIQUE'},
 	{'node':'SampleTrait', 'property':'name', 'constraint':'IS UNIQUE'},
@@ -51,9 +55,19 @@ CONSTRAINTS = ({'node':'User', 'property':'username', 'constraint':'IS UNIQUE'},
 	{'node':'Counter', 'property':'uid', 'constraint':'IS UNIQUE'},
 	{'node':'Country', 'property':'name', 'constraint':'IS UNIQUE'},
 	{'node':'Storage', 'property':'name', 'constraint':'IS UNIQUE'},
-	{'node':'Tissue', 'property':'name', 'constraint':'IS UNIQUE'})
+	{'node':'Tissue', 'property':'name', 'constraint':'IS UNIQUE'},
+	{'node':'Variety', 'property':'name', 'constraint':'IS UNIQUE'})
+
+
+
 
 #functions
+#https://docs.python.org/3.1/library/itertools.html#recipes
+def grouper(n, iterable, fillvalue=None):
+	"grouper(3, 'ABCDEFG', 'x') --> ABC DEF Gxx"
+	args = [iter(iterable)] * n
+	return zip_longest(*args, fillvalue=fillvalue)
+
 def confirm(question):
 	valid = {"yes": True, "y": True, "no": False, "n": False}
 	prompt = " [y/n] "
@@ -68,6 +82,9 @@ def confirm(question):
 def delete_database(tx):
 #	shutil.rmtree("/var/lib/neo4j/data/databases/graph.db/")
 	tx.run('MATCH (n) OPTIONAL MATCH (n)-[r]-() DELETE n,r')
+
+
+
 
 class Create:
 	def __init__ (self, username):
@@ -89,6 +106,8 @@ class Create:
 				' -[:SUBMITTED]->(:Countries) '
 			' MERGE (sub)-[:SUBMITTED]->(:Partners) '
 			' MERGE (sub)-[:SUBMITTED]->(:Traits) '
+			' MERGE (sub)-[:SUBMITTED]->(:Trials) '
+			' MERGE (sub)-[:SUBMITTED]->(:Varieties) '
 			' MERGE (sub)-[:SUBMITTED]->(:Emails {allowed : $allowed_emails})'
 			' RETURN u.found', 
 			username=username,
@@ -192,6 +211,228 @@ class Create:
 						print ('Created: '+ level + 'Trait ' + trait['name'])
 					else:
 						print ('Error with merger of ' + level +'Trait ' + trait['name'])
+	def varieties(self, tx, varieties):
+		#first build the trials connected country
+		trials = {"props":[]}
+		for wp in VARIETIES:
+			for trial in wp['trials']:
+				trials['props'].append({
+					'number':trial['number'],
+					'name':trial['name'],
+					'wp':wp['WP'],
+					'country':trial['country']
+					})
+		trial_create = tx.run(' MATCH (u:User {username:$username}) '
+				' -[:SUBMITTED]->(:Submissions) '
+				' -[:SUBMITTED]->(ut:Trials)  ' 
+				' WITH ut '
+				' UNWIND $trials as trial'
+				' MATCH (country:Country {name: trial.country})'
+				' CREATE (ut) '
+					' -[s:SUBMITTED {time:timestamp()}]->(n:Trial) '
+					' -[:PERFORMED_IN]->(country) '
+				' SET n = trial '
+				' RETURN n.number, n.name, country.name',
+			username = self.username,
+			trials = trials['props'])
+		print 'Creating trials:'
+		for record in trial_create:
+			print record[0], record[1], record[2]
+		#then merge varieties, connect to trial and group (inbred/hybrid/)
+		varieties = {"props":[]}
+		for wp in VARIETIES:
+			for trial in wp['trials']:
+				for group in trial['varieties']:
+					for variety in trial['varieties'][group]:
+						varieties['props'].append({
+							'name':variety,
+							'trial':trial['number'],
+							'group':group
+							})
+		#then create a TreeTrait per trial to store the varieties.
+		#This splits it up to make it more relevant per user
+		#also long lists of multicats don't work in fieldbook, the last ones are hidden.
+		variety_trait_create = tx.run( 'MATCH (u:User {username:$username}) '
+				' -[:SUBMITTED]->(:Submissions) '
+				' -[:SUBMITTED]->(uts:Traits) '
+				' MERGE (uts)-[s1:SUBMITTED]-(ut:TreeTraits) '
+					' ON CREATE SET s1.time = timestamp() '
+				' WITH ut '
+				' MATCH (trial:Trial) '
+				' MERGE (ut)-[s2:SUBMITTED]->(t:TreeTrait {group: "general", '
+						' name: ("Varieties (Trial " + trial.number + ")"),  '
+						' format: "multicat", '
+						' defaultValue: "", '
+						' minimum: "", '
+						' maximum: "",'
+						' details: ("Varieties (Trial #" + trial.number + ", " + trial.name + ")"), '
+						' categories: ""}) '
+					' -[:TRAIT_FOR]->(trial) '	
+				' ON MATCH SET t.found="TRUE" '
+				' ON CREATE SET t.found="FALSE", s2.time=timestamp() '
+				' RETURN t.name, t.found',
+			username = self.username,
+			)
+		for record in variety_trait_create:
+			print ("Created: " if record[1] else "Found:"), record[0]
+		#now add the specific list of categories to each trait
+		#the order is important here, 
+		#and the height of the row in fieldbook is set by the last button
+		#so this should be the longest string
+		for wp in VARIETIES:
+			for trial in wp['trials']:
+				varieties = []
+				##creating list with inbred first and grafted last
+				for group in ['inbred','hybrid','grafted']:
+					if group in trial['varieties']:
+						varieties.extend(trial['varieties'][group])
+				varieties3 = []
+				for var3 in grouper(3, varieties):
+					var3 = filter(None, list(var3))
+					var3.sort(key = lambda s: len(s))
+					varieties3.extend(var3)
+				categories = str("/".join(varieties3))
+				trait_categories_create = tx.run( ' MATCH (tt:TreeTrait '
+					' {name: ("Varieties (Trial " + $trial + ")")})  '
+					' SET tt.categories = $categories '
+					' RETURN tt.name, tt.categories ',
+					trial = trial['number'],
+					categories = categories)
+				for record in trait_categories_create:
+					print ("Set " + record[0] + " categories as " + record[1])
+
+
+
+#sorted(varieties[group])
+		#then create a TreeTrait per 
+
+
+##then group these into 3 and sorted by length
+#category_list_grouped = []
+#for group_3 in grouper(3, category_list):
+#	print(group_3)
+#	group_3 = filter(None, list(group_3))
+#	print(group_3)
+#	group_3.sort(key = lambda s: len(s))
+#	print(group_3)
+#	category_list_grouped.extend(group_3)
+#categories = str("/".join(category_list_grouped))
+#		create_categories = tx.run (' MATCH (tt:TreeTrait {name:"variety"}) '
+#			' SET tt.categories = $categories '
+#			' RETURN tt.categories ',
+#			categories = categories)
+#		for record in create_categories:
+#			print ('Created categories list on TreeTrait (variety): ' + record['tt.categories'])
+
+
+
+
+###		variety_create = tx.run(
+###				'MATCH (u:User {username:$username}) '
+###						' -[:SUBMITTED]->(:Submissions) '
+###						' -[:SUBMITTED]->(uv:Varieties), ' 
+###					' (tt:TreeTrait {name:"variety"}) '
+###				' UNWIND $varieties AS variety '
+###				' MERGE (uv) '
+###					'-[s1:SUBMITTED]->(var:Variety {name:variety.name}) '
+###					' ON CREATE SET s1.time=timestamp(), var.found = "FALSE" '
+###					' ON MATCH SET var.found = "TRUE" '
+###				' MERGE (group:VarietyGroup {name:variety.group}) '
+###				' MERGE (var)-[r:OF_CATEGORY]->(group) '
+###					' ON CREATE SET r.time = timestamp(), r.found = "FALSE" '
+###					' ON MATCH SET r.found = "TRUE" '
+###				' RETURN var.name, var.found ',
+###					username = self.username,
+###					varieties = varieties['props'])
+###		import pdb; pdb.set_trace()
+###		print ("Creating varieties:")
+###		for record in variety_create:
+###			print ("Created" if record[1] else "Found"), record[0]
+
+
+#		##then build in the relationships for hybrids to their parents
+#		for variety in varieties['hybrid']:
+#			parents = variety.split(' x ')
+#			if len(parents) > 1:
+#				maternal = parents[0]
+#				paternal = parents[1]
+#				link_hybrid =  tx.run( ' MATCH (var:Variety {name:$variety}) '
+#					' MERGE (mat:Variety {name:$maternal}) '
+#						' ON CREATE SET mat.found = "FALSE" '
+#						' ON MATCH SET mat.found = "TRUE" '
+#					' MERGE (pat:Variety {name:$paternal}) '
+#						' ON CREATE SET pat.found = "FALSE" '
+#						' ON MATCH SET pat.found = "TRUE" '
+#					' MERGE (var)-[m:MATERNAL_DONOR]->(mat) '
+#						' ON CREATE SET m.found = "FALSE" '
+#						' ON MATCH SET m.found = "TRUE" '
+#					' MERGE (var)-[p:PATERNAL_DONOR]->(pat) '
+#						' ON CREATE SET p.found = "FALSE" '
+#						' ON MATCH SET p.found = "TRUE" '
+#					' RETURN var.name, mat.name, mat.found, pat.name, pat.found, m.found, p.found ',
+#						variety = variety,
+#						maternal = maternal,
+#						paternal = paternal)
+#				for record in link_hybrid:
+#					if record['mat.found'] == "TRUE":
+#						print ('Maternal donor variety is already registered: ' + record['mat.name'] )
+#					elif record['mat.found'] == "FALSE":
+#						print ('Maternal donor variety created: ' + record['mat.name'] )
+#					if record['pat.found'] == "TRUE":
+#						print ('Paternal donor variety is already registered: ' + record['pat.name'] )
+#					elif record['pat.found'] == "FALSE":
+#						print ('Paternal donor variety created: ' + record['pat.name'] )
+#					if record['m.found'] == "TRUE" :
+#						print('Maternal donor relationship already established between ' + record['var.name'] + " and " + record['mat.name'] )
+#					if record['m.found'] == "FALSE" :
+#						print('Maternal donor relationship created between ' + record['var.name'] + " and " + record['mat.name'] )
+#					if record['p.found'] == "TRUE" :
+#						print('Paternal donor relationship already established between ' + record['var.name'] + " and " + record['pat.name'] )
+#					if record['p.found'] == "FALSE" :
+#						print('paternal donor relationship created between ' + record['var.name'] + " and " + record['pat.name'] )
+#		##tand same for grafts
+#		for variety in varieties['grafted']:
+#			grafted = variety.split(' ⁄ ')
+#			if len(grafted) > 1:
+#				scion = grafted[0]
+#				rootstock = grafted[1]
+#				link_graft =  tx.run( ' MATCH (var:Variety {name:$variety}) '
+#					' MERGE (scion:Variety {name:$scion}) '
+#						' ON CREATE SET scion.found = "FALSE" '
+#						' ON MATCH SET scion.found = "TRUE" '
+#					' MERGE (rootstock:Variety {name:$rootstock}) '
+#						' ON CREATE SET rootstock.found = "FALSE" '
+#						' ON MATCH SET rootstock.found = "TRUE" '
+#					' MERGE (var)-[s:SCION]->(scion) '
+#						' ON CREATE SET s.found = "FALSE" '
+#						' ON MATCH SET s.found = "TRUE" '
+#					' MERGE (var)-[r:ROOTSTOCK]->(rootstock) '
+#						' ON CREATE SET r.found = "FALSE" '
+#						' ON MATCH SET r.found = "TRUE" '
+#					' RETURN var.name, scion.name, scion.found, rootstock.name, rootstock.found, s.found, r.found ',
+#						variety = variety,
+#						scion = scion,
+#						rootstock = rootstock)
+#				for record in link_graft:
+#					if record['scion.found'] == "TRUE":
+#						print ('Scion variety is already registered: ' + record['scion.name'] )
+#					elif record['scion.found'] == "FALSE":
+#						print ('Scion variety created: ' + record['scion.name'] )
+#					if record['rootstock.found'] == "TRUE":
+#						print ('Rootstock variety is already registered: ' + record['rootstock.name'] )
+#					elif record['rootstock.found'] == "FALSE":
+#						print ('Rootstock variety created: ' + record['rootstock.name'] )
+#					if record['s.found'] == "TRUE" :
+#						print('Scion relationship already established between ' + record['var.name'] + " and " + record['scion.name'] )
+#					if record['s.found'] == "FALSE" :
+#						print('Scion donor relationship created between ' + record['var.name'] + " and " + record['scion.name'] )
+#					if record['r.found'] == "TRUE" :
+#						print('Rootstock relationship already established between ' + record['var.name'] + " and " + record['rootstock.name'] )
+#					if record['r.found'] == "FALSE" :
+#						print('Rootstock relationship created between ' + record['var.name'] + " and " + record['rootstock.name'] )						
+
+
+
 
 
 if not confirm('Are you sure you want to proceed? This is should probably only be run when setting up the database'):
@@ -213,4 +454,5 @@ else:
 		session.write_transaction(Create('start').traits, 'traits/block_traits.csv', 'Block')
 		session.write_transaction(Create('start').traits, 'traits/tree_traits.csv', 'Tree')
 		session.write_transaction(Create('start').traits, 'traits/sample_traits.csv', 'Sample')
+		session.write_transaction(Create('start').varieties, VARIETIES)
 	print ('Complete')

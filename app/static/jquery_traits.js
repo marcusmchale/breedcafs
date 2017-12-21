@@ -33,7 +33,7 @@ $('#submit_traits').click( function(e) {
 	flash_wait = "<div id='traits_flash' class='flash'>" + wait_message + "</div>"
 	$("form").append(flash_wait)
 	trait_count = $("form input[type=checkbox]:checked").length - $('[id^=select_all_]:checked').length;
-	if ($("#email_checkbox").prop('checked') == true) {trait_count = trait_count -1};
+	if ($("[id$=email_checkbox]").prop('checked') == true) {trait_count = trait_count -1};
 	if (trait_count > 64) {
 		$("#traits_flash").after("<div id='traits_flash' \
 			class='flash'>Caution: Field Book can only export up to 64 traits at a time\
@@ -45,7 +45,6 @@ $('#submit_traits').click( function(e) {
 		flash_select = "<div id='traits_flash' class='flash'>" + select_message + "</div>"
 		$("#traits_flash").replaceWith(flash_select)
 	} else {
-		console.log($("form").serialize())
 		var submit_traits = $.ajax({
 			url: "/traits/" + level + "/create_trt",
 			data: $("form").serialize(),

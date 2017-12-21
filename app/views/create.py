@@ -633,7 +633,7 @@ def create_trt(level):
 					filename = file_details['filename'], 
 					_external = True)
 				#send email if requested and include as attachment if less than ~5mb
-				if request.form.get('email_checkbox'):
+				if [i for i in request.form if i.endswith("email_checkbox")]:
 					recipients=[User(session['username']).find('')['email']]
 					subject = "BreedCAFS: traits.trt"
 					body = ("You requested a " + level + ".trt file from the BreedCAFS database. "

@@ -1,4 +1,6 @@
 *.pyc
 *.log
+logs/
 instance/
 venv/
+traits/
