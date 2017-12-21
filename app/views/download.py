@@ -87,7 +87,8 @@ def generate_csv():
 					username = session['username'], 
 					filename=file_details['filename'],
 					_external = True)
-				if request.form.get('email_checkbox'):
+				#if request.form.get(level + '-email_checkbox'):
+				if request.form.get('block-email_checkbox'):
 					recipients=[User(session['username']).find('')['email']]
 					subject = "BreedCAFS: Data file generated"
 					body = ('You requested data from the BreedCAFS database. The file is attached (if less than 5mb) and available at the following address: ' + download_url )
