@@ -366,7 +366,7 @@ class Cypher():
 		' OPTIONAL MATCH (tree)'
 			' <-[:FROM_TREE]-(ttt:TreeTreeTrait)'
 			' -[:DATA_FOR]->(:PlotTreeTrait) '
-			' -[:FOR_TRAIT]->(:TreeTrait {name:"name"}) '
+			' -[:FOR_TRAIT]->(:TreeTrait {name:"Custom name"}) '
 		' OPTIONAL MATCH (ttt) '
 			' <-[:DATA_FOR]-(data:Data) '
 		' RETURN { UID : tree.uid, '
