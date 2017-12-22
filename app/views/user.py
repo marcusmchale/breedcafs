@@ -332,9 +332,9 @@ def admin_users():
 		return redirect(url_for('login'))
 	else:
 		if 'global_admin' in session['access']:
-			users = [record[0] for record in User.get_users_for_admin(session['username'], 'global_admin')]
+			users = [record[0] for record in User(session['username']).get_users_for_admin('global_admin')]
 		elif 'partner_admin' in session['access']:
-			users = [record[0] for record in User.get_users_for_admin(session['username'], 'partner_admin')]
+			users = [record[0] for record in User(session['username']).get_users_for_admin('partner_admin')]
 		else:
 			flash('User access to this page is restricted to administrators')
 			return redirect(url_for('index'))

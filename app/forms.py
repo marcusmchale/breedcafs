@@ -1,4 +1,4 @@
-from flask import jsonify
+from flask import jsonify, session
 from wtforms import (StringField, 
 	PasswordField, 
 	BooleanField, 
@@ -109,7 +109,7 @@ class UserAdminForm(FlaskForm):
 		form = UserAdminForm()
 		form.confirmed_users.choices = []
 		form.unconfirmed_users.choices =[]
-		users = [record[0] for record in User.get_users_for_admin(user, access)]
+		users = [record[0] for record in User(session['username']).get_users_for_admin(access)]
 		for user in users:
 			user_table = "<td>" + user['Name'] + "</td><td>" + user['Partner'] + "</td>"
 			if user['Confirmed'] == True:

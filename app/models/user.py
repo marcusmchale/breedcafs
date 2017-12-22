@@ -185,19 +185,18 @@ class User:
 	@staticmethod		
 	def _password_reset(tx, email, password):
 		tx.run(Cypher.password_reset, email=email, password=bcrypt.encrypt(password))
-	#this retrieves the list of users the input user is able to administrate
-	@staticmethod
-	def get_users_for_admin(user, access):
+	#this retrieves the list of users the input user is able to confirm
+	def get_users_for_admin(self, access):
 		with get_driver().session() as neo4j_session:
-			return neo4j_session.read_transaction(User._get_users_for_admin, user, access)
-	@staticmethod
-	def _get_users_for_admin(tx, user, access):
+			return neo4j_session.read_transaction(self._get_users_for_admin, access)
+	def _get_users_for_admin(self, tx, access):
 		#if have global admin, retrieves all user accounts
 		if 'global_admin' in access:
 			users = tx.run(Cypher.global_admin_users)
-		#else if have partner_admin retrieves just those users that registered with a partner for which the current user has "admin_for" relationship with
+		#else if have partner_admin retrieves just those users that registered with a partner 
+		#for which the current user has "admin" in relationship with
 		elif 'partner_admin' in access:
-			users = tx.run(Cypher.partner_admin_users, user)
+			users = tx.run(Cypher.partner_admin_users, username = self.username)
 		return users
 	#this confirms/unconfirms lists of users
 	@staticmethod
