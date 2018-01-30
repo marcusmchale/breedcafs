@@ -52,25 +52,5 @@ class Chart:
 		with get_driver().session() as neo4j_session:
 			records = neo4j_session.read_transaction(self._get_plots_treecount)
 		#collect all nodes/rels from records into nested dict
-		nested={'name':'nodes','label':'root_node','children':[record[0] for record in records]}
-		#for record in records:
-		#	if record['C.name'] not in [country['name'] for country in nested['children']]:
-		#		nested['children'].append({'name':record['C.name'],'label':record['C_label'],'children':[]})
-		#	if record['R.name']:
-		#		for country in nested['children']:
-		#			if country['name'] == record['C.name']:
-		#				if record['R.name'] not in [region['name'] for region in country['children']]:
-		#					country['children'].append({'name':record['R.name'],'label':record['R_label'],'children':[]})
-		#				if record['F.name']:
-		#					for region in country['children']:
-		#						if region['name'] == record['R.name']:
-		#							if record['F.name'] not in [farm['name'] for farm in region['children']]:
-		#								region['children'].append({'name':record['F.name'],'label':record['F_label'],'children':[]})
-		#							if record['P.name']:
-		#								for farm in region['children']:
-		#									if record['P.name'] not in [plot['name'] for plot in farm['children']]:
-		#										farm['children'].append({'name':record['P.name'],'label':record['P_label'],
-		#											'uid':record['P.uid'],'treecount':record['T.count']})
-		#import pdb; pdb.set_trace();
+		nested = {'name':'nodes','label':'root_node','children':[record[0] for record in records]}
 		return jsonify(nested)
-		#return jsonify(nested)

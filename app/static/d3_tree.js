@@ -28,12 +28,12 @@ var load_chart = function () {
 	})
 }
 
+
 //first load it anyway
 load_chart();
 //and reload it in location_select.js when new locations/trees are submitted
 
 function load(data) {
-
 	//remove countries without region for chart
 	var i = data.children.length 
 	while (i--) {
