@@ -223,106 +223,130 @@ def add_affiliations():
 #catchall admin route, redirects for global vs partner admins
 @app.route('/admin', methods=['GET'])
 def admin():
-	if 'global_admin' in session['access']:
-		return render_template('admin_choice.html')
-	elif 'partner_admin' in session['access']:
-		return redirect(url_for('user_admin'))
+	if 'username' not in session:
+		flash('Please log in')
+		return redirect(url_for('login'))
 	else:
-		flash('You attempted to access a restricted page')
-		return redirect(url_for('index'))
+		if 'global_admin' in session['access']:
+			return render_template('admin_choice.html')
+		elif 'partner_admin' in session['access']:
+			return redirect(url_for('user_admin'))
+		else:
+			flash('You attempted to access a restricted page')
+			return redirect(url_for('index'))
 
 #a route for the user admin available to partner_admins (and global_admins)
 @app.route('/admin/user_admin', methods=['GET', 'POST'])
 def user_admin():
-	try:
-		if 'global_admin' in session['access']:
-			user_admin_form = UserAdminForm.update(session['username'],'global_admin')
-		elif 'partner_admin' in session['access']:
-			user_admin_form = UserAdminForm.update(session['username'],'partner_admin')
-		else:
-			flash ('You attempted to access a restricted page')
+	if 'username' not in session:
+		flash('Please log in')
+		return redirect(url_for('login'))
+	else:
+		try:
+			if 'global_admin' in session['access']:
+				user_admin_form = UserAdminForm.update(session['username'],'global_admin')
+			elif 'partner_admin' in session['access']:
+				user_admin_form = UserAdminForm.update(session['username'],'partner_admin')
+			else:
+				flash ('You attempted to access a restricted page')
+				return redirect(url_for('index'))
+			add_user_email_form = AddUserEmailForm()
+			remove_user_email_form  = RemoveUserEmailForm().update(session['username'])
+			return render_template('user_admin.html',
+				user_admin_form = user_admin_form,
+				add_user_email_form = add_user_email_form,
+				remove_user_email_form = remove_user_email_form)
+		except (ServiceUnavailable):
+			flash("Database unavailable")
 			return redirect(url_for('index'))
-		add_user_email_form = AddUserEmailForm()
-		remove_user_email_form  = RemoveUserEmailForm().update(session['username'])
-		return render_template('user_admin.html',
-			user_admin_form = user_admin_form,
-			add_user_email_form = add_user_email_form,
-			remove_user_email_form = remove_user_email_form)
-	except (ServiceUnavailable):
-		flash("Database unavailable")
-		return redirect(url_for('index'))
 
 #route to add new allowed users, the email is added to the current users own list
 @app.route('/admin/add_allowed_email', methods=['POST'])
 def add_allowed_user():
-	try:
-		if not set(session['access']).intersection(set(['global_admin','partner_admin'])):
-			flash ('You attempted to access a restricted page')
-			return redirect(url_for('index'))
-		else: 
-			add_user_email_form = AddUserEmailForm()
-			if add_user_email_form.validate_on_submit():
-				username = session['username']
-				email = request.form['user_email'].lower()
-				result = User(username).add_allowed_email(email)
-				if result:
-					return jsonify({'success':result})
+	if 'username' not in session:
+		flash('Please log in')
+		return redirect(url_for('login'))
+	else:
+		try:
+			if not set(session['access']).intersection(set(['global_admin','partner_admin'])):
+				flash ('You attempted to access a restricted page')
+				return redirect(url_for('index'))
+			else: 
+				add_user_email_form = AddUserEmailForm()
+				if add_user_email_form.validate_on_submit():
+					username = session['username']
+					email = request.form['user_email'].lower()
+					result = User(username).add_allowed_email(email)
+					if result:
+						return jsonify({'success':result})
+					else:
+						return jsonify({'error':'This email address is already allowed '})
 				else:
-					return jsonify({'error':'This email address is already allowed '})
-			else:
-				return jsonify({'error':add_user_email_form.errors["user_email"]})
-	except (ServiceUnavailable):
-		flash ("Database unavailable")
-		return redirect(url_for('index'))
+					return jsonify({'error':add_user_email_form.errors["user_email"]})
+		except (ServiceUnavailable):
+			flash ("Database unavailable")
+			return redirect(url_for('index'))
 
 #route to remove allowed users from a partner_admin's own list
 @app.route('/admin/remove_allowed_email', methods=['POST'])
 def remove_allowed_user():
-	try:
-		if not set(session['access']).intersection(set(['global_admin','partner_admin'])):
-			flash ('You attempted to access a restricted page')
+	if 'username' not in session:
+		flash('Please log in')
+		return redirect(url_for('login'))
+	else:		
+		try:
+			if not set(session['access']).intersection(set(['global_admin','partner_admin'])):
+				flash ('You attempted to access a restricted page')
+				return redirect(url_for('index'))
+			else: 
+				username = session['username']
+				remove_user_email_form = RemoveUserEmailForm.update(username)
+				if remove_user_email_form.validate_on_submit():
+					emails = request.form.getlist('emails_list')
+					result = User(username).remove_allowed_email(emails)
+					return jsonify({'success':result})
+				else:
+					return jsonify({'error':add_user_email_form.errors["user_email"]})
+		except (ServiceUnavailable):
+			flash ("Database unavailable")
 			return redirect(url_for('index'))
-		else: 
-			username = session['username']
-			remove_user_email_form = RemoveUserEmailForm.update(username)
-			if remove_user_email_form.validate_on_submit():
-				emails = request.form.getlist('emails_list')
-				result = User(username).remove_allowed_email(emails)
-				return jsonify({'success':result})
-			else:
-				return jsonify({'error':add_user_email_form.errors["user_email"]})
-	except (ServiceUnavailable):
-		flash ("Database unavailable")
-		return redirect(url_for('index'))
 
 
 #a route to get the list of allowed emails a partner_admin has added
 @app.route('/admin/get_user_allowed_emails')
 def get_user_allowed_emails():
-	try: 
-		if not set(session['access']).intersection(set(['global_admin','partner_admin'])):
-			flash ('You attempted to access a restricted page')
+	if 'username' not in session:
+		flash('Please log in')
+		return redirect(url_for('login'))
+	else:
+		try: 
+			if not set(session['access']).intersection(set(['global_admin','partner_admin'])):
+				flash ('You attempted to access a restricted page')
+				return redirect(url_for('index'))
+			else: 
+				return jsonify(User(session['username']).get_user_allowed_emails())
+		except (ServiceUnavailable):
+			flash ("Database unavailable")
 			return redirect(url_for('index'))
-		else: 
-			return jsonify(User(session['username']).get_user_allowed_emails())
-	except (ServiceUnavailable):
-		flash ("Database unavailable")
-		return redirect(url_for('index'))
 
 
 #a route for partner admin only available to global admins
 @app.route('/admin/partner_admin', methods=['GET', 'POST'])
 def partner_admin():
-	if 'global_admin' in session['access']:
-		try:
-			form = PartnerAdminForm.update()
-			return render_template('partner_admin.html', form=form)
-		except (ServiceUnavailable):
-			flash("Database unavailable")
-			return redirect(url_for('index'))
+	if 'username' not in session:
+		flash('Please log in')
+		return redirect(url_for('login'))
 	else:
-		flash ('You attempted to access a restricted page')
-		return redirect(url_for('index'))
+		if 'global_admin' in session['access']:
+			try:
+				form = PartnerAdminForm.update()
+				return render_template('partner_admin.html', form=form)
+			except (ServiceUnavailable):
+				flash("Database unavailable")
+				return redirect(url_for('index'))
+		else:
+			flash ('You attempted to access a restricted page')
+			return redirect(url_for('index'))
 
 #endpoint to get lists of users in html table format to populate the form on user_admin page
 @app.route('/admin/users', methods = ['GET'])

@@ -646,19 +646,31 @@ class Cypher():
 		#And give the user feedback on their submission success
 		' RETURN d.found' 
 		)
-	get_plots_treecount = (
-		' MATCH (C:Country) '
-		' OPTIONAL MATCH (C) <-[:IS_IN]-(R:Region) '
-		' OPTIONAL MATCH (R) <-[:IS_IN]-(F:Farm) '
-		' OPTIONAL MATCH (F) <-[:IS_IN]-(P:Plot) '
-		' OPTIONAL MATCH (P) <-[:IS_IN]-(pt:PlotTrees) '
-		' OPTIONAL MATCH (pt) <-[:FOR]-(T:Counter {name:"Trees"}) '
-		' RETURN '
-			' labels(C)[0] as C_label, '
-			' labels(R)[0] as R_label, '
-			' labels(F)[0] as F_label, '
-			' labels(P)[0] as P_label, '
-			' C.name, R.name, F.name, P.name, P.uid, T.count ' )
+#	get_plots_treecount = (
+#		' MATCH (C:Country) '
+#		' OPTIONAL MATCH (C) <-[:IS_IN]-(R:Region) '
+#		' OPTIONAL MATCH (R) <-[:IS_IN]-(F:Farm) '
+#		' OPTIONAL MATCH (F) <-[:IS_IN]-(P:Plot) '
+#		' OPTIONAL MATCH (P) <-[:IS_IN]-(pt:PlotTrees) '
+#		' OPTIONAL MATCH (pt) <-[:FOR]-(T:Counter {name:"Trees"}) '
+#		' RETURN '
+#			' labels(C)[0] as C_label, '
+#			' labels(R)[0] as R_label, '
+#			' labels(F)[0] as F_label, '
+#			' labels(P)[0] as P_label, '
+#			' C.name, R.name, F.name, P.name, P.uid, T.count ' )
+	get_plots_treecount = (' MATCH (C:Country)<-[:IS_IN]-(R:Region) '
+		' OPTIONAL MATCH (R)<-[:IS_IN]-(F:Farm) '
+		' OPTIONAL MATCH (F)<-[:IS_IN]-(P:Plot) '
+		' OPTIONAL MATCH (P)<-[:IS_IN]-(:PlotTrees)<-[:FOR]-(T:Counter {name:"Trees"}) '
+		' OPTIONAL MATCH (P)<-[:IS_IN*..2]-(B:Block) '
+		' OPTIONAL MATCH (B)<-[:IS_IN*..2]-(t:Tree) '
+		' WITH C, R, F, P, T, {name: B.name, label:"Block", treecount:count(t)} as blocks, count(t) as blocktrees '
+		' WITH C, R, F, {name: P.name, label:"Plot", treecount: T.count - sum(blocktrees), children:collect(blocks)} as plots '
+		' WITH C, R, {name: F.name, label:"Farm", children: collect(plots)} as farms '
+		' WITH C, {name: R.name, label:"Region", children: collect(farms)} as regions '
+		' WITH {name: C.name, label:"Country", children: collect (regions)} as countries '
+		' RETURN countries ' )
 	get_submissions_range = ( 
 		# gets arguments to filter by time from last SUBMITTED relationship
 		# currently not using these though

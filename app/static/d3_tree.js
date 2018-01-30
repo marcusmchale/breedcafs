@@ -86,7 +86,7 @@ function update(source) {
 	var links = treeData.descendants().slice(1);
 
 	//normalise for fixed depth
-	nodes.forEach(function(d){ d.y = d.depth * 100 });
+	nodes.forEach(function(d){ d.y = d.depth * 80 });
 
 	// **NODES **
 
