@@ -38,6 +38,8 @@ class Samples:
 		#register samples and return index data
 		with get_driver().session() as neo4j_session:
 			neo4j_session.write_transaction(self._add_samples)
+		if len(self.id_list) == 0:
+			return { "error" : "Please check the trees selected are registered in the database"}
 		#create user download path if not found
 		if not os.path.isdir(os.path.join(app.instance_path, app.config['DOWNLOAD_FOLDER'], session['username'])):
 			os.mkdir(os.path.join(app.instance_path, app.config['DOWNLOAD_FOLDER'], session['username']))

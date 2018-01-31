@@ -785,8 +785,8 @@ def add_samples():
 				#register samples, make file describing index information and return filename etc.
 				file_details = Samples().add_samples(plotID, start, end, replicates, tissue, storage, date)
 				#if result = none then no data was found
-				if file_details == None:
-					return jsonify({'submitted' : "No entries found that match your selection"})
+				if 'error' in file_details:
+					return jsonify({'submitted':file_details['error']})
 				#create a download url
 				download_url = url_for('download_file', 
 					username = session['username'], 
