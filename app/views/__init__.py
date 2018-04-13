@@ -8,9 +8,10 @@ from create import (create,
 	regions, 
 	farms, 
 	plots, 
-	blocks, 
+	blocks)
+from collect import (collect,
 	tissues,
 	storage_methods)
+from record import record
 from chart import json_submissions
 from flask.views import View
-

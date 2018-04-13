@@ -2,6 +2,19 @@ remove_flash = function() {
 	$(".flash").remove();
 }
 
+$('#submission_type').val('FB');
+$('#table_details').hide()
+
+//hide boxes that aren't relevant
+$('#submission_type').change(function () {
+    remove_flash();
+	if (this.value === 'FB') {
+		$('#table_details').hide()
+	} else {
+		$('#table_details').show();
+	}
+});
+
 //generate traits.csv
 $('#upload_submit').click( function(e) {
 	e.preventDefault();
@@ -20,8 +33,10 @@ $('#upload_submit').click( function(e) {
 			if (response.hasOwnProperty('submitted')) {
 				flash_submitted = "<div id='upload_submit_flash' class='flash'> " + response.submitted + " </div>";
 				$("#upload_submit_flash").replaceWith(flash_submitted);
-				$('svg').empty();
-				task_id = response.task_id;
+				if (response.hasOwnProperty('task_id')) {
+				    $('svg').empty();
+				    poll(response.task_id);
+				}
 			} else {
 				$("#upload_submit_flash").remove();
 				for (var key in response){
@@ -38,15 +53,17 @@ $('#upload_submit').click( function(e) {
 	//button was hidden, reveal again.
 	$("#upload_submit").show();
 	//poll for result of submission
-	function poll() {
+	function poll(task_id) {
 		setTimeout( function () {
 			$.ajax({
 				type: 'GET',
 				url: "/status/" + task_id +"/",
-				success: function(response) { //check if available
+				success: function(response) {
 					if (response.hasOwnProperty('status')) {
 						flash_status = "<div id='upload_submit_flash' class='flash'> " + response.status + "</div>";
 						$("#upload_submit_flash").replaceWith(flash_status);
+						if (response.status !== 'SUCCESS') { poll(task_id) };
+					    if (response.status === 'SUCCESS') { load_graph() };
 					}
 					if (response.hasOwnProperty('result')) {
 						if (typeof response.result !== "undefined") {
@@ -55,11 +72,12 @@ $('#upload_submit').click( function(e) {
 							$("#upload_submit_flash").replaceWith(flash_result);
 						}
 					}
-					if (response.status !== 'SUCCESS') { poll() };
-					if (response.status === 'SUCCESS') { load_graph() };
 				}
 			});
 		}, 1000);
 	}
-	submit.done(poll())
-})
+});
+
+//Render a calendar in jquery-ui for date selection
+$("#date").datepicker({ dateFormat: 'yy-mm-dd'});
+$('#time').timepicker({ dateFormat: 'hh-mm'});

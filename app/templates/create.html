@@ -1,34 +1,40 @@
 {% extends "layout.html" %}	
 {% block body %}
-<div class="text_body">
-	<h2>Plots</h2>
-		<dl>
-			<dt><a href="{{ url_for('location_plots') }}">Register plots</a></dt>
-			<dd>Register plots and export plots.csv for Field-Book</dd>
-			<dt><a href="{{ url_for('select_traits', level='plot') }}">Select plot traits</a></dt>
-			<dd>Create a custom plot_traits.trt for import to Field-Book</dd>
-		</dl>
-	<h2>Blocks</h2>
-		<dl>
-			<dt><a href="{{ url_for('location_blocks') }}">Register blocks</a></dt>
-			<dd>Register blocks and export blocks.csv for Field-Book</dd>	
-			<dt><a href="{{ url_for('select_traits', level='block') }}">Select block traits</a></dt>
-			<dd>Create a custom block_traits.trt for import to Field-Book</dd>
-		</dl>
-	<h2>Trees</h2>
-		<dl>
-			<dt><a href="{{ url_for('location_trees') }}">Register trees</a></dt>
-			<dd>Register trees and export trees.csv for Field-Book</dd>
-			<dt><a href="{{ url_for('select_traits', level='tree') }}">Select tree traits</a></dt>
-			<dd>Create a custom tree_traits.trt for import to Field-Book</dd>
-		</dl>
-	<h2>Samples</h2>
-		<dl>
-			<dt><a href="{{ url_for('sample_reg') }}">Register samples</a></dt>
-			<dd>Register samples and export samples.csv for Field-Book</dd>
-			<dt><a href="{{ url_for('select_traits', level='sample') }}">Select sample traits</a></dt>
-			<dd>Create a custom sample_traits.trt for import to Field-Book</dd>
-		</dl>
-
+	<div class="text_body">
+		<p>On this page you can register new fields and trees into the database for subsequent sampling and data collection</p> 
+		{% from "_formhelpers_location_fields.html" import render_field %}
+		<form action="{{ url_for('create') }}" id="create" method="post">
+			{{ location_form.csrf_token }}
+			{{ render_field (location_form.country) }}
+			{{ render_field (add_country.text_country) }} 
+			{{ render_field (add_country.submit_country) }}
+			{{ render_field (location_form.region) }}
+			{{ render_field (add_region.text_region) }} 
+			{{ render_field (add_region.submit_region) }}
+			{{ render_field (location_form.farm) }}
+			{{ render_field (add_farm.text_farm) }} 
+			{{ render_field (add_farm.submit_farm) }}
+			{{ render_field (location_form.plot) }}
+			{{ render_field (add_plot.text_plot) }} 
+			{{ render_field (add_plot.submit_plot) }}
+			<a>Optional (but preferred):</a>
+			{{ render_field (location_form.block) }}
+			{{ render_field (add_block_form.text_block) }}
+			{{ render_field (add_block_form.submit_block) }}
+			<br><a>Add trees to the selected plot/block</a><br>
+			{{ render_field (add_trees_form.count) }}
+			{{ render_field (add_trees_form.submit_trees) }}
+		</form>
+	</div>
+<script src="{{ url_for('static', filename='jquery_1.8.3_min.js') }}"></script>
+<script src="{{ url_for('static', filename='jquery_location.js') }}"></script>
+{% endblock %}
+{% block chart %}
+<div class="chart">
+	<p>Registered plots and counts of trees (click to expand/collapse)</p>
+	<svg width=500 height=500></svg>
 </div>
+<script>jsonData = "/json_plots_treecount";</script>
+<script src="{{ url_for('static', filename='d3.v4.min.js') }}"></script>
+<script src="{{ url_for('static', filename='d3_tree.js') }}"></script>
 {% endblock %}

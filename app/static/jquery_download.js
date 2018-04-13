@@ -1,24 +1,4 @@
 //LOCATION
-//update blockx (not in location form as different rendering on different pages (list dropbox))
-update_blocks = function() {
-	var sel_plot = $("#plot").find(":selected").val();
-	if (sel_plot !== "") {
-		var request = $.ajax({
-			type: 'GET',
-			url: "/location/blocks/" + sel_plot + '/',
-		});
-		request.done(function(data){
-			var blocks = [["","Select Block"]].concat(data).sort();
-			$("#block").empty();
-			for (var i = 0; i < blocks.length; i++) {
-				$("#block").append(
-					$("<option></option>").attr(
-						"value", blocks[i][0]).text(blocks[i][1])
-				);
-			}
-		});
-	}
-};
 
 //hide boxes that aren't relevant
 $('#country').change(update_blocks).change(function () {
@@ -67,7 +47,7 @@ $('#block').hide();
 $('#submit_block_traits').remove();
 $('#submit_tree_traits').remove();
 
-//also load set trait level undefined by defauly and only display level traits when selected
+//also load set trait level undefined by default and only display level traits when selected
 $('#trait_level').val('0');
 $('#sample_traits,#tree_traits,#block_traits,#plot_traits').hide();
 

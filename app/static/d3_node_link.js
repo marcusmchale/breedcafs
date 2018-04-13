@@ -7,9 +7,12 @@ var svg = d3.select("svg"),
 	link;
 
 var simulation = d3.forceSimulation()
+    .force("center", d3.forceCenter(width/2, height/2))
 	.force("link", d3.forceLink().id(function (d) {return d.id;}).distance(50).strength(1))
-	.force("charge", d3.forceManyBody().strength(-100).distanceMin(10).distanceMax(300))
-	.force("center", d3.forceCenter(width / 2, height / 2));
+	.force("charge", d3.forceManyBody().strength(-30).distanceMin(10).distanceMax(300))
+	.force("collision", d3.forceCollide().radius(function(d) {
+	    return d.radius
+	}).strength(1000))
 
 var load_graph = function() {
 	// load graph (nodes,links) json from /graph endpoint
@@ -77,10 +80,14 @@ var ticked = function() {
 			+ ")"; 
 		});
 	link
-		.attr("x1", function(d) { return d.source.x; })
-		.attr("y1", function(d) { return d.source.y; })
-		.attr("x2", function(d) { return d.target.x; })
-		.attr("y2", function(d) { return d.target.y; });
+	    .attr("x1", function(d) { return Math.max(radius, Math.min(width-radius, d.source.x)); })
+	    .attr("y1", function(d) { return Math.max(radius, Math.min(height-radius, d.source.y)); })
+	    .attr("x2", function(d) { return Math.max(radius, Math.min(width-radius, d.target.x)); })
+	    .attr("y2", function(d) { return Math.max(radius, Math.min(height-radius, d.target.y)); })
+		//.attr("x1", function(d) { return d.source.x; })
+		//.attr("y1", function(d) { return d.source.y; })
+		//.attr("x2", function(d) { return d.target.x; })
+		//.attr("y2", function(d) { return d.target.y; });
 }
 
 var dragstarted = function(d) {

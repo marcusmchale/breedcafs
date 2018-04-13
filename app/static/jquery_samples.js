@@ -110,55 +110,6 @@ $("#submit_samples").click( function(e) {
 	});
 })
 
-
-//custom samples csv
-
-$("#make_samples_csv").click( function(e) {
-	e.preventDefault();
-	$(".flash").remove();
-	wait_message = "Please wait for file to be generated"
-	flash_wait = "<div id='samples_flash' class='flash'>" + wait_message + "</div>"
-	$(this).parent().after(flash_wait);
-	var submit_samples = $.ajax({
-		url: "/get_samples",
-		data: $("form").serialize(),
-		type: 'POST',
-		success: function(response) {
-			console.log(response);
-			if (response.hasOwnProperty('submitted')) {
-				flash_submitted = "<div id='samples_flash' class='flash'> " + response.submitted + " </div>";
-				$("#samples_flash").replaceWith(flash_submitted);
-			} else {
-				$("#samples_flash").remove();
-				for (var key in response[0]){
-					if (response[0].hasOwnProperty(key)) {
-						flash = "<div id='flash_" + key + "' class='flash'>" + response[0][key][0] + "</div>";
-						$('#' + key).after(flash);
-					}
-				}
-				//this response is an array from two forms so need two of these (alternatively could iterate over these...)
-				for (var key in response[1]){
-					if (response[1].hasOwnProperty(key)) {
-						flash = "<div id='flash_" + key + "' class='flash'>" + response[1][key][0] + "</div>";
-						$('#' + key).after(flash);
-					}
-				}
-			}
-		},
-		error: function(error) {
-		}
-	});
-})
-
-//button to reset form values
-$("#make_samples_csv").after('<input id="reset_form_button" name="Reset Form" value="Clear Form" type="submit")>')
-
-$("#reset_form_button").click( function(e) {
-	e.preventDefault();
-	$("#sample_reg").find('input:text').val('');
-	$("#sample_reg").find('select').val('');
-	})
-
 //Render a calendar in jquery-ui for date selection
 $("#date_collected").datepicker({ dateFormat: 'yy-mm-dd'});
 $("#date_from").datepicker({ dateFormat: 'yy-mm-dd'});

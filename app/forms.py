@@ -168,10 +168,10 @@ class LocationForm(FlaskForm):
 	def update(optional = False):
 		form = LocationForm()
 		COUNTRIES = sorted(set(Lists('Country').create_list_tup('name','name')), key=lambda tup: tup[1])
-		REGIONS = sorted(set(Lists('Country').get_connected('name', form.country.data, 'IS_IN')), key=lambda tup: tup[1])
-		FARMS = sorted(set(Fields(form.country.data).get_farms(form.region.data)), key=lambda tup: tup[1])
+		REGIONS = sorted(set(Lists('Country').get_connected('name', form.country.data, 'IS_IN')), key=lambda tup: tup[0])
+		FARMS = sorted(set(Fields(form.country.data).get_farms(form.region.data)), key=lambda tup: tup[0])
 		PLOTS = sorted(set(Fields(form.country.data).get_plots_tup(form.region.data, form.farm.data)), key=lambda tup: tup[1])
-		BLOCKS = sorted(set(Fields.get_blocks_tup(form.plot.data)), key=lambda tup: tup[1])
+		BLOCKS = sorted(set(Fields.get_blocks_tup(form.plot.data)), key=lambda tup: tup[0])
 		form.country.choices = [('','Select Country')] + COUNTRIES
 		form.region.choices = [('','Select Region')] + [(REGIONS[i], REGIONS[i]) for i, items in enumerate(REGIONS)]
 		form.farm.choices = [('','Select Farm')] + [(FARMS[i], FARMS[i]) for i, items in enumerate(FARMS)]
@@ -268,10 +268,10 @@ class AddTreesForm(FlaskForm):
 class CustomTreesForm(FlaskForm):
 	id = "custom_trees_Form"
 	email_checkbox_custom = BooleanField('Email checkbox custom')
-	trees_start = 	IntegerField('Start TreeID',[InputRequired(), 
+	trees_start = 	IntegerField('Start TreeID',[Optional(),
 		NumberRange(min=1, max=1000000, message='')],
 		description= "Start TreeID")
-	trees_end = IntegerField('End TreeID',[InputRequired(), 
+	trees_end = IntegerField('End TreeID',[Optional(),
 		NumberRange(min=1, max=1000000, message='')],
 		description= "End TreeID")
 	custom_trees_csv = SubmitField('Custom trees.csv')
@@ -325,8 +325,9 @@ class SampleRegForm(FlaskForm):
 		form.tissue.choices = [('','Select Tissue')] + TISSUES
 		form.storage.choices = [('','Select Storage')] + STORAGE_TYPES
 		if optional == False:
-			form.trees_start.validators.append(InputRequired())
-			form.trees_end.validators.append(InputRequired())
+			#leave trees as optional and provide default as being all trees in plot
+			form.trees_start.validators.insert(0, Optional())
+			form.trees_end.validators.insert(0, Optional())
 			form.replicates.validators.append(InputRequired())
 			form.tissue.validators.append(InputRequired())
 			form.storage.validators.append(InputRequired())
@@ -343,9 +344,14 @@ class SampleRegForm(FlaskForm):
 class CustomSampleForm(FlaskForm):
 	id = "custom_sample_Form"
 	email_checkbox_custom = BooleanField('Email checkbox custom')
-	samples_start = IntegerField('Start SampleID', [Optional(), 
-		NumberRange(min=1, max=1000000000, message='')],
-		description= "Start SampleID")
+	samples_start = IntegerField(
+		'Start SampleID',
+		[
+			Optional(),
+			NumberRange(min=1, max=1000000000, message='')
+		],
+		description="Start SampleID",
+	)
 	samples_end = IntegerField('End SampleID', [Optional(), 
 		NumberRange(min=1, max=1000000000, message='')],
 		description= "End SampleID")
@@ -355,15 +361,54 @@ class CustomSampleForm(FlaskForm):
 	date_to = DateField('Date end (YYYY-mm-dd): ', [Optional()],
 		format='%Y-%m-%d',
 		description = 'End date')
-	make_samples_csv = SubmitField('Custom samples.csv')
+	make_samples_csv = SubmitField('Generate list')
 
+#record
+class RecordForm(FlaskForm):
+	trait_level = SelectField('Trait level', [InputRequired()],
+		choices = [('','Select Level'),('plot','Plot'),('block','Block'),('tree','Tree'),('sample','Sample'),])
+	template_format = SelectField('Template format', [InputRequired()],
+		choices = [('', 'Select Format'),('fb','Field Book'),('csv','CSV template')])
+	new_sample_replicates = IntegerField(
+		'Replicates',
+		[
+			Optional(),
+			NumberRange(min=1, max=100, message='Maximum of 100 replicates per submission')
+		],
+		description = "Replicates"
+	)
+	old_new_samples = SelectField(
+		'Find existing or create new sample IDs',
+		[InputRequired()],
+		choices = [('old','Find existing IDs'),('new','Create new IDs')]
+	)
+	submit_record = SubmitField('Generate file/s')
 
 #upload
 class UploadForm(FlaskForm):
 	id = "upload_form"
-	submission_type =  SelectField('Submission type:', [InputRequired()], 
-		choices = sorted([('FB','Field Book Database')], key=lambda tup: tup[1]))
+	strip_filter = lambda x: x.strip() if x else None
+	submission_type =  SelectField('Submission type:', [InputRequired()],
+		choices = sorted([('FB','Field Book CSV'),('table', 'Table Template CSV')], key=lambda tup: tup[1]))
 	file = FileField('Select a file:', [FileRequired()])
+	user = StringField(
+		'Person (field staff/lab member)',
+		[Optional(),
+		Regexp('([^\x00-\x7F]|\w)+', message='Name contains illegal characters'),
+		Length(min=1, max=50, message='Maximum 50 characters')],
+		filters=[strip_filter],
+		description = "User"
+	)
+	date = DateField(
+		'Date (YYYY-mm-dd): ',
+		[Optional()],
+		format='%Y-%m-%d',
+		description = 'Date')
+	time =DateTimeField(
+		'Time (HH:mm)',
+		[Optional()],
+		format = '%H:%M'
+	)
 	upload_submit = SubmitField('Upload')
 
 #download

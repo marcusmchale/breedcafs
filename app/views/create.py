@@ -22,23 +22,10 @@ from app.forms import (LocationForm,
 	BlocksForm, 
 	AddTreesForm, 
 	CustomTreesForm, 
-	CustomSampleForm,
-	SampleRegForm, 
-	AddTissueForm, 
-	AddStorageForm, 
 	CreateTraits)
 from app.emails import send_attachment, send_static_attachment, send_email
 from flask.views import MethodView
 from datetime import datetime
-
-@app.route('/create', methods=['GET'])
-def create():
-	if 'username' not in session:
-		flash('Please log in')
-		return redirect(url_for('login'))
-	else:
-		return render_template('create.html', title='Create')
-
 
 #endpoints to get locations as tuples for forms
 class countries(MethodView):
@@ -117,6 +104,35 @@ class blocks(MethodView):
 			except (ServiceUnavailable):
 				flash("Database unavailable")
 				return redirect(url_for('index'))
+
+
+@app.route('/create', methods=['GET', 'POST'])
+def create():
+	if 'username' not in session:
+		flash('Please log in')
+		return redirect(url_for('login'))
+	else:
+		try:
+			location_form = LocationForm.update()
+			add_country = AddCountry()
+			add_region = AddRegion()
+			add_farm = AddFarm()
+			add_plot = AddPlot()
+			add_block_form = AddBlock()
+			add_trees_form = AddTreesForm()
+			return render_template('create.html',
+				location_form = location_form,
+				add_country = add_country, 
+				add_region = add_region, 
+				add_farm = add_farm, 
+				add_plot = add_plot,
+				add_block_form = add_block_form,
+				add_trees_form = add_trees_form,
+				title = 'Register fields and submit details')
+		except (ServiceUnavailable):
+				flash("Database unavailable")
+				return redirect(url_for('index'))
+
 
 @app.route('/add_country', methods=["POST"])
 def add_country():
@@ -214,112 +230,6 @@ def add_plot():
 				flash("Database unavailable")
 				return redirect(url_for('index'))
 
-@app.route('/location_plots', methods=['GET', 'POST'])
-def location_plots():
-	if 'username' not in session:
-		flash('Please log in')
-		return redirect(url_for('login'))
-	else:
-		try:
-			location_form = LocationForm.update()
-			add_country = AddCountry()
-			add_region = AddRegion()
-			add_farm = AddFarm()
-			add_plot = AddPlot()
-			plots_form = PlotsForm()
-			return render_template('location_plots.html', 
-				location_form = location_form,
-				add_country = add_country, 
-				add_region = add_region, 
-				add_farm = add_farm, 
-				add_plot = add_plot,
-				plots_form = plots_form,
-				title = 'Register fields and submit details')
-		except (ServiceUnavailable):
-				flash("Database unavailable")
-				return redirect(url_for('index'))
-
-@app.route('/generate_plots_csv', methods=["POST"])
-def generate_plots_csv():
-	if 'username' not in session:
-		flash('Please log in')
-		return redirect(url_for('login'))
-	else:
-		try:
-			location_form = LocationForm.update(optional = True)
-			plots_form = PlotsForm()
-			if all([location_form.validate_on_submit(), plots_form.validate_on_submit()]):
-				farm = request.form['farm']
-				region = request.form['region']
-				country = request.form['country']
-				parameters = {}
-				query = 'MATCH (p:Plot)-[:IS_IN]->(f:Farm '
-				if farm != '':
-					query = query + '{name: $farm}'
-					parameters['farm'] = farm
-				query = query +  ')-[:IS_IN]-(r:Region '
-				if region != '':
-					query = query + '{name: $region}'
-					parameters['region'] = region
-				query = query + ')-[:IS_IN]->(c:Country'
-				if country != '':
-					query = query + '{name: $country}'
-					parameters['country'] = country
-				query = query + (') RETURN {'
-					' UID : p.uid, '
-					' Plot : p.name, '
-					' Farm : f.name, '
-					' Region : r.name, '
-					' Country : c.name }'
-					' ORDER BY p.uid' )
-				#make the file and return a dictionary with filename, file_path and file_size
-				file_details = Fields.make_plots_csv(session['username'], query, parameters)
-				#if result = none then no data was found
-				if file_details == None:
-					return jsonify({'submitted' : "No entries found that match your selection"})
-				#create a download url for the file
-				download_url = url_for('download_file', 
-					username = session['username'], 
-					filename=file_details['filename'], 
-					_external = True)
-				#if selected send an email copy of the file (or link to download if greater than ~5mb)
-				if request.form.get('email_checkbox'):
-					recipients=[User(session['username']).find('')['email']]
-					subject = "BreedCAFS: plots.csv"
-					body = ("You requested the attached plots.csv file from the BreedCAFS database tools. "
-						+ " This file is also available for download at the following address: "
-						+ download_url )
-					html = render_template('emails/generate_plots.html',
-						download_url = download_url)
-					if file_details['file_size'] < 5000000:
-						send_static_attachment(subject, 
-							app.config['ADMINS'][0], 
-							recipients, 
-							body, 
-							html,
-							file_details['filename'],
-							'text/csv',
-							file_details['file_path'])
-						return jsonify({'submitted' : ('Your file is ready for download and a copy has been sent to your email as an attachment:'
-							+ '"<a href="' + download_url + '">' + file_details['filename'] + '</a>"')})
-					else:
-						send_email(subject,
-							app.config['ADMINS'][0],
-							recipients,
-							body,
-							html)
-						return jsonify({'submitted' : 'Your file is ready for download and a link has been sent to your email address:'
-							+ '"<a href="' + download_url + '">' + file_details['filename'] + '</a>"'})
-				#return as jsonify so that can be interpreted the same way as error message
-				else:
-					return jsonify({'submitted' : 'Your file is ready for download: "<a href="' + download_url + '">' + file_details['filename'] + '</a>"'})
-			else:
-				errors = jsonify([location_form.errors, plots_form.errors])
-				return errors
-		except (ServiceUnavailable):
-				flash("Database unavailable")
-				return redirect(url_for('index'))
-
 @app.route('/add_block', methods=["POST"])
 def add_block():
 	if 'username' not in session:
@@ -346,110 +256,6 @@ def add_block():
 				flash("Database unavailable")
 				return redirect(url_for('index'))
 
-@app.route('/location_blocks', methods=['GET', 'POST'])
-def location_blocks():
-	if 'username' not in session:
-		flash('Please log in')
-		return redirect(url_for('login'))
-	else:
-		try:
-			location_form = LocationForm.update()
-			add_block_form = AddBlock()
-			blocks_form = BlocksForm()
-			return render_template('location_blocks.html', 
-				location_form = location_form,
-				blocks_form = blocks_form,
-				add_block_form = add_block_form,
-				title = 'Register blocks and create blocks.csv')
-		except (ServiceUnavailable):
-				flash("Database unavailable")
-				return redirect(url_for('index'))
-
-
-@app.route('/generate_blocks_csv', methods=["POST"])
-def generate_blocks_csv():
-	if 'username' not in session:
-		flash('Please log in')
-		return redirect(url_for('login'))
-	else:
-		try:
-			location_form = LocationForm.update()
-			blocks_form = BlocksForm()
-			if all([location_form.validate_on_submit(), blocks_form.validate_on_submit()]):
-				plotID = int(request.form['plot'])
-				#make the file and return a dictionary with filename, file_path and file_size
-				file_details = Fields.make_blocks_csv(session['username'], plotID)
-				#if result = none then no data was found
-				if file_details == None:
-					return jsonify({'submitted' : "No entries found that match your selection"})
-				#create a download url for the file
-				download_url = url_for('download_file', 
-					username = session['username'], 
-					filename=file_details['filename'], 
-					_external = True)
-				#if selected send an email copy of the file (or link to download if greater than ~5mb)
-				if request.form.get('email_checkbox'):
-					recipients=[User(session['username']).find('')['email']]
-					subject = "BreedCAFS: blocks.csv"
-					body = ("You requested a blocks.csv file for blocks in plotID: " + str(plotID)
-						+ " These are described in the attached file (if less than 5mb) that is also available for download at the following address: "
-						+ download_url )
-					html = render_template('emails/generate_blocks.html',
-						plotID=plotID,
-						download_url = download_url)
-					if file_details['file_size'] < 5000000:
-						send_static_attachment(subject, 
-							app.config['ADMINS'][0], 
-							recipients, 
-							body, 
-							html,
-							file_details['filename'],
-							'text/csv',
-							file_details['file_path'])
-						return jsonify({'submitted' : ('Your file is ready for download and a copy has been sent to your email as an attachment:'
-							+ '"<a href="' + download_url + '">' + file_details['filename'] + '</a>"')})
-					else:
-						send_email(subject,
-							app.config['ADMINS'][0],
-							recipients,
-							body,
-							html)
-						return jsonify({'submitted' : 'Your file is ready for download and a link has been sent to your email address:'
-							+ '"<a href="' + download_url + '">' + file_details['filename'] + '</a>"'})
-				#return as jsonify so that can be interpreted the same way as error message
-				else:
-					return jsonify({'submitted' : 'Your file is ready for download: "<a href="' + download_url + '">' + file_details['filename'] + '</a>"'})
-			else:
-				errors = jsonify([location_form.errors, blocks_form.errors])
-				return errors
-		except (ServiceUnavailable):
-				flash("Database unavailable")
-				return redirect(url_for('index'))
-
-#Trees
-@app.route('/location_trees', methods=['GET', 'POST'])
-def location_trees():
-	if 'username' not in session:
-		flash('Please log in')
-		return redirect(url_for('login'))
-	else:
-		try:
-			location_form = LocationForm.update()
-			add_trees_form = AddTreesForm()
-			add_country = AddCountry()
-			add_region = AddRegion()
-			add_farm = AddFarm()
-			add_plot = AddPlot()
-			custom_trees_form = CustomTreesForm()
-			return render_template('location_trees.html', 
-				location_form = location_form,
-				add_trees_form = add_trees_form, 
-				custom_trees_form = custom_trees_form,
-				title = 'Register trees and create trees.csv')
-		except (ServiceUnavailable):
-				flash("Database unavailable")
-				return redirect(url_for('index'))
-
 @app.route('/add_trees', methods=["POST"])
 def add_trees():
 	if 'username' not in session:
@@ -465,54 +271,13 @@ def add_trees():
 				blockUID = request.form['block']
 				#register trees, make a file and return filename etc.
 				if blockUID == "":
-					file_details = Fields.add_trees(plotID, count)
+					added_trees = Fields.add_trees(plotID, count)
 				else:
-					file_details = Fields.add_trees(plotID, count, blockUID)
-				#create a download url
-				download_url = url_for('download_file', 
-					username = session['username'], 
-					filename = file_details['filename'], 
-					_external = True)
-				if request.form.get('email_checkbox_add'):
-					recipients=[User(session['username']).find('')['email']]
-					subject = "BreedCAFS: Trees registered"
-					body = ( "You successfully registered " + str(count) + " trees in plotID: " + str(plotID) + "."
-						+ " These trees were assigned IDs from " + str(file_details['first_tree_id']) + " to " + str(file_details['last_tree_id'])
-						+ " and are described in a file (attached if less than 5mb) and available for download at the following address: " + download_url )
-					html = render_template('emails/add_trees.html',
-						count=count,
-						plotID=plotID,
-						download_url = download_url)
-					if file_details['file_size'] < 5000000:
-						send_static_attachment(subject, 
-							app.config['ADMINS'][0], 
-							recipients, 
-							body, 
-							html,
-							file_details['filename'],
-							'text/csv',
-							file_details['file_path'])
-						return jsonify({'submitted' : ('You successfully registered ' + str(count) + ' trees in plotID: ' + str(plotID) + '.'
-							+ ' These trees were assigned IDs from ' + str(file_details['first_tree_id']) + " to " + str(file_details['last_tree_id'])
-							+ ' and are described in this file: '
-							+ '"<a href="' + download_url + '">' + file_details['filename'] + '</a>'
-							+ ' This file has also been sent to your email address.')})
-					else:
-						send_email(subject,
-							app.config['ADMINS'][0],
-							recipients,
-							body,
-							html)
-						return jsonify({'submitted' : ('You successfully registered ' + str(count) + ' trees in plotID: ' + str(plotID) + '.'
-							+ ' These trees were assigned IDs from ' + str(file_details['first_tree_id']) + " to " + str(file_details['last_tree_id'])
-							+ ' and are described in this file:'
-							+ '"<a href="' + download_url + '">' + file_details['filename'] + '</a>'
-							+ ' This link has also been sent to your email address.')})
-				else:
-					return jsonify({'submitted' : 'You successfully registered ' + str(count) + ' trees in plotID ' + str(plotID)
-						+ ' These trees were assigned IDs from ' + str(file_details['first_tree_id']) + " to " + str(file_details['last_tree_id'])
-						+ ' and are described in this file: '
-						+ '<a href="' + download_url + '">' + file_details['filename'] + '</a>'})
+					added_trees = Fields.add_trees(plotID, count, blockUID)
+				return jsonify({'submitted' : str(count) + ' trees (TreeIDs: ' 
+					+ str(added_trees['first_tree_id'])
+					+ "-" + str(added_trees['last_tree_id']) + ') '
+					+ 'added to plot (plotID: ' + str(plotID) + ')</a>'})
 			else:
 				errors = jsonify([location_form.errors, add_trees_form.errors])
 				return errors
@@ -520,424 +285,4 @@ def add_trees():
 				flash("Database unavailable")
 				return redirect(url_for('index'))
 
-@app.route('/custom_trees_csv', methods=["POST"])
-def custom_trees_csv():
-	if 'username' not in session:
-		flash('Please log in')
-		return redirect(url_for('login'))
-	else:
-		try:
-			location_form = LocationForm.update()
-			custom_trees_form = CustomTreesForm()
-			if all([location_form.validate_on_submit(), custom_trees_form.validate_on_submit()]):
-				plotID = int(request.form['plot'])
-				start = int(request.form['trees_start'])
-				end = int(request.form['trees_end'])
-				#make the file and return filename, path, size
-				file_details = Fields.get_trees(plotID, start, end)
-				#if result = none then no data was found
-				if file_details == None:
-					return jsonify({'submitted' : "No entries found that match your selection"})
-				#create a download url
-				download_url = url_for('download_file', 
-					username = session['username'], 
-					filename = file_details['filename'], 
-					_external = True)
-				#send email if requested, as link if >5mb
-				if request.form.get('email_checkbox_custom'):
-					recipients = [User(session['username']).find('')['email']]
-					subject = "BreedCAFS: Custom trees.csv"
-					body = ("You requested a custom trees.csv file for trees " + str(file_details['first_tree_id']) + " to " 
-						+ str(file_details['last_tree_id']) + " in PlotID: " + str(plotID)
-						+ " This file is attached (if less than 5mb) and available for download at the following address: " + download_url )
-					html = render_template('emails/custom_trees.html',
-						start= str(file_details['first_tree_id']),
-						end=str(file_details['last_tree_id']),
-						plotID=plotID)
-					if file_details['file_size'] < 5000000:
-						send_static_attachment(subject, 
-							app.config['ADMINS'][0], 
-							recipients, 
-							body, 
-							html, 
-							file_details['filename'], 
-							'text/csv',
-							file_details['file_path'])
-						return jsonify({'submitted' : ( 'Your file is ready for download: '
-							+ '"<a href="' + download_url + '">' + file_details['filename'] + '</a>'
-							+ ' This file has also been sent to your email address.')})
-					else:
-						send_email(subject, 
-							app.config['ADMINS'][0], 
-							recipients, 
-							body, 
-							html)
-						return jsonify({'submitted' : ('Your file is ready for downoad: '
-							+ '"<a href="' + download_url + '">' + file_details['filename'] + '</a>'
-							+ ' This link has also been sent to your email address.')})
-				else:
-					return jsonify({'submitted' : ('Your file is ready for download : '
-						+ '<a href="' + download_url + '">' + file_details['filename'] + '</a>')})
-			else:
-				errors = jsonify([location_form.errors, custom_trees_form.errors])
-				return errors
-		except (ServiceUnavailable):
-				flash("Database unavailable")
-				return redirect(url_for('index'))
 
-#traits
-@app.route('/traits/<level>/', methods=['GET', 'POST'])
-def select_traits(level):
-	if 'username' not in session:
-		flash('Please log in')
-		return redirect(url_for('login'))
-	else:
-		try:
-			traits_form = CreateTraits().update(level)
-			return render_template('traits.html', 
-				level = level,
-				traits_form = traits_form,
-				title='Select traits for ' + level + '_traits.trt')
-		except (ServiceUnavailable):
-				flash("Database unavailable")
-				return redirect(url_for('index'))
-
-@app.route('/traits/<level>/create_trt', methods=['GET', 'POST'])
-def create_trt(level):
-	if 'username' not in session:
-		flash('Please log in')
-		return redirect(url_for('login'))
-	else:
-		try:
-			form = CreateTraits().update(level)
-			if level == 'sample':
-				node_label = 'SampleTrait'
-			elif level == 'tree':
-				node_label = 'TreeTrait'
-			elif level == 'block':
-				node_label = 'BlockTrait'
-			elif level == 'plot':
-				node_label = 'PlotTrait'
-			if form.validate_on_submit():
-				#selected traits
-				#just a fancy flattening of the list
-				selection = [item for sublist in [request.form.getlist(i) for i in request.form if i[len(level)+1:] != 'csrf_token'] for item in sublist]
-				#make the trt file and return it's details (filename, file_path, file_size)
-				file_details = Lists(node_label).create_trt(session['username'], selection, 'name', level)
-				#if result = none then no data was found
-				if file_details == None:
-					return jsonify({'submitted' : "No entries found that match your selection"})
-				download_url = url_for('download_file', 
-					username = session['username'], 
-					filename = file_details['filename'], 
-					_external = True)
-				#send email if requested and include as attachment if less than ~5mb
-				if [i for i in request.form if i.endswith("email_checkbox")]:
-					recipients=[User(session['username']).find('')['email']]
-					subject = "BreedCAFS: traits.trt"
-					body = ("You requested a " + level + ".trt file from the BreedCAFS database. "
-						" The file is attached (if less than 5mb) and available for download at the following address:"
-						+ download_url)
-					html = render_template('emails/create_traits.html', 
-						level = level,
-						download_url = download_url)
-					if file_details['file_size'] < 5000000:
-						send_static_attachment(subject, 
-							app.config['ADMINS'][0], 
-							recipients, 
-							body, 
-							html, 
-							file_details['filename'], 
-							'text/csv', 
-							file_details['file_path'])
-						return jsonify({'submitted' : 'Your file is ready for download and a copy has been sent to your email as an attachment:'
-							+ '"<a href="' + download_url + '">' + file_details['filename'] + '</a>"'})
-					else:
-						send_email(subject,
-							app.config['ADMINS'][0],
-							recipients,
-							body,
-							html)
-						return jsonify({'submitted' : 'Your file is ready for download and a link has been sent to your email address:'
-							+ '"<a href="' + download_url + '">' + file_details['filename'] + '</a>"'})
-				#return as jsonify so that can be interpreted the same way as error message
-				else:
-					return jsonify({'submitted' : 'Your file is ready for download: "<a href="' + download_url + '">' + file_details['filename'] + '</a>"'})
-			else:
-				return jsonify(form.errors)
-		except (ServiceUnavailable):
-				flash("Database unavailable")
-				return redirect(url_for('index'))
-
-#Samples
-@app.route('/sample_reg', methods =['GET','POST'])
-def sample_reg():
-	if 'username' not in session:
-		flash('Please log in')
-		return redirect(url_for('login'))
-	else:
-		try:
-			location_form = LocationForm.update()
-			add_tissue_form = AddTissueForm()
-			add_storage_form = AddStorageForm()
-			sample_reg_form = SampleRegForm.update()
-			custom_sample_form = CustomSampleForm()
-			return render_template('sample_reg.html', 
-				location_form = location_form,
-				add_tissue_form = add_tissue_form,
-				add_storage_form = add_storage_form,
-				sample_reg_form = sample_reg_form,
-				custom_sample_form = custom_sample_form,
-				title = 'Sample registration')
-		except (ServiceUnavailable):
-				flash("Database unavailable")
-				return redirect(url_for('index'))
-
-class tissues(MethodView):
-	def get(self):
-		if 'username' not in session:
-			flash('Please log in')
-			return redirect(url_for('login'))
-		else:
-			try:
-				tissues = Lists('Tissue').create_list_tup('name','name')
-				response = make_response(jsonify(tissues))
-				response.content_type = 'application/json'
-				return response
-			except (ServiceUnavailable):
-				flash("Database unavailable")
-				return redirect(url_for('index'))
-
-@app.route('/add_tissue', methods=["POST"])
-def add_tissue():
-	if 'username' not in session:
-		flash('Please log in')
-		return redirect(url_for('login'))
-	else:
-		try:
-			form = AddTissueForm()
-			text_tissue = request.form['text_tissue']
-			if form.validate_on_submit():
-				if Lists('Tissue').find_node(text_tissue):
-					return ("Tissue already found: " + str(text_tissue))
-				else:
-					Samples().add_tissue(text_tissue)
-					return ("Tissue submitted: " + str(text_tissue))
-			else:
-				return form.errors["text_tissue"][0]
-		except (ServiceUnavailable):
-				flash("Database unavailable")
-				return redirect(url_for('index'))
-
-class storage_methods(MethodView):
-	def get(self):
-		if 'username' not in session:
-			flash('Please log in')
-			return redirect(url_for('login'))
-		else:
-			try:
-				storage_methods = Lists('Storage').create_list_tup('name','name')
-				response = make_response(jsonify(storage_methods))
-				response.content_type = 'application/json'
-				return response
-			except (ServiceUnavailable):
-				flash("Database unavailable")
-				return redirect(url_for('index'))
-
-@app.route('/add_storage', methods=["POST"])
-def add_storage():
-	if 'username' not in session:
-		flash('Please log in')
-		return redirect(url_for('login'))
-	else:
-		try:
-			form = AddStorageForm()
-			text_storage = request.form['text_storage']
-			if form.validate_on_submit():
-				if Lists('Storage').find_node(text_storage):
-					return ("Storage already found: " + str(text_storage))
-				else:
-					Samples().add_storage(text_storage)
-					return ("Storage submitted: " + str(text_storage))
-			else:
-				return form.errors["text_storage"][0]
-		except (ServiceUnavailable):
-				flash("Database unavailable")
-				return redirect(url_for('index'))
-
-@app.route('/add_samples', methods = ['GET','POST'])
-def add_samples():
-	if 'username' not in session:
-		flash('Please log in')
-		return redirect(url_for('login'))
-	else:
-		try:
-			location_form = LocationForm.update()
-			sample_form = SampleRegForm.update()
-			if all([location_form.validate_on_submit(), sample_form.validate_on_submit()]):
-				plotID = int(request.form['plot'])
-				start = int(request.form['trees_start'])
-				end = int(request.form['trees_end'])
-				replicates = int(request.form['replicates'])
-				tissue = request.form['tissue']
-				storage = request.form['storage']
-				date = request.form['date_collected']
-				#register samples, make file describing index information and return filename etc.
-				file_details = Samples().add_samples(plotID, start, end, replicates, tissue, storage, date)
-				#if result = none then no data was found
-				if 'error' in file_details:
-					return jsonify({'submitted':file_details['error']})
-				#create a download url
-				download_url = url_for('download_file', 
-					username = session['username'], 
-					filename = file_details['filename'], 
-					_external = True)
-				#if requested create email (and send as attachment if less than ~5mb)
-				if request.form.get('email_checkbox'):
-					recipients=[User(session['username']).find('')['email']]
-					subject = "BreedCAFS: Samples registered"
-					body = ("You registered " + str(replicates) + " replicates of " + str(tissue)
-						+ " samples stored in " + str(storage) + " on " + str(date) + " for trees from " + str(start) + " to " + str(end) + " in plotID: " + str(plotID)  + "." 
-						+ " These samples are described in a file available for download at the following address: " + download_url)
-					html = render_template('emails/add_samples.html', 
-						plotID = plotID,
-						start = start,
-						end = end,
-						replicates = replicates,
-						tissue = tissue,
-						storage = storage,
-						date = date,
-						download_url = download_url)
-					if file_details['file_size'] < 5000000:
-						send_static_attachment(subject,
-							app.config['ADMINS'][0],
-							recipients,
-							body,
-							html,
-							file_details['filename'],
-							'text/csv',
-							file_details['file_path'])
-						return jsonify({'submitted' : ('You successfully registered ' + str(tissue) + ' samples. '
-							+ 'These are described in the following file: '
-							+ '<a href="' + download_url + '">' + file_details['filename'] + '</a>.'
-							+ ' This file has also been sent to your email address ')})
-					else:
-						send_static_attachment(subject,
-							app.config['ADMINS'][0],
-							recipients,
-							body,
-							html,
-							file_details['filename'],
-							'text/csv',
-							file_details['file_path'])
-						return jsonify({'submitted' : ('You successfully registered ' + str(tissue) + ' samples. '
-							+ 'These are described in the following file : ' 
-							+ '<a href="' + download_url + '">' + file_details['filename'] + '</a>.'
-							+ ' This link has also been sent to your email address. ')})
-				else:
-					return jsonify({'submitted' : 'You successfully registered ' + str(tissue) + ' samples. '
-						+ 'These are described in the following file : ' 
-						+ '<a href="' + download_url + '">' + file_details['filename'] + '</a>'})
-			else:
-				errors = jsonify([location_form.errors, sample_form.errors])
-				return errors
-		except (ServiceUnavailable):
-				flash("Database unavailable")
-				return redirect(url_for('index'))
-
-
-@app.route('/get_samples', methods = ['GET','POST'])
-def get_samples():
-	if 'username' not in session:
-		flash('Please log in')
-		return redirect(url_for('login'))
-	else:
-		try:
-			location_form = LocationForm().update(optional = True)
-			sample_form = SampleRegForm().update(optional = True)
-			custom_sample_form=CustomSampleForm()
-			if all([location_form.validate_on_submit(), sample_form.validate_on_submit(), custom_sample_form.validate_on_submit()]):
-				#get form values to filter by
-				country = request.form['country']
-				region = request.form['region']
-				farm = request.form['farm']
-				plotID = int(request.form['plot']) if request.form['plot'] else ""
-				trees_start = int(request.form['trees_start']) if request.form['trees_start'] else ""
-				trees_end = int(request.form['trees_end']) if request.form['trees_end'] else ""
-				replicates = int(request.form['replicates']) if request.form['replicates'] else ""
-				tissue = request.form['tissue']
-				storage = request.form['storage']
-				date_from = request.form['date_from']
-				date_to = request.form['date_to']
-				samples_start = int(request.form['samples_start']) if request.form['samples_start'] else ""
-				samples_end = int(request.form['samples_end']) if request.form['samples_end'] else ""
-				if date_from: 
-					start_time = int((datetime.strptime(date_from, '%Y-%m-%d')-datetime(1970,1,1)).total_seconds()*1000)
-				else:
-					start_time = ""
-				if date_to:
-					end_time = int((datetime.strptime(date_to, '%Y-%m-%d')-datetime(1970,1,1)).total_seconds()*1000)
-				else: end_time = ""
-				#build the file and return filename etc.
-				file_details = Samples().get_samples(country, 
-					region, 
-					farm,
-					plotID, 
-					trees_start, 
-					trees_end,
-					replicates, 
-					tissue, 
-					storage, 
-					start_time,
-					end_time,
-					samples_start,
-					samples_end)
-				#if result = none then no data was found
-				if file_details == None:
-					return jsonify({'submitted' : "No entries found that match your selection"})
-				#create a download url
-				download_url = url_for('download_file', 
-					username = session['username'], 
-					filename = file_details['filename'], 
-					_external = True)
-				#if requested create email (and send as attachment if less than ~5mb)
-				if request.form.get('email_checkbox_custom'):
-					recipients=[User(session['username']).find('')['email']]
-					subject = "BreedCAFS: Samples registered"
-					body = ("You requested a custom list of samples. This file is attached (if less than 5mb) and " 
-						+ " available for download at the following address: " + download_url)
-					html = render_template('emails/custom_samples.html', 
-						download_url = download_url)
-					if file_details['file_size'] < 5000000:
-						send_static_attachment(subject,
-							app.config['ADMINS'][0],
-							recipients,
-							body,
-							html,
-							file_details['filename'],
-							'text/csv',
-							file_details['file_path'])
-						return jsonify({'submitted' : ('Your custom list of samples is ready for download: '
-							+ '<a href="' + download_url + '">' + file_details['filename']+ '</a>.'
-							+ ' This file has also been sent to your email address. ')})
-					else:
-						send_static_attachment(subject,
-							app.config['ADMINS'][0],
-							recipients,
-							body,
-							html,
-							file_details['filename'],
-							'text/csv',
-							file_details['file_path'])
-						return jsonify({'submitted' : ('Your custom list of samples is ready for download: '
-							+ '<a href="' + download_url + '">' + file_details['filename']+ '</a>.'
-							+ ' This link has also been sent to your email address. ')})
-				else:
-					return jsonify({'submitted' : ('Your custom list of samples is ready for download: '
-						+ '<a href="' + download_url + '">' + file_details['filename'] + '</a>')})
-			else:
-				errors = jsonify([location_form.errors, sample_form.errors, custom_sample_form.errors])
-				return errors
-		except (ServiceUnavailable):
-				flash("Database unavailable")
-				return redirect(url_for('index'))

@@ -1,0 +1,67 @@
+{% extends "layout.html" %}	
+{% block body %}
+<div class="text_body">
+	<h2>Record</h2>
+		{% from "_formhelpers_location_fields.html" import render_field %}
+	<form>
+		{{ record_form.csrf_token }}
+		<!--{{ location_form.csrf_token }}-->
+		<h3>Trait level</h3>
+				<dt>{{ record_form.trait_level }} </dt> <br>
+		<div id = trait_selection>
+			<h3>Trait Selection</h3>
+			{% include 'traits_form.html' %}
+		</div>
+		<h3>Location</h3>
+			<dt>{{ location_form.country }}</dt>
+			<dt>{{ location_form.region }}</dt>
+			<dt>{{ location_form.farm }}</dt>
+			<dt>{{ location_form.plot }}</dt>
+			<div id=tree_ids>
+				<br>
+				<dt>Tree ID range:</dt>
+				<dd>{{ custom_trees_form.trees_start(placeholder=custom_trees_form.trees_start.description) }}
+				{{ custom_trees_form.trees_end(placeholder=custom_trees_form.trees_end.description) }} </dd>
+				<br>
+			</div>
+			<div id=sample_ids>
+				<dt>{{ record_form.old_new_samples }}</dt>
+				<div id = old_samples>
+					<h3>Filters:</h3>
+						<a>Sample type:</a>
+						<dt>{{ sample_reg_form.tissue }}</dt>
+						<dt>{{ sample_reg_form.storage }}</dt>
+						<a>Date range:</a>
+						<dd>{{ custom_sample_form.date_from(placeholder = custom_sample_form.date_from.description) }}
+							{{ custom_sample_form.date_to(placeholder = custom_sample_form.date_to.description) }}</dd>
+						<a>Sample ID range:</a>
+						<dd>{{ custom_sample_form.samples_start(placeholder = custom_sample_form.samples_start.description) }}
+							{{ custom_sample_form.samples_end(placeholder = custom_sample_form.samples_end.description) }}
+						</dd>
+				</div>
+				<div id = new_samples>
+					<p>Select the number of replicates per tree</p>
+					<dt>{{
+							record_form.new_sample_replicates(
+								placeholder = record_form.new_sample_replicates.description
+							)
+						}}
+					</dt>
+				</div>
+			</div>
+		<h3>File type</h3>
+			<dt>{{ record_form.template_format }} </dt>
+			<dt>
+				{{ record_form.submit_record }}
+				<input id="email_checkbox" name="email_checkbox" placeholder="" value="y" type="checkbox">
+				<a>Email a copy</a>
+			</dt>
+		</div>
+	</form>
+</div>
+<script src="{{ url_for('static', filename='jquery_1.8.3_min.js') }}"></script>
+<script src="{{ url_for('static', filename='jquery_location.js') }}"></script>
+<script src="{{ url_for('static', filename='jquery_record.js') }}"></script>
+<script src="{{ url_for('static', filename='jquery-ui-1.12.1.custom/jquery-ui.js') }}"></script>
+<script src="{{ url_for('static', filename='jquery_samples.js') }}"></script>
+{% endblock %}

@@ -27,6 +27,7 @@ update_regions = function() {
 		$("#region").append($("<option></option>").attr("value", "").text("Select Region"))
 	}
 	else {
+		$("#region").prop( "disabled", true);
 		var request = $.ajax({
 			type: 'GET',
 			url: "/location/" + sel_country +'/',
@@ -39,6 +40,7 @@ update_regions = function() {
 					$("<option></option>").attr(
 						"value", regions[i][0]).text(regions[i][1])
 				);
+			$("#region").prop( "disabled", false);
 			}
 		});
 	}
@@ -54,6 +56,7 @@ update_farms = function() {
 		$("#farm").append($("<option></option>").attr("value", "").text("Select Farm"))
 	}
 	else {
+		$("#farm").prop( "disabled", true);
 		var request = $.ajax({
 			type: 'GET',
 			url: "/location/" + sel_country +'/' + sel_region + '/',
@@ -66,6 +69,7 @@ update_farms = function() {
 					$("<option></option>").attr(
 						"value", farms[i][0]).text(farms[i][1])
 				);
+			$("#farm").prop( "disabled", false);
 			}
 		});
 	}
@@ -81,6 +85,7 @@ update_plots = function() {
 		$("#plot").append($("<option></option>").attr("value", "").text("Select Plot"))
 	}
 	else {
+		$("#plot").prop( "disabled", true);
 		var request = $.ajax({
 			type: 'GET',
 			url: "/location/" + sel_country + '/' + sel_region + '/' + sel_farm + '/',
@@ -93,10 +98,38 @@ update_plots = function() {
 					$("<option></option>").attr(
 						"value", plots[i][0]).text(plots[i][1])
 				);
+			$("#plot").prop( "disabled", false);
 			}
 		});
 	}
 };
+
+update_blocks = function() {
+	var sel_plot = $("#plot").find(":selected").val();
+	if (sel_plot === "")  {
+		$("#block").empty();
+		$("#block").append($("<option></option>").attr("value", "").text("Select Block"))
+	}
+	else {
+		$("#block").prop( "disabled", true);
+		var request = $.ajax({
+			type: 'GET',
+			url: "/location/blocks/" + sel_plot + '/',
+		});
+		request.done(function(data){
+			var blocks = [["","Select Block"]].concat(data).sort();
+			$("#block").empty();
+			for (var i = 0; i < blocks.length; i++) {
+				$("#block").append(
+					$("<option></option>").attr(
+						"value", blocks[i][0]).text(blocks[i][1])
+				);
+			$("#block").prop( "disabled", false);
+			}
+		});
+	}
+};
+
 
 remove_flash = function() {
 	$(".flash").remove();
@@ -106,7 +139,7 @@ $( window ).load(update_countries)
 $("#country").change(update_regions).change(remove_flash);
 $("#region").change(update_farms).change(remove_flash);
 $("#farm").change(update_plots).change(remove_flash);
-$('#plot').change(remove_flash);
+$('#plot').change(update_blocks).change(remove_flash);
 
 //Disable submit on keypress "Enter" for all inputs boxes
 $("input").keypress( function(e) {
@@ -188,4 +221,82 @@ $("#submit_plot").click( function(e) {
 		}
 	});
 	submit_plot.done(update_plots).done(load_chart);
+})
+
+//Add new treatment block to the plot
+$("#submit_block").click( function(e) {
+	e.preventDefault();
+	remove_flash();
+	wait_message = "Please wait for block to be submitted";
+	flash_wait = "<div id='submit_block_flash' class='flash'>" + wait_message + "</div>";
+	$(this).after(flash_wait)
+	var submit_block = $.ajax({
+		url: "/add_block",
+		data: $("form").serialize(),
+		type: 'POST',
+		success: function(response) {
+			if (response.hasOwnProperty('submitted')) {
+				flash_submitted = "<div id='submit_block_flash' class='flash'>" + response.submitted + "</div>";
+				$("#submit_block_flash").replaceWith(flash_submitted);
+				update_blocks();
+			} else {
+				$("#submit_block_flash").remove();
+				for (var key in response[0]){
+					if (response[0].hasOwnProperty(key)) {
+						flash = "<div id='flash_" + key + "' class='flash'>" + response[0][key][0] + "</div>";
+						$('#' + key).after(flash);
+					}
+				}
+				//this response is an array from two forms so need two of these (alternatively could iterate over these...)
+				for (var key in response[1]){
+					if (response[1].hasOwnProperty(key)) {
+						flash = "<div id='flash_" + key + "' class='flash'>" + response[1][key][0] + "</div>";
+						$('#' + key).after(flash);
+					}
+				}
+			}
+		},
+		error: function (error) {
+			console.log(error);
+		}
+	});
+})
+
+//register new trees
+$("#submit_trees").click( function(e) {
+	e.preventDefault();
+	remove_flash();
+	wait_message = "Please wait for trees to be registered and files generated"
+	flash_wait = "<div id='trees_flash' class='flash'>" + wait_message + "</div>"
+	$(this).parent().after(flash_wait)
+	var submit_trees = $.ajax({
+		url: "/add_trees",
+		data: $("form").serialize(),
+		type: 'POST',
+		success: function(response) {
+			if (response.hasOwnProperty('submitted')) {
+				flash_submitted = "<div id='trees_flash' class='flash'>" + response.submitted + "</div>";
+				$("#trees_flash").replaceWith(flash_submitted);
+				load_chart();
+			} else {
+				$("#trees_flash").remove();
+				for (var key in response[0]){
+					if (response[0].hasOwnProperty(key)) {
+						flash = "<div id='flash_" + key + "' class='flash'>" + response[0][key][0] + "</div>";
+						$('#' + key).after(flash);
+					}
+				}
+				//this response is an array from two forms so need two of these (alternatively could iterate over these...)
+				for (var key in response[1]){
+					if (response[1].hasOwnProperty(key)) {
+						flash = "<div id='flash_" + key + "' class='flash'>" + response[1][key][0] + "</div>";
+						$('#' + key).after(flash);
+					}
+				}
+			}
+		},
+		error: function(error) {
+			console.log(error);
+		}
+	});
 })

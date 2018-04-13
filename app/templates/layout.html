@@ -14,6 +14,10 @@
 			{% if session.username %}
 				<a>Logged in as {{ session.username }}:</a>
 				<a href="{{ url_for('logout') }}">Logout</a>
+				<a href="{{ url_for('user') }}"><img src="{{ url_for('static', filename='user.svg') }}"></a>
+				<a href="{{ url_for('help') }}"><img src="{{ url_for('static', filename='help.svg') }}"></a>
+				{% if ('global_admin' in session.access) or ('partner_admin' in session.access) %}
+					<a href="{{ url_for('admin') }}"><img src = "{{ url_for('static', filename='admin.svg') }}"> </a>
 			{% endif %}
 		</div>
 		<div class="header">
@@ -21,13 +25,11 @@
 			<a href="/index"><h1>BreedCAFS database tools</h1></a>
 			{% if session.username %}
 			<div class="utils">
-				<a href="{{ url_for('create') }}"><img src="{{ url_for('static', filename='create.svg') }}"></a>
+				<a href="{{ url_for('create') }}"><img src="{{ url_for('static', filename='create_field.svg') }}"></a>
+				<a href="{{ url_for('collect') }}"><img src="{{ url_for('static', filename='collect.svg') }}"></a>
+				<a href="{{ url_for('record') }}"><img src="{{ url_for('static', filename='record.svg') }}"></a>
 				<a href="{{ url_for('upload') }}"><img src="{{ url_for('static', filename='upload.svg') }}"></a>
 				<a href="{{ url_for('download') }}"><img src="{{ url_for('static', filename='download_espresso.svg') }}"></a>
-				<a href="{{ url_for('help') }}"><img src="{{ url_for('static', filename='help.svg') }}"></a>
-				<a href="{{ url_for('user') }}"><img src="{{ url_for('static', filename='user.svg') }}"></a>
-				{% if ('global_admin' in session.access) or ('partner_admin' in session.access) %}
-					<a href="{{ url_for('admin') }}"><img src = "{{ url_for('static', filename='admin.svg') }}"> </a>
 				{% endif %}
 			</div>
 			{% endif %}

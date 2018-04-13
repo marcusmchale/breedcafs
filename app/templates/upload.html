@@ -6,9 +6,18 @@
 		<form action="{{ url_for('upload') }}" method="post" enctype=multipart/form-data>
 		{{ form.csrf_token }}
 			<dl>
-			{{ render_field(form.submission_type) }}
-			{{ render_field(form.file) }}
-			{{ render_field(form.upload_submit) }}
+				{{ render_field(form.submission_type) }}
+				{{ render_field(form.file) }}
+				<div id = 'table_details'>
+					<br>
+					<a>Details of data collection:</a>
+					<br><br>
+					{{ render_field(form.user) }}
+					{{ render_field(form.date) }}
+					{{ render_field(form.time) }}
+					<br><br>
+				</div>
+				{{ render_field(form.upload_submit) }}
 			</dl>
 		</form>
 </div>
@@ -21,6 +30,8 @@
 <script src="{{ url_for('static', filename='jquery_1.8.3_min.js') }}"></script>
 <script src="{{ url_for('static', filename='d3.v4.min.js') }}"></script>
 <script src="{{ url_for('static', filename='d3-selection-multi.v1.min.js') }}"></script>
+<script src="{{ url_for('static', filename='jquery-ui-1.12.1.custom/jquery-ui.js') }}"></script>
+<script src="{{ url_for('static', filename='jquery.ui.timepicker.js') }}"></script>
 <script src="{{ url_for('static', filename='jquery_upload.js') }}"></script>
 <script src="{{ url_for('static', filename='d3_node_link.js') }}"></script>
 {% endblock %}

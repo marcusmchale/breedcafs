@@ -1,5 +1,4 @@
-{% set levels = ['sample','tree','block','plot'] %}
-
+{% set levels = ['plot','block','tree','sample',] %}
 {% if level in levels %}
 	{{ traits_form.csrf_token }}
 	{% for field in traits_form %}
@@ -11,7 +10,7 @@
 	{% endfor %}
 {% endif %}
 
-<!-- render all forms on download page and hide those that aren't selected -->
+<!-- render all forms on page and hide those that aren't selected -->
 
 {% if level == 'all' %}
 	{% for level in levels %}

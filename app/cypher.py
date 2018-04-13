@@ -74,7 +74,8 @@ class Cypher():
 				' (items)-[:SUBMITTED]->(:Trees), '
 				' (items)-[:SUBMITTED]->(:Samples), '
 			' (sub)-[:SUBMITTED]->(data:DataSub), '
-				'(data)-[:SUBMITTED]->(:FieldBook)'
+				'(data)-[:SUBMITTED]->(:FieldBook),'
+				'(data)-[:SUBMITTED]->(:TableCSV)'
 			' ')
 	add_allowed_email = ( ' MATCH (all:Emails) '
 		' WITH all.allowed as allowed_emails '
@@ -238,9 +239,9 @@ class Cypher():
 		' RETURN properties (b)')
 	block_find = ( 'MATCH (block:Block {name : $block}) '
 		' -[:IS_IN]->(:PlotBlocks) '
-		' -[:IS_IN]->(:Plot {uid : $plotID}) '
+		' -[:IS_IN]->(:Plot {uid : toInteger($plotID)}) '
 	 	' RETURN block' )
-	block_id_lock = (' MATCH (p:Plot {uid:$plotID})'
+	block_id_lock = (' MATCH (p:Plot {uid: toInteger($plotID)})'
 		' MERGE (id:Counter {name:"Blocks", uid: ("plot_" + $plotID + "_blocks")}) '
 				'-[:FOR]->(:PlotBlocks)-[:IS_IN]->(p) '
 			' ON MATCH SET id._LOCK_ = true '
@@ -259,9 +260,9 @@ class Cypher():
 		' MERGE (b)-[s:SUBMITTED]->(block) '
 			' ON CREATE SET s.time = timestamp () '
 		' SET id._LOCK_ = false')
-	get_blocks_csv = ( ' MATCH (b:Block) '
+	get_blocks_details = ( ' MATCH (b:Block) '
 			' -[:IS_IN]->(:PlotBlocks) '
-			' -[:IS_IN]->(p:Plot {uid : $plotID}) '
+			' -[:IS_IN]->(p:Plot {uid : toInteger($plotID)}) '
 			' -[:IS_IN]->(f:Farm) '
 			' -[:IS_IN]->(r:Region) '
 			' -[:IS_IN]->(c:Country) '
@@ -275,7 +276,7 @@ class Cypher():
 			' Country : c.name }'
 		' ORDER BY b.id' )
 #tree procedures
-	tree_id_lock = (' MATCH (p:Plot {uid: $plotID})'
+	tree_id_lock = (' MATCH (p:Plot {uid: toInteger($plotID)})'
 		' MERGE (id:Counter {name : "Trees", uid: ("plot_" + $plotID + "_trees")}) '
 				' -[:FOR]->(:PlotTrees)-[:IS_IN]->(p) '
 			' ON CREATE SET id._LOCK_ = true, id.count = 0 '
@@ -284,7 +285,7 @@ class Cypher():
 				' -[:SUBMITTED]->(:Submissions) '
 				' -[:SUBMITTED]->(:Items) '
 				' -[:SUBMITTED]->(ut:Trees), '
-			' (pt:PlotTrees)-[:IS_IN]->(p:Plot {uid: $plotID}) '
+			' (pt:PlotTrees)-[:IS_IN]->(p:Plot {uid: toInteger($plotID)}) '
 		#create per user per plot trees node
 		' MERGE (ut)-[:SUBMITTED]->(upt:UserPlotTrees)-[:CONTRIBUTED]->(pt) '
 		' WITH p, pt, upt'
@@ -317,7 +318,7 @@ class Cypher():
 				' -[:SUBMITTED]->(:Submissions) '
 				' -[:SUBMITTED]->(:Items) '
 				' -[:SUBMITTED]->(ut:Trees), '
-			' (pt:PlotTrees)-[:IS_IN]->(p:Plot {uid: $plotID}) '
+			' (pt:PlotTrees)-[:IS_IN]->(p:Plot {uid: toInteger($plotID)}) '
 		#create per user per plot trees node
 		' MERGE (ut)-[:SUBMITTED]->(upt:UserPlotTrees)-[:CONTRIBUTED]->(pt) '
 		' WITH p, pt, upt'
@@ -352,7 +353,7 @@ class Cypher():
 		' ORDER BY t.id')
 	trees_get = ( 'MATCH (tree:Tree) '
 			' -[:IS_IN]->(pt:PlotTrees) '
-			' -[:IS_IN]->(plot:Plot {uid : $plotID}) '
+			' -[:IS_IN]->(plot:Plot {uid : toInteger($plotID)}) '
 			' -[:IS_IN]->(farm:Farm) '
 			' -[:IS_IN]->(region:Region) '
 			' -[:IS_IN]->(country:Country) '
@@ -392,7 +393,7 @@ class Cypher():
 		' MERGE (sa)-[s:SUBMITTED]->(:Storage {name :$storage}) '
 			' ON CREATE SET s.time = timestamp() ')
 	#regular stuff
-	sample_id_lock = ( ' MATCH  (p:Plot {uid: $plotID}) '
+	sample_id_lock = ( ' MATCH  (p:Plot {uid: toInteger($plotID)}) '
 		' MERGE (id:Counter {name : "Samples", '
 				' uid: ("plot_" + $plotID + "_samples") '
 				' }) '
@@ -403,7 +404,7 @@ class Cypher():
 	samples_add = (' MATCH '
 			' (t:Tree) '
 				' -[:IS_IN]->(:PlotTrees) '
-				' -[:IS_IN]->(:Plot {uid: $plotID}), '
+				' -[:IS_IN]->(:Plot {uid: toInteger($plotID)}), '
 			' (tissue:Tissue {name:$tissue}), '
 			' (storage:Storage {name:$storage}), '
 			' (:User {username:$username}) '
@@ -412,7 +413,7 @@ class Cypher():
 				' -[:SUBMITTED]->(samples:Samples), '
 			' (id:Counter {uid: ("plot_" + $plotID + "_samples")}) '
 				' -[:FOR]->(ps:PlotSamples) '
-				' -[:FROM_PLOT]->(p:Plot {uid: $plotID}) '
+				' -[:FROM_PLOT]->(p:Plot {uid: toInteger($plotID)}) '
 				' -[:IS_IN]->(f:Farm) '
 				' -[:IS_IN]->(r:Region) '
 				' -[:IS_IN]->(c:Country) '
@@ -469,6 +470,75 @@ class Cypher():
 			' Date : s.date, '
 			' Tissue : tissue.name, '
 			' Storage : storage.name, '
+			' Block : b.name, '
+			' Plot : p.name, '
+			' Farm : f.name, '
+			' Region : r.name, '
+			' Country : c.name '
+		' } '
+		' ORDER BY s.id '
+		)
+	samples_add_notype = (' MATCH '
+			' (t:Tree) '
+				' -[:IS_IN]->(:PlotTrees) '
+				' -[:IS_IN]->(:Plot {uid: toInteger($plotID)}), '
+			' (:User {username:$username}) '
+				' -[:SUBMITTED]->(:Submissions) '
+				' -[:SUBMITTED]->(:Items) '
+				' -[:SUBMITTED]->(samples:Samples), '
+			' (id:Counter {uid: ("plot_" + $plotID + "_samples")}) '
+				' -[:FOR]->(ps:PlotSamples) '
+				' -[:FROM_PLOT]->(p:Plot {uid: toInteger($plotID)}) '
+				' -[:IS_IN]->(f:Farm) '
+				' -[:IS_IN]->(r:Region) '
+				' -[:IS_IN]->(c:Country) '
+		# with the selected trees to be sampled
+		' WITH t, samples, id, ps, p, f, r, c '
+		' ORDER BY t.id '
+		' WHERE t.id >= $start '
+		' AND t.id <= $end '
+		#get tree name
+		' OPTIONAL MATCH (t)'
+			' <-[:FROM_TREE]-(treename:TreeTreeTrait)'
+			' -[:DATA_FOR]->(:PlotTreeTrait) '
+			' -[:FOR_TRAIT]->(:TreeTrait {name:"name"}) '
+		' OPTIONAL MATCH (treename) '
+			' <-[:DATA_FOR]-(d:Data) '
+		# get block name
+		' OPTIONAL MATCH (t) '
+			' -[:IS_IN]->(:BlockTrees) '
+			' -[:IS_IN]->(b:Block) '
+		#with replicates
+		' UNWIND range(1, $replicates) as replicates '
+		#incrementing with a plot level counter
+		' SET id.count = id.count + 1 '
+		#Create samples
+		' CREATE (s:Sample { '
+				' uid: (p.uid + "_S" + id.count), '
+				' id:id.count, '
+				' replicates: $replicates '
+				'}) '
+		# Create a NoType node for the PlotSamples node to collect all these separate from the Tissue/Storage samples
+		' MERGE (nt:NoType)-[:FROM_PLOT]->(ps) '
+		# Link this to the trees TreeSamples node, create if not found yet
+		' MERGE (ts:TreeSamples)-[:FROM_TREE]->(t) '
+		' MERGE (nt)-[:FROM_TREE]->(ts)'
+		#Link the sample to its TreeSamples and NoType containers
+		' MERGE (s)-[:FROM_TREE]->(ts) '
+		' MERGE (s)-[:FROM_PLOT]->(nt) '
+		#track user submissions through successive UserPlotSamples then UserTreeSamples container nodes
+		' MERGE (samples)-[:SUBMITTED]->(ups:UserPlotSamples)-[:CONTRIBUTED]->(ps) '
+		' MERGE (ups)-[:SUBMITTED]->(uts:UserTreeSamples)-[:CONTRIBUTED]->(ts) '
+		' MERGE (uts)-[s1:SUBMITTED]->(s) '
+			' ON CREATE SET s1.time = timestamp() '
+		' SET id._LOCK_ = false '
+		#return for csv
+		' RETURN { '
+			' UID : s.uid, '
+			' PlotID : p.uid, '
+			' TreeID : t.id, '
+			' TreeName : d.value, '
+			' SampleID : s.id, '
 			' Block : b.name, '
 			' Plot : p.name, '
 			' Farm : f.name, '
@@ -556,7 +626,7 @@ class Cypher():
 		' MERGE (uptt)-[s1:SUBMITTED]->(d) '
 			' ON CREATE SET s1.time = timestamp() '
 		# if block data create link tree to block
-		' FOREACH (n IN CASE WHEN csvLine.trait = "block" THEN [1] ELSE [] END | '
+		' FOREACH (n IN CASE WHEN csvLine.trait = "new block" THEN [1] ELSE [] END | '
 				#first ensure we have the PlotBlocks container and lock the counter
 				' MERGE (id:Counter {name:"Blocks", uid: ("plot_" + plot.uid + "_blocks")}) '
 						'-[:FOR]->(pb:PlotBlocks)-[:IS_IN]->(plot) '
@@ -580,20 +650,89 @@ class Cypher():
 			' ) '
 		#And give the user feedback on their submission success
 		' RETURN d.found ' )
-	upload_FB_block = ( 
+	upload_table_tree = (
+		# get the user submission tracking nodes
+		' MATCH '
+			' (:User {username : $username}) '
+				' -[:SUBMITTED]->(submissions:Submissions) '
+				' -[:SUBMITTED]->(:DataSub) '
+				' -[:SUBMITTED]->(table:TableCSV),'
+		#and the block submission node in case block names are part of the TreeTrait data 
+		# (this is a special case to handle flexible blocks)
+			' (submissions)-[:SUBMITTED]->(:Items) '
+				' -[:SUBMITTED]->(blocks:Blocks) '
+		# load in the csv
+		' LOAD CSV WITH HEADERS FROM $filename as csvLine '
+		# And identify the trees by UID
+		' MATCH (tree:Tree {uid:csvLine.UID}) '
+			' -[:IS_IN]->(:PlotTrees) '
+			' -[:IS_IN]->(plot:Plot {uid:toInteger(head(split(csvLine.UID, "_")))}) '
+		#and the traits by name from the list
+		' UNWIND $traits as table_trait '
+			' MATCH (trait:TreeTrait {name:table_trait}) '
+			' WHERE NOT csvLine[table_trait] IS NULL '
+				# Create per plot per trait node
+				' MERGE (plot)<-[:FROM_PLOT]-(ptt:PlotTreeTrait)-[:FOR_TRAIT]->(trait) '
+				# Also per tree per PlotTreeTrait node
+				' MERGE (tree)<-[:FROM_TREE]-(ttt:TreeTreeTrait)-[:DATA_FOR]->(ptt) '
+				' MERGE '
+					'(d:Data { '
+						' block : csvLine.UID, '
+						' person : $form_user, '
+						' form_date : $form_date, '
+						' form_time : $form_time, '
+						' time : $neo4j_time,'
+						' trait : trait.name, '
+						' value : csvLine[table_trait]'
+					'}) -[:DATA_FOR]->(ttt)'
+					' ON CREATE SET d.found = false '
+					' ON MATCH SET d.found = true '
+				# track user submissions through User/Plot/BlockTrait container
+				' MERGE (table)-[:SUBMITTED]->(uptt:UserPlotTreeTrait)-[:CONTRIBUTED]->(ptt) '
+				' MERGE (uptt)-[s1:SUBMITTED]->(d) '
+					' ON CREATE SET s1.time = timestamp() '
+				# if block data create link tree to block
+			' FOREACH (n IN CASE WHEN table_trait = "new block" THEN [1] ELSE [] END | '
+					#first ensure we have the PlotBlocks container and lock the counter
+					' MERGE (id:Counter {name:"Blocks", uid: ("plot_" + plot.uid + "_blocks")}) '
+							'-[:FOR]->(pb:PlotBlocks)-[:IS_IN]->(plot) '
+						' ON MATCH SET id._LOCK_ = true '
+						' ON CREATE SET id._LOCK_ = true, id.count = 0 '
+					#then increment the counter and add our block
+					' SET id.count = id.count + 1 '
+					' MERGE (block:Block {name:csvLine[table_trait]})-[:IS_IN]->(pb) '
+						' ON CREATE SET block.uid = (plot.uid + "_B" + id.count), block.id = id.count '
+						#but if it exists then decrement the counter back
+						' ON MATCH SET id.count = id.count -1 '
+					#then ensure we have the BlockTrees container
+					' MERGE (bt:BlockTrees)-[:IS_IN]->(block) '
+					#then link the tree to this
+					' MERGE (tree)-[s2:IS_IN]->(bt) '
+						' ON CREATE SET s2.time = timestamp()'
+					# and track the user submission in this part of the graph too, to be consistent with other block submissions
+					# also add from_fb tag to allow more easy identification of these special cases (they may need scrutiny for typos/redundancy)
+					' MERGE (blocks)-[s3:SUBMITTED]->(block) '
+						' ON CREATE SET s3.time = timestamp(), s3.from_fb = true '
+					#and "unlock"
+					' SET id._LOCK_ = false'
+				' ) '
+			# And give the user feedback on their submission success
+			' RETURN d.found'
+	)
+	upload_FB_block = (
 		# load in the csv
 		' LOAD CSV WITH HEADERS FROM $filename as csvLine '
 		# And identify the plots and traits assessed
 		' MATCH (block:Block {uid:csvLine.UID}) '
-			' -[:IS_IN]-(:PlotBlocks) '
-			' -[:IS_IN]-(plot:Plot {uid:toInteger(head(split(csvLine.UID, "_")))}), '
+			' -[:IS_IN]->(:PlotBlocks) '
+			' -[:IS_IN]->(plot:Plot {uid:toInteger(head(split(csvLine.UID, "_")))}), '
 			' (trait:BlockTrait {name:csvLine.trait}), '
 			# get the user submission tracking nodes
 			' (:User {username : $username}) '
 				' -[:SUBMITTED]->(:Submissions) '
 				' -[:SUBMITTED]->(:DataSub) '
 				' -[:SUBMITTED]->(fb:FieldBook) '
-		# Crete per plot per trait node
+		# Create per plot per trait node
 		' MERGE (plot)<-[:FROM_PLOT]-(pbt:PlotBlockTrait)-[:FOR_TRAIT]->(trait) '
 		# Also per block per PlotBlockTrait node
 		' MERGE (block)<-[:FROM_BLOCK]-(bbt:BlockBlockTrait)-[:DATA_FOR]->(pbt) '
@@ -615,6 +754,42 @@ class Cypher():
 		#And give the user feedback on their submission success
 		' RETURN d.found' 
 		)
+	upload_table_block = (
+		# get the user submission tracking nodes
+		' MATCH (:User {username : $username}) '
+		' -[:SUBMITTED]->(:Submissions) '
+		' -[:SUBMITTED]->(:DataSub) '
+		' -[:SUBMITTED]->(table:TableCSV)'
+		# load in the csv
+		' LOAD CSV WITH HEADERS FROM $filename as csvLine '
+		# And identify the plots and traits assessed
+		' MATCH (block:Block {uid:csvLine.UID}) '
+			' -[:IS_IN]->(:PlotBlocks) '
+			' -[:IS_IN]->(plot:Plot {uid:toInteger(head(split(csvLine.UID, "_")))}) '
+		' UNWIND $traits as table_trait '
+			' MATCH (trait:BlockTrait {name:table_trait}) '
+			' WHERE NOT csvLine[table_trait] IS NULL '
+			# Create per plot per trait node
+			' MERGE (plot)<-[:FROM_PLOT]-(pbt:PlotBlockTrait)-[:FOR_TRAIT]->(trait) '
+			# Also per block per PlotBlockTrait node
+			' MERGE (block)<-[:FROM_BLOCK]-(bbt:BlockBlockTrait)-[:DATA_FOR]->(pbt) '
+			' MERGE (d:Data {block : csvLine.UID, '
+						' person : $form_user, '
+						' form_date : $form_date, '
+						' form_time : $form_time, '
+						' time : $neo4j_time,'
+						' trait : trait.name, '
+						' value : csvLine[table_trait]}) '
+					' -[:DATA_FOR]->(bbt)'
+				' ON CREATE SET d.found = false '
+				' ON MATCH SET d.found = true '
+			# track user submissions through User/Plot/BlockTrait container
+			' MERGE (table)-[:SUBMITTED]->(upbt:UserPlotBlockTrait)-[:CONTRIBUTED]->(pbt) '
+			' MERGE (upbt)-[s1:SUBMITTED]->(d) '
+				' ON CREATE SET s1.time = timestamp() '
+			#And give the user feedback on their submission success
+			' RETURN d.found'
+	)
 	upload_FB_plot = ( 
 		# load in the csv
 		' LOAD CSV WITH HEADERS FROM $filename as csvLine '
@@ -646,13 +821,45 @@ class Cypher():
 		#And give the user feedback on their submission success
 		' RETURN d.found' 
 		)
+	upload_table_plot = (
+		# get the user submission tracking nodes
+		' MATCH (:User {username : $username}) '
+		' -[:SUBMITTED]->(:Submissions) '
+		' -[:SUBMITTED]->(:DataSub) '
+		' -[:SUBMITTED]->(table:TableCSV)'
+		# load in the csv
+		' LOAD CSV WITH HEADERS FROM $filename as csvLine '
+		# And identify the plots and traits assessed
+		' MATCH (plot:Plot {uid:toInteger(csvLine.UID)}) '
+		' UNWIND $traits as table_trait '
+			' MATCH (trait:PlotTrait {name:table_trait}) '
+			# Create per plot per trait container node
+			' WHERE NOT csvLine[table_trait] IS NULL '
+				' MERGE (plot)<-[:FROM_PLOT]-(ppt:PlotPlotTrait)-[:FOR_TRAIT]->(trait) '
+				# Merge the data point linking to the Plot/PlotTrait node
+				' MERGE (d:Data {plot : toInteger(csvLine.UID), '
+					' person : $form_user, '
+					' form_date : $form_date, '
+					' form_time : $form_time, '
+					' time : $neo4j_time, '
+					' trait : trait.name, '
+					' value : csvLine[table_trait]}) '
+					' -[:DATA_FOR]->(ppt) '
+				' ON CREATE SET d.found = false '
+				' ON MATCH SET d.found = true '
+				# track user submissions through User/Plot/PlotTrait container
+				' MERGE (table)-[:SUBMITTED]->(uppt:UserPlotPlotTrait)-[:CONTRIBUTED]->(ppt) '
+				' MERGE (uppt)-[s1:SUBMITTED]->(d) '
+				' ON CREATE SET s1.time = timestamp() '
+				# And give the user feedback on their submission success
+				' RETURN d.found '
+	)
 	get_plots_treecount = (' MATCH (C:Country)<-[:IS_IN]-(R:Region) '
 		' OPTIONAL MATCH (R)<-[:IS_IN]-(F:Farm) '
 		' OPTIONAL MATCH (F)<-[:IS_IN]-(P:Plot) '
 		' OPTIONAL MATCH (P)<-[:IS_IN]-(:PlotTrees)<-[:FOR]-(T:Counter {name:"Trees"}) '
 		' OPTIONAL MATCH (P)<-[:IS_IN*..2]-(B:Block) '
 		' OPTIONAL MATCH (B)<-[:IS_IN*..2]-(t:Tree) '
-		#CASE WHEN csvLine.trait = "block" THEN [1] ELSE [] 
 		' WITH C, R, F, P, T, {name: B.name, label:"Block", treecount:count(t)} as blocks, count(t) as blocktrees '
 		' WITH C, R, F, {name: P.name, label:"Plot", treecount: T.count - sum(blocktrees), children: FILTER(block IN collect(blocks) WHERE block["name"] IS NOT NULL)} as plots '
 		' WITH C, R, {name: F.name, label:"Farm", children: FILTER(plot IN collect(plots) WHERE plot["name"] IS NOT NULL)} as farms '
@@ -770,7 +977,7 @@ class Cypher():
 				' -[:DATA_FOR]->(bbt:BlockBlockTrait) '
 				' -[:DATA_FOR]->(:PlotBlockTrait) '
 				' -[:FOR_TRAIT]->(blocktrait:BlockTrait), '
-			' (bbt)-[:FROM_BLOCK]-(block:Block) '
+			' (bbt)-[:FROM_BLOCK]->(block:Block) '
 		' WHERE s.time >=$starttime AND s.time <= $endtime'
 		' RETURN '
 			' "Trait" as d_label, '
@@ -808,10 +1015,20 @@ class Cypher():
 		' MATCH (:User {username:$username}) '
 			' -[:SUBMITTED*4]->() '
 			' -[s:SUBMITTED]->(data:Data) '
-			' -[:DATA_FOR*..2]->() '
-			' -[:FROM_TREE]->() '
-			' -[:IS_IN*2]->(block:Block) '
-			' WHERE s.time >=$starttime AND s.time <= $endtime'
+		' WHERE s.time >=$starttime AND s.time <= $endtime'
+		' WITH data '
+			' MATCH (block:Block) '
+				' WHERE '
+					' (data)-[:DATA_FOR*2]->(:TreeSampleTrait) '
+					' -[:FROM_TREE]->(:Tree) '
+					' -[:IS_IN*2]->(block:Block) '
+				' OR '
+					'(data)-[:DATA_FOR]->(:TreeTreeTrait) '
+					' -[:FROM_TREE]->(:Tree) '
+					' -[:IS_IN*2]->(block:Block) '
+				' OR '
+					' (data)-[:DATA_FOR]->(:BlockBlockTrait) '
+					' -[:FROM_BLOCK]->(block:Block) '
 		' WITH DISTINCT block '
 		' MATCH (block)-[:IS_IN*2]->(plot:Plot) '
 		' RETURN '
@@ -824,4 +1041,116 @@ class Cypher():
 			' "IS_IN" as r_type,  '
 			' (id(block) + "_" + id(plot)) as r_id, '
 			' id(block) as r_start, '
-			' id(plot) as r_end')
+			' id(plot) as r_end'
+		' UNION '
+		# link plots into farms
+		' MATCH (:User {username:$username}) '
+			' -[:SUBMITTED*4]->() '
+			' -[s:SUBMITTED]->(data:Data) '
+		' WHERE s.time >=$starttime AND s.time <= $endtime'
+		' WITH data '
+			' MATCH (plot:Plot) '
+				' WHERE '
+					' (data)-[:DATA_FOR*3]->(:PlotSampleTrait) '
+					' -[:FROM_PLOT]->(plot:Plot) '
+				' OR '
+					'(data)-[:DATA_FOR*2]->(:PlotTreeTrait) '
+					' -[:FROM_PLOT]->(plot:Plot) '
+				' OR '
+					' (data)-[:DATA_FOR*2]->(:PlotBlockTrait) '
+					' -[:FROM_PLOT]->(plot:Plot) '
+				' OR '
+					' (data)-[:DATA_FOR]->(:PlotPlotTrait) '
+					' -[:FROM_PLOT]->(plot:Plot) '
+		' WITH DISTINCT plot '
+		' MATCH (plot)-[:IS_IN]->(farm:Farm) '
+		' RETURN '		
+			' "Plot" as d_label, '
+			' plot.name as d_name, '
+			' id(plot) as d_id, '
+			' "Farm" as n_label, '
+			' farm.name as n_name, '
+			' id(farm) as n_id, '
+			' "IS_IN" as r_type,  '
+			' (id(plot) + "_" + id(farm)) as r_id, '
+			' id(plot) as r_start, '
+			' id(farm) as r_end'
+		' UNION '
+		# link farms into regions
+		' MATCH (:User {username:$username}) '
+			' -[:SUBMITTED*4]->() '
+			' -[s:SUBMITTED]->(data:Data) '
+		' WHERE s.time >=$starttime AND s.time <= $endtime'
+		' WITH data '
+			' MATCH (farm:Farm) '
+				' WHERE '
+					' (data)-[:DATA_FOR*3]->(:PlotSampleTrait) '
+					' -[:FROM_PLOT]->(:Plot) '
+					' -[:IS_IN]->(farm:Farm)'
+				' OR '
+					'(data)-[:DATA_FOR*2]->(:PlotTreeTrait) '
+					' -[:FROM_PLOT]->(:Plot) '
+					' -[:IS_IN]->(farm:Farm)'
+				' OR '
+					' (data)-[:DATA_FOR*2]->(:PlotBlockTrait) '
+					' -[:FROM_PLOT]->(:Plot) '
+					' -[:IS_IN]->(farm:Farm)'
+				' OR '
+					' (data)-[:DATA_FOR]->(:PlotPlotTrait) '
+					' -[:FROM_PLOT]->(:Plot) '
+					' -[:IS_IN]->(farm:Farm)'
+		' WITH DISTINCT farm '
+		' MATCH (farm)-[:IS_IN]->(region:Region) '
+		' RETURN '
+			' "Farm" as d_label, '
+			' farm.name as d_name, '
+			' id(farm) as d_id, '
+			' "Region" as n_label, '
+			' region.name as n_name, '
+			' id(region) as n_id, '
+			' "IS_IN" as r_type,  '
+			' (id(farm) + "_" + id(region)) as r_id, '
+			' id(farm) as r_start, '
+			' id(region) as r_end'
+		' UNION '
+		# link regions into countries
+		' MATCH (:User {username:$username}) '
+			' -[:SUBMITTED*4]->() '
+			' -[s:SUBMITTED]->(data:Data) '
+		' WHERE s.time >=$starttime AND s.time <= $endtime'
+		' WITH data '
+			' MATCH (region:Region) '
+				' WHERE '
+					' (data)-[:DATA_FOR*3]->(:PlotSampleTrait) '
+					' -[:FROM_PLOT]->(:Plot) '
+					' -[:IS_IN]->(:Farm) '
+					' -[:IS_IN]->(region:Region) '
+				' OR '
+					'(data)-[:DATA_FOR*2]->(:PlotTreeTrait) '
+					' -[:FROM_PLOT]->(:Plot) '
+					' -[:IS_IN]->(:Farm)'
+					' -[:IS_IN]->(region:Region) '
+				' OR '
+					' (data)-[:DATA_FOR*2]->(:PlotBlockTrait) '
+					' -[:FROM_PLOT]->(:Plot) '
+					' -[:IS_IN]->(:Farm)'
+					' -[:IS_IN]->(region:Region) '
+				' OR '
+					' (data)-[:DATA_FOR]->(:PlotPlotTrait) '
+					' -[:FROM_PLOT]->(:Plot) '
+					' -[:IS_IN]->(:Farm)'
+					' -[:IS_IN]->(region:Region) '
+		' WITH DISTINCT region '
+		' MATCH (region)-[:IS_IN]->(country:Country) '
+		' RETURN '
+			' "Region" as d_label, '
+			' region.name as d_name, '
+			' id(region) as d_id, '
+			' "Country" as n_label, '
+			' country.name as n_name, '
+			' id(country) as n_id, '
+			' "IS_IN" as r_type,  '
+			' (id(region) + "_" + id(country)) as r_id, '
+			' id(region) as r_start, '
+			' id(country) as r_end '
+	)
