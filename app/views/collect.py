@@ -20,7 +20,6 @@ from app.models import (
 )
 from app.forms import (
 	LocationForm,
-	CustomTreesForm,
 	CreateTraits,
 	CustomSampleForm,
 	SampleRegForm,
@@ -38,7 +37,6 @@ def collect():
 	else:
 		try:
 			location_form = LocationForm.update()
-			custom_trees_form = CustomTreesForm()
 			sample_traits_form = CreateTraits().update('sample')
 			tree_traits_form = CreateTraits().update('tree')
 			block_traits_form = CreateTraits().update('block')
@@ -50,7 +48,6 @@ def collect():
 			return render_template(
 				'collect.html',
 				location_form=location_form,
-				custom_trees_form=custom_trees_form,
 				level='all',
 				sample_traits_form=sample_traits_form,
 				tree_traits_form=tree_traits_form,
@@ -217,7 +214,7 @@ def add_samples():
 						replicates=replicates,
 						tissue=tissue,
 						storage=storage,
-						date=date,
+						date = date,
 						download_url=download_url
 					)
 					if file_details['file_size'] < 5000000:

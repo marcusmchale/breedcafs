@@ -20,14 +20,39 @@
 			<div id=tree_ids>
 				<br>
 				<dt>Tree ID range:</dt>
-				<dd>{{ custom_trees_form.trees_start(placeholder=custom_trees_form.trees_start.description) }}
-				{{ custom_trees_form.trees_end(placeholder=custom_trees_form.trees_end.description) }} </dd>
+				<dd>{{ record_form.trees_start(placeholder=record_form.trees_start.description) }}
+				{{ record_form.trees_end(placeholder=record_form.trees_end.description) }} </dd>
 				<br>
 			</div>
-			<div id=sample_ids>
-				<dt>{{ record_form.old_new_samples }}</dt>
-				<div id = old_samples>
-					<h3>Filters:</h3>
+			<div id=existing_ids>
+				<hr>
+				{{ record_form.old_new_ids }}
+				<div id=new_ids>
+						<p>Select the number of replicates per tree</p>
+						<dt>{{
+								record_form.replicates(
+									placeholder = record_form.replicates.description
+								)
+							}}
+						</dt>
+				</div>
+				<div id=old_ids>
+					<div id=branch_ids>
+						<br>
+						<dt>Branch ID range:</dt>
+						<dd>{{ record_form.trees_start(placeholder=record_form.trees_start.description) }}
+						{{ record_form.trees_end(placeholder=record_form.trees_end.description) }} </dd>
+						<br>
+					</div>
+					<div id=leaf_ids>
+						<br>
+						<dt>Leaf ID range:</dt>
+						<dd>{{ record_form.trees_start(placeholder=record_form.trees_start.description) }}
+						{{ record_form.trees_end(placeholder=record_form.trees_end.description) }} </dd>
+						<br>
+					</div>
+					<div id=sample_ids>
+						<br>
 						<a>Sample type:</a>
 						<dt>{{ sample_reg_form.tissue }}</dt>
 						<dt>{{ sample_reg_form.storage }}</dt>
@@ -38,15 +63,7 @@
 						<dd>{{ custom_sample_form.samples_start(placeholder = custom_sample_form.samples_start.description) }}
 							{{ custom_sample_form.samples_end(placeholder = custom_sample_form.samples_end.description) }}
 						</dd>
-				</div>
-				<div id = new_samples>
-					<p>Select the number of replicates per tree</p>
-					<dt>{{
-							record_form.new_sample_replicates(
-								placeholder = record_form.new_sample_replicates.description
-							)
-						}}
-					</dt>
+					</div>
 				</div>
 			</div>
 		<h3>File type</h3>

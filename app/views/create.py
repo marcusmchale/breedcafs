@@ -20,8 +20,7 @@ from app.forms import (LocationForm,
 	PlotsForm, 
 	AddBlock, 
 	BlocksForm, 
-	AddTreesForm, 
-	CustomTreesForm, 
+	AddTreesForm,
 	CreateTraits)
 from app.emails import send_attachment, send_static_attachment, send_email
 from flask.views import MethodView
@@ -105,6 +104,20 @@ class blocks(MethodView):
 				flash("Database unavailable")
 				return redirect(url_for('index'))
 
+class treecount(MethodView):
+	def get(self, plotID):
+		if 'username' not in session:
+			flash('Please log in')
+			return redirect(url_for('login'))
+		else:
+			try:
+				treecount = Fields.get_treecount(plotID)
+				response = make_response(jsonify(treecount))
+				response.content_type = 'application/json'
+				return response
+			except (ServiceUnavailable):
+				flash("Database unavailable")
+				return redirect(url_for('index'))
 
 @app.route('/create', methods=['GET', 'POST'])
 def create():

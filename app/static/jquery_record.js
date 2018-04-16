@@ -1,52 +1,80 @@
 //TRAITS
 //Set trait level undefined by default and only display traits when level selected
 $('#trait_level').val('0');
-$('#sample_traits,#tree_traits,#block_traits,#plot_traits').hide();
-$('#plot,#tree_ids,#sample_ids').hide();
+traits = $('#plot_traits,#block_traits,#tree_traits,#branch_traits,#leaf_traits,#sample_traits');
+traits.hide();
+id_forms = $('#plot,#tree_ids,#branch_ids,#leaf_ids,#sample_ids');
+id_forms.hide();
+$('#existing_ids').hide();
+
 $('#trait_level').change(function () {
 	$(".flash").remove();
 	if (this.value === '') {
-		$('#sample_traits,#tree_traits,#block_traits,#plot_traits').hide();
-		$('#plot,#tree_ids,#sample_ids').hide();
+		traits.hide();
+		id_forms.hide();
 	}
 	else if (this.value === 'plot') {
-		$('#sample_traits,#tree_traits,#block_traits').hide();
+		$('#block_traits, #tree_traits, #branch_traits, #leaf_traits, #sample_traits').hide();
 		$('#plot_traits').show();
+		$('#existing_ids').hide();
 		$('#plot, #tree_ids, #sample_ids').hide();
 	}
 	else if (this.value === 'block') {
-		$('#sample_traits,#tree_traits,#plot_traits').hide();
+		$('#plot_traits, #tree_traits, #branch_traits, #leaf_traits, #sample_traits').hide();
 		$('#block_traits').show();
 		$('#plot').show();
+		$('#existing_ids').hide();
 		$('#tree_ids, #sample_ids').hide();
 	}
 	else if (this.value === 'tree') {
-		$('#sample_traits,#block_traits,#plot_traits').hide();
+		$('#plot_traits,#block_traits,#branch_traits,#leaf_traits,#sample_traits').hide();
 		$('#tree_traits').show();
 		$('#plot, #tree_ids').show();
-		$('#sample_ids').hide();
+		$('#existing_ids').hide();
+		$('#branch_ids,#leaf_ids,#sample_ids').hide();
+	}
+	else if (this.value === 'branch') {
+		$('#plot_traits,#block_traits,#tree_traits,#leaf_traits,#sample_traits').hide();
+		$('#branch_traits').show();
+		$('#existing_ids').show();
+		$('#old_new_ids').val('old');
+		$('#new_ids').hide();
+		$('#plot, #tree_ids, #branch_ids').show();
+		$('#leaf_ids, #sample_ids').hide();
+	}
+	else if (this.value === 'leaf') {
+		$('#plot_traits,#block_traits,#tree_traits,#branch_traits,#sample_traits').hide();
+		$('#leaf_traits').show();
+		$('#existing_ids').show();
+		$('#old_new_ids').val('old');
+		$('#new_ids').hide();
+		$('#plot,#leaf_ids,#tree_ids').show();
+		$('#branch_ids,#sample_ids').hide();
 	}
 	else if (this.value === 'sample') {
-		$('#tree_traits,#block_traits,#plot_traits').hide();
+		$('#plot_traits,#block_traits,#tree_traits,#branch_traits,#leaf_traits').hide();
 		$('#sample_traits').show();
+		$('#existing_ids').show();
+		$('#old_new_ids').val('old');
+		$('#new_ids').hide();
 		$('#plot, #sample_ids, #tree_ids').show();
+		$('#branch_ids,#leaf_ids').hide();
 	}
 })
 
-$('#old_new_samples').val('old');
-$('#new_samples').hide();
+$('#old_new_ids').val('old');
+$('#old_ids').show();
 
-$('#old_new_samples').change(function () {
-    console.log(this.value);
-    $(".flash").remove;
-    if (this.value === 'old') {
-        $('#old_samples').show();
-        $('#new_samples').hide();
+$('#old_new_ids').change(function () {
+   $(".flash").remove;
+   if (this.value === 'old') {
+        $('#new_ids').hide();
+        $('#old_ids').show();
     }
     if (this.value === 'new') {
-        $('#new_samples').show();
-        $('#old_samples').hide();
-    }
+        $('#new_ids').show();
+        $('#old_ids').hide();
+   }
 })
 
 //remove flash message on change of data format select box
@@ -122,12 +150,13 @@ $("#submit_record").click( function(e) {
 })
 
 
-//button to reset form values
-$("#custom_samples_csv").after('<br><input id="reset_form_button" name="Reset Form" value="Clear Form" type="submit")><br>')
 
-$("#reset_form_button").click( function(e) {
-	e.preventDefault();
-	$("form").find('input:text').val('');
-	$("form").find('select').val('');
-	$(".flash").remove();
-	})
+//button to reset form values
+//$("#custom_samples_csv").after('<br><input id="reset_form_button" name="Reset Form" value="Clear Form" type="submit")><br>')
+
+//$("#reset_form_button").click( function(e) {
+//	e.preventDefault();
+//	$("form").find('input:text').val('');
+//	$("form").find('select').val('');
+//	$(".flash").remove();
+//	})

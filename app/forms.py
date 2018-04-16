@@ -265,17 +265,6 @@ class AddTreesForm(FlaskForm):
 		description= "Number of new trees")
 	submit_trees = SubmitField('Register new trees')
 
-class CustomTreesForm(FlaskForm):
-	id = "custom_trees_Form"
-	email_checkbox_custom = BooleanField('Email checkbox custom')
-	trees_start = 	IntegerField('Start TreeID',[Optional(),
-		NumberRange(min=1, max=1000000, message='')],
-		description= "Start TreeID")
-	trees_end = IntegerField('End TreeID',[Optional(),
-		NumberRange(min=1, max=1000000, message='')],
-		description= "End TreeID")
-	custom_trees_csv = SubmitField('Custom trees.csv')
-
 #Samples
 class AddTissueForm(FlaskForm):
 	id = "add_tissue_form"
@@ -365,11 +354,70 @@ class CustomSampleForm(FlaskForm):
 
 #record
 class RecordForm(FlaskForm):
-	trait_level = SelectField('Trait level', [InputRequired()],
-		choices = [('','Select Level'),('plot','Plot'),('block','Block'),('tree','Tree'),('sample','Sample'),])
-	template_format = SelectField('Template format', [InputRequired()],
-		choices = [('', 'Select Format'),('fb','Field Book'),('csv','CSV template')])
-	new_sample_replicates = IntegerField(
+	trait_level = SelectField(
+		'Trait level',
+		[InputRequired()],
+		choices = [
+			('','Select Level'),
+			('plot','Plot'),
+			('block','Block'),
+			('tree','Tree'),
+			('branch','Branch'),
+			('leaf', 'Leaf'),
+			('sample','Sample')
+		]
+	)
+	template_format = SelectField(
+		'Template format',
+		[InputRequired()],
+		choices = [('', 'Select Format'), ('fb', 'Field Book'), ('csv', 'CSV template')]
+	)
+	trees_start = 	IntegerField(
+		'Start TreeID',
+		[
+			Optional(),
+			NumberRange(min=1, max=999999, message='An integer (1 to 999999)')
+		],
+		description = "Start TreeID",
+	)
+	trees_end = IntegerField(
+		'End TreeID',
+		[
+			Optional(),
+			NumberRange(min=1, max=999999, message='An integer (1 to 999999)')
+		],
+		description = "End TreeID",
+	)
+	branches_start = 	IntegerField(
+		'Start BranchID',
+		[
+			Optional(),
+			NumberRange(min=1, max=999999, message='An integer (1 to 999999)')
+		],
+		description = "Start BranchID")
+	branches_end = IntegerField(
+		'End BranchID',
+		[
+			Optional(),
+			NumberRange(min=1, max=999999, message='An integer (1 to 999999)')
+		],
+		description = "End BranchID")
+	leaves_start = 	IntegerField(
+		'Start LeafID',
+		[
+			Optional(),
+			NumberRange(min=1, max=999999, message='An integer (1 to 999999)')
+		],
+		description = "Start LeafID")
+	leaves_end = IntegerField(
+		'End LeafID',
+		[
+			Optional(),
+			NumberRange(min=1, max=999999, message='An integer (1 to 999999)')
+		],
+		description = "End LeafID"
+	)
+	replicates = IntegerField(
 		'Replicates',
 		[
 			Optional(),
@@ -377,12 +425,14 @@ class RecordForm(FlaskForm):
 		],
 		description = "Replicates"
 	)
-	old_new_samples = SelectField(
-		'Find existing or create new sample IDs',
+	old_new_ids = SelectField(
+		'Find existing or create new IDs',
 		[InputRequired()],
 		choices = [('old','Find existing IDs'),('new','Create new IDs')]
 	)
 	submit_record = SubmitField('Generate file/s')
+
+
 
 #upload
 class UploadForm(FlaskForm):
@@ -432,21 +482,13 @@ class CreateTraits(FlaskForm):
 		super(CreateTraits, self).__init__(*args, **kwargs)
 		#the updates are methods so that flask can load while the database is unavailable
 		#list the basic levels of trait
-		levels = ['sample','tree','block','plot']
+		levels = ['plot','block','tree','branch','leaf','sample']
 		#create an empty nested dictionary (level:group:[traits])
 		self.levels_groups_traits = defaultdict(lambda: defaultdict(list))
 		#fill this dictionary 
 		for level in levels:
-			if level == 'sample':
-				node_label = 'SampleTrait'
-			elif level == 'tree':
-				node_label = 'TreeTrait'
-			elif level == 'block':
-				node_label = 'BlockTrait'
-			elif level == 'plot':
-				node_label = 'PlotTrait'
 			#get a list of dictionaries of properties from each trait node at this level
-			traits = Lists(node_label).get_nodes()
+			traits = Lists(level.title() + 'Trait').get_nodes()
 			#merge this into our nested defaultdict[level] with group as key and list of traits as value
 			for trait in traits:
 				self.levels_groups_traits[level][trait['group']].append((trait['name'], trait['details']))

@@ -47,6 +47,10 @@ app.add_url_rule('/location/blocks/<plotID>/',
 	view_func=views.blocks.as_view('blocks'), 
 	methods=['GET'])
 
+app.add_url_rule('/location/treecount/<plotID>/',
+	view_func=views.treecount.as_view('treecount'),
+	methods=['GET'])
+
 app.add_url_rule('/sample_reg/tissues/', 
 	view_func=views.tissues.as_view('tissues'), 
 	methods=['GET'])

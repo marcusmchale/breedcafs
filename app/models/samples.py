@@ -93,7 +93,7 @@ class Samples:
 	):
 		tx.run(Cypher.sample_id_lock,
 			plotID = plotID)
-		result=tx.run(Cypher.samples_add,
+		result = tx.run(Cypher.samples_add,
 			plotID = plotID,
 			start = start,
 			end = end,
@@ -101,11 +101,10 @@ class Samples:
 			tissue = tissue,
 			storage = storage,
 			date = date,
-			#convert the date to epoch time (ms)
 			time = (datetime.strptime(date, '%Y-%m-%d')-datetime(1970,1,1)).total_seconds()*1000,
 			username = session['username'])
-		id_list = [record[0] for record in result]
-		#setting default values for args
+		return [record[0] for record in result]
+
 	def _add_samples_notype(
 			self,
 			tx,
@@ -120,9 +119,8 @@ class Samples:
 		replicates = int(replicates) if replicates else 1
 		tx.run(Cypher.sample_id_lock, plotID = plotID)
 		result=tx.run(Cypher.samples_add_notype, plotID = plotID, start = start, end = end, replicates = replicates, username = session['username'])
-		id_list = [record[0] for record in result]
-		return id_list
-		#setting default values for args
+		return [record[0] for record in result]
+
 	def get_samples(self, parameters):
 		#build the query
 		#match samples by location in the graph

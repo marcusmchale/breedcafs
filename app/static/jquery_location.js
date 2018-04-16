@@ -300,3 +300,31 @@ $("#submit_trees").click( function(e) {
 		}
 	});
 })
+
+//This is for the collect and record forms
+$("#trees_end").val('')
+
+update_defaults = function() {
+	var sel_plot = $("#plot").find(":selected").val();
+	if (sel_plot !== "") {
+	    $("#trees_start,trees_end").prop("disabled", true);
+        var request = $.ajax({
+            type: 'GET',
+            url: "/location/treecount/" + sel_plot + '/',
+        });
+        request.done(function(data){
+            //lazily return starting ID as 1
+            $("#trees_start").val(1)
+            //but have looked up the following so replace
+            $("#trees_end").val(data[0])
+            //and be sure to allow the user to edit
+            $("#trees_start,#trees_end").prop( "disabled", false);
+        });
+    }
+    else {
+        //handling return to nothing entered on deselection of plot
+	    $("#trees_start,#trees_end").val('')
+	}
+};
+
+$('#plot').change(update_defaults);

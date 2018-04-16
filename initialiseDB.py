@@ -59,8 +59,6 @@ CONSTRAINTS = ({'node':'User', 'property':'username', 'constraint':'IS UNIQUE'},
 	{'node':'Variety', 'property':'name', 'constraint':'IS UNIQUE'})
 
 
-
-
 #functions
 #https://docs.python.org/3.1/library/itertools.html#recipes
 def grouper(n, iterable, fillvalue=None):
@@ -453,6 +451,8 @@ else:
 		session.write_transaction(Create('start').traits, 'traits/plot_traits.csv', 'Plot')
 		session.write_transaction(Create('start').traits, 'traits/block_traits.csv', 'Block')
 		session.write_transaction(Create('start').traits, 'traits/tree_traits.csv', 'Tree')
+		session.write_transaction(Create('start').traits, 'traits/branch_traits.csv', 'Branch')
+		session.write_transaction(Create('start').traits, 'traits/leaf_traits.csv', 'Leaf')
 		session.write_transaction(Create('start').traits, 'traits/sample_traits.csv', 'Sample')
 		session.write_transaction(Create('start').varieties, VARIETIES)
 	print ('Complete')

@@ -149,6 +149,13 @@ class Fields:
 				'end': end
 			}
 			return [record[0] for record in neo4j_session.read_transaction(neo4j_query, Cypher.trees_get, parameters)]
+	@staticmethod
+	def get_treecount(plotid):
+		with get_driver().session() as neo4j_session:
+			parameters = {
+				'plotid': plotid
+			}
+			return [record[0] for record in neo4j_session.read_transaction(neo4j_query, Cypher.treecount, parameters)]
 	def get_farms(self, region):
 		self.region=region
 		with get_driver().session() as neo4j_session:

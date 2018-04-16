@@ -1,4 +1,4 @@
-{% set levels = ['plot','block','tree','sample',] %}
+{% set levels = ['plot','block','tree','branch','leaf','sample',] %}
 {% if level in levels %}
 	{{ traits_form.csrf_token }}
 	{% for field in traits_form %}
@@ -14,17 +14,23 @@
 
 {% if level == 'all' %}
 	{% for level in levels %}
-		{% if level == 'sample' %}
-			{% set traits_form = sample_traits_form %}
+		{% if level == 'plot' %}
+			{% set traits_form = plot_traits_form %}
+		{% endif %}
+		{% if level == 'block' %}
+				{% set traits_form = block_traits_form %}
 		{% endif %}
 		{% if level == 'tree' %}
 			{% set traits_form = tree_traits_form %}
 		{% endif %}
-		{% if level == 'block' %}
-			{% set traits_form = block_traits_form %}
+		{% if level == 'branch' %}
+			{% set traits_form = branch_traits_form %}
 		{% endif %}
-		{% if level == 'plot' %}
-			{% set traits_form = plot_traits_form %}
+		{% if level == 'leaf' %}
+			{% set traits_form = leaf_traits_form %}
+		{% endif %}
+		{% if level == 'sample' %}
+			{% set traits_form = sample_traits_form %}
 		{% endif %}
 		<div id= "{{ level }}_traits">
 			{{ traits_form.csrf_token }}

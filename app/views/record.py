@@ -20,7 +20,6 @@ from app.models import (
 )
 from app.forms import (
 	LocationForm,
-	CustomTreesForm,
 	RecordForm,
 	CreateTraits,
 	CustomSampleForm,
@@ -40,25 +39,25 @@ def record():
 		try:
 			record_form = RecordForm()
 			location_form = LocationForm.update()
-			custom_trees_form = CustomTreesForm()
-			sample_traits_form = CreateTraits().update('sample')
-			tree_traits_form = CreateTraits().update('tree')
-			block_traits_form = CreateTraits().update('block')
 			plot_traits_form = CreateTraits().update('plot')
-			sample_reg_form = SampleRegForm().update()
-			add_tissue_form = AddTissueForm()
-			add_storage_form = AddStorageForm()
+			block_traits_form = CreateTraits().update('block')
+			tree_traits_form = CreateTraits().update('tree')
+			branch_traits_form = CreateTraits().update('branch')
+			leaf_traits_form = CreateTraits().update('leaf')
+			sample_traits_form = CreateTraits().update('sample')
+			sample_reg_form = SampleRegForm.update()
 			custom_sample_form = CustomSampleForm()
 			return render_template(
 				'record.html',
 				location_form = location_form,
-				custom_trees_form = custom_trees_form,
 				record_form = record_form,
 				level = 'all',
-				sample_traits_form = sample_traits_form,
-				tree_traits_form = tree_traits_form,
+				plot_traits_form=plot_traits_form,
 				block_traits_form = block_traits_form,
-				plot_traits_form = plot_traits_form,
+				tree_traits_form=tree_traits_form,
+				branch_traits_form = branch_traits_form,
+				leaf_traits_form = leaf_traits_form,
+				sample_traits_form=sample_traits_form,
 				sample_reg_form = sample_reg_form,
 				custom_sample_form = custom_sample_form,
 				title = 'Record'
@@ -79,43 +78,56 @@ def generate_files():
 			record_form = RecordForm()
 			if record_form.validate_on_submit():
 				#first ensure selection of trait level and load the appropriate location form
+				form_data = request.form
 				trait_level = request.form['trait_level']
 				traits_form = CreateTraits().update(trait_level)
-				custom_trees_form = CustomTreesForm()
-				sample_reg_form = SampleRegForm().update(optional = True)
-				custom_sample_form = CustomSampleForm()
 				if trait_level == 'plot':
 					location_form = LocationForm.update(optional = True)
 				else:
 					location_form = LocationForm.update(optional = False)
 				if all([location_form.validate_on_submit(), traits_form.validate_on_submit()]):
-					form_data = request.form
-					if trait_level == 'tree':
-						if not (custom_trees_form.validate_on_submit()):
-							errors = jsonify([custom_trees_form.errors])
-							return errors
-					if trait_level == 'sample':
-						if not all(
-							[
-								sample_reg_form.validate_on_submit(),
-								custom_sample_form.validate_on_submit()
-							]
-						):
-							errors = jsonify([sample_reg_form.errors, custom_sample_form.errors])
-							return errors
-						if form_data['old_new_samples'] == 'new':
+					if trait_level in ['branch','leaf','sample']:
+						if form_data['old_new_ids'] == 'new':
 							plotID = form_data['plot']
-							start = form_data['trees_start']
-							end = form_data['trees_end']
-							replicates = form_data['new_sample_replicates']
-							tissue = None
-							storage = None
-							date = None
-							sample_ids = Samples().add_samples(plotID, start, end, replicates, tissue, storage, date, False)
+							import pdb;
+							pdb.set_trace()
+							start = int(form_data['trees_start']) if form_data['trees_start'] else 0
+							end = int(form_data['trees_end']) if form_data['trees_end'] else 999999
+							replicates = form_data['replicates']
+							if trait_level == 'branch':
+								import pdb;
+								pdb.set_trace()
+							elif trait_level == 'leaf':
+								import pdb;
+								pdb.set_trace()
+							# find the existing ID's if requested
+							elif trait_level == 'sample':
+								sample_reg_form = SampleRegForm().update(optional=True)
+								custom_sample_form = CustomSampleForm()
+								tissue = None
+								storage = None
+								date = None
+								if not all(
+										[
+											sample_reg_form.validate_on_submit(),
+											custom_sample_form.validate_on_submit()
+										]
+								):
+									errors = jsonify([sample_reg_form.errors, custom_sample_form.errors])
+									return errors
+							existing_ids = Samples().add_samples(
+								plotID,
+								start,
+								end,
+								replicates,
+								tissue,
+								storage,
+								date,
+								False)
 					#now create the index files requested: plots/blocks/trees/samples.csv
 					if form_data['template_format'] == 'fb':
 						if all([form_data['trait_level'] == 'sample', form_data['old_new_samples'] == 'new']):
-							csv_file_details = Download(session['username']).get_index_csv(form_data, sample_ids)
+							csv_file_details = Download(session['username']).get_index_csv(form_data, existing_ids)
 						else:
 							csv_file_details = Download(session['username']).get_index_csv(form_data)
 						if csv_file_details == None:

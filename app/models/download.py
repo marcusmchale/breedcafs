@@ -508,7 +508,7 @@ class Download(User):
 	def get_index_csv(
 			self,
 			form_data,
-			sample_ids = None
+			existing_ids = None
 	):
 		if form_data['trait_level'] == 'plot':
 			parameters = {}
@@ -552,7 +552,7 @@ class Download(User):
 				id_list,
 				filename + 'plotIDs.csv'
 			)
-		elif form_data['trait_level'] in ['block','tree','sample']:
+		elif form_data['trait_level'] in ['block','tree','branch','leaf','sample']:
 			plotID = int(form_data['plot'])
 			if form_data['trait_level'] == 'block':
 				# make the file and return a dictionary with filename, file_path and file_size
@@ -576,6 +576,32 @@ class Download(User):
 					id_list,
 					'treeIDs_' + str(first_tree_id) + '-' + str(last_tree_id) + '.csv'
 				)
+			if form_data['trait_level'] == 'branch':
+				fieldnames = ['UID', 'PlotID', 'Plot', 'BlockID', 'Block', 'TreeName', 'TreeID', 'BranchID']
+				if form_data['old_new_samples'] == 'old':
+					parameters = {
+						'country': form_data['country'],
+						'region': form_data['region'],
+						'farm': form_data['farm'],
+						'plotID': int(plotID),
+						'trees_start': int(form_data['trees_start']) if form_data['trees_start'] else '',
+						'trees_end': int(form_data['trees_end']) if form_data['trees_end'] else '',
+						'start_time': int((datetime.strptime(form_data['date_from'], '%Y-%m-%d') -	datetime(1970, 1, 1)).total_seconds() * 1000) if form_data['date_from'] != '' else '',
+						'end_time': int((datetime.strptime(form_data['date_to'], '%Y-%m-%d')- datetime(1970, 1, 1)).total_seconds() * 1000) if form_data['date_to'] != '' else '',
+						'branches_start': int(form_data['branches_start']) if form_data['branches_start'] else "",
+						'branches_end': int(form_data['branches_end']) if form_data['branches_end'] else ""
+					}
+					import pdb;pdb.set_trace()
+					id_list = Fields.get_branches(parameters)
+					csv_file_details = self.make_csv_file(
+						fieldnames,
+						id_list,
+						'branchIDs.csv'
+					)
+				else:
+					import pdb;
+					pdb.set_trace()
+					csv_file_details = self.make_csv_file(fieldnames, existing_ids, 'branchIDs.csv')
 			if form_data['trait_level'] == 'sample':
 				if form_data['old_new_samples'] == 'old':
 					parameters = {
@@ -600,9 +626,9 @@ class Download(User):
 						fieldnames,
 						id_list,
 						'sampleIDs.csv')
-				if form_data['old_new_samples'] == 'new':
+				else:
 					fieldnames = ['UID', 'PlotID', 'TreeID', 'TreeName', 'SampleID', 'Farm', 'Region', 'Country']
-					csv_file_details = self.make_csv_file( fieldnames, sample_ids, 'sampleIDs.csv')
+					csv_file_details = self.make_csv_file(fieldnames, existing_ids, 'sampleIDs.csv')
 		return csv_file_details
 		#return the file details
 	#creates the traits.trt file for import to Field-Book

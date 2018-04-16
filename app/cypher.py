@@ -380,6 +380,10 @@ class Cypher():
 			' Region : region.name, '
 			' Country : country.name } '
 		' ORDER BY tree.id ' )
+	treecount = (
+		'MATCH (tc:Counter {uid:("plot_" + $plotid + "_trees")}) '
+		'RETURN tc.count '
+	)
 #sample procedures
 	#these are unique in allowing users to submit other than locations/items/data
 	#not sure if good idea, check with Benoit if can get list of tissues and storage procedures instead
@@ -440,9 +444,10 @@ class Cypher():
 		#Create samples
 		' CREATE (s:Sample { '
 				' uid: (p.uid + "_S" + id.count), '
-				' id:id.count, '
-				' date:$date, '
-				' time:$time, '
+				' id: id.count, '
+				' tree: t.id, '
+				' date: $date, '
+				' time: $time, '
 				' replicates: $replicates '
 				'}) '
 		#Create a per Tissue per Storage container node
@@ -516,6 +521,7 @@ class Cypher():
 		' CREATE (s:Sample { '
 				' uid: (p.uid + "_S" + id.count), '
 				' id:id.count, '
+				' tree: t.id,'
 				' replicates: $replicates '
 				'}) '
 		# Create a NoType node for the PlotSamples node to collect all these separate from the Tissue/Storage samples
