@@ -51,12 +51,16 @@ CONSTRAINTS = ({'node':'User', 'property':'username', 'constraint':'IS UNIQUE'},
 	{'node':'Plot', 'property':'uid', 'constraint':'IS UNIQUE'},
 	{'node':'Block', 'property':'uid', 'constraint':'IS UNIQUE'},
 	{'node':'Tree', 'property':'uid', 'constraint':'IS UNIQUE'},
+	{'node':'Branch', 'property':'uid', 'constraint':'IS UNIQUE'},
+	{'node':'Leaf', 'property':'uid', 'constraint':'IS UNIQUE'},
 	{'node':'Sample', 'property':'uid', 'constraint':'IS UNIQUE'},
 	{'node':'Counter', 'property':'uid', 'constraint':'IS UNIQUE'},
 	{'node':'Country', 'property':'name', 'constraint':'IS UNIQUE'},
 	{'node':'Storage', 'property':'name', 'constraint':'IS UNIQUE'},
 	{'node':'Tissue', 'property':'name', 'constraint':'IS UNIQUE'},
 	{'node':'Variety', 'property':'name', 'constraint':'IS UNIQUE'})
+
+
 
 
 #functions
@@ -102,6 +106,8 @@ class Create:
 			' MERGE (u)-[:SUBMITTED]->(sub:Submissions) '
 				' -[:SUBMITTED]->(locations:Locations) '
 				' -[:SUBMITTED]->(:Countries) '
+			' MERGE (sub)-[:SUBMITTED]->(counter:Counter {name: "plot"}) '
+				' ON CREATE SET counter.count = 0 '
 			' MERGE (sub)-[:SUBMITTED]->(:Partners) '
 			' MERGE (sub)-[:SUBMITTED]->(:Traits) '
 			' MERGE (sub)-[:SUBMITTED]->(:Trials) '
@@ -428,10 +434,6 @@ class Create:
 #						print('Rootstock relationship already established between ' + record['var.name'] + " and " + record['rootstock.name'] )
 #					if record['r.found'] == "FALSE" :
 #						print('Rootstock relationship created between ' + record['var.name'] + " and " + record['rootstock.name'] )						
-
-
-
-
 
 if not confirm('Are you sure you want to proceed? This is should probably only be run when setting up the database'):
 	sys.exit()

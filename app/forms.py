@@ -330,30 +330,10 @@ class SampleRegForm(FlaskForm):
 			form.date_collected.validators.insert(0,Optional())
 		return form
 
-class CustomSampleForm(FlaskForm):
-	id = "custom_sample_Form"
-	email_checkbox_custom = BooleanField('Email checkbox custom')
-	samples_start = IntegerField(
-		'Start SampleID',
-		[
-			Optional(),
-			NumberRange(min=1, max=1000000000, message='')
-		],
-		description="Start SampleID",
-	)
-	samples_end = IntegerField('End SampleID', [Optional(), 
-		NumberRange(min=1, max=1000000000, message='')],
-		description= "End SampleID")
-	date_from = DateField('Date start (YYYY-mm-dd): ',  [Optional()],
-		format='%Y-%m-%d',
-		description = 'Start date')
-	date_to = DateField('Date end (YYYY-mm-dd): ', [Optional()],
-		format='%Y-%m-%d',
-		description = 'End date')
-	make_samples_csv = SubmitField('Generate list')
-
 #record
 class RecordForm(FlaskForm):
+	min = 1
+	max = 1000000
 	trait_level = SelectField(
 		'Trait level',
 		[InputRequired()],
@@ -376,7 +356,7 @@ class RecordForm(FlaskForm):
 		'Start TreeID',
 		[
 			Optional(),
-			NumberRange(min=1, max=999999, message='An integer (1 to 999999)')
+			NumberRange(min=min, max=max, message='An integer (' + str(min) + ' to ' + str(max) +')')
 		],
 		description = "Start TreeID",
 	)
@@ -384,7 +364,7 @@ class RecordForm(FlaskForm):
 		'End TreeID',
 		[
 			Optional(),
-			NumberRange(min=1, max=999999, message='An integer (1 to 999999)')
+			NumberRange(min=min, max=max, message='An integer (' + str(min) + ' to ' + str(max) +')')
 		],
 		description = "End TreeID",
 	)
@@ -392,30 +372,58 @@ class RecordForm(FlaskForm):
 		'Start BranchID',
 		[
 			Optional(),
-			NumberRange(min=1, max=999999, message='An integer (1 to 999999)')
+			NumberRange(min=min, max=max, message='An integer (' + str(min) + ' to ' + str(max) + ')')
 		],
 		description = "Start BranchID")
 	branches_end = IntegerField(
 		'End BranchID',
 		[
 			Optional(),
-			NumberRange(min=1, max=999999, message='An integer (1 to 999999)')
+			NumberRange(min=min, max=max, message='An integer (' + str(min) + ' to ' + str(max) +')')
 		],
 		description = "End BranchID")
 	leaves_start = 	IntegerField(
 		'Start LeafID',
 		[
 			Optional(),
-			NumberRange(min=1, max=999999, message='An integer (1 to 999999)')
+			NumberRange(min=min, max=max, message='An integer (' + str(min) + ' to ' + str(max) +')')
 		],
 		description = "Start LeafID")
 	leaves_end = IntegerField(
 		'End LeafID',
 		[
 			Optional(),
-			NumberRange(min=1, max=999999, message='An integer (1 to 999999)')
+			NumberRange(min=min, max=max, message='An integer (' + str(min) + ' to ' + str(max) +')')
 		],
 		description = "End LeafID"
+	)
+	samples_start = IntegerField(
+		'Start SampleID',
+		[
+			Optional(),
+			NumberRange(min=min, max=max, message='An integer (' + str(min) + ' to ' + str(max) +')')
+		],
+		description="Start SampleID",
+	)
+	samples_end = IntegerField(
+		'End SampleID',
+		[
+			Optional(),
+			NumberRange(min=min, max=max, message='An integer (' + str(min) + ' to ' + str(max) +')')
+		],
+		description= "End SampleID"
+	)
+	date_from = DateField(
+		'Date start (YYYY-mm-dd): ',
+		[Optional()],
+		format='%Y-%m-%d',
+		description = 'Start date'
+	)
+	date_to = DateField(
+		'Date end (YYYY-mm-dd): ',
+		[Optional()],
+		format='%Y-%m-%d',
+		description = 'End date'
 	)
 	replicates = IntegerField(
 		'Replicates',
@@ -464,7 +472,15 @@ class UploadForm(FlaskForm):
 #download
 class DownloadForm(FlaskForm):
 	trait_level = SelectField('Trait level', [InputRequired()],
-		choices = [('','Select Level'),('sample','Sample'),('tree','Tree'),('block','Block'),('plot','Plot')])
+		choices = [
+			('','Select Level'),
+			('plot', 'Plot'),
+			('block', 'Block'),
+			('tree', 'Tree'),
+			('branch','Branch'),
+			('leaf','Leaf'),
+			('sample','Sample')
+			])
 	date_from = DateField('Date start (YYYY-mm-dd): ',  [Optional()],
 		format='%Y-%m-%d',
 		description = 'Start date')

@@ -14,6 +14,7 @@ from flask import (
 )
 from app.models import (
 	Lists,
+	Fields,
 	User,
 	Download,
 	Samples,
@@ -22,7 +23,6 @@ from app.forms import (
 	LocationForm,
 	RecordForm,
 	CreateTraits,
-	CustomSampleForm,
 	SampleRegForm,
 	AddTissueForm,
 	AddStorageForm,
@@ -46,7 +46,6 @@ def record():
 			leaf_traits_form = CreateTraits().update('leaf')
 			sample_traits_form = CreateTraits().update('sample')
 			sample_reg_form = SampleRegForm.update()
-			custom_sample_form = CustomSampleForm()
 			return render_template(
 				'record.html',
 				location_form = location_form,
@@ -59,7 +58,6 @@ def record():
 				leaf_traits_form = leaf_traits_form,
 				sample_traits_form=sample_traits_form,
 				sample_reg_form = sample_reg_form,
-				custom_sample_form = custom_sample_form,
 				title = 'Record'
 			)
 		except ServiceUnavailable:
@@ -77,57 +75,53 @@ def generate_files():
 		try:
 			record_form = RecordForm()
 			if record_form.validate_on_submit():
-				#first ensure selection of trait level and load the appropriate location form
+				#first ensure selection of trait level and load the appropriate forms
 				form_data = request.form
 				trait_level = request.form['trait_level']
 				traits_form = CreateTraits().update(trait_level)
+				sample_reg_form = SampleRegForm().update(optional=True)
 				if trait_level == 'plot':
 					location_form = LocationForm.update(optional = True)
 				else:
 					location_form = LocationForm.update(optional = False)
 				if all([location_form.validate_on_submit(), traits_form.validate_on_submit()]):
+					#first check traits were selected
+					trait_selection = [
+						item for sublist in [
+							form_data.getlist(i) for i in form_data if
+							all(['csrf_token' not in i, form_data['trait_level'] + '-' in i])
+						]
+						for item in sublist
+					]
+					if len(trait_selection) == 0:
+						return jsonify({'submitted': "Please select traits to include"})
+					plotID = int(form_data['plot']) if form_data['plot'] else None
+					start = int(form_data['trees_start']) if form_data['trees_start'] else 1
+					end = int(form_data['trees_end']) if form_data['trees_end'] else 999999
+					replicates = int(form_data['replicates']) if form_data['replicates'] else 1
 					if trait_level in ['branch','leaf','sample']:
-						if form_data['old_new_ids'] == 'new':
-							plotID = form_data['plot']
-							import pdb;
-							pdb.set_trace()
-							start = int(form_data['trees_start']) if form_data['trees_start'] else 0
-							end = int(form_data['trees_end']) if form_data['trees_end'] else 999999
-							replicates = form_data['replicates']
+						if form_data['old_new_ids'] == 'new': # create new IDs
 							if trait_level == 'branch':
-								import pdb;
-								pdb.set_trace()
-							elif trait_level == 'leaf':
-								import pdb;
-								pdb.set_trace()
-							# find the existing ID's if requested
+								id_list = Fields.add_branches(plotID, start, end, replicates)
+							elif trait_level =='leaf':
+								id_list = Fields.add_leaves(plotID, start, end, replicates)
 							elif trait_level == 'sample':
-								sample_reg_form = SampleRegForm().update(optional=True)
-								custom_sample_form = CustomSampleForm()
 								tissue = None
 								storage = None
 								date = None
-								if not all(
-										[
-											sample_reg_form.validate_on_submit(),
-											custom_sample_form.validate_on_submit()
-										]
-								):
-									errors = jsonify([sample_reg_form.errors, custom_sample_form.errors])
-									return errors
-							existing_ids = Samples().add_samples(
-								plotID,
-								start,
-								end,
-								replicates,
-								tissue,
-								storage,
-								date,
-								False)
-					#now create the index files requested: plots/blocks/trees/samples.csv
+								id_list = Samples().add_samples(
+									plotID,
+									start,
+									end,
+									replicates,
+									tissue,
+									storage,
+									date,
+									False)
+					#now create the index files requested: plots/blocks/trees/branches/leaves/samples.csv
 					if form_data['template_format'] == 'fb':
-						if all([form_data['trait_level'] == 'sample', form_data['old_new_samples'] == 'new']):
-							csv_file_details = Download(session['username']).get_index_csv(form_data, existing_ids)
+						if all([form_data['trait_level'] in ['branch','leaf'], form_data['old_new_ids'] == 'new']):
+							csv_file_details = Download(session['username']).get_index_csv(form_data, id_list)
 						else:
 							csv_file_details = Download(session['username']).get_index_csv(form_data)
 						if csv_file_details == None:
@@ -141,7 +135,10 @@ def generate_files():
 							'details': trt_file_details
 						}
 					elif form_data['template_format'] == 'csv':
-						file_details_dict = Download(session['username']).get_table_csv(form_data)
+						if all([form_data['trait_level'] in ['branch','leaf'], form_data['old_new_ids'] == 'new']):
+							file_details_dict = Download(session['username']).get_table_csv(form_data, id_list)
+						else:
+							file_details_dict = Download(session['username']).get_table_csv(form_data)
 						if file_details_dict == None:
 							return jsonify({'submitted': "Please select traits to include"})
 					#create html block with urls

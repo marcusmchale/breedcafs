@@ -157,13 +157,14 @@ def add_country():
 			form = AddCountry()
 			text_country = request.form['text_country']
 			if form.validate_on_submit():
-				if Fields(text_country).find_country():
-					return ("Country already found: " + str(text_country))
+				found = Fields(text_country).find_country()
+				if found:
+					return jsonify({"found" : found[0]['name']})
 				else:
-					Fields(text_country).add_country()
-					return ("Country submitted: " + str(text_country))
+					result = Fields(text_country).add_country()
+					return jsonify({"submitted": result[0]})
 			else:
-				return form.errors["text_country"][0]
+				return jsonify([form.errors])
 		except (ServiceUnavailable):
 			flash("Database unavailable")
 			return redirect(url_for('index'))
@@ -180,14 +181,16 @@ def add_region():
 			text_region = request.form['text_region']
 			if form.validate_on_submit():
 				if country in ['','None']:
-					return ('Please select a country to register a new region')
-				elif Fields(country).find_region(text_region):
-					return ("Region already found: " + str(text_region))
+					return jsonify([{"country":["Please select a country to add a new region"]}])
 				else:
-					Fields(country).add_region(text_region)
-					return ("Region submitted: " + str(text_region))
+					found = Fields(country).find_region(text_region)
+					if found:
+						return jsonify({"found": found[0]['name']})
+					else:
+						result = Fields(country).add_region(text_region)
+						return jsonify({"submitted": result[0]})
 			else:
-				return form.errors["text_region"][0]
+				return jsonify([form.errors])
 		except (ServiceUnavailable):
 				flash("Database unavailable")
 				return redirect(url_for('index'))
@@ -205,14 +208,16 @@ def add_farm():
 			text_farm = request.form['text_farm']
 			if form.validate_on_submit():
 				if bool(set([country,region]) & set(['','None'])):
-					return ('Please select a country and region to register a new farm')
-				elif Fields(country).find_farm(region, text_farm):
-					return ("Farm already found: " + str(text_farm))
+					return jsonify([{"region": ["Please select a region to add a new farm"]}])
 				else:
-					Fields(country).add_farm(region, text_farm)
-					return ("Farm submitted: " + str(text_farm))
+					found = Fields(country).find_farm(region, text_farm)
+					if found:
+						return jsonify({"found": found[0]['name']})
+					else:
+						result = Fields(country).add_farm(region, text_farm)
+						return jsonify({"submitted": result[0]})
 			else:
-				return form.errors["text_farm"][0]
+				return jsonify([form.errors])
 		except (ServiceUnavailable):
 				flash("Database unavailable")
 				return redirect(url_for('index'))
@@ -231,14 +236,16 @@ def add_plot():
 			text_plot = request.form['text_plot']
 			if form.validate_on_submit():
 				if bool(set([country,region,farm]) & set(['','None'])):
-					return ('Please select a country, region and farm to register a new plot')
-				elif Fields(country).find_plot(region, farm, text_plot):
-					return ("Plot already found: " + str(text_plot))
+					return jsonify([{"farm":["Please select a farm to add a new plot"]}])
 				else:
-					Fields(country).add_plot(region, farm, text_plot )
-					return ("Plot submitted: " + str(text_plot))
+					found = Fields(country).find_plot(region, farm, text_plot)
+					if found:
+						return jsonify({"found": {'uid': found[0]['uid'], 'name': found[0]['name']}})
+					else:
+						result = Fields(country).add_plot(region, farm, text_plot)
+						return jsonify({"submitted": {'uid': result[0]['uid'], 'name': result[0]['name']}})
 			else:
-				return form.errors["text_plot"][0]
+				return jsonify([form.errors])
 		except (ServiceUnavailable):
 				flash("Database unavailable")
 				return redirect(url_for('index'))
@@ -256,12 +263,14 @@ def add_block():
 				plotID = int(request.form['plot'])
 				text_block = request.form['text_block']
 				if plotID in ['','None']:
-					return jsonify({"submitted": "Please select a plot to register a new block"})
-				elif Fields.find_block(plotID, text_block):
-					return jsonify({"submitted": "Block already found: " + str(text_block)})
+					return jsonify([{"country": ["Please select a country to add a new region"]}])
 				else:
-					Fields.add_block(plotID, text_block)
-					return jsonify({"submitted" : "Plot submitted: " + str(text_block)})
+					found = Fields.find_block(plotID, text_block)
+					if found:
+						return jsonify({"found": {'uid': found[0]['uid'], 'name': found[0]['name']}})
+					else:
+						result = Fields.add_block(plotID, text_block)
+						return jsonify({"submitted": {'uid': result[0]['uid'], 'name': result[0]['name']}})
 			else:
 				errors = jsonify([location_form.errors, add_block_form.errors])
 				return errors
@@ -281,16 +290,9 @@ def add_trees():
 			if all([location_form.validate_on_submit(), add_trees_form.validate_on_submit()]):
 				plotID = int(request.form['plot'])
 				count = int(request.form['count'])
-				blockUID = request.form['block']
-				#register trees, make a file and return filename etc.
-				if blockUID == "":
-					added_trees = Fields.add_trees(plotID, count)
-				else:
-					added_trees = Fields.add_trees(plotID, count, blockUID)
-				return jsonify({'submitted' : str(count) + ' trees (TreeIDs: ' 
-					+ str(added_trees['first_tree_id'])
-					+ "-" + str(added_trees['last_tree_id']) + ') '
-					+ 'added to plot (plotID: ' + str(plotID) + ')</a>'})
+				blockUID = request.form['block'] if request.form['block'] != '' else None
+				new_tree_count = Fields.add_trees(plotID, count, blockUID)[0]
+				return jsonify({'submitted' : str(new_tree_count) + ' trees registered</a>'})
 			else:
 				errors = jsonify([location_form.errors, add_trees_form.errors])
 				return errors

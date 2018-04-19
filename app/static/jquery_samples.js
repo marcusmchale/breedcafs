@@ -84,25 +84,19 @@ $("#submit_samples").click( function(e) {
 		data: $("form").serialize(),
 		type: 'POST',
 		success: function(response) {
-			console.log(response);
 			if (response.hasOwnProperty('submitted')) {
 				flash_submitted = "<div id='samples_flash' class='flash'> " + response.submitted + " </div>";
 				$("#samples_flash").replaceWith(flash_submitted);
-			} else {
-				$("#samples_flash").remove();
-				for (var key in response[0]){
-					if (response[0].hasOwnProperty(key)) {
-						flash = "<div id='flash_" + key + "' class='flash'>" + response[0][key][0] + "</div>";
-						$('#' + key).after(flash);
-					}
-				}
-				//this response is an array from two forms so need two of these (alternatively could iterate over these...)
-				for (var key in response[1]){
-					if (response[1].hasOwnProperty(key)) {
-						flash = "<div id='flash_" + key + "' class='flash'>" + response[1][key][0] + "</div>";
-						$('#' + key).after(flash);
-					}
-				}
+			}  else {
+				$("#files_flash").remove();
+                for (i in response) {
+                    for (var key in response[i]){
+                        if (response[i].hasOwnProperty(key)) {
+                            flash = "<div id='flash_" + key + "' class='flash'>" + response[i][key][0] + "</div>";
+                            $('#' + key).after(flash);
+                        }
+                    }
+                }
 			}
 		},
 		error: function(error) {

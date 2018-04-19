@@ -4,7 +4,10 @@ from user import User
 from lists import Lists
 from samples import Samples
 from config import ALLOWED_EXTENSIONS
-from neo4j_driver import get_driver
+from neo4j_driver import (
+	get_driver,
+	neo4j_query
+)
 from flask import (
 	session,
 	url_for
@@ -535,10 +538,21 @@ class Download(User):
 				' ORDER BY p.uid'
 			)
 			# make the file and return a dictionary with filename, file_path and file_size
-			id_list = Fields.get_plots_optional(query, parameters)
+			with get_driver().session() as neo4j_session:
+				result = neo4j_session.read_transaction(
+					neo4j_query,
+					query,
+					parameters)
+				id_list = [record[0] for record in result]
 			if len(id_list) == 0:
 				return None
-			fieldnames = ['UID', 'Plot', 'Farm', 'Region', 'Country']
+			fieldnames = [
+				'UID',
+				'Country',
+				'Region',
+				'Farm',
+				'Plot'
+			]
 			if 'farm' in parameters:
 				filename = parameters['farm'] + '_'
 			elif 'region' in parameters:
@@ -561,11 +575,22 @@ class Download(User):
 				if len(id_list) == 0:
 					return None
 				csv_file_details = self.make_csv_file(fieldnames, id_list, 'blockIDs.csv')
-			if form_data['trait_level'] == 'tree':
+			elif form_data['trait_level'] == 'tree':
 				trees_start = int(form_data['trees_start'] if form_data['trees_start'] else 0)
 				trees_end = int(form_data['trees_end'] if form_data['trees_end'] else 999999)
 				# make the file and return filename, path, size
-				fieldnames = ['UID','PlotID','TreeID', 'TreeName', 'Block', 'Plot', 'Farm', 'Region', 'Country']
+				fieldnames = [
+					'UID',
+					'Country',
+					'Region',
+					'Farm',
+					'Plot',
+					'PlotID',
+					'Block',
+					'BlockID',
+					'TreeName',
+					'TreeID',
+				]
 				id_list = Fields.get_trees(plotID, trees_start, trees_end)
 				if len(id_list) == 0:
 					return None
@@ -576,59 +601,114 @@ class Download(User):
 					id_list,
 					'treeIDs_' + str(first_tree_id) + '-' + str(last_tree_id) + '.csv'
 				)
-			if form_data['trait_level'] == 'branch':
-				fieldnames = ['UID', 'PlotID', 'Plot', 'BlockID', 'Block', 'TreeName', 'TreeID', 'BranchID']
-				if form_data['old_new_samples'] == 'old':
+			elif form_data['trait_level'] == 'branch':
+				fieldnames = ['UID', 'Country', 'Region', 'Farm', 'Plot', 'PlotID', 'Block', 'BlockID', 'TreeName', 'TreeID', 'BranchID']
+				if form_data['old_new_ids'] == 'old':
 					parameters = {
 						'country': form_data['country'],
 						'region': form_data['region'],
 						'farm': form_data['farm'],
-						'plotID': int(plotID),
-						'trees_start': int(form_data['trees_start']) if form_data['trees_start'] else '',
-						'trees_end': int(form_data['trees_end']) if form_data['trees_end'] else '',
+						'plotID': plotID,
+						'trees_start': int(form_data['trees_start']) if form_data['trees_start'] else 1,
+						'trees_end': int(form_data['trees_end']) if form_data['trees_end'] else 999999,
 						'start_time': int((datetime.strptime(form_data['date_from'], '%Y-%m-%d') -	datetime(1970, 1, 1)).total_seconds() * 1000) if form_data['date_from'] != '' else '',
 						'end_time': int((datetime.strptime(form_data['date_to'], '%Y-%m-%d')- datetime(1970, 1, 1)).total_seconds() * 1000) if form_data['date_to'] != '' else '',
-						'branches_start': int(form_data['branches_start']) if form_data['branches_start'] else "",
-						'branches_end': int(form_data['branches_end']) if form_data['branches_end'] else ""
+						'branches_start': int(form_data['branches_start']) if form_data['branches_start'] != '' else 1,
+						'branches_end': int(form_data['branches_end']) if form_data['branches_end'] != ''else 999999
 					}
-					import pdb;pdb.set_trace()
-					id_list = Fields.get_branches(parameters)
+					with get_driver().session() as neo4j_session:
+						result = neo4j_session.read_transaction(neo4j_query, Cypher.branches_get, parameters)
+					id_list = [record[0] for record in result]
+					if len(id_list) == 0:
+						return None
 					csv_file_details = self.make_csv_file(
 						fieldnames,
 						id_list,
 						'branchIDs.csv'
 					)
 				else:
-					import pdb;
-					pdb.set_trace()
-					csv_file_details = self.make_csv_file(fieldnames, existing_ids, 'branchIDs.csv')
-			if form_data['trait_level'] == 'sample':
-				if form_data['old_new_samples'] == 'old':
+					if len(existing_ids) == 0:
+						return None
+					csv_file_details = self.make_csv_file(
+						fieldnames,
+						existing_ids,
+						'branchIDs.csv'
+					)
+			elif form_data['trait_level'] == 'leaf':
+				fieldnames = ['UID', 'Country', 'Region', 'Farm', 'Plot', 'PlotID', 'Block', 'BlockID', 'TreeName', 'TreeID', 'BranchID', 'LeafID']
+				if form_data['old_new_ids'] == 'old':
 					parameters = {
 						'country': form_data['country'],
 						'region': form_data['region'],
 						'farm': form_data['farm'],
-						'plotID': int(plotID),
-						'trees_start': int(form_data['trees_start']) if form_data['trees_start'] else '',
-						'trees_end': int(form_data['trees_end']) if form_data['trees_end'] else '',
-						'tissue': form_data['tissue'],
-						'storage': form_data['storage'],
+						'plotID': plotID,
+						'trees_start': int(form_data['trees_start']) if form_data['trees_start'] else 1,
+						'trees_end': int(form_data['trees_end']) if form_data['trees_end'] else 999999,
 						'start_time': int((datetime.strptime(form_data['date_from'], '%Y-%m-%d') -	datetime(1970, 1, 1)).total_seconds() * 1000) if form_data['date_from'] != '' else '',
 						'end_time': int((datetime.strptime(form_data['date_to'], '%Y-%m-%d')- datetime(1970, 1, 1)).total_seconds() * 1000) if form_data['date_to'] != '' else '',
-						'samples_start': int(form_data['samples_start']) if form_data['samples_start'] else "",
-						'samples_end': int(form_data['samples_end']) if form_data['samples_end'] else ""
+						'leaves_start': int(form_data['leaves_start']) if form_data['leaves_start'] != '' else 1,
+						'leaves_end': int(form_data['leaves_end']) if form_data['leaves_end'] != ''else 999999
 					}
-					# build the file and return filename etc.
-					fieldnames = ['UID', 'PlotID', 'TreeID', 'TreeName', 'SampleID', 'Date', 'Tissue', 'Storage', 'Plot',
-								  'Farm', 'Region', 'Country']
-					id_list = Samples().get_samples(parameters)
+					with get_driver().session() as neo4j_session:
+						result = neo4j_session.read_transaction(neo4j_query, Cypher.leaves_get, parameters)
+					id_list = [record[0] for record in result]
+					if len(id_list) == 0:
+						return None
 					csv_file_details = self.make_csv_file(
 						fieldnames,
 						id_list,
-						'sampleIDs.csv')
+						'leafIDs.csv'
+					)
 				else:
-					fieldnames = ['UID', 'PlotID', 'TreeID', 'TreeName', 'SampleID', 'Farm', 'Region', 'Country']
-					csv_file_details = self.make_csv_file(fieldnames, existing_ids, 'sampleIDs.csv')
+					if len(existing_ids) == 0:
+						return None
+					csv_file_details = self.make_csv_file(
+						fieldnames,
+						existing_ids,
+						'leafIDs.csv'
+					)
+			elif form_data['trait_level'] == 'sample':
+				parameters = {
+					'country': form_data['country'],
+					'region': form_data['region'],
+					'farm': form_data['farm'],
+					'plotID': int(plotID),
+					'trees_start': int(form_data['trees_start']) if form_data['trees_start'] else '',
+					'trees_end': int(form_data['trees_end']) if form_data['trees_end'] else '',
+					'tissue': form_data['tissue'],
+					'storage': form_data['storage'],
+					'start_time': int((datetime.strptime(form_data['date_from'], '%Y-%m-%d') -	datetime(1970, 1, 1)).total_seconds() * 1000) if form_data['date_from'] != '' else '',
+					'end_time': int((datetime.strptime(form_data['date_to'], '%Y-%m-%d')- datetime(1970, 1, 1)).total_seconds() * 1000) if form_data['date_to'] != '' else '',
+					'samples_start': int(form_data['samples_start']) if form_data['samples_start'] else "",
+					'samples_end': int(form_data['samples_end']) if form_data['samples_end'] else ""
+				}
+				# build the file and return filename etc.
+				fieldnames = [
+					'UID',
+					'Country',
+					'Region',
+					'Farm',
+					'Plot',
+					'PlotID',
+					'Block',
+					'BlockID',
+					'TreeName',
+					'TreeID',
+					'BranchID',
+					'LeafID',
+					'SampleID'
+					'Tissue',
+					'Storage',
+					'Date',
+					'Time'
+				]
+				id_list = Samples().get_samples(parameters)
+				if len(id_list) == 0:
+					return None
+				csv_file_details = self.make_csv_file(
+					fieldnames,
+					id_list,
+					'sampleIDs.csv')
 		return csv_file_details
 		#return the file details
 	#creates the traits.trt file for import to Field-Book
@@ -663,7 +743,7 @@ class Download(User):
 		#make the file
 		file_details = self.make_csv_file(fieldnames, selected_traits, form_data['trait_level'] + '.trt')
 		return file_details
-	def get_table_csv(self, form_data):
+	def get_table_csv(self, form_data, existing_ids = None):
 		#create two files, one is the index + trait names + time details table, the other is a trait description file - specifying format and details of each trait value
 		# starts with getting the index data (id_list) and fieldnames (to which the traits will be added)
 		if form_data['trait_level'] == 'plot':
@@ -691,8 +771,13 @@ class Download(User):
 				' ORDER BY p.uid'
 			)
 			fieldnames = ['UID', 'Plot', 'Farm', 'Region', 'Country']
-			id_list = Fields.get_plots_optional(query, parameters)
-		elif form_data['trait_level'] in ['block','tree','sample']:
+			with get_driver().session() as neo4j_session:
+				result = neo4j_session.read_transaction(
+					neo4j_query,
+					query,
+					parameters)
+				id_list = [record[0] for record in result]
+		elif form_data['trait_level'] in ['block', 'tree', 'branch', 'leaf', 'sample']:
 			plotID = int(form_data['plot'])
 			if form_data['trait_level'] == 'block':
 				# make the file and return a dictionary with filename, file_path and file_size
@@ -704,8 +789,71 @@ class Download(User):
 				# make the file and return filename, path, size
 				fieldnames = ['UID','PlotID','TreeID', 'TreeName', 'Block', 'Plot', 'Farm', 'Region', 'Country']
 				id_list = Fields.get_trees(plotID, trees_start, trees_end)
-				first_tree_id = id_list[0]['TreeID']
-				last_tree_id = id_list[-1]['TreeID']
+			if form_data['trait_level'] == 'branch':
+				fieldnames = [
+					'UID',
+					'Country',
+					'Region',
+					'Farm',
+					'Plot',
+					'PlotID',
+					'Block',
+					'BlockID',
+					'TreeName',
+					'TreeID',
+					'BranchID'
+				]
+				if form_data['old_new_ids'] == 'old':
+					parameters = {
+						'country': form_data['country'],
+						'region': form_data['region'],
+						'farm': form_data['farm'],
+						'plotID': plotID,
+						'trees_start': int(form_data['trees_start']) if form_data['trees_start'] else 1,
+						'trees_end': int(form_data['trees_end']) if form_data['trees_end'] else 999999,
+						'start_time': int((datetime.strptime(form_data['date_from'], '%Y-%m-%d') -	datetime(1970, 1, 1)).total_seconds() * 1000) if form_data['date_from'] != '' else '',
+						'end_time': int((datetime.strptime(form_data['date_to'], '%Y-%m-%d')- datetime(1970, 1, 1)).total_seconds() * 1000) if form_data['date_to'] != '' else '',
+						'branches_start': int(form_data['branches_start']) if form_data['branches_start'] != '' else 1,
+						'branches_end': int(form_data['branches_end']) if form_data['branches_end'] != ''else 999999
+					}
+					with get_driver().session() as neo4j_session:
+						result = neo4j_session.read_transaction(neo4j_query, Cypher.branches_get, parameters)
+					id_list = [record[0] for record in result]
+				else:
+					id_list = existing_ids
+			if form_data['trait_level'] == 'leaf':
+				fieldnames = [
+					'UID',
+					'Country',
+					'Region',
+					'Farm',
+					'Plot',
+					'PlotID',
+					'Block',
+					'BlockID',
+					'TreeName',
+					'TreeID',
+					'BranchID',
+					'LeafID'
+				]
+				if form_data['old_new_ids'] == 'old':
+					parameters = {
+						'country': form_data['country'],
+						'region': form_data['region'],
+						'farm': form_data['farm'],
+						'plotID': plotID,
+						'trees_start': int(form_data['trees_start']) if form_data['trees_start'] else 1,
+						'trees_end': int(form_data['trees_end']) if form_data['trees_end'] else 999999,
+						'start_time': int((datetime.strptime(form_data['date_from'], '%Y-%m-%d') -	datetime(1970, 1, 1)).total_seconds() * 1000) if form_data['date_from'] != '' else '',
+						'end_time': int((datetime.strptime(form_data['date_to'], '%Y-%m-%d')- datetime(1970, 1, 1)).total_seconds() * 1000) if form_data['date_to'] != '' else '',
+						'leaves_start': int(form_data['leaves_start']) if form_data['leaves_start'] != '' else 1,
+						'leaves_end': int(form_data['leaves_end']) if form_data['leaves_end'] != ''else 999999
+					}
+					with get_driver().session() as neo4j_session:
+						result = neo4j_session.read_transaction(neo4j_query, Cypher.leaves_get, parameters)
+					id_list = [record[0] for record in result]
+				else:
+					id_list = existing_ids
 			if form_data['trait_level'] == 'sample':
 				parameters = {
 					'country': form_data['country'],

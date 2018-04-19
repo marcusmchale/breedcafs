@@ -70,29 +70,37 @@ def _submit(
 		neo4j_time
 ):
 	if submission_type == 'FB':
+		if level == 'plot':
+			query = Cypher.upload_FB_plot
+		elif level == 'block':
+			query = Cypher.upload_FB_block
+		elif level == 'tree':
+			query = Cypher.upload_FB_tree
+		elif level == 'branch':
+			query = Cypher.upload_FB_branch
+		elif level == 'leaf':
+			query = Cypher.upload_FB_leaf
+		elif level == 'sample':
+			query = Cypher.upload_FB_sample
+		else:
+			query = 'MATCH (d:Data) return d.found'
+		result = tx.run(
+			query,
+			username=username,
+			filename=("file:///" + username + '/' + filename),
+			submission_type=submission_type
+		)
+	else: #submission_type == 'table':
 			if level == 'sample':
-				query = Cypher.upload_FB_sample
-			elif level == 'tree':
-				query = Cypher.upload_FB_tree
-			elif level == 'block':
-				query = Cypher.upload_FB_block
-			elif level == 'plot':
-				query = Cypher.upload_FB_plot
-			result = tx.run(
-				query,
-				username=username,
-				filename=("file:///" + username + '/' + filename),
-				submission_type=submission_type
-			)
-	elif submission_type == 'table':
-			if level == 'sample':
-				query = Cypher.upload_table_sample
+				query = 'MATCH (d:Data) return d.found'
 			elif level == 'tree':
 				query = Cypher.upload_table_tree
 			elif level == 'block':
 				query = Cypher.upload_table_block
 			elif level == 'plot':
 				query = Cypher.upload_table_plot
+			else:
+				query = 'MATCH (d:Data) return d.found'
 			result = tx.run(
 				query,
 				username = username,

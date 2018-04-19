@@ -2,7 +2,12 @@ import os
 from app import app
 #import celery
 from flask import ( flash, redirect, url_for, request, session, render_template, jsonify )
-from app.models import User, Upload, Chart, async_submit
+from app.models import (
+	#User,
+	Upload,
+	#Chart,
+	async_submit
+)
 from app.forms import UploadForm
 from werkzeug.utils import secure_filename
 from datetime import (
@@ -10,8 +15,8 @@ from datetime import (
 	time as datetime_time
 )
 import unicodecsv as csv 
-from itertools import islice
-from cStringIO import StringIO
+#from itertools import islice
+#from cStringIO import StringIO
 
 @app.route('/upload', methods=['GET', 'POST'])
 def upload():
@@ -77,6 +82,7 @@ def upload_submit():
 							return jsonify(
 								{"submitted": "This file does not contain a 'UID' header. "
 											  "Please use only upload supported files"
+											  "Please use only upload supported files"
 								 }
 							)
 						#now check UID's for consistency (already at second line after reading into file_dict)
@@ -91,23 +97,29 @@ def upload_submit():
 							level = "plot"
 						else:
 							level_list = [uid[uid.index("_") + 1] for uid in uid_list if any(
-								["_S" in uid,
-								 "_T" in uid,
-								 "_B" in uid])]
+								[
+								"_B" in uid,
+								"_T" in uid,
+								"_R" in uid,
+								"_L" in uid,
+								"_S" in uid
+								])]
 							#ensure only one level per file
 							if len(set(level_list)) > 1:
-								import pdb;
-								pdb.set_trace()
 								return jsonify(
 									{"submitted": "This file appears to contains mixed trait levels. "
 												  "Please use only upload supported files"}
 								)
-							if level_list[0] == "S":
-								level = "sample"
+							if level_list[0] == "B":
+								level = "block"
 							elif level_list[0] == "T":
 								level = "tree"
-							elif level_list[0] == "B":
-								level = "block"
+							elif level_list[0] == "R":
+								level = "branch"
+							elif level_list[0] == "L":
+								level = "leaf"
+							elif level_list[0] == "S":
+								level = "sample"
 							else:
 								return jsonify({"submitted": "This file does not seem to contain BreedCAFS unique ID's"
 															 "Please use only upload supported files"
@@ -118,8 +130,6 @@ def upload_submit():
 								return jsonify({"submitted": "This file does not look like a FieldBook exported CSV file"
 															 "Please use check the submission type"
 												})
-							#now check the first row of this sample to identify the sample type
-							#note: seek(0) on the read file to return to the start of the reader object
 							# as an asynchonous function with celery, result will be stored in redis and accessible from the status/task_id endpoint
 							task = async_submit.apply_async(args=[username, filename, subtype, level])
 						elif request.form['submission_type'] == 'table':
@@ -131,7 +141,7 @@ def upload_submit():
 									"submitted": "This file contains duplicate rows for unique ID's. "
 												 "This is not supported in table format"
 								})
-							#note: to return to the start of the reader object you just seek(0) on the read file
+							#note: to return to the start of the reader object you have to seek(0) on the read file
 							file.seek(0)
 							#just passing in the full list of keys as we later do a match in the database for which are relevant traits
 							traits = [key for key in file_dict.next()]

@@ -21,7 +21,6 @@ from app.models import (
 from app.forms import (
 	LocationForm,
 	CreateTraits,
-	CustomSampleForm,
 	SampleRegForm,
 	AddTissueForm,
 	AddStorageForm,
@@ -44,7 +43,6 @@ def collect():
 			sample_reg_form = SampleRegForm().update()
 			add_tissue_form = AddTissueForm()
 			add_storage_form = AddStorageForm()
-			custom_sample_form = CustomSampleForm()
 			return render_template(
 				'collect.html',
 				location_form=location_form,
@@ -56,7 +54,6 @@ def collect():
 				sample_reg_form=sample_reg_form,
 				add_tissue_form=add_tissue_form,
 				add_storage_form=add_storage_form,
-				custom_sample_form=custom_sample_form,
 				title='Collect'
 			)
 		except ServiceUnavailable:

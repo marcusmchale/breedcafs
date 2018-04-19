@@ -11,46 +11,41 @@ class Samples:
 	def __init__ (self):
 		pass
 	def add_tissue(self, tissue):
-		self.tissue = tissue
+		parameters = {
+			'tissue': tissue,
+			'username': session['username']
+		}
 		with get_driver().session() as neo4j_session:
-			neo4j_session.write_transaction(self._add_tissue)
-	def _add_tissue(self, tx):
-		tx.run(Cypher.tissue_add,
-			tissue = self.tissue,
-			username = session['username'])
-# should really reduce these calls down to a common function, lots of repitition here!!
+			neo4j_session.write_transaction(neo4j_query, Cypher.tissue_add, parameters)
 	def add_storage(self, storage):
-		self.storage = storage
 		with get_driver().session() as neo4j_session:
-			neo4j_session.write_transaction(self._add_storage)
-	def _add_storage(self, tx):
-		tx.run(Cypher.storage_add,
-			storage = self.storage,
-			username = session['username'])
+			parameters = {
+				'storage': storage,
+				'username': session['username']
+			}
+			neo4j_session.write_transaction(neo4j_query, Cypher.storage_add, parameters)
 	def add_samples(self, plotID, start, end, replicates, tissue, storage, date, get_file):
-		#register samples and return index data
 		with get_driver().session() as neo4j_session:
-			if get_file == True:
-				id_list = neo4j_session.write_transaction(
-					self._add_samples,
-					plotID,
-					start,
-					end,
-					replicates,
-					tissue,
-					storage,
-					date
-				)
-			else:
-				id_list = neo4j_session.write_transaction(
-					self._add_samples_notype,
-					plotID,
-					start,
-					end,
-					replicates
-				)
+			lock_parameters = {
+				'plotID': plotID,
+				'level': 'sample'
+			}
+			neo4j_session.write_transaction(neo4j_query, Cypher.id_lock, lock_parameters)
+			add_parameters = {
+				'plotID': plotID,
+				'start': start,
+				'end': end,
+				'replicates': replicates,
+				'tissue': tissue,
+				'storage': storage,
+				'date': date,
+				'time': (datetime.strptime(date, '%Y-%m-%d') - datetime(1970, 1, 1)).total_seconds() * 1000,
+				'username': session['username']
+			}
+			result = neo4j_session.write_transaction(neo4j_query, Cypher.samples_add, add_parameters)
+			id_list = [record[0] for record in result]
 		if len(id_list) == 0:
-			return { "error" : "Please check the trees selected are registered in the database"}
+			return { "error" : "No sample codes generated. Please check the selected trees are registered"}
 		if get_file == True:
 			#create user download path if not found
 			if not os.path.isdir(os.path.join(app.instance_path, app.config['DOWNLOAD_FOLDER'], session['username'])):
@@ -80,46 +75,6 @@ class Samples:
 				"last_sample_id":last_sample_id }
 		else:
 			return id_list
-	def _add_samples(
-			self,
-			tx,
-			plotID,
-			start,
-			end,
-			replicates,
-			tissue,
-			storage,
-			date
-	):
-		tx.run(Cypher.sample_id_lock,
-			plotID = plotID)
-		result = tx.run(Cypher.samples_add,
-			plotID = plotID,
-			start = start,
-			end = end,
-			replicates = replicates,
-			tissue = tissue,
-			storage = storage,
-			date = date,
-			time = (datetime.strptime(date, '%Y-%m-%d')-datetime(1970,1,1)).total_seconds()*1000,
-			username = session['username'])
-		return [record[0] for record in result]
-
-	def _add_samples_notype(
-			self,
-			tx,
-			plotID,
-			start,
-			end,
-			replicates
-	):
-		start = start if start else 0
-		end = end if end else 9999999
-		plotID = int(plotID)
-		replicates = int(replicates) if replicates else 1
-		tx.run(Cypher.sample_id_lock, plotID = plotID)
-		result=tx.run(Cypher.samples_add_notype, plotID = plotID, start = start, end = end, replicates = replicates, username = session['username'])
-		return [record[0] for record in result]
 
 	def get_samples(self, parameters):
 		#build the query
@@ -187,20 +142,34 @@ class Samples:
 		q = (q + ' OPTIONAL MATCH (tree) '
 			' -[:IS_IN]->(:BlockTrees) '
 			' -[:IS_IN]->(block:Block) ')
+		# get branch ID
+		q = (q + ' OPTIONAL MATCH (sample) '
+			 	' -[:FROM_BRANCH]->(branch:Branch) ')
+		 # get leaf ID
+		q = (q + ' OPTIONAL MATCH (sample) ' 
+			 ' -[:FROM_LEAF]->(leaf:Leaf) ')
 		# build the return statement
-		q = q + (' RETURN {UID: sample.uid, '
-			' PlotID : plot.uid, '
-			' TreeID : tree.id, '
-			' TreeName : d.value, '
-			' SampleID : sample.id, '
-			' Date : sample.date, '
-			' Tissue : tissue.name, '
-			' Storage : storage.name, '
-			' Block : block.name, '
-			' Plot : plot.name, '
-			' Farm : farm.name, '
-			' Region : region.name, '
-			' Country : country.name} ')
+		q = q + (
+			' RETURN { '
+				' UID: sample.uid, '
+				' Country : country.name, '
+				' Region : region.name, '
+				' Farm : farm.name, '
+				' Plot : plot.name, '
+				' PlotID : plot.uid, '
+				' Block : block.name, '
+				' Block : block.id, '
+				' TreeName : tree.name, '
+				' TreeID : tree.id, '
+				' TreeName : d.value, '
+				' BranchID : branch.id, '
+				' LeafID : leaf.id, '
+				' SampleID : sample.id, '
+				' Tissue : tissue.name, '
+				' Storage : storage.name, '
+				' Date : sample.date '
+			' } '
+		)
 		#and order by sample id
 		query = q + ' ORDER BY sample.id'
 		#return index data

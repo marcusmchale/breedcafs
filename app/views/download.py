@@ -26,12 +26,16 @@ def download():
 			location_form = LocationForm().update(optional=True)
 			download_form = DownloadForm()
 			sample_traits_form = CreateTraits().update('sample')
+			leaf_traits_form = CreateTraits().update('leaf')
+			branch_traits_form = CreateTraits().update('branch')
 			tree_traits_form = CreateTraits().update('tree')
 			block_traits_form = CreateTraits().update('block')
 			plot_traits_form = CreateTraits().update('plot')
 			return render_template('download.html', 
 				download_form = download_form,
 				location_form = location_form,
+				branch_traits_form=branch_traits_form,
+				leaf_traits_form=leaf_traits_form,
 				sample_traits_form = sample_traits_form,
 				tree_traits_form = tree_traits_form,
 				block_traits_form = block_traits_form,

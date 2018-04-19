@@ -54,9 +54,7 @@ $('#trait_level').change(function () {
 	else if (this.value === 'sample') {
 		$('#plot_traits,#block_traits,#tree_traits,#branch_traits,#leaf_traits').hide();
 		$('#sample_traits').show();
-		$('#existing_ids').show();
-		$('#old_new_ids').val('old');
-		$('#new_ids').hide();
+		$('#existing_ids').hide();
 		$('#plot, #sample_ids, #tree_ids').show();
 		$('#branch_ids,#leaf_ids').hide();
 	}
