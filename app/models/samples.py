@@ -1,6 +1,6 @@
 import os
 import unicodecsv as csv 
-import cStringIO
+#import cStringIO
 from app import app
 from app.cypher import Cypher
 from neo4j_driver import get_driver, neo4j_query
@@ -75,7 +75,6 @@ class Samples:
 				"last_sample_id":last_sample_id }
 		else:
 			return id_list
-
 	def get_samples(self, parameters):
 		#build the query
 		#match samples by location in the graph

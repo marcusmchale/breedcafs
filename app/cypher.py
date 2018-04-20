@@ -899,14 +899,16 @@ class Cypher():
 		' FOREACH (n IN CASE WHEN csvLine.trait = "new block" THEN [1] ELSE [] END | '
 				#first find the PlotBlocks container and lock the counter
 				' SET id._LOCK_ = true '
-				#then increment the counter and add our block
-				' SET id.count = id.count + 1 '
+				#then merge the block by name and increment the counter if it is created
 				' MERGE (block:Block {name:csvLine.value})-[:IS_IN]->(pb) '
-					' ON CREATE SET block.uid = (plot.uid + "_B" + id.count), block.id = id.count '
+					' ON CREATE SET '
+						' id.count = id.count + 1, '
+						' block.uid = (plot.uid + "_B" + id.count), '
+						' block.id = id.count '
 				' SET id._LOCK = false '
 				#then ensure we have the BlockTrees container and counter
 				' MERGE (bc:Counter {name: "tree", uid: (block.uid + "_tree")}) '
-						' -[:FOR]-(:BlockTrees)-[:IS_IN]->(block) '
+						' -[:FOR]-(bt:BlockTrees)-[:IS_IN]->(block) '
 					' ON CREATE SET bc.count = 0 '
 				#then link the tree to this block
 				' MERGE (tree)-[s2:IS_IN]->(bt) '
@@ -1131,8 +1133,9 @@ class Cypher():
 		' LOAD CSV WITH HEADERS FROM $filename as csvLine '
 		# And identify the trees by UID
 		' MATCH (tree:Tree {uid:csvLine.UID}) '
-			' -[:IS_IN]->(:PlotTrees) '
-			' -[:IS_IN]->(plot:Plot {uid:toInteger(head(split(csvLine.UID, "_")))}) '
+				' -[:IS_IN]->(:PlotTrees) '
+				' -[:IS_IN]->(plot:Plot {uid:toInteger(head(split(csvLine.UID, "_")))}), '
+			' (pb:PlotBlocks)<-[:FOR]-(id:Counter {uid: (plot.uid + "_block")}) '
 		#and the traits by name from the list
 		' UNWIND $traits as table_trait '
 			' MATCH (trait:TreeTrait {name:table_trait}) '
@@ -1159,17 +1162,14 @@ class Cypher():
 					' ON CREATE SET s1.time = timestamp() '
 				# if block data create link tree to block
 			' FOREACH (n IN CASE WHEN table_trait = "new block" THEN [1] ELSE [] END | '
-					#first ensure we have the PlotBlocks container and lock the counter
-					' MERGE (id:Counter {name:"block", uid: (plot.uid + "_block")}) '
-							'-[:FOR]->(pb:PlotBlocks) '
-						' ON MATCH SET id._LOCK_ = true '
-						' ON CREATE SET id._LOCK_ = true, id.count = 0 '
+					# lock the counter
+						' SET id._LOCK_ = true '
 					#then increment the counter and add our block
-					' SET id.count = id.count + 1 '
 					' MERGE (block:Block {name:csvLine[table_trait]})-[:IS_IN]->(pb) '
-						' ON CREATE SET block.uid = (plot.uid + "_B" + id.count), block.id = id.count '
-						#but if it exists then decrement the counter back
-						' ON MATCH SET id.count = id.count -1 '
+						' ON CREATE SET '
+							' SET id.count = id.count + 1, '
+							' block.uid = (plot.uid + "_B" + id.count), '
+							' block.id = id.count '
 					#then ensure we have the BlockTrees container
 					' MERGE (bt:BlockTrees)-[:IS_IN]->(block) '
 					#then link the tree to this

@@ -770,7 +770,13 @@ class Download(User):
 				' Country : c.name }'
 				' ORDER BY p.uid'
 			)
-			fieldnames = ['UID', 'Plot', 'Farm', 'Region', 'Country']
+			fieldnames = [
+				'UID',
+				'Country',
+				'Region',
+				'Farm',
+				'Plot'
+			]
 			with get_driver().session() as neo4j_session:
 				result = neo4j_session.read_transaction(
 					neo4j_query,
@@ -878,8 +884,22 @@ class Download(User):
 					'samples_end': int(form_data['samples_end']) if form_data['samples_end'] else ""
 				}
 				# build the file and return filename etc.
-				fieldnames = ['UID', 'PlotID', 'TreeID', 'TreeName', 'SampleID', 'Date', 'Tissue', 'Storage', 'Plot',
-							  'Farm', 'Region', 'Country']
+				fieldnames = [
+					'UID',
+					'Country',
+					'Region',
+					'Farm',
+					'Plot',
+					'PlotID',
+					'Block',
+					'BlockID',
+					'TreeName',
+					'TreeID',
+					'SampleID',
+					'Date',
+					'Tissue',
+					'Storage'
+				]
 				id_list = Samples().get_samples(parameters)
 		#check we have found matching ID's, if not return None
 		if len(id_list) == 0:

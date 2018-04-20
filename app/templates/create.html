@@ -17,11 +17,12 @@
 			{{ render_field (location_form.plot) }}
 			{{ render_field (add_plot.text_plot) }} 
 			{{ render_field (add_plot.submit_plot) }}
-			<a>Optional (but preferred):</a>
+			<br>
+			<a>Treatment:</a>
 			{{ render_field (location_form.block) }}
 			{{ render_field (add_block_form.text_block) }}
 			{{ render_field (add_block_form.submit_block) }}
-			<br><a>Add trees to the selected plot/block</a><br>
+			<br>
 			{{ render_field (add_trees_form.count) }}
 			{{ render_field (add_trees_form.submit_trees) }}
 		</form>
