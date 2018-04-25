@@ -173,8 +173,8 @@ class LocationForm(FlaskForm):
 		PLOTS = sorted(set(Fields(form.country.data).get_plots_tup(form.region.data, form.farm.data)), key=lambda tup: tup[1])
 		BLOCKS = sorted(set(Fields.get_blocks_tup(form.plot.data)), key=lambda tup: tup[0])
 		form.country.choices = [('','Select Country')] + COUNTRIES
-		form.region.choices = [('','Select Region')] + [(REGIONS[i], REGIONS[i]) for i, items in enumerate(REGIONS)]
-		form.farm.choices = [('','Select Farm')] + [(FARMS[i], FARMS[i]) for i, items in enumerate(FARMS)]
+		form.region.choices = [('','Select Region')] + [(REGIONS[i], REGIONS[i].title()) for i, items in enumerate(REGIONS)]
+		form.farm.choices = [('','Select Farm')] + [(FARMS[i], FARMS[i].title()) for i, items in enumerate(FARMS)]
 		form.plot.choices = [('','Select Plot')] +  PLOTS
 		form.block.choices = [('','Select Block')] + BLOCKS
 		if optional == False:

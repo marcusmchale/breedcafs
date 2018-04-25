@@ -34,7 +34,7 @@ class Lists:
 		return [(node[key]) for node in self.get_nodes()]
 	#lists of tups for forms
 	def create_list_tup(self, key1, key2):
-		return [(node[key1], node[key2]) for node in self.get_nodes()]
+		return [(node[key1], node[key2].title()) for node in self.get_nodes()]
 	#Finds node (defined by key:value of a property) and gets 'name' from nodes connected by a relationship with label 'rel'
 	def get_connected(self, key, value, rel):
 		self.key=key 

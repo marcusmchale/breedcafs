@@ -203,7 +203,7 @@ class Fields:
 				'farm': farm
 			}
 			result = neo4j_session.read_transaction(neo4j_query, Cypher.get_plots, parameters)
-			return [(str(record[0]['uid']), record[0]['name']) for record in result]
+			return [(str(record[0]['uid']), record[0]['name'].title()) for record in result]
 	#get lists of items - these have plotID so don't need country
 	@staticmethod  # has plotID so doesn't need country
 	def get_blocks(plotID):
@@ -220,7 +220,7 @@ class Fields:
 				'plotID': plotID
 			}
 			result = neo4j_session.read_transaction(neo4j_query, Cypher.get_blocks, parameters)
-			return [(record[0]['uid'], record[0]['name']) for record in result]
+			return [(record[0]['uid'], record[0]['name'].title()) for record in result]
 	@staticmethod
 	def get_trees(plotID, start = 0, end = 999999):
 		with get_driver().session() as neo4j_session:

@@ -51,7 +51,7 @@ class regions(MethodView):
 		else:
 			try:
 				REGIONS = Lists('Country').get_connected('name', country, 'IS_IN')
-				response = make_response(jsonify([(REGIONS[i],REGIONS[i]) for i, items in enumerate(REGIONS)]))
+				response = make_response(jsonify([(REGIONS[i],REGIONS[i].title()) for i, items in enumerate(REGIONS)]))
 				response.content_type = 'application/json'
 				return response
 			except (ServiceUnavailable):
@@ -67,7 +67,7 @@ class farms(MethodView):
 		else:
 			try:
 				FARMS = Fields(country).get_farms(region)
-				response = make_response(jsonify([(FARMS[i],FARMS[i]) for i, items in enumerate(FARMS)]))
+				response = make_response(jsonify([(FARMS[i],FARMS[i].title()) for i, items in enumerate(FARMS)]))
 				response.content_type = 'application/json'
 				return response
 			except (ServiceUnavailable):
@@ -155,14 +155,14 @@ def add_country():
 	else:
 		try:
 			form = AddCountry()
-			text_country = request.form['text_country']
+			text_country = request.form['text_country'].lower().strip()
 			if form.validate_on_submit():
 				found = Fields(text_country).find_country()
 				if found:
-					return jsonify({"found" : found[0]['name']})
+					return jsonify({"found" : found[0]['name'].title()})
 				else:
 					result = Fields(text_country).add_country()
-					return jsonify({"submitted": result[0]})
+					return jsonify({"submitted": result[0].title()})
 			else:
 				return jsonify([form.errors])
 		except (ServiceUnavailable):
@@ -178,17 +178,17 @@ def add_region():
 		try:
 			form = AddRegion()
 			country = request.form['country']
-			text_region = request.form['text_region']
+			text_region = request.form['text_region'].lower().strip()
 			if form.validate_on_submit():
 				if country in ['','None']:
 					return jsonify([{"country":["Please select a country to add a new region"]}])
 				else:
 					found = Fields(country).find_region(text_region)
 					if found:
-						return jsonify({"found": found[0]['name']})
+						return jsonify({"found": found[0]['name'].title()})
 					else:
 						result = Fields(country).add_region(text_region)
-						return jsonify({"submitted": result[0]})
+						return jsonify({"submitted": result[0].title()})
 			else:
 				return jsonify([form.errors])
 		except (ServiceUnavailable):
@@ -205,17 +205,17 @@ def add_farm():
 			form = AddFarm()
 			country = request.form['country']
 			region = request.form['region']
-			text_farm = request.form['text_farm']
+			text_farm = request.form['text_farm'].lower().strip()
 			if form.validate_on_submit():
 				if bool(set([country,region]) & set(['','None'])):
 					return jsonify([{"region": ["Please select a region to add a new farm"]}])
 				else:
 					found = Fields(country).find_farm(region, text_farm)
 					if found:
-						return jsonify({"found": found[0]['name']})
+						return jsonify({"found": found[0]['name'].title()})
 					else:
 						result = Fields(country).add_farm(region, text_farm)
-						return jsonify({"submitted": result[0]})
+						return jsonify({"submitted": result[0].title()})
 			else:
 				return jsonify([form.errors])
 		except (ServiceUnavailable):
@@ -233,17 +233,17 @@ def add_plot():
 			country = request.form['country']
 			region = request.form['region']
 			farm = request.form['farm']
-			text_plot = request.form['text_plot']
+			text_plot = request.form['text_plot'].lower().strip()
 			if form.validate_on_submit():
 				if bool(set([country,region,farm]) & set(['','None'])):
 					return jsonify([{"farm":["Please select a farm to add a new plot"]}])
 				else:
 					found = Fields(country).find_plot(region, farm, text_plot)
 					if found:
-						return jsonify({"found": {'uid': found[0]['uid'], 'name': found[0]['name']}})
+						return jsonify({"found": {'uid': found[0]['uid'], 'name': found[0]['name'].title()}})
 					else:
 						result = Fields(country).add_plot(region, farm, text_plot)
-						return jsonify({"submitted": {'uid': result[0]['uid'], 'name': result[0]['name']}})
+						return jsonify({"submitted": {'uid': result[0]['uid'], 'name': result[0]['name'].title()}})
 			else:
 				return jsonify([form.errors])
 		except (ServiceUnavailable):
@@ -261,16 +261,16 @@ def add_block():
 			add_block_form = AddBlock()
 			if all([location_form.validate_on_submit(), add_block_form.validate_on_submit()]):
 				plotID = int(request.form['plot'])
-				text_block = request.form['text_block']
+				text_block = request.form['text_block'].lower().strip()
 				if plotID in ['','None']:
 					return jsonify([{"country": ["Please select a country to add a new region"]}])
 				else:
 					found = Fields.find_block(plotID, text_block)
 					if found:
-						return jsonify({"found": {'uid': found[0]['uid'], 'name': found[0]['name']}})
+						return jsonify({"found": {'uid': found[0]['uid'], 'name': found[0]['name'].title()}})
 					else:
 						result = Fields.add_block(plotID, text_block)
-						return jsonify({"submitted": {'uid': result[0]['uid'], 'name': result[0]['name']}})
+						return jsonify({"submitted": {'uid': result[0]['uid'], 'name': result[0]['name'].title()}})
 			else:
 				errors = jsonify([location_form.errors, add_block_form.errors])
 				return errors

@@ -1,4 +1,4 @@
-update_tissues = function() {
+update_tissues = function(set_tissue = "") {
 	var request = $.ajax({
 		type: 'GET',
 		url: "/sample_reg/tissues/",
@@ -12,10 +12,11 @@ update_tissues = function() {
 					"value", tissues[i][0]).text(tissues[i][1])
 			);
 		}
+		$('#tissue').val(set_tissue);
 	});
 }
 
-update_storage = function() {
+update_storage = function(set_storage = "") {
 	var request = $.ajax({
 		type: 'GET',
 		url: "/sample_reg/storage_methods/",
@@ -29,6 +30,7 @@ update_storage = function() {
 					"value", storage_methods[i][0]).text(storage_methods[i][1])
 			);
 		}
+		$('#storage').val(set_storage)
 	});
 }
 
@@ -43,9 +45,27 @@ $("#submit_tissue").click( function(e) {
 			data: $("form").serialize(),
 			type: 'POST',
 			success: function(response) {
-				flash = "<div id='tissue_flash' class='flash'> " + response + " </div>"
-				$("#submit_tissue").after(flash)
-				update_tissues();
+			    if (response.hasOwnProperty('submitted')) {
+			        flash = "<div id='tissue_flash' class='flash'> Submitted: " + response['submitted'] + " </div>";
+				    $("#submit_tissue").after(flash);
+				    $("#text_tisue").val("");
+				    update_tissues(response['submitted'].toLowerCase());
+				    load_chart();
+			    }  else if (response.hasOwnProperty('found')) {
+			        flash = flash = "<div id='tissue_flash' class='flash'> Found: " + response['found'] + " </div>";
+			        $("#submit_tissue").after(flash);
+			        update_tissues(response['found'].toLowerCase());
+				    $("#text_tissue").val("");
+			    } else {
+                    for (i in response) {
+                        for (var key in response[i]){
+                            if (response[i].hasOwnProperty(key)) {
+                                flash = "<div id='flash_" + key + "' class='flash'>" + response[i][key][0] + "</div>";
+                                $('#' + key).after(flash);
+                            }
+                        }
+                    }
+                }
 			},
 			error: function(error) {
 				console.log(error);
@@ -62,9 +82,27 @@ $("#submit_storage").click( function(e) {
 			data: $("form").serialize(),
 			type: 'POST',
 			success: function(response) {
-				flash = "<div id='storage_flash' class='flash'> " + response + " </div>"
-				$("#submit_storage").after(flash)
-				update_storage();
+			    if (response.hasOwnProperty('submitted')) {
+			        flash = "<div id='storage_flash' class='flash'> Submitted: " + response['submitted'] + " </div>";
+				    $("#submit_storage").after(flash);
+				    $("#text_storage").val("");
+				    update_storage(response['submitted'].toLowerCase());
+				    load_chart();
+			    }  else if (response.hasOwnProperty('found')) {
+			        flash = flash = "<div id='storage_flash' class='flash'> Found: " + response['found'] + " </div>";
+			        $("#submit_storage").after(flash);
+			        update_storage(response['found'].toLowerCase());
+				    $("#text_storage").val("");
+			    } else {
+                    for (i in response) {
+                        for (var key in response[i]){
+                            if (response[i].hasOwnProperty(key)) {
+                                flash = "<div id='flash_" + key + "' class='flash'>" + response[i][key][0] + "</div>";
+                                $('#' + key).after(flash);
+                            }
+                        }
+                    }
+                }
 			},
 			error: function(error) {
 				console.log(error);

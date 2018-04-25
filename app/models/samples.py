@@ -16,14 +16,16 @@ class Samples:
 			'username': session['username']
 		}
 		with get_driver().session() as neo4j_session:
-			neo4j_session.write_transaction(neo4j_query, Cypher.tissue_add, parameters)
+			result = neo4j_session.write_transaction(neo4j_query, Cypher.tissue_add, parameters)
+			return [record[0] for record in result]
 	def add_storage(self, storage):
+		parameters = {
+			'storage': storage,
+			'username': session['username']
+		}
 		with get_driver().session() as neo4j_session:
-			parameters = {
-				'storage': storage,
-				'username': session['username']
-			}
-			neo4j_session.write_transaction(neo4j_query, Cypher.storage_add, parameters)
+			result = neo4j_session.write_transaction(neo4j_query, Cypher.storage_add, parameters)
+			return [record[0] for record in result]
 	def add_samples(self, plotID, start, end, replicates, tissue, storage, date, get_file):
 		with get_driver().session() as neo4j_session:
 			lock_parameters = {
@@ -65,6 +67,9 @@ class Samples:
 					extrasaction='ignore')
 				writer.writeheader()
 				for row in id_list:
+					to_title_case = ['Tissue', 'Storage', 'Block', 'Plot', 'Farm', 'Region', 'Country']
+					for item in to_title_case:
+						row[item] = row[item].title() if row[item] else None
 					writer.writerow(row)
 				file_size = file.tell()
 			#return file details

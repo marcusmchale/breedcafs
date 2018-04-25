@@ -167,12 +167,12 @@ $("#submit_country").click( function(e) {
 			        flash = "<div id='country_flash' class='flash'> Submitted: " + response['submitted'] + " </div>";
 				    $("#submit_country").after(flash);
 				    $("#text_country").val("");
-				    update_countries(response['submitted']);
+				    update_countries(response['submitted'].toLowerCase());
 				    load_chart();
 			    }  else if (response.hasOwnProperty('found')) {
 			        flash = flash = "<div id='country_flash' class='flash'> Found: " + response['found'] + " </div>";
 			        $("#submit_country").after(flash);
-			        update_countries(response['found']);
+			        update_countries(response['found'].toLowerCase());
 				    $("#text_country").val("");
 			    } else {
                     for (i in response) {
@@ -203,12 +203,12 @@ $("#submit_region").click( function(e) {
 			        flash = "<div id='region_flash' class='flash'> Submitted: " + response['submitted'] + " </div>";
 				    $("#submit_region").after(flash);
 				    $("#text_region").val("");
-				    update_regions(response['submitted']);
+				    update_regions(response['submitted'].toLowerCase());
 				    load_chart();
 			    }  else if (response.hasOwnProperty('found')) {
 			        flash = flash = "<div id='region_flash' class='flash'> Found: " + response['found'] + " </div>";
 			        $("#submit_region").after(flash);
-			        update_regions(response['found']);
+			        update_regions(response['found'].toLowerCase());
 				    $("#text_region").val("");
 			    } else {
                     for (i in response) {
@@ -239,12 +239,12 @@ $("#submit_farm").click( function(e) {
 			        flash = "<div id='farm_flash' class='flash'> Submitted: " + response['submitted'] + " </div>";
 				    $("#submit_farm").after(flash);
 				    $("#text_farm").val("");
-				    update_farms(response['submitted']);
+				    update_farms(response['submitted'].toLowerCase());
 				    load_chart();
 			    }  else if (response.hasOwnProperty('found')) {
 			        flash = flash = "<div id='farm_flash' class='flash'> Found: " + response['found'] + " </div>";
 			        $("#submit_farm").after(flash);
-			        update_farms(response['found']);
+			        update_farms(response['found'].toLowerCase());
 				    $("#text_farm").val("");
 			    } else {
                     for (i in response) {

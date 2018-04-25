@@ -111,15 +111,16 @@ def add_tissue():
 	else:
 		try:
 			form = AddTissueForm()
-			text_tissue = request.form['text_tissue']
+			text_tissue = request.form['text_tissue'].lower().strip()
 			if form.validate_on_submit():
-				if Lists('Tissue').find_node(text_tissue):
-					return "Tissue already found: " + str(text_tissue)
+				find_tissue = Lists('Tissue').find_node(text_tissue)
+				if find_tissue:
+					return jsonify({"found": find_tissue[0]['name'].title()})
 				else:
-					Samples().add_tissue(text_tissue)
-					return "Tissue submitted: " + str(text_tissue)
+					new_tissue = Samples().add_tissue(text_tissue)
+					return jsonify({"submitted": new_tissue[0]['name'].title()})
 			else:
-				return form.errors["text_tissue"][0]
+				return jsonify({form.errors})
 		except ServiceUnavailable:
 			flash("Database unavailable")
 			return redirect(url_for('index'))
@@ -149,15 +150,16 @@ def add_storage():
 	else:
 		try:
 			form = AddStorageForm()
-			text_storage = request.form['text_storage']
+			text_storage = request.form['text_storage'].lower().strip()
 			if form.validate_on_submit():
-				if Lists('Storage').find_node(text_storage):
-					return "Storage already found: " + str(text_storage)
+				find_storage = Lists('Storage').find_node(text_storage)
+				if find_storage:
+					return jsonify({"found": find_storage[0]['name'].title()})
 				else:
-					Samples().add_storage(text_storage)
-					return "Storage submitted: " + str(text_storage)
+					new_storage = Samples().add_storage(text_storage)
+					return jsonify({"submitted": new_storage[0]['name'].title()})
 			else:
-				return form.errors["text_storage"][0]
+				return jsonify({[form.errors]})
 		except ServiceUnavailable:
 			flash("Database unavailable")
 			return redirect(url_for('index'))
@@ -311,13 +313,6 @@ def get_samples():
 					end_time,
 					samples_start,
 					samples_end)
-
-
-
-
-
-
-
 				#if result = none then no data was found
 				if file_details == None:
 					return jsonify({'submitted' : "No entries found that match your selection"})

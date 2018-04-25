@@ -38,6 +38,9 @@ class Download(User):
 				extrasaction = 'ignore')
 			writer.writeheader()
 			for row in id_list:
+				to_title_case = set(fieldnames).intersection(['Variety','Tissue', 'Storage', 'Block', 'Plot', 'Farm', 'Region', 'Country'])
+				for item in to_title_case:
+					row[item] = row[item].title() if row[item] else None
 				writer.writerow(row)
 			file_size = file.tell()
 		#return file details
@@ -491,6 +494,10 @@ class Download(User):
 				extrasaction='ignore')
 			writer.writeheader()
 			for i, item in enumerate(result):
+				to_title_case = set(fieldnames).intersection(
+					['Variety', 'Tissue', 'Storage', 'Block', 'Plot', 'Farm', 'Region', 'Country'])
+				for item in to_title_case:
+					row[item] = row[item].title() if row[item] else None
 				writer.writerow(item)
 			file_size = file.tell()
 		return { "filename":filename,
@@ -787,13 +794,33 @@ class Download(User):
 			plotID = int(form_data['plot'])
 			if form_data['trait_level'] == 'block':
 				# make the file and return a dictionary with filename, file_path and file_size
-				fieldnames = ['UID', 'PlotID', 'BlockID', 'Block', 'Plot', 'Farm', 'Region', 'Country']
+				fieldnames = [
+					'UID',
+					'Country',
+					'Region',
+					'Farm',
+					'Plot',
+					'PlotID',
+					'Block',
+					'BlockID'
+				]
 				id_list = Fields.get_blocks(plotID)
 			if form_data['trait_level'] == 'tree':
 				trees_start = int(form_data['trees_start'] if form_data['trees_start'] else 0)
 				trees_end = int(form_data['trees_end'] if form_data['trees_end'] else 999999)
 				# make the file and return filename, path, size
-				fieldnames = ['UID','PlotID','TreeID', 'TreeName', 'Block', 'Plot', 'Farm', 'Region', 'Country']
+				fieldnames = [
+					'UID',
+					'Country',
+					'Region',
+					'Farm',
+					'Plot',
+					'PlotID',
+					'Block',
+					'BlockID',
+					'TreeName',
+					'TreeID'
+				]
 				id_list = Fields.get_trees(plotID, trees_start, trees_end)
 			if form_data['trait_level'] == 'branch':
 				fieldnames = [
@@ -898,8 +925,8 @@ class Download(User):
 					'SampleID',
 					'Date',
 					'Tissue',
-					'Storage'
-				]
+					'Storage',
+					]
 				id_list = Samples().get_samples(parameters)
 		#check we have found matching ID's, if not return None
 		if len(id_list) == 0:
