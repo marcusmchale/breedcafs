@@ -10,7 +10,7 @@ class Cypher():
 		' RETURN FILTER (n in e.allowed WHERE NOT n in registered_emails) as user_allowed' )
 	user_find = ('MATCH (user:User) '
 	' WHERE user.username = $username '
-	' OR user.email = $email '
+	' OR user.email = toLower(trim($email)) '
 	' RETURN user ')
 	user_affiliations = (' MATCH (u:User {username : $username}) '
 		' -[a:AFFILIATED]->(p:Partner) '
@@ -39,13 +39,14 @@ class Cypher():
 		' RETURN p.name ')
 	username_find = ('MATCH (user:User {username : $username}) '
 		' RETURN user ')
-	email_find = ('MATCH (user:User {email : $email} '
+	email_find = ('MATCH (user:User {email : toLower(trim($email))} '
 		'RETURN user ')
-	confirm_email = ('MATCH (user:User {email : $email}) '
+	confirm_email = ('MATCH (user:User {email : toLower(trim($email))}) '
 		' SET user.confirmed = true ')
-	password_reset = ('MATCH (user:User {email : $email}) '
+	password_reset = ('MATCH (user:User {email : toLower(trim($email))}) '
 		' SET user.password = $password ')
-	user_register = ('MATCH (partner:Partner {name:$partner}) '
+	user_register = (
+		' MATCH (partner:Partner {name:$partner}) '
 		' CREATE ' 
 			' (user:User {username : $username, '
 					' password : $password, ' 
@@ -64,44 +65,56 @@ class Cypher():
 				'}] -> (partner), '
 			' (user)-[:SUBMITTED]->(sub:Submissions), '
 			' (sub)-[:SUBMITTED]->(:Emails {allowed :[]}),'
+			' (sub)-[:SUBMITTED]->(:Partners), '
+			' (sub)-[:SUBMITTED]->(:Traits), '
+			' (sub)-[:SUBMITTED]->(:Trials), '
 			' (sub)-[:SUBMITTED]->(locations:Locations), '
 				' (locations)-[:SUBMITTED]->(:Countries), '
 				' (locations)-[:SUBMITTED]->(:Regions), '
 				' (locations)-[:SUBMITTED]->(:Farms), '
 				' (locations)-[:SUBMITTED]->(:Plots), '
+			' (sub)-[:SUBMITTED]->(traits:Traits), '
+				' (traits)-[:SUBMITTED]->(:FarmTraits), '
+				' (traits)-[:SUBMITTED]->(:PlotTraits), '
+				' (traits)-[:SUBMITTED]->(:BlockTraits), '
+				' (traits)-[:SUBMITTED]->(:TreeTraits), '
+				' (traits)-[:SUBMITTED]->(:BranchTraits), '
+				' (traits)-[:SUBMITTED]->(:LeafTraits), '
+				' (traits)-[:SUBMITTED]->(:SampleTraits), '
 			' (sub)-[:SUBMITTED]->(varieties:Varieties), '
 				' (varieties)-[:SUBMITTED]->(:Hybrids), '
 				' (varieties)-[:SUBMITTED]->(:Inbreds), '
 				' (varieties)-[:SUBMITTED]->(:Grafts), '
+			' (sub)-[:SUBMITTED]->(descriptors:SampleDescriptors), '
+				' (descriptors)-[:SUBMITTED]->(:Tissues), '
+				' (descriptors)-[:SUBMITTED]->(:StorageMethods), '
 			' (sub)-[:SUBMITTED]->(items:Items), '
 				' (items)-[:SUBMITTED]->(:Blocks), '
 				' (items)-[:SUBMITTED]->(:Trees), '
 				' (items)-[:SUBMITTED]->(:Branches), '
 				' (items)-[:SUBMITTED]->(:Leaves), '
 				' (items)-[:SUBMITTED]->(:Samples), '
-			' (sub)-[:SUBMITTED]->(descriptors:SampleDescriptors), '
-				' (descriptors)-[:SUBMITTED]->(:Tissues), '
-				' (descriptors)-[:SUBMITTED]->(:StorageMethods), '
 			' (sub)-[:SUBMITTED]->(data:DataSub), '
 				'(data)-[:SUBMITTED]->(:FieldBook),'
 				'(data)-[:SUBMITTED]->(:TableCSV)'
-			' ')
+			' '
+	)
 	add_allowed_email = ( ' MATCH (all:Emails) '
 		' WITH all.allowed as allowed_emails '
 		' UNWIND allowed_emails as email '
 		' WITH collect(DISTINCT email) as set '
-		' WHERE NOT $email IN set '
+		' WHERE NOT toLower(trim($email)) IN set '
 		' MATCH (:User {username : $username}) '
 		' -[:SUBMITTED]->(:Submissions) '
 		' -[:SUBMITTED]->(e:Emails) '
-		' SET e.allowed = e.allowed + [$email] '
-		' RETURN $email ' )
+		' SET e.allowed = e.allowed + [toLower(trim($email))] '
+		' RETURN toLower(trim($email)) ' )
 	remove_allowed_email = ( ' MATCH (:User {username : $username}) '
 		' -[:SUBMITTED]->(:Submissions) '
 		' -[:SUBMITTED]->(e:Emails) '
-		' SET e.allowed = FILTER (n in e.allowed WHERE NOT n IN $email) '
-		' RETURN $email ' )
-	user_del = ( ' MATCH (u:User {email:$email, confirmed: false}) '
+		' SET e.allowed = FILTER (n in e.allowed WHERE NOT n IN toLower(trim($email))) '
+		' RETURN toLower(trim($email)) ' )
+	user_del = ( ' MATCH (u:User {email:toLower(trim($email)), confirmed: false}) '
 		' OPTIONAL MATCH (u)-[:SUBMITTED*..3]->(n) '
 		' DETACH DELETE u,n ' )
 	partner_admin_users = ( 'MATCH (:User {username : $username}) '
@@ -395,7 +408,8 @@ class Cypher():
 			' SET id._LOCK_ = false '
 			' RETURN count(t) '
 	)
-	trees_get = ( 'MATCH (tree:Tree) '
+	trees_get = (
+		'MATCH (tree:Tree) '
 			' -[:IS_IN]->(pt:PlotTrees) '
 			' -[:IS_IN]->(plot:Plot {uid : toInteger($plotID)}) '
 			' -[:IS_IN]->(farm:Farm) '
@@ -407,23 +421,26 @@ class Cypher():
 		#find block if registered
 		' OPTIONAL MATCH (tree) '
 			' -[:IS_IN]->(:BlockTrees)-[:IS_IN]->(block:Block)'
-		#find custom tree name if registered
+		# find custom tree name if registered
 		' OPTIONAL MATCH (tree)'
 			' <-[:FROM_TREE]-(ttt:TreeTreeTrait)'
 			' -[:DATA_FOR]->(:PlotTreeTrait) '
-			' -[:FOR_TRAIT]->(:TreeTrait {name:"Custom name"}) '
+			' -[:FOR_TRAIT]->(:TreeTrait {name:"custom name"}) '
 		' OPTIONAL MATCH (ttt) '
-			' <-[:DATA_FOR]-(data:Data) '
+			' <-[:DATA_FOR]-(treename:Data) '
+		#return the values
 		' RETURN { UID : tree.uid, '
 			' PlotID : plot.uid, '
 			' TreeID : tree.id, '
-			' TreeName : data.value, '
+			' TreeName : treename.value, '
 			' Block : block.name, '
 			' Plot : plot.name, '
 			' Farm : farm.name, '
 			' Region : region.name, '
-			' Country : country.name } '
-		' ORDER BY tree.id ' )
+			' Country : country.name '
+		' } '
+		' ORDER BY tree.id '
+	)
 	treecount = (
 		'MATCH (tc:Counter {uid:($plotid + "_tree")}) '
 		'RETURN tc.count '
@@ -450,8 +467,17 @@ class Cypher():
 		' ORDER BY t.id '
 		' WHERE t.id >= toInteger($start) '
 		' AND t.id <= toInteger($end) '
+		#find block if registered
 		' OPTIONAL MATCH (t) '
 			' -[:IS_IN]->(:BlockTrees)-[:IS_IN]->(block:Block)'
+		# find custom tree name if registered
+		' OPTIONAL MATCH (t)'
+			' <-[:FROM_TREE]-(ttt:TreeTreeTrait)'
+			' -[:DATA_FOR]->(:PlotTreeTrait) '
+			' -[:FOR_TRAIT]->(:TreeTrait {name:"custom name"}) '
+		' OPTIONAL MATCH (ttt) '
+			' <-[:DATA_FOR]-(treename:Data) '
+		#create new branch ids
 		' UNWIND range(1, $replicates) as replicates '
 		' SET id.count = id.count + 1 '
 		' CREATE (r:Branch { '
@@ -485,7 +511,7 @@ class Cypher():
 			' PlotID : p.uid, '
 			' Block: block.name, '
 			' BlockID: block.id, '
-			' TreeName : t.name, '
+			' TreeName : treename.name, '
 			' TreeID : t.id, '
 			' BranchID : r.id  '
 		' } '
@@ -513,7 +539,7 @@ class Cypher():
 			' -[:DATA_FOR]->(:PlotTreeTrait) '
 			' -[:FOR_TRAIT]->(:TreeTrait {name:"Custom name"}) '
 		' OPTIONAL MATCH (ttt) '
-			' <-[:DATA_FOR]-(data:Data) '
+			' <-[:DATA_FOR]-(treename:Data) '
 		' RETURN { '
 			' UID : branch.uid, '
 			' Country : country.name, '
@@ -523,13 +549,13 @@ class Cypher():
 			' PlotID : plot.uid, ' 
 			' Block : block.name, '
 			' BlockID: block.id, '
-			' TreeName : data.value, '
+			' TreeName : treename.value, '
 			' TreeID : tree.id, '
 			' BranchID: branch.id '
 		' } '
 		' ORDER BY branch.id '
 	)
-	#leaf procedures
+	# leaf procedures
 	# branch procedures
 	leaves_add = (
 		' MATCH '
@@ -552,8 +578,17 @@ class Cypher():
 		' ORDER BY t.id '
 		' WHERE t.id >= toInteger($start) '
 		' AND t.id <= toInteger($end) '
+		# find block if registered
 		' OPTIONAL MATCH (t) '
 			' -[:IS_IN]->(:BlockTrees)-[:IS_IN]->(block:Block) '
+		 # find custom tree name if registered
+		' OPTIONAL MATCH (t)'
+			' <-[:FROM_TREE]-(ttt:TreeTreeTrait)'
+			' -[:DATA_FOR]->(:PlotTreeTrait) '
+			' -[:FOR_TRAIT]->(:TreeTrait {name:"Custom name"}) '
+		' OPTIONAL MATCH (ttt) '
+			' <-[:DATA_FOR]-(treename:Data) '
+		#create leaf ID's
 		' UNWIND range(1, toInteger($replicates)) as replicates '
 		' SET id.count = id.count + 1 '
 		' CREATE (l:Leaf { '
@@ -619,6 +654,7 @@ class Cypher():
 			' -[:FOR_TRAIT]->(:TreeTrait {name:"Custom name"}) '
 		' OPTIONAL MATCH (ttt) '
 			' <-[:DATA_FOR]-(data:Data) '
+		# and return
 		' RETURN { '
 			' UID : leaf.uid, '
 			' Country : country.name, '
@@ -628,8 +664,8 @@ class Cypher():
 			' PlotID : plot.uid, ' 
 			' Block : block.name, '
 			' BlockID: block.id, '
-			' TreeName : data.value, '
 			' TreeID : tree.id, '
+			' TreeName : data.value, '
 			' BranchID: branch.id, '
 			' LeafID: leaf.id '
 		' } '
@@ -676,7 +712,7 @@ class Cypher():
 		' ORDER BY t.id '
 		' WHERE t.id >= $start '
 		' AND t.id <= $end '
-		#get tree name
+		#get tree name if registered
 		' OPTIONAL MATCH (t)'
 			' <-[:FROM_TREE]-(treename:TreeTreeTrait)'
 			' -[:DATA_FOR]->(:PlotTreeTrait) '
@@ -725,76 +761,6 @@ class Cypher():
 			' Date : s.date, '
 			' Tissue : tissue.name, '
 			' Storage : storage.name, '
-			' Block : b.name, '
-			' Plot : p.name, '
-			' Farm : f.name, '
-			' Region : r.name, '
-			' Country : c.name '
-		' } '
-		' ORDER BY s.id '
-		)
-	samples_add_notype = (' MATCH '
-			' (t:Tree) '
-				' -[:IS_IN]->(:PlotTrees) '
-				' -[:IS_IN]->(:Plot {uid: toInteger($plotID)}), '
-			' (:User {username:$username}) '
-				' -[:SUBMITTED]->(:Submissions) '
-				' -[:SUBMITTED]->(:Items) '
-				' -[:SUBMITTED]->(samples:Samples), '
-			' (id:Counter {uid: ($plotID + "_sample")}) '
-				' -[:FOR]->(ps:PlotSamples) '
-				' -[:FROM_PLOT]->(p:Plot {uid: toInteger($plotID)}) '
-				' -[:IS_IN]->(f:Farm) '
-				' -[:IS_IN]->(r:Region) '
-				' -[:IS_IN]->(c:Country) '
-		# with the selected trees to be sampled
-		' WITH t, samples, id, ps, p, f, r, c '
-		' ORDER BY t.id '
-		' WHERE t.id >= $start '
-		' AND t.id <= $end '
-		#get tree name
-		' OPTIONAL MATCH (t)'
-			' <-[:FROM_TREE]-(treename:TreeTreeTrait)'
-			' -[:DATA_FOR]->(:PlotTreeTrait) '
-			' -[:FOR_TRAIT]->(:TreeTrait {name:"name"}) '
-		' OPTIONAL MATCH (treename) '
-			' <-[:DATA_FOR]-(d:Data) '
-		# get block name
-		' OPTIONAL MATCH (t) '
-			' -[:IS_IN]->(:BlockTrees) '
-			' -[:IS_IN]->(b:Block) '
-		#with replicates
-		' UNWIND range(1, $replicates) as replicates '
-		#incrementing with a plot level counter
-		' SET id.count = id.count + 1 '
-		#Create samples
-		' CREATE (s:Sample { '
-				' uid: (p.uid + "_S" + id.count), '
-				' id:id.count, '
-				' tree: t.id,'
-				' replicates: $replicates '
-				'}) '
-		# Create a NoType node for the PlotSamples node to collect all these separate from the Tissue/Storage samples
-		' MERGE (nt:NoType)-[:FROM_PLOT]->(ps) '
-		# Link this to the trees TreeSamples node, create if not found yet
-		' MERGE (ts:TreeSamples)-[:FROM_TREE]->(t) '
-		' MERGE (nt)-[:FROM_TREE]->(ts)'
-		#Link the sample to its TreeSamples and NoType containers
-		' MERGE (s)-[:FROM_TREE]->(ts) '
-		' MERGE (s)-[:FROM_PLOT]->(nt) '
-		#track user submissions through successive UserPlotSamples then UserTreeSamples container nodes
-		' MERGE (samples)-[:SUBMITTED]->(ups:UserPlotSamples)-[:CONTRIBUTED]->(ps) '
-		' MERGE (ups)-[:SUBMITTED]->(uts:UserTreeSamples)-[:CONTRIBUTED]->(ts) '
-		' MERGE (uts)-[s1:SUBMITTED]->(s) '
-			' ON CREATE SET s1.time = timestamp() '
-		' SET id._LOCK_ = false '
-		#return for csv
-		' RETURN { '
-			' UID : s.uid, '
-			' PlotID : p.uid, '
-			' TreeID : t.id, '
-			' TreeName : d.value, '
-			' SampleID : s.id, '
 			' Block : b.name, '
 			' Plot : p.name, '
 			' Farm : f.name, '
@@ -1376,7 +1342,7 @@ class Cypher():
 					#and "unlock"
 					' SET id._LOCK_ = false'
 				' ) '
-							# if variety trait create link tree to variety
+			# if variety trait create link tree to variety
 			' FOREACH (n IN CASE WHEN toLower(trim(trait.name)) = "variety" '
 				' THEN [1] ELSE [] END | '
 					# Find the variety

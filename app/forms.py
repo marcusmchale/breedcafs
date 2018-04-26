@@ -504,7 +504,7 @@ class CreateTraits(FlaskForm):
 		#fill this dictionary 
 		for level in levels:
 			#get a list of dictionaries of properties from each trait node at this level
-			traits = Lists(level.title() + 'Trait').get_nodes()
+			traits = sorted(Lists(level.title() + 'Trait').get_nodes(), key = lambda dict: dict['name'])
 			#merge this into our nested defaultdict[level] with group as key and list of traits as value
 			for trait in traits:
 				self.levels_groups_traits[level][trait['group']].append((trait['name'], trait['details']))

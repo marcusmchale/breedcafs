@@ -101,23 +101,30 @@ class Create:
 		user_create = tx.run(' MERGE (u:User {username:toLower(trim($username))}) '
 			' ON MATCH SET u.found = True '
 			' ON CREATE SET u.found = False, u.time = timestamp() '
-			' MERGE (u)-[:SUBMITTED]->(sub:Submissions) '
-				' -[:SUBMITTED]->(locations:Locations) '
-				' -[:SUBMITTED]->(:Countries) '
-			' MERGE (sub)-[:SUBMITTED]->(counter:Counter {name: "plot"}) '
-				' ON CREATE SET counter.count = 0 '
-			' MERGE (sub)-[:SUBMITTED]->(:Partners) '
-			' MERGE (sub)-[:SUBMITTED]->(:Traits) '
-			' MERGE (sub)-[:SUBMITTED]->(:Trials) '
-			' MERGE (sub)-[:SUBMITTED]->(varieties : Varieties) '
-				' MERGE (varieties)-[ : SUBMITTED]->(:Inbreds) '
-				' MERGE (varieties)-[ : SUBMITTED]->(:Hybrids) '
-				' MERGE (varieties)-[ : SUBMITTED]->(:Grafts) ' 
-			' MERGE (sub)-[:SUBMITTED]->(sd:SampleDescriptors)'
-				' MERGE (sd)-[:SUBMITTED]->(:StorageMethods)'
-				' MERGE (sd)-[:SUBMITTED]->(:Tissues)'
-			' MERGE (sub)-[:SUBMITTED]->(:Emails {allowed : $allowed_emails})'
-			' RETURN u.found', 
+			' CREATE (u)-[:SUBMITTED]->(sub:Submissions), '
+				' (sub)-[:SUBMITTED]->(counter:Counter {name: "plot", count: 0}), '
+				' (sub)-[:SUBMITTED]->(:Emails {allowed : $allowed_emails}),'
+				' (sub)-[:SUBMITTED]->(:Partners), '
+				' (sub)-[:SUBMITTED]->(:Traits), '
+				' (sub)-[:SUBMITTED]->(:Trials), '
+				' (sub)-[:SUBMITTED]->(locations:Locations), '
+					' (locations)-[:SUBMITTED]->(:Countries), '
+				' (sub)-[:SUBMITTED]->(traits:Traits), '
+					' (traits)-[:SUBMITTED]->(:FarmTraits), '
+					' (traits)-[:SUBMITTED]->(:PlotTraits), '
+					' (traits)-[:SUBMITTED]->(:BlockTraits), '
+					' (traits)-[:SUBMITTED]->(:TreeTraits), '
+					' (traits)-[:SUBMITTED]->(:BranchTraits), '
+					' (traits)-[:SUBMITTED]->(:LeafTraits), '
+					' (traits)-[:SUBMITTED]->(:SampleTraits), '
+				' (sub)-[:SUBMITTED]->(varieties : Varieties), '
+					' (varieties)-[ : SUBMITTED]->(:Inbreds), '
+					' (varieties)-[ : SUBMITTED]->(:Hybrids), '
+					' (varieties)-[ : SUBMITTED]->(:Grafts), ' 
+				' (sub)-[:SUBMITTED]->(sd:SampleDescriptors), '
+					' (sd)-[:SUBMITTED]->(:StorageMethods), '
+					' (sd)-[:SUBMITTED]->(:Tissues) '
+			' RETURN u.found',
 			username=username,
 			allowed_emails = ALLOWED_EMAILS)
 		result = [record[0] for record in user_create]
@@ -188,18 +195,23 @@ class Create:
 		with open (traits_file, 'rb') as traits_csv:
 			reader = csv.DictReader(traits_csv, delimiter=',', quotechar='"')
 			for trait in reader: 
-				trait_create = tx.run('MATCH (u : User {username : toLower(trim($username))}) '
-					' -[:SUBMITTED]->(:Submissions)-[:SUBMITTED]->(uts:Traits) '
-					' MERGE (uts)-[s1:SUBMITTED]-(ut:' + level + 'Traits) '
-						' ON CREATE SET s1.time = timestamp() '
-					' MERGE (ut)-[s2:SUBMITTED]->(t:' + level +'Trait {group: toLower(trim($group)), '
-						' name: toLower(trim($trait)), '
-						' format: toLower(trim($format)), '
-						' defaultValue: $defaultValue, '
-						' minimum: $minimum, '
-						' maximum: $maximum,'
-						' details: $details, '
-						' categories: $categories}) '
+				trait_create = tx.run(
+					'MATCH (u : User {username : toLower(trim($username))}) '
+						' -[:SUBMITTED]->(:Submissions) '
+						' -[:SUBMITTED]->(uts:Traits) '
+						' -[s1:SUBMITTED]-(ut:' + level + 'Traits) '
+					' MERGE '
+						' (ut)-[s2:SUBMITTED]->(t:' + level +'Trait {'
+							' group: toLower(trim($group)), '
+							' name: toLower(trim($trait)), '
+							' format: toLower(trim($format)), '
+							' defaultValue: $defaultValue, '
+							' minimum: $minimum, '
+							' maximum: $maximum,'
+							' details: $details, '
+							' categories: $categories,'
+							' category_list: split($categories, "/")'
+						' }) '
 					' ON MATCH SET t.found = True '
 					' ON CREATE SET t.found = False, s2.time=timestamp() '
 					' RETURN t.found',
@@ -297,11 +309,14 @@ class Create:
 		for record in variety_create:
 			print ("Created" if record[1] else "Found"), record[0]
 		##then build in the relationships for hybrids to their parents
+		inbreds = []
 		hybrids = []
 		grafts = []
 		for variety in varieties:
-			if variety['type'] == 'hybrid':
-					hybrids.append(variety['name'])
+			if variety['type'] == 'inbred':
+				inbreds.append(variety['name'])
+			elif variety['type'] == 'hybrid':
+				hybrids.append(variety['name'])
 			elif variety['type'] == 'graft':
 				grafts.append(variety['name'])
 			else:
@@ -385,58 +400,100 @@ class Create:
 						print('Rootstock relationship already established between ' + record['var.name'] + " and " + record['rootstock.name'] )
 					if not record['r.found']:
 						print('Rootstock relationship created between ' + record['var.name'] + " and " + record['rootstock.name'] )
+		# # Assign variety as a text field but with list of categories still and later check for categories when uploading
+		variety_list = sorted(inbreds) + sorted(hybrids) + sorted(grafts)
+		import pdb; pdb.set_trace()
+		variety_trait_create = tx.run(
+			'MATCH (u:User {username:toLower(trim($username))}) '
+				' -[:SUBMITTED]->(:Submissions) '
+				' -[:SUBMITTED]->(:Traits) '
+				' -[:SUBMITTED]-(ut:TreeTraits) '
+				' WITH ut '
+				' MERGE (ut)-[s2 : SUBMITTED]->(t : TreeTrait { '
+						' name: "variety" '
+					' }) '
+					' ON CREATE SET '
+						' t.group = "general", '
+						' t.format = "text", '
+						' t.category_list = $varieties, ' 				
+						' t.details = "Enter variety name as text", '
+						' t.found = False, '
+						' s2.time = timestamp() '
+					' ON MATCH SET t.found = True '
+				' RETURN t.name, t.found, t.category_list',
+				username = self.username,
+				varieties = variety_list
+		)
+		for record in variety_trait_create:
+			print ("Created trait: " if not record[1] else "Found:"), record[0]
+		##The below was still not working well for fieldbook, it really doesn't handle long names in categories well
 		#then create a TreeTrait per trial to store the varieties.
 		#This splits it up to make it more relevant per user
-		#also long lists of multicats don't work in fieldbook, the last ones are hidden.
-		variety_trait_create = tx.run( 'MATCH (u:User {username:toLower(trim($username))}) '
-				' -[:SUBMITTED]->(:Submissions) '
-				' -[:SUBMITTED]->(uts:Traits) '
-				' MERGE (uts)-[s1:SUBMITTED]-(ut:TreeTraits) '
-					' ON CREATE SET s1.time = timestamp() '
-				' WITH ut '
-				' MATCH (trial:Trial) '
-				' MERGE (ut)-[s2 : SUBMITTED]->(t : TreeTrait { '
-						' group: "variety", '
-						' name: toLower(trim("varieties (Trial " + trial.number + ")")),  '
-						' format: "categorical", '
-						' defaultValue: "", '
-						' minimum: "", '
-						' maximum: "",'
-						' details: ("Varieties (Trial #" + trial.number + ", " + trial.name + ")"), '
-						' categories: ""}) '
-					' -[:TRAIT_FOR]->(trial) '
-				' ON MATCH SET t.found = True '
-				' ON CREATE SET t.found = False, s2.time=timestamp() '
-				' RETURN t.name, t.found',
-			username = self.username,
-			)
-		for record in variety_trait_create:
-			print ("Created: " if not record[1] else "Found:"), record[0]
-		#now add the specific list of categories to each trait
-		#the order is important here, 
-		#and the height of the row in fieldbook is set by the last button
-		#so this should be the longest string
-		for wp in VARIETIES:
-			for trial in wp['trials']:
-				varieties = []
-				##creating list with inbred first and grafted last
-				for group in ['inbred','hybrid','grafted']:
-					if group in trial['varieties']:
-						varieties.extend(trial['varieties'][group])
-				varieties3 = []
-				for var3 in grouper(3, varieties):
-					var3 = filter(None, list(var3))
-					var3.sort(key = lambda s: len(s))
-					varieties3.extend(var3)
-				categories = str("/".join(varieties3))
-				trait_categories_create = tx.run( ' MATCH (tt:TreeTrait '
-					' {name: toLower(trim(("Varieties (Trial " + $trial + ")")))})  '
-					' SET tt.categories = $categories '
-					' RETURN tt.name, tt.categories ',
-					trial = trial['number'],
-					categories = categories)
-				for record in trait_categories_create:
-					print ("Set " + record[0] + " categories as " + record[1])
+		#variety_trait_create = tx.run( 'MATCH (u:User {username:toLower(trim($username))}) '
+		#		' -[:SUBMITTED]->(:Submissions) '
+		#		' -[:SUBMITTED]->(uts:Traits) '
+		#		' MERGE (uts)-[s1:SUBMITTED]-(ut:TreeTraits) '
+		#			' ON CREATE SET s1.time = timestamp() '
+		#		' WITH ut '
+		#		' MATCH (trial:Trial) '
+		#		' MERGE (ut)-[s2 : SUBMITTED]->(t : TreeTrait { '
+		#				' group: "variety", '
+		#				' name: toLower(trim("varieties (trial " + '
+		#					' CASE '
+		#						' WHEN size(toString(trial.number)) = 1 '
+		#							' THEN "00" + trial.number '
+		#						' WHEN size(toString(trial.number)) = 2 '
+		#							' THEN "0" + trial.number '
+		#						' WHEN size(toString(trial.number)) = 3 '
+		#							' THEN trial.number '
+		#						' END '
+		#					' + ")")),  '
+		#				' format: "categorical", '
+		#				' defaultValue: "", '
+		#				' minimum: "", '
+		#				' maximum: "",'
+		#				' details: ("Varieties (Trial #" + trial.number + ", " + trial.name + ")"), '
+		#				' categories: ""}) '
+		#			' -[:TRAIT_FOR]->(trial) '
+		#		' ON MATCH SET t.found = True '
+		#		' ON CREATE SET t.found = False, s2.time=timestamp() '
+		#		' RETURN t.name, t.found',
+		#	username = self.username,
+		#	)
+		#for record in variety_trait_create:
+		#	print ("Created: " if not record[1] else "Found:"), record[0]
+		## now add the specific list of categories to each trait
+#
+		#for wp in VARIETIES:
+		#	for trial in wp['trials']:
+		#		varieties = []
+		#		##creating list with inbred first and grafted last
+		#		for group in ['inbred','hybrid','grafted']:
+		#			if group in trial['varieties']:
+		#				varieties.extend(trial['varieties'][group])
+		#		varieties3 = []
+		#		for var3 in grouper(3, varieties):
+		#			var3 = filter(None, list(var3))
+		#			var3.sort(key = lambda s: len(s))
+		#			varieties3.extend(var3)
+		#		categories = str("/".join(varieties3))
+		#		trait_categories_create = tx.run( ' MATCH (tt:TreeTrait '
+		#			' {name: toLower(trim(("Varieties (trial " + '
+		#				' CASE '
+		#					' WHEN size(toString($trial)) = 1 '
+		#						' THEN "00" + $trial '
+		#					' WHEN size(toString($trial)) = 2 '
+		#						' THEN "0" + trial.number '
+		#					' WHEN size(toString($trial)) = 3 '
+		#						' THEN $trial '
+		#					' END '
+		#				' + ")")))})  '
+		#			' SET tt.categories = $categories '
+		#			' RETURN tt.name, tt.categories ',
+		#			trial = trial['number'],
+		#			categories = categories)
+		#		for record in trait_categories_create:
+		#			print ("Set " + record[0] + " categories as " + record[1])
 #sorted(varieties[group])
 		#then create a TreeTrait per 
 
@@ -457,6 +514,7 @@ class Create:
 #			categories = categories)
 #		for record in create_categories:
 #			print ('Created categories list on TreeTrait (variety): ' + record['tt.categories'])
+
 if not confirm('Are you sure you want to proceed? This is should probably only be run when setting up the database'):
 	sys.exit()
 else:
@@ -472,6 +530,7 @@ else:
 	with driver.session() as session:
 		session.write_transaction(Create('start').user)
 		session.write_transaction(Create('start').partners, PARTNERS)
+		session.write_transaction(Create('start').traits, 'traits/farm_traits.csv', 'Farm')
 		session.write_transaction(Create('start').traits, 'traits/plot_traits.csv', 'Plot')
 		session.write_transaction(Create('start').traits, 'traits/block_traits.csv', 'Block')
 		session.write_transaction(Create('start').traits, 'traits/tree_traits.csv', 'Tree')
