@@ -299,7 +299,7 @@ class SampleRegForm(FlaskForm):
 		description= "End TreeID")
 	replicates = IntegerField('Replicates', 
 		[NumberRange(min=1, max=100, message='Maximum of 100 replicates per submission')],
-		description= "Replicates")
+		description= "Replicates (per tree)")
 	tissue = SelectField('Tissue: ')
 	storage = SelectField('Storage: ')
 	date_collected = DateField('Date collected (YYYY-mm-dd): ', 
@@ -431,7 +431,15 @@ class RecordForm(FlaskForm):
 			Optional(),
 			NumberRange(min=1, max=100, message='Maximum of 100 replicates per submission')
 		],
-		description = "Replicates"
+		description = "Replicates (number of items per tree)"
+	)
+	sample_replicates = IntegerField(
+		'Sample Replicates',
+		[
+			Optional(),
+			NumberRange(min=1, max=100, message='Maximum of 100 measures of each trait per submission')
+		],
+		description = "Replicates (measures per sample)"
 	)
 	old_new_ids = SelectField(
 		'Find existing or create new IDs',

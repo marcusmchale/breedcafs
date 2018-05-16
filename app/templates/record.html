@@ -36,12 +36,19 @@
 						<dd>{{ record_form.samples_start(placeholder = record_form.samples_start.description) }}
 							{{ record_form.samples_end(placeholder = record_form.samples_end.description) }}
 						</dd>
+						<a>Specify the number of measures per sample</a>
+						<dt>{{
+								record_form.sample_replicates(
+									placeholder = record_form.sample_replicates.description
+								)
+							}}
+						</dt>
 					</div>
 			<div id=existing_ids>
 				<hr>
 				{{ record_form.old_new_ids }}
 				<div id=new_ids>
-						<p>Select the number of replicates per tree</p>
+						<p>Specify the number of replicates (branches/leaves) per tree</p>
 						<dt>{{
 								record_form.replicates(
 									placeholder = record_form.replicates.description

@@ -105,19 +105,19 @@ def generate_files():
 								id_list = Fields.add_branches(plotID, start, end, replicates)
 							elif trait_level =='leaf':
 								id_list = Fields.add_leaves(plotID, start, end, replicates)
-							elif trait_level == 'sample':
-								tissue = None
-								storage = None
-								date = None
-								id_list = Samples().add_samples(
-									plotID,
-									start,
-									end,
-									replicates,
-									tissue,
-									storage,
-									date,
-									False)
+							#elif trait_level == 'sample':
+							#	tissue = None
+							#	storage = None
+							#	date = None
+							#	id_list = Samples().add_samples(
+							#		plotID,
+							#		start,
+							#		end,
+							#		replicates,
+							#		tissue,
+							#		storage,
+							#		date,
+							#		False)
 					#now create the index files requested: plots/blocks/trees/branches/leaves/samples.csv
 					if form_data['template_format'] == 'fb':
 						if all([form_data['trait_level'] in ['branch','leaf'], form_data['old_new_ids'] == 'new']):
@@ -140,7 +140,7 @@ def generate_files():
 						else:
 							file_details_dict = Download(session['username']).get_table_csv(form_data)
 						if file_details_dict == None:
-							return jsonify({'submitted': "Please select traits to include"})
+							return jsonify({'submitted': "TEST"})
 					#create html block with urls
 					url_list_html = ''
 					for file in file_details_dict:

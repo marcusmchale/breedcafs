@@ -155,7 +155,7 @@ def add_country():
 	else:
 		try:
 			form = AddCountry()
-			text_country = request.form['text_country'].lower().strip()
+			text_country = request.form['text_country'].strip()
 			if form.validate_on_submit():
 				found = Fields(text_country).find_country()
 				if found:

@@ -38,9 +38,17 @@ class Download(User):
 				extrasaction = 'ignore')
 			writer.writeheader()
 			for row in id_list:
-				to_title_case = set(fieldnames).intersection(['Variety','Tissue', 'Storage', 'Block', 'Plot', 'Farm', 'Region', 'Country'])
+				to_title_case = set(fieldnames).intersection([
+					'Variety',
+					'Tissue',
+					'Storage',
+					'Block',
+					'Plot',
+					'Farm',
+					'Region',
+					'Country'])
 				for item in to_title_case:
-					row[item] = row[item].title() if row[item] else None
+					row[item] = str(row[item]).title() if row[item] else None
 				writer.writerow(row)
 			file_size = file.tell()
 		#return file details
@@ -78,7 +86,7 @@ class Download(User):
 		#build query strings - always be careful not to allow injection when doing this!!
 		#all of the input needs to be validated (in this case it is already done by WTForms checking against selectfield options)
 		#but as I am not entirely sure about the security of this layer I am adding another check of the values that are used to concatenate the string
-		node_label = level.title() + 'Trait'
+		node_label = str(level).title() + 'Trait'
 		TRAITS = Lists(node_label).create_list('name')
 		#First I limit the data nodes to those submitted by members of an affiliated institute
 		user_data_query = ( 
@@ -497,7 +505,7 @@ class Download(User):
 				to_title_case = set(fieldnames).intersection(
 					['Variety', 'Tissue', 'Storage', 'Block', 'Plot', 'Farm', 'Region', 'Country'])
 				for item in to_title_case:
-					row[item] = row[item].title() if row[item] else None
+					row[item] = str(row[item]).title() if row[item] else None
 				writer.writerow(item)
 			file_size = file.tell()
 		return { "filename":filename,
@@ -703,15 +711,24 @@ class Download(User):
 					'TreeID',
 					'BranchID',
 					'LeafID',
-					'SampleID'
+					'SampleID',
 					'Tissue',
 					'Storage',
-					'Date',
-					'Time'
+					'Date'
 				]
 				id_list = Samples().get_samples(parameters)
 				if len(id_list) == 0:
 					return None
+				sample_replicates = int(form_data['sample_replicates']) if form_data['sample_replicates'] else 1
+				if sample_replicates != 1:
+					fieldnames.insert(11, 'Replicate')
+					id_list_reps = []
+					for sample in id_list:
+						for i in range(sample_replicates):
+							sample['UID'] = str(sample['PlotID']) + "_S" + str(sample['SampleID']) + "." + str(int(i + 1))
+							sample['Replicate'] = i + 1
+							id_list_reps.append(sample.copy())
+					id_list = id_list_reps
 				csv_file_details = self.make_csv_file(
 					fieldnames,
 					id_list,
@@ -721,7 +738,7 @@ class Download(User):
 	#creates the traits.trt file for import to Field-Book
 	#may need to replace 'name' with 'trait' in header but doesn't seem to affect Field-Book
 	def create_trt(self, form_data):
-		node_label = form_data['trait_level'].title() + 'Trait'
+		node_label = str(form_data['trait_level']).title() + 'Trait'
 		selection = [
 			item for sublist in [
 				form_data.getlist(i) for i in form_data if all(['csrf_token' not in i, form_data['trait_level'] + '-' in i])
@@ -931,8 +948,19 @@ class Download(User):
 		#check we have found matching ID's, if not return None
 		if len(id_list) == 0:
 			return None
+		#if requesting replicates for samples then create these in the id_list
+		sample_replicates = int(form_data['sample_replicates']) if form_data['sample_replicates'] else 1
+		if sample_replicates != 1:
+			fieldnames.insert(11, 'Replicate')
+			id_list_reps = []
+			for sample in id_list:
+				for i in range(sample_replicates):
+					sample['UID'] = str(sample['PlotID']) + "_S" + str(sample['SampleID']) + "." + str(int(i + 1))
+					sample['Replicate'] = i + 1
+					id_list_reps.append(sample.copy())
+			id_list = id_list_reps
 		#then we get the traits list from the form
-		node_label = form_data['trait_level'].title() + 'Trait'
+		node_label = str(form_data['trait_level']).title() + 'Trait'
 		selection = [
 			item for sublist in [
 				form_data.getlist(i) for i in form_data if all(['csrf_token' not in i, form_data['trait_level'] + '-' in i])

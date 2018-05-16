@@ -48,7 +48,7 @@ $("#submit_tissue").click( function(e) {
 			    if (response.hasOwnProperty('submitted')) {
 			        flash = "<div id='tissue_flash' class='flash'> Submitted: " + response['submitted'] + " </div>";
 				    $("#submit_tissue").after(flash);
-				    $("#text_tisue").val("");
+				    $("#text_tissue").val("");
 				    update_tissues(response['submitted'].toLowerCase());
 				    load_chart();
 			    }  else if (response.hasOwnProperty('found')) {

@@ -69,7 +69,7 @@ class Samples:
 				for row in id_list:
 					to_title_case = ['Tissue', 'Storage', 'Block', 'Plot', 'Farm', 'Region', 'Country']
 					for item in to_title_case:
-						row[item] = row[item].title() if row[item] else None
+						row[item] = str(row[item]).title() if row[item] else None
 					writer.writerow(row)
 				file_size = file.tell()
 			#return file details
@@ -162,10 +162,9 @@ class Samples:
 				' Plot : plot.name, '
 				' PlotID : plot.uid, '
 				' Block : block.name, '
-				' Block : block.id, '
-				' TreeName : tree.name, '
-				' TreeID : tree.id, '
+				' BlockID : block.id, '
 				' TreeName : d.value, '
+				' TreeID : tree.id, '
 				' BranchID : branch.id, '
 				' LeafID : leaf.id, '
 				' SampleID : sample.id, '
@@ -181,6 +180,3 @@ class Samples:
 			id_list = [record[0] for record in neo4j_session.read_transaction(neo4j_query, query, parameters)]
 		#check if any data found, if not return none
 		return id_list
-
-
-
