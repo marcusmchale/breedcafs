@@ -54,7 +54,8 @@ indexes = [
 	#{'label': 'Country', 'property': 'name'},
 	{'label': 'Region', 'property': 'name_lower'},
 	{'label': 'Farm', 'property': 'name_lower'},
-	{'label': 'Plot', 'property': 'name_lower'}
+	{'label': 'Plot', 'property': 'name_lower'},
+	{'label': 'Data', 'property': 'time'}
 ]
 
 # Node Key constraint requires Neo4j Enterprise Edition
