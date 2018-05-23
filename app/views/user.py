@@ -1,4 +1,4 @@
-from app import app, ServiceUnavailable
+from app import app, ServiceUnavailable, logging
 from flask import (request, 
 	session, 
 	redirect, 
@@ -27,7 +27,7 @@ def register():
 	try:
 		form = RegistrationForm.update()
 		if form.validate_on_submit():
-			username = form.username.data.lower()
+			username = form.username.data
 			password = form.password.data
 			email = form.email.data.lower()
 			name = form.name.data
@@ -61,7 +61,8 @@ def register():
 				send_email(subject, app.config['ADMINS'][0], recipients, body, html )
 				flash('Registration successful. Please check your email to confirm.')
 				return redirect(url_for('login'))
-			except:
+			except Exception as e:
+				logging.info('Error registering user:' + str(e))
 				flash('Error with registration please contact an administrator')
 		return render_template('register.html', form=form, title='Register') 
 	except (ServiceUnavailable):

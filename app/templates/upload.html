@@ -2,7 +2,7 @@
 {% block body %}
 <div class="text_body">
 {% from "_formhelpers.html" import render_field %}
-	<h2>Upload CSV</h2>
+	<h2>Upload Data</h2>
 		<form action="{{ url_for('upload') }}" method="post" enctype=multipart/form-data>
 		{{ form.csrf_token }}
 			<dl>

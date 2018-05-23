@@ -93,7 +93,7 @@ class Fields:
 				'country': self.country,
 				'region': region,
 				'farm': farm,
-				'plot':plot,
+				'plot': plot,
 				'username': session['username']
 			}
 			result  = neo4j_session.write_transaction(neo4j_query, Cypher.plot_add, parameters)

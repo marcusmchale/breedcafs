@@ -58,7 +58,7 @@ $('#trait_level').change(function () {
 		$('#plot, #sample_ids, #tree_ids').show();
 		$('#branch_ids,#leaf_ids').hide();
 	}
-})
+});
 
 $('#old_new_ids').val('old');
 $('#old_ids').show();
@@ -73,17 +73,34 @@ $('#old_new_ids').change(function () {
         $('#new_ids').show();
         $('#old_ids').hide();
    }
-})
+});
 
 //remove flash message on change of data format select box
 $('#data_format').change(function () {
 	$(".flash").remove();
+});
+
+checkbox_formatting = function () {
+	if ($(this).closest("dl").find("li > input:checked").length === $(this).closest("dl").find("li > input").length) {
+		$(this).closest("dl").find('dt > label').css('text-decoration', 'none');
+		$(this).closest("dl").find('dt > input').prop("checked", true);
+	}
+	else if ($(this).closest("dl").find("li > input:checked").length > 0) {
+		$(this).closest("dl").find('dt > label').css('text-decoration', 'underline');
+		$(this).closest("dl").find('dt > input').prop("checked", false);
+	}
+	else {
+		$(this).closest("dl").find('dt > label').css('text-decoration', 'none');
+		$(this).closest("dl").find('dt > input').prop("checked", false);
+	}
+};
+
+$( window ).load(function () {
+	$('dl').each(checkbox_formatting);
 })
 
 //Add select all checkboxes to the form
 $('dl').each( function () {
-	//get ID from ul element
-	id = $(this).find('dd > ul').attr('id');
 	//make trait groups look clickable
 	$(this).find('dt > label').mouseover(function () {
 	    $(this).css('font-weight', 'bold');
@@ -98,17 +115,23 @@ $('dl').each( function () {
 	});
 	//and start collapsed
 	$(this).find('dd').hide()
+	//get trait ul id
+	trait_id = $(this).find('dd > ul').attr('id');
 	//add checkbox
-	$(this).find('dt > label').before("<input id='select_all_" + id + "' type='checkbox'>");
+	$(this).find('dt > label').before("<input id='select_all_" + trait_id + "' type='checkbox'>");
 	//on checkbox change toggle children true/false
-	$('#select_all_' + id).change(function () {
-		if (this.checked) { 
+	$('[id="select_all_' + trait_id + '"]').change(function () {
+		if (this.checked) {
 			$(this).parent().next().find("input").prop("checked", true);
+			$(this).find('label').css('text-decoration', 'underline');
 		}
 		else {
 			$(this).parent().next().find("input").prop("checked", false);
+			$(this).find('label').css('text-decoration', 'none');
 		}
 	});
+	//make trait groups underlined if any items checked within
+	$(this).find('li > input').change(checkbox_formatting);
 });
 
 //expand the general tab as defaults are set (and as example)

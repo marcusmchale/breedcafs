@@ -18,7 +18,7 @@ class Lists:
 	def _find_node(self, tx):
 		node_label = self.node_label
 		name = self.name
-		Cypher_node_find='MATCH (n: ' + node_label +' {name:$name}) RETURN (n)'
+		Cypher_node_find='MATCH (n: ' + node_label +' {name_lower:toLower($name)}) RETURN (n)'
 		for record in tx.run(Cypher_node_find, name=self.name):
 			return record
 	#get lists of all nodes with properties as dict
@@ -34,23 +34,21 @@ class Lists:
 		return [(node[key]) for node in self.get_nodes()]
 	#lists of tups for forms
 	def create_list_tup(self, key1, key2):
-		return [(node[key1], node[key2].title()) for node in self.get_nodes()]
+		return [(node[key1].lower(), node[key2]) for node in self.get_nodes()]
 	#Finds node (defined by key:value of a property) and gets 'name' from nodes connected by a relationship with label 'rel'
 	def get_connected(self, key, value, rel):
-		self.key=key 
+		self.key=key
 		self.rel=rel
 		self.value=value
 		with get_driver().session() as neo4j_session:
-			result = neo4j_session.read_transaction(self._get_connected)
+			result = neo4j_session.read_transaction(self._get_connected, key, value, rel)
 			return [(record[0]['name']) for record in result]
-	def _get_connected(self, tx):
-		key = self.key
-		rel = self.rel
-		value = self.value
-		node_label=self.node_label
-		Cypher_get_connected=('MATCH (n: ' + node_label +' {' + key + ':$value}) <- [:' 
-			+ rel + '] - (r) RETURN properties (r)')
-		return tx.run(Cypher_get_connected, value=self.value)
+	def _get_connected(self, tx, key, value, rel):
+		Cypher_get_connected = (
+			'MATCH (n: ' + self.node_label + ' {' + key + '_lower:toLower($value)}) <- [:'
+			+ rel + '] - (r) RETURN properties (r)'
+		)
+		return tx.run(Cypher_get_connected, value = value)
 	#get selected nodes (forms)
 	def get_selected(self, selection, keyby):
 		all_nodes = self.get_nodes()

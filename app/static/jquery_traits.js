@@ -1,28 +1,29 @@
-//Add select all checkboxes to the form
-$('dl').each( function () {
-	//get ID from ul element
-	id = $(this).find('dd > ul').attr('id');
-	//expand collapse trait details on click label
-	$(this).find('dt > label').click(function () {
-		$(this).parent().next().toggle();
-	});
-	//and start collapsed
-	$(this).find('dd').hide()
-	//add checkbox
-	$(this).find('dt > label').before("<input id='select_all_" + id + "' type='checkbox'>");
-	//on checkbox change toggle children true/false
-	$('#select_all_' + id).change(function () {
-		if (this.checked) { 
-			$(this).parent().next().find("input").prop("checked", true);
-		}
-		else {
-			$(this).parent().next().find("input").prop("checked", false);
-		}
-	})
-})
+////Add select all checkboxes to the form
+//$('dl').each( function () {
+//	//get ID from ul element
+//	id = $(this).find('dd > ul').attr('id');
+//	//expand collapse trait details on click label
+//	$(this).find('dt > label').click(function () {
+//		$(this).parent().next().toggle();
+//	});
+//	//and start collapsed
+//	$(this).find('dd').hide()
+//	//add checkbox
+//	$(this).find('dt > label').before("<input id='select_all_" + id + "' type='checkbox'>");
+//	//on checkbox change toggle children true/false
+//	$('#select_all_' + id).change(function () {
+//		if (this.checked) {
+//			$(this).parent().next().find("input").prop("checked", true);
+//			console.log(id);
+//		}
+//		else {
+//			$(this).parent().next().find("input").prop("checked", false);
+//		}
+//	})
+//})
 
 //expand the general tab as defaults are set (and as example)
-$('#select_all_general').parent().next().show();
+//$('#select_all_general').parent().next().show();
 
 ////generate traits.csv
 //$('#submit_traits').click( function(e) {

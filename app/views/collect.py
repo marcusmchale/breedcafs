@@ -111,7 +111,7 @@ def add_tissue():
 	else:
 		try:
 			form = AddTissueForm()
-			text_tissue = request.form['text_tissue'].lower().strip()
+			text_tissue = request.form['text_tissue'].strip()
 			if form.validate_on_submit():
 				find_tissue = Lists('Tissue').find_node(text_tissue)
 				if find_tissue:
@@ -150,7 +150,7 @@ def add_storage():
 	else:
 		try:
 			form = AddStorageForm()
-			text_storage = request.form['text_storage'].lower().strip()
+			text_storage = request.form['text_storage'].strip()
 			if form.validate_on_submit():
 				find_storage = Lists('Storage').find_node(text_storage)
 				if find_storage:
