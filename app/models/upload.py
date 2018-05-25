@@ -70,20 +70,7 @@ def _submit(
 		neo4j_time
 ):
 	if submission_type == 'FB':
-		if level == 'plot':
-			query = Cypher.upload_FB_plot
-		elif level == 'block':
-			query = Cypher.upload_FB_block
-		elif level == 'tree':
-			query = Cypher.upload_FB_tree
-		elif level == 'branch':
-			query = Cypher.upload_FB_branch
-		elif level == 'leaf':
-			query = Cypher.upload_FB_leaf
-		elif level == 'sample':
-			query = Cypher.upload_FB_sample
-		else:
-			query = 'MATCH (d:Data) return d.found'
+		query = Cypher.upload_FB
 		result = tx.run(
 			query,
 			username=username,

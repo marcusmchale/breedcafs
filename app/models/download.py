@@ -545,11 +545,12 @@ class Download(User):
 			query += (
 				' )<-[IS_IN]-(p:Plot) '
 				' RETURN {'
-				' UID : p.uid, '
-				' Plot : p.name, '
-				' Farm : f.name, '
-				' Region : r.name, '
-				' Country : c.name }'
+				'	UID: p.uid, '
+				'	Plot: p.name, '
+				'	Farm: f.name, '
+				'	Region: r.name, '
+				'	Country: c.name '
+				' } '
 				' ORDER BY p.uid'
 			)
 			# make the file and return a dictionary with filename, file_path and file_size

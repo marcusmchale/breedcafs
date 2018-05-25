@@ -121,13 +121,12 @@ $('dl').each( function () {
 	$(this).find('dt > label').before("<input id='select_all_" + trait_id + "' type='checkbox'>");
 	//on checkbox change toggle children true/false
 	$('[id="select_all_' + trait_id + '"]').change(function () {
+		$(this).parent().find('label').css('text-decoration', 'none');
 		if (this.checked) {
 			$(this).parent().next().find("input").prop("checked", true);
-			$(this).find('label').css('text-decoration', 'underline');
 		}
 		else {
 			$(this).parent().next().find("input").prop("checked", false);
-			$(this).find('label').css('text-decoration', 'none');
 		}
 	});
 	//make trait groups underlined if any items checked within

@@ -102,7 +102,6 @@ class tissues(MethodView):
 				flash("Database unavailable")
 				return redirect(url_for('index'))
 
-
 @app.route('/add_tissue', methods=["POST"])
 def add_tissue():
 	if 'username' not in session:
@@ -125,7 +124,6 @@ def add_tissue():
 			flash("Database unavailable")
 			return redirect(url_for('index'))
 
-
 class storage_methods(MethodView):
 	def get(self):
 		if 'username' not in session:
@@ -140,7 +138,6 @@ class storage_methods(MethodView):
 			except ServiceUnavailable:
 				flash("Database unavailable")
 				return redirect(url_for('index'))
-
 
 @app.route('/add_storage', methods=["POST"])
 def add_storage():
@@ -163,7 +160,6 @@ def add_storage():
 		except ServiceUnavailable:
 			flash("Database unavailable")
 			return redirect(url_for('index'))
-
 
 @app.route('/add_samples', methods=['GET', 'POST'])
 def add_samples():

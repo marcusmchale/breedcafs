@@ -55,6 +55,11 @@ indexes = [
 	{'label': 'Region', 'property': 'name_lower'},
 	{'label': 'Farm', 'property': 'name_lower'},
 	{'label': 'Plot', 'property': 'name_lower'},
+	{'label': 'Block', 'property': 'id'},
+	{'label': 'Tree', 'property': 'id'},
+	{'label': 'Branch', 'property': 'id'},
+	{'label': 'Leaf', 'property': 'id'},
+	{'label': 'Sample', 'property': 'id'},
 	{'label': 'Data', 'property': 'time'}
 ]
 

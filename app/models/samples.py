@@ -85,13 +85,13 @@ class Samples:
 		#match samples by location in the graph
 		q = ' MATCH (country:Country '
 		if parameters['country']:
-			q = q + ' {name:$country} '
+			q = q + ' {name_lower:toLower($country)} '
 		q = q + ')<-[:IS_IN]-(region:Region '
 		if parameters['region']:
-			q = q + ' {name:$region} '
+			q = q + ' {name_lower:toLower($region)} '
 		q = q + ')<-[:IS_IN]-(farm:Farm '
 		if parameters['farm']:
-			q = q + '{name:$farm} '
+			q = q + '{name_lower:toLower($farm)} '
 		q = q + ')<-[:IS_IN]-(plot:Plot '
 		if parameters['plotID']:
 			q = q + ' {uid:$plotID}'
@@ -103,11 +103,11 @@ class Samples:
 			+ ' -[:OF_TISSUE]->(tissue:Tissue ')
 		# and if tissue specified filter by tissue
 		if parameters['tissue']:
-			q = q + ' {name:$tissue}'
+			q = q + ' {name_lower:toLower($tissue)}'
 		# and same for storage
 		q = q + '), (TiSt)-[:STORED_IN]-(storage:Storage '
 		if parameters['storage']:
-			q = q + ' {name:$storage} '
+			q = q + ' {name_lower:toLower($storage)} '
 		# find the tree from each samples
 		q = (q + '), (sample)-[:FROM_TREE]->(:TreeSamples) '
 			+ ' -[:FROM_TREE]->(tree:Tree) ')
@@ -135,23 +135,16 @@ class Samples:
 			filters_list.append('sample.replicates >= $replicates') if parameters['replicates'] != '' else None
 			for filter in filters_list:
 				q = q + ' ' + filter + ' AND'
-		#get tree name
-		q = (q + ' OPTIONAL MATCH (tree)'
-				' <-[:FROM_TREE]-(treename:TreeTreeTrait)'
-				' -[:FOR_TRAIT]->(:PlotSampleTrait) '
-				' -[:FOR_TRAIT]->(:TreeTrait {name:"name"}) '
-			' OPTIONAL MATCH (treename) '
-				' <-[:DATA_FOR]-(d:Data) ' )
 		# get block name
 		q = (q + ' OPTIONAL MATCH (tree) '
-			' -[:IS_IN]->(:BlockTrees) '
+			' -[:IS_IN {current: True}]->(:BlockTrees) '
 			' -[:IS_IN]->(block:Block) ')
 		# get branch ID
 		q = (q + ' OPTIONAL MATCH (sample) '
-			 	' -[:FROM_BRANCH]->(branch:Branch) ')
+			 	' -[:FROM_BRANCH {current : True}]->(branch:Branch) ')
 		 # get leaf ID
 		q = (q + ' OPTIONAL MATCH (sample) ' 
-			 ' -[:FROM_LEAF]->(leaf:Leaf) ')
+			 ' -[:FROM_LEAF {current: True}]->(leaf:Leaf) ')
 		# build the return statement
 		q = q + (
 			' RETURN { '
@@ -163,7 +156,7 @@ class Samples:
 				' PlotID : plot.uid, '
 				' Block : block.name, '
 				' BlockID : block.id, '
-				' TreeName : d.value, '
+				' TreeCustomID : tree.custom_id, '
 				' TreeID : tree.id, '
 				' BranchID : branch.id, '
 				' LeafID : leaf.id, '
