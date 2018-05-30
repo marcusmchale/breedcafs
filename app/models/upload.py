@@ -23,7 +23,6 @@ def async_submit(
 		username,
 		filename,
 		submission_type,
-		level,
 		traits = [],
 		form_user = 'unknown',
 		form_date = 'unknown',
@@ -37,7 +36,6 @@ def async_submit(
 				username,
 				filename,
 				submission_type,
-				level,
 				traits,
 				form_user,
 				form_date,
@@ -62,7 +60,6 @@ def _submit(
 		username,
 		filename,
 		submission_type,
-		level,
 		traits,
 		form_user,
 		form_date,
@@ -78,16 +75,7 @@ def _submit(
 			submission_type=submission_type
 		)
 	else: #submission_type == 'table':
-			if level == 'sample':
-				query = 'MATCH (d:Data) return d.found'
-			elif level == 'tree':
-				query = Cypher.upload_table_tree
-			elif level == 'block':
-				query = Cypher.upload_table_block
-			elif level == 'plot':
-				query = Cypher.upload_table_plot
-			else:
-				query = 'MATCH (d:Data) return d.found'
+			query = Cypher.upload_table
 			result = tx.run(
 				query,
 				username = username,

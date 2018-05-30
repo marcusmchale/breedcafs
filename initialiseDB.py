@@ -69,26 +69,21 @@ indexes = [
 # then create the constraint on that unique label
 
 constraints = [
-	{'node':'User', 'property':'username_lower', 'constraint':'IS UNIQUE'},
-	{'node':'Partner', 'property':'name_lower', 'constraint':'IS UNIQUE'},
-	{'node':'FarmTrait','property':'name_lower', 'constraint':'IS UNIQUE'},
-	{'node':'PlotTrait', 'property':'name_lower', 'constraint':'IS UNIQUE'},
-	{'node':'BlockTrait', 'property':'name_lower', 'constraint':'IS UNIQUE'},
-	{'node':'TreeTrait', 'property':'name_lower', 'constraint':'IS UNIQUE'},
-	{'node':'BranchTrait', 'property':'name_lower', 'constraint':'IS UNIQUE'},
-	{'node':'LeafTrait', 'property':'name_lower', 'constraint':'IS UNIQUE'},
-	{'node':'SampleTrait', 'property':'name_lower', 'constraint':'IS UNIQUE'},
-	{'node':'Plot', 'property':'uid', 'constraint':'IS UNIQUE'},
-	{'node':'Block', 'property':'uid', 'constraint':'IS UNIQUE'},
-	{'node':'Tree', 'property':'uid', 'constraint':'IS UNIQUE'},
-	{'node':'Branch', 'property':'uid', 'constraint':'IS UNIQUE'},
-	{'node':'Leaf', 'property':'uid', 'constraint':'IS UNIQUE'},
-	{'node':'Sample', 'property':'uid', 'constraint':'IS UNIQUE'},
-	{'node':'Counter', 'property':'uid', 'constraint':'IS UNIQUE'},
-	{'node':'Country', 'property':'name_lower', 'constraint':'IS UNIQUE'},
-	{'node':'Storage', 'property':'name_lower', 'constraint':'IS UNIQUE'},
-	{'node':'Tissue', 'property':'name_lower', 'constraint':'IS UNIQUE'},
-	{'node':'Variety', 'property':'name_lower', 'constraint':'IS UNIQUE'}
+	{'node': 'User', 'property': 'username_lower', 'constraint': 'IS UNIQUE'},
+	{'node': 'Partner', 'property': 'name_lower', 'constraint': 'IS UNIQUE'},
+	{'node': 'FarmTrait','property': 'name_lower', 'constraint': 'IS UNIQUE'},
+	{'node': 'PlotTrait', 'property': 'name_lower', 'constraint': 'IS UNIQUE'},
+	{'node': 'BlockTrait', 'property': 'name_lower', 'constraint': 'IS UNIQUE'},
+	{'node': 'TreeTrait', 'property': 'name_lower', 'constraint': 'IS UNIQUE'},
+	{'node': 'BranchTrait', 'property': 'name_lower', 'constraint': 'IS UNIQUE'},
+	{'node': 'LeafTrait', 'property': 'name_lower', 'constraint': 'IS UNIQUE'},
+	{'node': 'SampleTrait', 'property': 'name_lower', 'constraint': 'IS UNIQUE'},
+	{'node': 'Item', 'property': 'uid', 'constraint': 'IS UNIQUE'},
+	{'node': 'Counter', 'property': 'uid', 'constraint': 'IS UNIQUE'},
+	{'node': 'Country', 'property': 'name_lower', 'constraint': 'IS UNIQUE'},
+	{'node': 'Storage', 'property': 'name_lower', 'constraint': 'IS UNIQUE'},
+	{'node': 'Tissue', 'property': 'name_lower', 'constraint': 'IS UNIQUE'},
+	{'node': 'Variety', 'property': 'name_lower', 'constraint': 'IS UNIQUE'}
 ]
 
 #functions

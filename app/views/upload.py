@@ -82,56 +82,46 @@ def upload_submit():
 							return jsonify(
 								{"submitted": "This file does not contain a 'UID' header. "
 											  "Please use only upload supported files"
-											  "Please use only upload supported files"
 								 }
 							)
 						#now check UID's for consistency (already at second line after reading into file_dict)
-						uid_list = [i['UID'] for i in file_dict]
-						#check if UID field is empty or contains whitespace in any rows
-						if True in [any([i.isspace(), not i]) for i in uid_list]:
-							return jsonify(
-								{"submitted": "Please delete any empty rows before submitting"}
-							)
-						#if UIDs are all integers then plot data, else classify by letter
-						if not False in [uid.isdigit() for uid in uid_list]:
-							level = "plot"
-						else:
-							level_list = [uid[uid.index("_") + 1] for uid in uid_list if any(
+						uid_list = [(i['UID']).strip() for i in file_dict]
+						# check if all UIDs are valid (formatting only)
+						for i in uid_list:
+							i_split = i.split("_")
+							# check if UID field is empty or contains whitespace in any rows
+							if any(
 								[
-								"_B" in uid,
-								"_T" in uid,
-								"_R" in uid,
-								"_L" in uid,
-								"_S" in uid
-								])]
-							#ensure only one level per file
-							if len(set(level_list)) > 1:
+									i.isspace(),
+									not i,
+									not i_split[0].isdigit(),
+								]
+							):
 								return jsonify(
-									{"submitted": "This file appears to contains mixed trait levels. "
-												  "Please use only upload supported files"}
+									{"submitted": "Please ensure all rows have a valid UID"}
 								)
-							if level_list[0] == "B":
-								level = "block"
-							elif level_list[0] == "T":
-								level = "tree"
-							elif level_list[0] == "R":
-								level = "branch"
-							elif level_list[0] == "L":
-								level = "leaf"
-							elif level_list[0] == "S":
-								level = "sample"
-							else:
-								return jsonify({"submitted": "This file does not seem to contain BreedCAFS unique ID's"
-															 "Please use only upload supported files"
-												})
+							if len(i_split) > 1:
+								if len(i_split) >2:
+									return jsonify(
+										{"submitted": "Please ensure all rows have a valid UID"}
+									)
+								if not any(
+									[
+										i_split[1][0].upper() in ["B","T","R","L","S"],
+										i_split[1].isdigit()
+									]
+								):
+									return jsonify(
+										{"submitted": "Please ensure all rows have a valid UID"}
+									)
 						if request.form['submission_type'] == 'FB':
-							required = set(['UID', 'trait', 'value', 'timestamp', 'person', 'location', 'number'])
+							required = set(['UID', 'trait', 'value', 'timestamp', 'person', 'location'])
 							if not required.issubset(file_dict.fieldnames):
 								return jsonify({"submitted": "This file does not look like a FieldBook exported CSV file"
 															 "Please use check the submission type"
 												})
 							# as an asynchonous function with celery, result will be stored in redis and accessible from the status/task_id endpoint
-							task = async_submit.apply_async(args=[username, filename, subtype, level])
+							task = async_submit.apply_async(args=[username, filename, subtype])
 						elif request.form['submission_type'] == 'table':
 							required = set(['UID'])
 							if not required.issubset(file_dict.fieldnames):
@@ -178,7 +168,6 @@ def upload_submit():
 								username,
 								filename,
 								subtype,
-								level,
 								traits,
 								form_user,
 								form_date,
