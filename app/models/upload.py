@@ -23,11 +23,7 @@ def async_submit(
 		username,
 		filename,
 		submission_type,
-		traits = [],
-		form_user = 'unknown',
-		form_date = 'unknown',
-		form_time = 'unknown',
-		neo4j_time = 0
+		traits = []
 ):
 	try:
 		with get_driver().session() as neo4j_session:
@@ -37,10 +33,6 @@ def async_submit(
 				filename,
 				submission_type,
 				traits,
-				form_user,
-				form_date,
-				form_time,
-				neo4j_time
 			)
 			with app.app_context():
 					#send result of merger in an email
@@ -61,10 +53,6 @@ def _submit(
 		filename,
 		submission_type,
 		traits,
-		form_user,
-		form_date,
-		form_time,
-		neo4j_time
 ):
 	if submission_type == 'FB':
 		query = Cypher.upload_FB
@@ -75,17 +63,13 @@ def _submit(
 			submission_type=submission_type
 		)
 	else: #submission_type == 'table':
-			query = Cypher.upload_table
-			result = tx.run(
-				query,
-				username = username,
-				filename = ("file:///" + username + '/' + filename),
-				submission_type = submission_type,
-				traits = traits,
-				form_user = form_user,
-				form_date = form_date,
-				form_time = form_time,
-				neo4j_time = neo4j_time
+		query = Cypher.upload_table
+		result = tx.run(
+			query,
+			username = username,
+			filename = ("file:///" + username + '/' + filename),
+			submission_type = submission_type,
+			traits = traits,
 			)
 	fcount=0
 	ncount=0

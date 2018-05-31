@@ -58,7 +58,7 @@ def upload_submit():
 					#using first 10 rows of data to check for consistency and to determine the "level" of data in this file (sample/tree/block)
 					#avoiding reading in the whole file to check in case it is large
 				with open(file_path) as file:
-					#try:
+					try:
 						#TODO implement CSV kit checks - in particular csvstat to check field length (avoid stray quotes)
 						#create a temporary file in memory sampling the first 2 rows from the uploaded file
 						#sample_file = StringIO()
@@ -126,56 +126,28 @@ def upload_submit():
 							required = set(['UID'])
 							if not required.issubset(file_dict.fieldnames):
 								return jsonify({"submitted": "This file appears to be missing the UID collumn"})
+
+							
 							if not len(set(uid_list)) == len(uid_list):
 								return jsonify({
 									"submitted": "This file contains duplicate rows for unique ID's. "
 												 "This is not supported in table format"
 								})
+
+
 							#note: to return to the start of the reader object you have to seek(0) on the read file
 							file.seek(0)
 							#just passing in the full list of keys as we later do a match in the database for which are relevant traits
 							traits = [key for key in file_dict.next()]
-							#get and format form data for person and time of data collection
-							form_user = form.user.data if form.user.data != None else 'unknown'
-							if all([form.date.data != None, form.time.data != None]):
-								form_date = form.date.data
-								form_time = form.time.data
-								neo4j_time = int(
-									(datetime.combine(
-										form_date,
-										datetime.time(form_time)
-									)
-									 - datetime(1970, 1, 1)).total_seconds() * 1000
-								)
-							elif all([form.date.data != None, form.time.data == None]):
-								form_date = form.date.data
-								form_time = 'unknown'
-								#calculate for middle of the day if not noted
-								neo4j_time = int(
-									(datetime.combine(
-										form_date,
-										datetime_time(12, 00)
-									)
-									 - datetime(1970, 1, 1)).total_seconds() * 1000
-								)
-							else:
-								# to ensure all data points have a time field give them a time of now if not specified
-								neo4j_time = int((datetime.now() - datetime(1970, 1, 1)).total_seconds() * 1000)
-								form_date = 'unknown'
-								form_time = 'unknown'
 							# as an asynchonous function with celery, result will be stored in redis and accessible from the status/task_id endpoint
 							task = async_submit.apply_async(args=[
 								username,
 								filename,
 								subtype,
-								traits,
-								form_user,
-								form_date,
-								form_time,
-								neo4j_time
+								traits
 							])
-					#except:
-						#return jsonify({'submitted':'An unknown error has occurred please check the file format'})
+					except:
+						return jsonify({'submitted':'An unknown error has occurred please check the file format'})
 				return jsonify({'submitted': ('File has been uploaded and will be merged into the database. '
 						' <br><br> Depending on the size of the file this may take some time so you will receive an email including a summary of the update. '
 						' <br><br> If you wait here you will also get feedback on this page.'), 
