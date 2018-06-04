@@ -32,7 +32,7 @@ def async_submit(
 				username,
 				filename,
 				submission_type,
-				traits,
+				traits
 			)
 			with app.app_context():
 					#send result of merger in an email
@@ -52,10 +52,10 @@ def _submit(
 		username,
 		filename,
 		submission_type,
-		traits,
+		traits
 ):
 	if submission_type == 'FB':
-		query = Cypher.upload_FB
+		query = Cypher.upload_fb
 		result = tx.run(
 			query,
 			username=username,
@@ -69,10 +69,10 @@ def _submit(
 			username = username,
 			filename = ("file:///" + username + '/' + filename),
 			submission_type = submission_type,
-			traits = traits,
+			traits = traits
 			)
-	fcount=0
-	ncount=0
+	fcount = 0
+	ncount = 0
 	for record in result:
 		if record['d.found'] == True:
 			fcount = fcount + 1
