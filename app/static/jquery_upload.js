@@ -3,17 +3,6 @@ remove_flash = function() {
 }
 
 $('#submission_type').val('FB');
-$('#table_details').hide()
-
-//hide boxes that aren't relevant
-$('#submission_type').change(function () {
-    remove_flash();
-	if (this.value === 'FB') {
-		$('#table_details').hide()
-	} else {
-		$('#table_details').show();
-	}
-});
 
 //generate traits.csv
 $('#upload_submit').click( function(e) {
@@ -66,8 +55,10 @@ $('#upload_submit').click( function(e) {
 					    if (response.status === 'SUCCESS') { load_graph() };
 					}
 					if (response.hasOwnProperty('result')) {
-						if (typeof response.result !== "undefined") {
-							result_text = String(response.result[0]) + " new records submitted, " + String(response.result[1]) + " records already found"
+						if (typeof response.result['new_data'] !== "undefined") {
+							result_text = String(response.result['new_data']) + " new records submitted, "
+							result_text += String(response.result['resubmissions']) + " records already found"
+							result_text += String()
 							flash_result = "<div id='upload_submit_flash' class='flash'> " + result_text +  "</div>";
 							$("#upload_submit_flash").replaceWith(flash_result);
 						}

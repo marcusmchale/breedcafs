@@ -71,11 +71,4 @@ def _submit(
 			submission_type = submission_type,
 			traits = traits
 			)
-	fcount = 0
-	ncount = 0
-	for record in result:
-		if record['d.found'] == True:
-			fcount = fcount + 1
-		elif record['d.found'] == False:
-			ncount = ncount + 1
-	return [ncount, fcount]
+	return [record[0] for record in result]

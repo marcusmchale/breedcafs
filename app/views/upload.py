@@ -41,7 +41,6 @@ def upload():
 			flash("Database unavailable")
 			return redirect(url_for('index'))
 
-
 @app.route('/upload_submit', methods=['POST'])
 def upload_submit():
 	if 'username' not in session:
@@ -62,9 +61,6 @@ def upload_submit():
 				filename = secure_filename(time + file.filename)
 				file_path = os.path.join(app.instance_path, app.config['UPLOAD_FOLDER'], username, filename)
 				file.save(file_path)
-				#check the csv file conforms to expectations of submission type
-					#using first 10 rows of data to check for consistency and to determine the "level" of data in this file (sample/tree/block)
-					#avoiding reading in the whole file to check in case it is large
 				try:
 					with open(file_path) as file:
 						# TODO implement CSV kit checks - in particular csvstat to check field length (avoid stray quotes)
@@ -108,7 +104,7 @@ def upload_submit():
 							return jsonify(
 								{"submitted": "This file does not contain a 'UID' header. "
 											  "Please use only upload supported files"
-								 }
+								}
 							)
 						# now check UID's for consistency (already at second line after reading into file_dict)
 						uid_list = [(i['uid']).strip() for i in file_dict]
@@ -174,8 +170,34 @@ def upload_submit():
 		else:
 			return jsonify(form.errors)
 
-
 @app.route('/status/<task_id>/')
 def taskstatus(task_id):
 	task = async_submit.AsyncResult(task_id)
-	return jsonify({'status': task.status, 'result':task.get()})
+	if task.status == 'SUCCESS':
+		result = task.get()
+		conflicts = []
+		resubmissions = 0
+		new_data = 0
+		for d in result:
+			if d["found"]:
+				if d["attempted_overwrite"] == d["value"]:
+					resubmissions += 1
+				else:
+					conflicts = conflicts + [d]
+			else:
+				new_data += 1
+		# create a conflicts file and a link to it for result.
+		# create procedure for admins to overwrite on upload
+			# this will create a new data point with the admin as the user uploaded and updated relationships where relevant
+			# link from the old data-point with a flag "replaced" by to the new one
+				# change relationship to Item and Trait (no longer DATA_FOR)
+		result = {
+			"conflicts": conflicts,
+			"resubmissions": resubmissions,
+			"new_data": new_data
+		}
+		import pdb;
+		pdb.set_trace()
+	else:
+		return jsonify({'status': task.status})
+	return jsonify({'status': task.status, 'result':result})

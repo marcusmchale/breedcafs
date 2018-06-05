@@ -457,24 +457,6 @@ class UploadForm(FlaskForm):
 	submission_type =  SelectField('Submission type:', [InputRequired()],
 		choices = sorted([('FB','Field Book CSV'),('table', 'Table Template CSV')], key=lambda tup: tup[1]))
 	file = FileField('Select a file:', [FileRequired()])
-	user = StringField(
-		'Person (field staff/lab member)',
-		[Optional(),
-		Regexp('([^\x00-\x7F]|\w)+', message='Name contains illegal characters'),
-		Length(min=1, max=50, message='Maximum 50 characters')],
-		filters=[strip_filter],
-		description = "User"
-	)
-	date = DateField(
-		'Date (YYYY-mm-dd): ',
-		[Optional()],
-		format='%Y-%m-%d',
-		description = 'Date')
-	time =DateTimeField(
-		'Time (HH:mm)',
-		[Optional()],
-		format = '%H:%M'
-	)
 	upload_submit = SubmitField('Upload')
 
 #download
