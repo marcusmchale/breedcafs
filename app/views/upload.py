@@ -4,7 +4,8 @@ from app import app
 from flask import ( flash, redirect, url_for, request, session, render_template, jsonify )
 from app.models import (
 	Upload,
-	async_submit
+	async_submit,
+	DictReaderInsensitive
 )
 from app.forms import UploadForm
 from werkzeug.utils import secure_filename
@@ -13,18 +14,6 @@ from datetime import (
 )
 import unicodecsv as csv 
 
-class DictReaderInsensitive(csv.DictReader):
-	#overwrites csv.fieldnames property so uses without surrounding whitespace and in lowercase
-	@property
-	def fieldnames(self):
-		return [field.strip().lower() for field in csv.DictReader.fieldnames.fget(self)]
-	def next(self):
-		return DictInsensitive(csv.DictReader.next(self))
-
-class DictInsensitive(dict):
-	# This class overrides the __getitem__ method to automatically strip() and lower() the input key
-	def __getitem__(self, key):
-		return dict.__getitem__(self, key.strip().lower())
 
 @app.route('/upload', methods=['GET', 'POST'])
 def upload():
@@ -54,10 +43,10 @@ def upload_submit():
 			file = form.file.data
 			subtype = form.submission_type.data
 			if Upload(username, file.filename).allowed_file():
-				#create user upload path if not found
+				# create user upload path if not found
 				if not os.path.isdir(os.path.join(app.instance_path, app.config['UPLOAD_FOLDER'], username)):
 					os.mkdir(os.path.join(app.instance_path, app.config['UPLOAD_FOLDER'], username))
-				#prepare a secure filename to save with
+				# prepare a secure filename to save with
 				filename = secure_filename(time + file.filename)
 				file_path = os.path.join(app.instance_path, app.config['UPLOAD_FOLDER'], username, filename)
 				file.save(file_path)
@@ -70,20 +59,7 @@ def upload_submit():
 						if not all((dialect.delimiter == ',', dialect.quotechar == '"')):
 							return jsonify(
 								{'submitted': 'Please upload comma (,) separated file with quoted (") fields' })
-						# create a dict object for further parsing
-						file.seek(0)
-						file_dict = DictReaderInsensitive(file)
-						# clean up the header whitespace and case
-						header = str()
-						first = True
-						for i in file_dict.fieldnames:
-								if first:
-									first = False
-								else:
-									header = header + ','
-								header = header + '"' + i + '"'
-						header = header + '\n'
-						# change the header to lower case for matching
+						# clean up the csv file by passing through dict reader and rewriting
 						temp_file_path = os.path.join(
 							app.instance_path,
 							app.config['UPLOAD_FOLDER'],
@@ -91,12 +67,29 @@ def upload_submit():
 							filename + "_temp"
 						)
 						with open(temp_file_path, "w") as temp_file:
-							temp_file.write(header)
 							file.seek(0)
-							file.readline()
-							shutil.copyfileobj(file, temp_file)
+							# this dict reader lowers case and trims whitespace on all headers
+							file_dict = DictReaderInsensitive(
+								file,
+								skipinitialspace=True
+							)
+							temp_csv = csv.DictWriter(
+								temp_file,
+								fieldnames = file_dict.fieldnames,
+								quoting = csv.QUOTE_ALL
+							)
+							temp_csv.writeheader()
+							for row in file_dict:
+								# remove rows without entries
+								if any(field.strip() for field in row):
+									for field in file_dict.fieldnames:
+										row[field] = row[field].strip()
+									temp_csv.writerow(row)
+						# back up the original file
+						shutil.move(file_path, file_path + ".bak")
+						# replace the original file with the filtered version
 						shutil.move(temp_file_path, file_path)
-					# re-open the file now we have checked format and sanitised the header
+					# re-open the cleaned up file
 					with open(file_path) as file:
 						file_dict = DictReaderInsensitive(file)
 						#first simply check the file contains UIDs
@@ -141,7 +134,7 @@ def upload_submit():
 							if not required.issubset(file_dict.fieldnames):
 								return jsonify({"submitted": "This file does not look like a FieldBook exported CSV file"
 															 "Please use check the submission type"
-												})
+									})
 							# as an asynchonous function with celery, result will be stored in redis and accessible from the status/task_id endpoint
 							task = async_submit.apply_async(args=[username, filename, subtype])
 						elif request.form['submission_type'] == 'table':
@@ -173,31 +166,8 @@ def upload_submit():
 @app.route('/status/<task_id>/')
 def taskstatus(task_id):
 	task = async_submit.AsyncResult(task_id)
-	if task.status == 'SUCCESS':
-		result = task.get()
-		conflicts = []
-		resubmissions = 0
-		new_data = 0
-		for d in result:
-			if d["found"]:
-				if d["attempted_overwrite"] == d["value"]:
-					resubmissions += 1
-				else:
-					conflicts = conflicts + [d]
-			else:
-				new_data += 1
-		# create a conflicts file and a link to it for result.
-		# create procedure for admins to overwrite on upload
-			# this will create a new data point with the admin as the user uploaded and updated relationships where relevant
-			# link from the old data-point with a flag "replaced" by to the new one
-				# change relationship to Item and Trait (no longer DATA_FOR)
-		result = {
-			"conflicts": conflicts,
-			"resubmissions": resubmissions,
-			"new_data": new_data
-		}
-		import pdb;
-		pdb.set_trace()
-	else:
+	if task.status != 'SUCCESS':
 		return jsonify({'status': task.status})
-	return jsonify({'status': task.status, 'result':result})
+	else:
+		result = task.get()
+		return jsonify({'status': task.status, 'result':result})

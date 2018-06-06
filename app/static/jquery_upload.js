@@ -51,7 +51,7 @@ $('#upload_submit').click( function(e) {
 					if (response.hasOwnProperty('status')) {
 						flash_status = "<div id='upload_submit_flash' class='flash'> " + response.status + "</div>";
 						$("#upload_submit_flash").replaceWith(flash_status);
-						if (response.status !== 'SUCCESS') { poll(task_id) };
+						if (response.status === 'PENDING') { poll(task_id) };
 					    if (response.status === 'SUCCESS') { load_graph() };
 					}
 					if (response.hasOwnProperty('result')) {

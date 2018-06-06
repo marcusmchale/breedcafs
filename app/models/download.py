@@ -3,7 +3,6 @@ from app.cypher import Cypher
 from user import User
 from lists import Lists
 from samples import Samples
-from config import ALLOWED_EXTENSIONS
 from neo4j_driver import (
 	get_driver,
 	neo4j_query
@@ -12,7 +11,6 @@ from flask import (
 	session,
 	url_for
 )
-import cStringIO
 import unicodecsv as csv
 from datetime import datetime
 from app.models import (
@@ -513,7 +511,8 @@ class Download(User):
 			"file_size":file_size }
 	def _get_csv(self, tx, query):
 		#perform transaction and return the simplified result (remove all the transaction metadata and just keep the result map)
-		return [record[0] for record in tx.run(query,
+		return [record[0] for record in tx.run(
+			query,
 			username = self.username,
 			country = self.country,
 			region = self.region,
@@ -522,7 +521,8 @@ class Download(User):
 			blockUID = self.blockUID,
 			traits = self.traits,
 			start_time = self.start_time,
-			end_time = self.end_time)]
+			end_time = self.end_time
+		)]
 	def get_index_csv(
 			self,
 			form_data,
