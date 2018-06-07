@@ -144,7 +144,7 @@ def upload_submit():
 							#note: to return to the start of the reader object you have to seek(0) on the read file
 							file.seek(0)
 							#just passing in the full list of keys as we later do a match in the database for which are relevant traits
-							traits = list(set([key for key in file_dict.next()]).difference(set(required)))
+							traits = [i for i in file_dict.fieldnames if not i in required]
 							# as an asynchonous function with celery, result will be stored in redis and accessible from the status/task_id endpoint
 							task = async_submit.apply_async(args=[
 								username,
