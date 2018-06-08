@@ -4,7 +4,6 @@ remove_flash = function() {
 
 $('#submission_type').val('FB');
 
-//generate traits.csv
 $('#upload_submit').click( function(e) {
 	e.preventDefault();
 	remove_flash();
@@ -23,7 +22,6 @@ $('#upload_submit').click( function(e) {
 				flash_submitted = "<div id='upload_submit_flash' class='flash'> " + response.submitted + " </div>";
 				$("#upload_submit_flash").replaceWith(flash_submitted);
 				if (response.hasOwnProperty('task_id')) {
-				    $('svg').empty();
 				    poll(response.task_id);
 				}
 			} else {
@@ -48,12 +46,15 @@ $('#upload_submit').click( function(e) {
 				type: 'GET',
 				url: "/status/" + task_id +"/",
 				success: function(response) {
+					console.log(response.result);
 					if (response.hasOwnProperty('status')) {
 						flash_status = "<div id='upload_submit_flash' class='flash'> " + response.status + "</div>";
 						$("#upload_submit_flash").replaceWith(flash_status);
 						if (response.status === 'PENDING') { poll(task_id) };
+						if (response.status === 'ERRORS') { $('#upload_submit').after(response.result) }
 					    if (response.status === 'SUCCESS') { load_graph() };
 					}
+
 					if (response.hasOwnProperty('result')) {
 						if (typeof response.result['new_data'] !== "undefined") {
 							result_text = String(response.result['new_data']) + " new records submitted, "

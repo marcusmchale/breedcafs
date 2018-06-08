@@ -1,7 +1,6 @@
-import os, shutil
-from app import app
-#import celery
-from flask import ( flash, redirect, url_for, request, session, render_template, jsonify )
+import os
+from app import app, ServiceUnavailable
+from flask import ( flash, redirect, url_for, request, session, render_template, jsonify)
 from app.models import (
 	Upload,
 	async_submit,
@@ -23,10 +22,12 @@ def upload():
 	else:
 		try:
 			form = UploadForm()
-			return render_template('upload.html', 
+			return render_template(
+				'upload.html',
 				form = form,
-				title = 'Upload')
-		except:
+				title = 'Upload'
+			)
+		except ServiceUnavailable:
 			flash("Database unavailable")
 			return redirect(url_for('index'))
 
@@ -43,92 +44,48 @@ def upload_submit():
 			file = form.file.data
 			subtype = form.submission_type.data
 			if Upload(username, file.filename).allowed_file():
-				# create user upload path if not found
-				if not os.path.isdir(os.path.join(app.instance_path, app.config['UPLOAD_FOLDER'], username)):
-					os.mkdir(os.path.join(app.instance_path, app.config['UPLOAD_FOLDER'], username))
-				# prepare a secure filename to save with
-				filename = secure_filename(time + file.filename)
-				file_path = os.path.join(app.instance_path, app.config['UPLOAD_FOLDER'], username, filename)
-				file.save(file_path)
 				try:
-					with open(file_path) as file:
+					# create user upload path if not found
+					if not os.path.isdir(os.path.join(app.instance_path, app.config['UPLOAD_FOLDER'], username)):
+						os.mkdir(os.path.join(app.instance_path, app.config['UPLOAD_FOLDER'], username))
+					# prepare a secure filename to save with
+					filename = secure_filename(time + file.filename)
+					uploaded_file_path = os.path.join(app.instance_path, app.config['UPLOAD_FOLDER'], username, filename)
+					file.save(uploaded_file_path)
+					with open(uploaded_file_path) as uploaded_file:
 						# TODO implement CSV kit checks - in particular csvstat to check field length (avoid stray quotes)
 						# now get the dialect and check it conforms to expectations
-						file.seek(0)
-						dialect = csv.Sniffer().sniff(file.read())
+						uploaded_file.seek(0)
+						dialect = csv.Sniffer().sniff(uploaded_file.read())
 						if not all((dialect.delimiter == ',', dialect.quotechar == '"')):
 							return jsonify(
 								{'submitted': 'Please upload comma (,) separated file with quoted (") fields' })
 						# clean up the csv file by passing through dict reader and rewriting
-						temp_file_path = os.path.join(
-							app.instance_path,
-							app.config['UPLOAD_FOLDER'],
-							username,
-							filename + "_temp"
-						)
-						with open(temp_file_path, "w") as temp_file:
-							file.seek(0)
+						trimmed_file_path = os.path.splitext(uploaded_file_path)[0] + '_trimmed.csv'
+						with open(trimmed_file_path, "w") as trimmed_file:
+							uploaded_file.seek(0)
 							# this dict reader lowers case and trims whitespace on all headers
-							file_dict = DictReaderInsensitive(
-								file,
+							uploaded_file_dict = DictReaderInsensitive(
+								uploaded_file,
 								skipinitialspace=True
 							)
-							temp_csv = csv.DictWriter(
-								temp_file,
-								fieldnames = file_dict.fieldnames,
+							trimmed_file_writer = csv.DictWriter(
+								trimmed_file,
+								fieldnames = uploaded_file_dict.fieldnames,
 								quoting = csv.QUOTE_ALL
 							)
-							temp_csv.writeheader()
-							for row in file_dict:
+							trimmed_file_writer.writeheader()
+							for row in uploaded_file_dict:
 								# remove rows without entries
 								if any(field.strip() for field in row):
-									for field in file_dict.fieldnames:
+									for field in uploaded_file_dict.fieldnames:
 										row[field] = row[field].strip()
-									temp_csv.writerow(row)
-						# back up the original file
-						shutil.move(file_path, file_path + ".bak")
-						# replace the original file with the filtered version
-						shutil.move(temp_file_path, file_path)
+									trimmed_file_writer.writerow(row)
 					# re-open the cleaned up file
-					with open(file_path) as file:
+					trimmed_filename = os.path.basename(trimmed_file_path)
+					with open(trimmed_file_path) as file:
 						file_dict = DictReaderInsensitive(file)
 						#first simply check the file contains UIDs
-						if not 'uid' in file_dict.fieldnames:
-							return jsonify(
-								{"submitted": "This file does not contain a 'UID' header. "
-											  "Please use only upload supported files"
-								}
-							)
-						# now check UID's for consistency (already at second line after reading into file_dict)
-						uid_list = [(i['uid']).strip() for i in file_dict]
-						# check if all UIDs are valid (formatting only)
-						for i in uid_list:
-							i_split = i.split("_")
-							# check if UID field is empty or contains whitespace in any rows
-							if any(
-								[
-									i.isspace(),
-									not i,
-									not i_split[0].isdigit(),
-								]
-							):
-								return jsonify(
-									{"submitted": "Please ensure all rows have a valid UID"}
-								)
-							if len(i_split) > 1:
-								if len(i_split) >2:
-									return jsonify(
-										{"submitted": "Please ensure all rows have a valid UID"}
-									)
-								if not any(
-									[
-										i_split[1][0].upper() in ["B","T","R","L","S"],
-										i_split[1][1:].isdigit()
-									]
-								):
-									return jsonify(
-										{"submitted": "Please ensure all rows have a valid UID"}
-									)
 						if request.form['submission_type'] == 'FB':
 							required = set(['uid', 'trait', 'value', 'timestamp', 'person', 'location'])
 							if not required.issubset(file_dict.fieldnames):
@@ -136,24 +93,22 @@ def upload_submit():
 															 "Please use check the submission type"
 									})
 							# as an asynchonous function with celery, result will be stored in redis and accessible from the status/task_id endpoint
-							task = async_submit.apply_async(args=[username, filename, subtype])
+							task = async_submit.apply_async(args=[username, trimmed_filename, subtype])
 						elif request.form['submission_type'] == 'table':
 							required = ['uid', 'date', 'time', 'person']
 							if not set(required).issubset(file_dict.fieldnames):
-								return jsonify({"submitted": "This file appears to be missing a required column (UID,Date,Time,Person)"})
-							#note: to return to the start of the reader object you have to seek(0) on the read file
-							file.seek(0)
+								return jsonify({"submitted": "This table file appears to be missing a required field (UID, Date, Time, Person)"})
 							#just passing in the full list of keys as we later do a match in the database for which are relevant traits
 							traits = [i for i in file_dict.fieldnames if not i in required]
 							# as an asynchonous function with celery, result will be stored in redis and accessible from the status/task_id endpoint
 							task = async_submit.apply_async(args=[
 								username,
-								filename,
+								trimmed_filename,
 								subtype,
 								traits
 							])
-				except:
-					return jsonify({'submitted':'An unknown error has occurred please check the file format'})
+				except ServiceUnavailable:
+					return jsonify({'submitted':'An unknown error has occurred, please try again'})
 				return jsonify({'submitted': ('File has been uploaded and will be merged into the database. '
 						' <br><br> Depending on the size of the file this may take some time so you will receive an email including a summary of the update. '
 						' <br><br> If you wait here you will also get feedback on this page.'), 
@@ -170,4 +125,16 @@ def taskstatus(task_id):
 		return jsonify({'status': task.status})
 	else:
 		result = task.get()
-		return jsonify({'status': task.status, 'result':result})
+		import pdb; pdb.set_trace()
+		if not result["success"]:
+			# create a table from the error rows
+			return jsonify({
+				'status': 'ERRORS',
+				'result': render_template(
+					'upload_errors_table.html',
+					result = result["result"]['value']
+				)
+			})
+		else:
+			return jsonify({'status': task.status, 'result':result})
+
