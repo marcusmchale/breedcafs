@@ -16,7 +16,18 @@ logging.basicConfig(filename=app.config['BREEDCAFS_LOG'],
 	datefmt= '%Y-%m-%d %H:%M:%S')
 
 #celery for scheduling large uploads
-celery = Celery(app , backend = app.config['CELERY_RESULT_BACKEND'], broker= app.config['CELERY_BROKER_URL'])
+celery = Celery(
+	app,
+	backend = app.config['CELERY_RESULT_BACKEND'],
+	broker = app.config['CELERY_BROKER_URL']
+)
+
+celery.conf.update(
+	task_serializer = 'pickle',
+	result_serializer = 'pickle',
+	event_serializer = 'pickle',
+	accept_content = ['pickle', 'json']
+)
 
 #and also use redis (not just with celery) for basic local datastore like login attempts and caching
 redis_store = StrictRedis(host= 'localhost', port = 6379, db=0)

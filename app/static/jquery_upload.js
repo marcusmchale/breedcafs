@@ -7,6 +7,7 @@ $('#submission_type').val('FB');
 $('#upload_submit').click( function(e) {
 	e.preventDefault();
 	remove_flash();
+	$('#error_table_div').empty()
 	wait_message = "Please wait for data to be submitted"
 	flash_wait = "<div id='upload_submit_flash' class='flash'>" + wait_message + "</div>"
 	$("#upload_submit").after(flash_wait);
@@ -46,12 +47,14 @@ $('#upload_submit').click( function(e) {
 				type: 'GET',
 				url: "/status/" + task_id +"/",
 				success: function(response) {
-					console.log(response.result);
 					if (response.hasOwnProperty('status')) {
 						flash_status = "<div id='upload_submit_flash' class='flash'> " + response.status + "</div>";
 						$("#upload_submit_flash").replaceWith(flash_status);
 						if (response.status === 'PENDING') { poll(task_id) };
-						if (response.status === 'ERRORS') { $('#upload_submit').after(response.result) }
+						if (response.status === 'ERRORS') {
+							$('#upload_submit_flash').replaceWith("<div id='error_table_div'></div>");
+							$('#error_table_div').append(response.result);
+							}
 					    if (response.status === 'SUCCESS') { load_graph() };
 					}
 

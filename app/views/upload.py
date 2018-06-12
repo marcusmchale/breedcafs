@@ -42,7 +42,7 @@ def upload_submit():
 			username = session['username']
 			time = datetime.now().strftime('_%Y%m%d-%H%M%S_')
 			file = form.file.data
-			subtype = form.submission_type.data
+			submission_type = form.submission_type.data
 			if Upload(username, file.filename).allowed_file():
 				try:
 					# create user upload path if not found
@@ -89,27 +89,23 @@ def upload_submit():
 						if request.form['submission_type'] == 'FB':
 							required = set(['uid', 'trait', 'value', 'timestamp', 'person', 'location'])
 							if not required.issubset(file_dict.fieldnames):
-								return jsonify({"submitted": "This file does not look like a FieldBook exported CSV file"
+								return jsonify({"submitted": "This file is missing fields typical of a "
+															 "FieldBook exported CSV file. "
 															 "Please use check the submission type"
 									})
-							# as an asynchonous function with celery, result will be stored in redis and accessible from the status/task_id endpoint
-							task = async_submit.apply_async(args=[username, trimmed_filename, subtype])
-						elif request.form['submission_type'] == 'table':
+						else: # request.form['submission_type'] == 'table':
 							required = ['uid', 'date', 'time', 'person']
-							if not set(required).issubset(file_dict.fieldnames):
-								return jsonify({"submitted": "This table file appears to be missing a required field (UID, Date, Time, Person)"})
-							#just passing in the full list of keys as we later do a match in the database for which are relevant traits
-							traits = [i for i in file_dict.fieldnames if not i in required]
-							# as an asynchonous function with celery, result will be stored in redis and accessible from the status/task_id endpoint
-							task = async_submit.apply_async(args=[
-								username,
-								trimmed_filename,
-								subtype,
-								traits
-							])
+						if not set(required).issubset(file_dict.fieldnames):
+							return jsonify({"submitted": "This table file appears to be missing a required field (UID, Date, Time, Person)"})
+						# as an asynchonous function with celery, result will be stored in redis and accessible from the status/task_id endpoint
+						task = async_submit.apply_async(args=[
+							username,
+							trimmed_filename,
+							submission_type
+						])
 				except ServiceUnavailable:
-					return jsonify({'submitted':'An unknown error has occurred, please try again'})
-				return jsonify({'submitted': ('File has been uploaded and will be merged into the database. '
+					return jsonify({'submitted':'The database is currently unavailable - please try again later'})
+				return jsonify({'submitted': ('Your file has been uploaded and will be merged into the database. '
 						' <br><br> Depending on the size of the file this may take some time so you will receive an email including a summary of the update. '
 						' <br><br> If you wait here you will also get feedback on this page.'), 
 					'task_id': task.id })
@@ -125,15 +121,11 @@ def taskstatus(task_id):
 		return jsonify({'status': task.status})
 	else:
 		result = task.get()
-		import pdb; pdb.set_trace()
-		if not result["success"]:
-			# create a table from the error rows
+		if result['status'] == 'ERRORS':
+			error_table = result['result'].html_table()
 			return jsonify({
 				'status': 'ERRORS',
-				'result': render_template(
-					'upload_errors_table.html',
-					result = result["result"]['value']
-				)
+				'result': error_table
 			})
 		else:
 			return jsonify({'status': task.status, 'result':result})
