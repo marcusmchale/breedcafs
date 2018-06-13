@@ -52,10 +52,16 @@ $('#upload_submit').click( function(e) {
 						$("#upload_submit_flash").replaceWith(flash_status);
 						if (response.status === 'PENDING') { poll(task_id) };
 						if (response.status === 'ERRORS') {
-							$('#upload_submit_flash').replaceWith("<div id='error_table_div'></div>");
-							$('#error_table_div').append(response.result);
-							}
-					    if (response.status === 'SUCCESS') { load_graph() };
+							$('#upload_submit_flash').replaceWith("<div id='response' class='flash'></div>");
+							$('#response').append("<p>Errors were found in the uploaded file:</p>");
+							$('#response').append(response.result);
+							};
+					    if (response.status === 'SUCCESS') {
+					    	console.log(response);
+					    	$('#upload_submit_flash').replaceWith("<div id='response' class='flash'></div>")
+					    	$('#response').append(response.result.result);
+					    	load_graph();
+					    	};
 					}
 
 					if (response.hasOwnProperty('result')) {

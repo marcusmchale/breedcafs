@@ -6,7 +6,6 @@ from user import User
 from config import ALLOWED_EXTENSIONS
 from neo4j_driver import get_driver
 import unicodecsv as csv
-import re
 from datetime import datetime
 
 from celery.contrib import rdb
@@ -139,7 +138,7 @@ class ItemSubmissionResult:
 	):
 		self.found = found
 		self.submitted_by = submitted_by
-		self.submitted_at = submitted_at
+		self.submitted_at = datetime.fromtimestamp(int(submitted_at) / 1000).strftime("%Y-%m-%d %H:%M:%S")
 		self.value = value
 		self.uploaded_value = uploaded_value
 		self.uid = uid
@@ -178,9 +177,10 @@ class ItemSubmissionResult:
 		return item_dict
 
 class SubmissionResult:
-	def __init__(self, username, filename):
+	def __init__(self, username, filename, submission_type):
 		self.username = username
 		self.filename = filename
+		self.submission_type = submission_type
 		self.conflicts = []
 		self.resubmissions = []
 		self.submitted = []
@@ -189,34 +189,36 @@ class SubmissionResult:
 		return {
 		"conflicts": len(self.conflicts),
 		"resubmissions": len(self.resubmissions),
-		"submitted": len(self.resubmitted)
+		"submitted": len(self.submitted)
 	}
 
-	def parse_item(self, item, submission_type):
+	def parse_record(self, record):
+		submission_type = self.submission_type
 		submission_item = ItemSubmissionResult(
-			item['found'],
-			item['submitted_by'],
-			item['submitted_at'],
-			item['value'],
-			item['uploaded_value'],
-			item['uid'],
-			item['trait'],
-			item['time']
+			record['found'],
+			record['submitted_by'],
+			record['submitted_at'],
+			record['value'],
+			record['uploaded_value'],
+			record['uid'],
+			record['trait'],
+			record['time']
 		)
 		if submission_type == "FB":
-			submission_item.fb_item(item['timestamp'])
+			submission_item.fb_item(record['timestamp'])
 		else: #  submission type == 'table'
-			submission_item.table_item(item['date'], item['time'])
-		if not self.found:
+			submission_item.table_item(record['date'], record['time'])
+		if not record['found']:
 			self.submitted.append(submission_item)
-		elif item.conflict():
+		elif submission_item.conflict():
 			self.conflicts.append(submission_item)
 		else:
-			self.resubmissions.append(item)
+			self.resubmissions.append(submission_item)
 
 	def conflicts_file(self):
-		username = self.username,
+		username = self.username
 		filename = self.filename
+		submission_type = self.submission_type
 		if len(self.conflicts) == 0:
 			return None
 		else:
@@ -225,7 +227,8 @@ class SubmissionResult:
 				app.instance_path,
 				app.config['DOWNLOAD_FOLDER'],
 				username,
-				conflicts_filename)
+				conflicts_filename
+			)
 			conflicts_fieldnames = [
 				"uid",
 				"trait",
@@ -240,15 +243,17 @@ class SubmissionResult:
 					conflicts_file,
 					fieldnames = conflicts_fieldnames,
 					quoting = csv.QUOTE_ALL,
-					extrasaction = 'ignore')
+					extrasaction = 'ignore'
+				)
 				writer.writeheader()
 				for item in self.conflicts:
-					writer.writerow(item.as_dict)
+					writer.writerow(item.as_dict(submission_type))
 		return conflicts_filename
 
 	def resubmissions_file(self):
-		username = self.username,
+		username = self.username
 		filename = self.filename
+		submission_type = self.submission_type
 		if len(self.resubmissions) == 0:
 			return None
 		else:
@@ -275,13 +280,14 @@ class SubmissionResult:
 					extrasaction = 'ignore')
 				writer.writeheader()
 				for item in self.resubmissions:
-					writer.writerow(item.as_dict)
+					writer.writerow(item.as_dict(submission_type))
 		return resubmissions_filename
 
 
 	def submitted_file(self):
-		username = self.username,
+		username = self.username
 		filename = self.filename
+		submission_type = self.submission_type
 		if len(self.submitted) == 0:
 			return None
 		else:
@@ -307,7 +313,7 @@ class SubmissionResult:
 					extrasaction = 'ignore')
 				writer.writeheader()
 				for item in self.submitted:
-					writer.writerow(item.as_dict)
+					writer.writerow(item.as_dict(submission_type))
 		return submitted_filename
 
 
@@ -316,35 +322,46 @@ class Parsers:
 		pass
 	@staticmethod
 	def timestamp_fb_format(timestamp_string):
-		timestamp_string = str(timestamp_string).strip()
-		timestamp_re = re.compile(
-			"^[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9] [0-9][0-9]:[0-9][0-9]:[0-9][0-9][+-][0-9][0-9][0-9][0-9]$"
-		)
-		if timestamp_re.match(timestamp_string):
-			return True
-		else:
+		timestamp = str(timestamp_string).strip()
+		try:
+			datetime.strptime(timestamp[0:19], '%Y-%m-%d %H:%M:%S')
+			if not all([
+				timestamp[-5] in ['+','-'],
+				int(timestamp[-4:-2]) < 24,
+				int(timestamp[-4:-2]) >= 0,
+				int(timestamp[-2:]) < 60,
+				int(timestamp[-2:]) >= 0
+			]):
+				return False
+			else:
+				return True
+		except ValueError:
 			return False
 
 	@staticmethod
 	def date_format(date_string):
 		date_string = str(date_string).strip()
-		date_re = re.compile(
-			'^[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]$'
-		)
-		if date_re.match(date_string):
+		try:
+			datetime.strptime(date_string, '%Y-%m-%d')
 			return True
-		else:
+		except ValueError:
 			return False
 
 	@staticmethod
 	def time_format(time_string):
 		time_string = str(time_string).strip()
-		time_re = re.compile(
-			'^[0-9][0-9]:[0-9][0-9]$'
-		)
-		if time_re.match(time_string):
-			return True
-		else:
+		try:
+			if not all([
+				time_string[2] == ':',
+				int(time_string[0:2]) < 24,
+				int(time_string[0:2]) >= 0,
+				int(time_string[3:5]) < 60,
+				int(time_string[3:5]) >= 0
+			]):
+				return False
+			else:
+				return True
+		except ValueError:
 			return False
 
 	@staticmethod
@@ -445,6 +462,7 @@ class Upload:
 			filename
 		)
 		with open(uploaded_file_path, 'r') as uploaded_file:
+			uploaded_dict = DictReaderInsensitive(uploaded_file)
 			if submission_type == "FB":
 				check_result = [record[0] for record in tx.run(
 					Cypher.upload_fb_check,
@@ -455,6 +473,7 @@ class Upload:
 			else:
 				required = ['uid', 'date', 'time', 'person']
 				traits = [i for i in uploaded_dict.fieldnames if i not in required]
+
 				check_result = [record[0] for record in tx.run(
 					Cypher.upload_table_check,
 					username = username,
@@ -462,7 +481,6 @@ class Upload:
 					submission_type = submission_type,
 					traits = traits
 				)]
-			uploaded_dict = DictReaderInsensitive(uploaded_file)
 			for row_data in uploaded_dict:
 				line_num = int(uploaded_dict.line_num)
 				# 0 based list call and have to account for header row so -2
@@ -525,23 +543,9 @@ class Upload:
 				traits=traits
 			)]
 		# create a submission result
-		submission_result = SubmissionResult(username, filename)
+		submission_result = SubmissionResult(username, filename, submission_type)
 		for record in result:
-			result_item = ItemSubmissionResult(
-				record['found'],
-				record['submitted_by'],
-				record['submitted_at'],
-				record['value'],
-				record['uploaded_value'],
-				record['uid'],
-				record['trait'],
-				record['time']
-			)
-			if submission_type == 'FB':
-				result_item.fb_item(record['timestamp'])
-			else:  # submission_type == 'table'
-				result_item.table_item(record['date'], record['time'])
-			submission_result.parse_item(result_item, submission_type)
+			submission_result.parse_record(record)
 		return submission_result
 
 
@@ -569,52 +573,66 @@ def async_submit(
 					submission_type,
 					preparse_result
 				)
-			if db_check_result:
+			if db_check_result.row_errors():
 				return {
 					'status': 'ERRORS',
 					'result': db_check_result
 				}
 			else:
+				# submit data
 				submission_result = neo4j_session.write_transaction(
 					upload.submit,
 					submission_type
 				)
+				# create summary dict
 				submission_summary = submission_result.summary()
+				# create files
 				conflicts_file = submission_result.conflicts_file()
-				conflicts_file_url = url_for(
-					'download_file',
-					username = self.username,
-					filename = conflicts_file,
-					_external = True
-				)
 				resubmissions_file = submission_result.resubmissions_file()
-				resubmissions_file_url = url_for(
-					'download_file',
-					username = self.username,
-					filename = resubmissions_file,
-					_external = True
-				)
 				submitted_file = submission_result.submitted_file()
-				submitted_file_url = url_for(
-					'download_file',
-					username = self.username,
-					filename = submitted_file,
-					_external = True
-				)
+				# now need app context for the following (this is running asynchronously)
 				with app.app_context():
+					# create urls
+					if conflicts_file:
+						conflicts_file_url = url_for(
+							'download_file',
+							username = username,
+							filename = conflicts_file,
+							_external = True
+						)
+					else:
+						conflicts_file_url = None
+					if resubmissions_file:
+						resubmissions_file_url = url_for(
+							'download_file',
+							username = username,
+							filename = resubmissions_file,
+							_external = True
+						)
+					else:
+						resubmissions_file = None
+					if submitted_file:
+						submitted_file_url = url_for(
+							'download_file',
+							username = username,
+							filename = submitted_file,
+							_external = True
+						)
+					else:
+						submitted_file_url = None
 					# send result of merger in an email
 					subject = "BreedCAFS upload summary"
 					recipients = [User(username).find('')['email']]
 					response = "Submission report:\n "
 					if submission_summary['submitted']:
-						response += " - <a href= " + conflicts_file_url + str(submission_summary['submitted']) \
-									+ "</a> new values were submitted to the database. \n"
+						response += "<p> - <a href= " + submitted_file_url + ">" + str(submission_summary['submitted']) \
+							+ "</a> new values were submitted to the database.\n </p>"
 					if submission_summary['resubmissions']:
-						response += " - <a href= " + resubmissions_file_url + str(submission_summary['resubmissions']) \
-									+"</a> existing values were already found. \n"
+						response += "<p> - <a href= " + resubmissions_file_url + ">" + str(submission_summary['resubmissions']) \
+							+ "</a> existing values were already found.\n</p>"
 					if submission_summary['conflicts']:
-						response += " - <a href= " + submitted_file_url + str(submission_summary['conflicts']) \
-									+ "</a>" + " existing values were already found. \n"
+						response += "<p> - <a href= " + conflicts_file_url + ">" + str(submission_summary['conflicts']) \
+							+ "</a> conflicts with existing values were found and not submitted.\n</p>"
 					body = response
 					html = render_template(
 						'emails/upload_report.html',
@@ -623,12 +641,7 @@ def async_submit(
 					send_email(subject, app.config['ADMINS'][0], recipients, body, html)
 				return {
 					'status': 'SUCCESS',
-					'result': submission_summary,
-					'files': {
-						'conflicts': conflicts_file,
-						'resubmissions': resubmissions_file,
-						'submitted': submitted_file
+					'result': response
 					}
-				}
 	except ServiceUnavailable as exc:
 		raise self.retry(exc=exc)
