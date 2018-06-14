@@ -1,5 +1,5 @@
 from user import User
-from upload import Upload, async_submit, DictReaderInsensitive
+from upload import Upload
 from lists import Lists
 from fields import Fields
 from chart import Chart

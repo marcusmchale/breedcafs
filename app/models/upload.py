@@ -7,6 +7,7 @@ from config import ALLOWED_EXTENSIONS
 from neo4j_driver import get_driver
 import unicodecsv as csv
 from datetime import datetime
+from werkzeug.utils import secure_filename
 
 from celery.contrib import rdb
 
@@ -86,15 +87,53 @@ class RowParseResult:
 		return row_string
 
 class ParseResult:
-	def __init__(self):
-		self.parse_result = {}
+	def __init__(self, submission_type):
+		self.submission_type = submission_type
+		self.parse_result = None
 
-	def merge_error(self, row_num, row_data, field, error_type):
-		if row_num in self.parse_result:
-			self.parse_result[row_num].add_error(field, error_type)
+	def parse_row(self, line_num, row_data):
+		submission_type = self.submission_type
+		if submission_type == "FB":
+			if not Parsers.timestamp_fb_format(row_data['timestamp']):
+				self.merge_error(
+					line_num,
+					row_data,
+					"timestamp",
+					"format"
+				)
+		else:  # submission_type == "table":
+			if not Parsers.date_format(row_data['date']):
+				self.merge_error(
+					line_num,
+					row_data,
+					"date",
+					"format"
+				)
+			if not Parsers.time_format(row_data['time']):
+				self.merge_error(
+					line_num,
+					row_data,
+					"time",
+					"format"
+				)
+		# check uid formatting
+		if not Parsers.uid_format(row_data['uid']):
+			self.merge_error(
+				line_num,
+				row_data,
+				"uid",
+				"format"
+			)
+
+	def merge_error(self, line_num, row_data, field, error_type):
+		if not self.parse_result:
+			self.parse_result = {}
+		parse_result = self.parse_result
+		if line_num in parse_result:
+			parse_result[line_num].add_error(field, error_type)
 		else:
-			self.parse_result[row_num] = RowParseResult(row_num, row_data)
-			self.parse_result[row_num].add_error(field, error_type)
+			parse_result[line_num] = RowParseResult(line_num, row_data)
+			parse_result[line_num].add_error(field, error_type)
 
 	def row_errors(self):
 		return self.parse_result
@@ -102,7 +141,7 @@ class ParseResult:
 	def html_table(self):
 		# create a html table string with tooltip for details
 		if self.parse_result:
-			# get headers from a random element in the dictionary (all should be equivalent)
+			# get the headers from the original file and match by lowercase
 			headers = self.parse_result[next(iter(self.parse_result))].headers()
 			header_string = '<tr><th><p>Line#</p></th>'
 			for i in headers:
@@ -119,10 +158,10 @@ class ParseResult:
 
 	def long_enough(self):
 		max_length = 10
-		if len(self.parse_result) >= max_length:
-			return True
-		else:
-			return False
+		if self.parse_result:
+			if len(self.parse_result) >= max_length:
+				return True
+		return False
 
 class ItemSubmissionResult:
 	def __init__(
@@ -383,265 +422,306 @@ class Parsers:
 				return False
 
 class Upload:
-	def __init__(self, username, filename):
+	def __init__(self, username, submission_type, raw_filename):
+		time = datetime.now().strftime('_%Y%m%d-%H%M%S_')
 		self.username = username
-		self.filename = filename
+		self.filename = secure_filename(time + '_' + raw_filename)
+		self.submission_type = submission_type
+		self.file_path = os.path.join(app.instance_path, app.config['UPLOAD_FOLDER'], username, self.filename)
+		self.trimmed_file_path = None
+		self.parse_result = None
+		self.submission_result = None
 
-	def allowed_file(self):
-		return '.' in self.filename and \
-			self.filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
-	def preparse(
-			self,
-			submission_type
-	):
-		username = self.username
-		filename = self.filename
-		uploaded_file_path = os.path.join(
-			app.instance_path,
-			app.config['UPLOAD_FOLDER'],
-			username,
-			filename
-		)
-		with open(uploaded_file_path, 'r') as uploaded_file:
-			uploaded_dict = DictReaderInsensitive(uploaded_file)
-			parse_results = ParseResult()
-			for row_data in uploaded_dict:
-				line_num = int(uploaded_dict.line_num)
+	@staticmethod
+	def allowed_file(filename):
+		return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+	def file_save(self, file_data):
+		# create user upload path if not found
+		if not os.path.isdir(os.path.join(app.instance_path, app.config['UPLOAD_FOLDER'], self.username)):
+			os.mkdir(os.path.join(app.instance_path, app.config['UPLOAD_FOLDER'], self.username))
+		file_data.save(self.file_path)
+
+	def is_valid_csv(self):
+		with open(self.file_path) as uploaded_file:
+			# TODO implement CSV kit checks - in particular csvstat to check field length (avoid stray quotes)
+			# now get the dialect and check it conforms to expectations
+			dialect = csv.Sniffer().sniff(uploaded_file.read())
+			if not all((dialect.delimiter == ',', dialect.quotechar == '"')):
+				return False
+			else:
+				return True
+
+	def check_headers(self):
+		with open(self.file_path) as uploaded_file:
+			file_dict = DictReaderInsensitive(uploaded_file)
+			file_headers = set(file_dict.fieldnames)
+			if self.submission_type == 'FB':
+				required = set(['uid', 'trait', 'value', 'timestamp', 'person', 'location'])
+			else:  # submission_type == 'table'
+				required = set(['uid', 'date', 'time'])
+			if not required.issubset(file_headers):
+				missing_headers = required.symmetric_difference(file_headers)
+				return "This file is missing the following headers: " + str([i for i in missing_headers])
+			else:
+				return None
+
+	# clean up the csv by passing through dict reader and rewriting
+	def trim_file(self):
+		file_path = self.file_path
+		self.trimmed_file_path = os.path.splitext(file_path)[0] + '_trimmed.csv'
+		trimmed_file_path = self.trimmed_file_path
+		with open(file_path, 'r') as uploaded_file, open(trimmed_file_path, "w") as trimmed_file:
+			# this dict reader lowers case and trims whitespace on all headers
+			file_dict = DictReaderInsensitive(
+				uploaded_file,
+				skipinitialspace=True
+			)
+			file_writer = csv.DictWriter(
+				trimmed_file,
+				fieldnames = file_dict.fieldnames,
+				quoting = csv.QUOTE_ALL
+			)
+			file_writer.writeheader()
+			for row in file_dict:
+				# remove rows without entries
+				if any(field.strip() for field in row):
+					for field in file_dict.fieldnames:
+						row[field] = row[field].strip()
+					file_writer.writerow(row)
+
+	def parse_rows(self):
+		trimmed_file_path = self.trimmed_file_path
+		submission_type = self.submission_type
+		parse_result = ParseResult(submission_type)
+		self.parse_result = parse_result
+		with open(trimmed_file_path, 'r') as trimmed_file:
+			trimmed_dict = DictReaderInsensitive(trimmed_file)
+			for row_data in trimmed_dict:
+				line_num = int(trimmed_dict.line_num)
 				# check timestamp formatting against regex
-				if submission_type == "FB":
-					if not Parsers.timestamp_fb_format(row_data['timestamp']):
-						parse_results.merge_error(
-							line_num,
-							row_data,
-							"timestamp",
-							"format"
-						)
-				else:  # submission_type == "table":
-					if not Parsers.date_format(row_data['date']):
-						parse_results.merge_error(
-							line_num,
-							row_data,
-							"date",
-							"format"
-						)
-					if not Parsers.time_format(row_data['time']):
-						parse_results.merge_error(
-							line_num,
-							row_data,
-							"time",
-							"format"
-						)
-				# check uid formatting
-				if not Parsers.uid_format(row_data['uid']):
-					parse_results.merge_error(
-						line_num,
-						row_data,
-						"uid",
-						"format"
-					)
+				parse_result.parse_row(line_num, row_data)
 				# if many errors already then return immediately
-				if parse_results.long_enough():
-					return parse_results
-		return parse_results
-
+				if parse_result.long_enough():
+					return parse_result
+		return parse_result
 
 	def db_check(
 		self,
-		tx,
-		submission_type,
-		# handing parse results in from the prior pre-parsing
-		parse_results
+		tx
 	):
 		username = self.username
-		filename = self.filename
-		uploaded_file_path = os.path.join(
-			app.instance_path,
-			app.config['UPLOAD_FOLDER'],
-			username,
-			filename
-		)
-		with open(uploaded_file_path, 'r') as uploaded_file:
-			uploaded_dict = DictReaderInsensitive(uploaded_file)
+		trimmed_file_path = self.trimmed_file_path
+		trimmed_filename = os.path.basename(trimmed_file_path)
+		submission_type = self.submission_type
+		parse_result = self.parse_result
+		with open(trimmed_file_path, 'r') as trimmed_file:
+			trimmed_dict = DictReaderInsensitive(trimmed_file)
 			if submission_type == "FB":
 				check_result = [record[0] for record in tx.run(
 					Cypher.upload_fb_check,
 					username = username,
-					filename = ("file:///" + username + '/' + filename),
+					filename = ("file:///" + username + '/' + trimmed_filename),
 					submission_type = submission_type
 				)]
 			else:
 				required = ['uid', 'date', 'time', 'person']
-				traits = [i for i in uploaded_dict.fieldnames if i not in required]
-
+				index_headers = [
+					'country',
+					'region',
+					'farm',
+					'plot',
+					'block',
+					'variety',
+					'treeid',
+					'treecustomid',
+					'branchid',
+					'leafid',
+					'tissue',
+					'storage'
+				]
+				not_traits = required + index_headers
+				traits = [i for i in trimmed_dict.fieldnames if i not in not_traits]
 				check_result = [record[0] for record in tx.run(
 					Cypher.upload_table_check,
 					username = username,
-					filename = ("file:///" + username + '/' + filename),
+					filename = ("file:///" + username + '/' + trimmed_filename),
 					submission_type = submission_type,
 					traits = traits
 				)]
-			for row_data in uploaded_dict:
-				line_num = int(uploaded_dict.line_num)
+			for row_data in trimmed_dict:
+				line_num = int(trimmed_dict.line_num)
 				# 0 based list call and have to account for header row so -2
 				item = check_result[line_num -2]
 				if not item['uid']:
-					parse_results.merge_error(
+					parse_result.merge_error(
 						line_num,
 						row_data,
 						"uid",
 						"missing"
 					)
 				if not item['trait']:
-					parse_results.merge_error(
+					parse_result.merge_error(
 						line_num,
 						row_data,
 						"trait",
 						"missing"
 					)
 				if not item['value']:
-					parse_results.merge_error(
+					parse_result.merge_error(
 						line_num,
 						row_data,
 						"value",
 						"format"
 					)
-			return parse_results
+			return parse_result
 
 	def submit(
 			self,
-			tx,
-			submission_type
+			tx
 	):
 		username = self.username
+		trimmed_file_path = self.trimmed_file_path
+		trimmed_filename = os.path.basename(trimmed_file_path)
+		submission_type = self.submission_type
 		filename = self.filename
-		uploaded_file_path = os.path.join(
-			app.instance_path,
-			app.config['UPLOAD_FOLDER'],
-			username,
-			filename
-		)
+		self.submission_result = SubmissionResult(username, filename, submission_type)
+		submission_result = self.submission_result
 		if submission_type == 'FB':
 			query = Cypher.upload_fb
 			result = [record[0] for record in tx.run(
 				query,
 				username = username,
-				filename = ("file:///" + username + '/' + filename),
-				submission_type=submission_type
+				filename = ("file:///" + username + '/' + trimmed_filename),
+				submission_type = submission_type
 			)]
 		else:  # submission_type == 'table':
-			with open(uploaded_file_path, 'r') as uploaded_file:
+			with open(trimmed_file_path, 'r') as uploaded_file:
 				uploaded_dict = DictReaderInsensitive(uploaded_file)
 				required = ['uid', 'date', 'time', 'person']
-				traits = [i for i in uploaded_dict.fieldnames if i not in required]
+				index_headers = [
+					'country',
+					'region',
+					'farm',
+					'plot',
+					'block',
+					'variety',
+					'treeid',
+					'treecustomid',
+					'branchid',
+					'leafid',
+					'tissue',
+					'storage'
+				]
+				not_traits = required + index_headers
+				traits = [i for i in uploaded_dict.fieldnames if i not in not_traits]
 			query = Cypher.upload_table
 			result = [record[0] for record in tx.run(
 				query,
-				username=username,
-				filename=("file:///" + username + '/' + filename),
-				submission_type=submission_type,
-				traits=traits
+				username = username,
+				filename = ("file:///" + username + '/' + trimmed_filename),
+				submission_type = submission_type,
+				traits = traits
 			)]
 		# create a submission result
-		submission_result = SubmissionResult(username, filename, submission_type)
 		for record in result:
 			submission_result.parse_record(record)
 		return submission_result
 
-
-# needed to separate this for celery as the class is not easily serialised into JSON for async calling
-@celery.task(bind=True)
-def async_submit(
-		self,
-		username,
-		filename,
-		submission_type
-):
-	try:
-		with get_driver().session() as neo4j_session:
-			upload = Upload(username, filename)
-			preparse_result = upload.preparse(submission_type)
-			if preparse_result.long_enough():
-				return {
-					'status': 'ERRORS',
-					'result': preparse_result
-				}
-			else:
-				# if not too many errors continue to db check (reducing the number of client feedback loops)
-				db_check_result = neo4j_session.read_transaction(
-					upload.db_check,
-					submission_type,
-					preparse_result
-				)
-			if db_check_result.row_errors():
-				return {
-					'status': 'ERRORS',
-					'result': db_check_result
-				}
-			else:
-				# submit data
-				submission_result = neo4j_session.write_transaction(
-					upload.submit,
-					submission_type
-				)
-				# create summary dict
-				submission_summary = submission_result.summary()
-				# create files
-				conflicts_file = submission_result.conflicts_file()
-				resubmissions_file = submission_result.resubmissions_file()
-				submitted_file = submission_result.submitted_file()
-				# now need app context for the following (this is running asynchronously)
-				with app.app_context():
-					# create urls
-					if conflicts_file:
-						conflicts_file_url = url_for(
-							'download_file',
-							username = username,
-							filename = conflicts_file,
-							_external = True
-						)
-					else:
-						conflicts_file_url = None
-					if resubmissions_file:
-						resubmissions_file_url = url_for(
-							'download_file',
-							username = username,
-							filename = resubmissions_file,
-							_external = True
-						)
-					else:
-						resubmissions_file = None
-					if submitted_file:
-						submitted_file_url = url_for(
-							'download_file',
-							username = username,
-							filename = submitted_file,
-							_external = True
-						)
-					else:
-						submitted_file_url = None
-					# send result of merger in an email
-					subject = "BreedCAFS upload summary"
-					recipients = [User(username).find('')['email']]
-					response = "Submission report:\n "
-					if submission_summary['submitted']:
-						response += "<p> - <a href= " + submitted_file_url + ">" + str(submission_summary['submitted']) \
-							+ "</a> new values were submitted to the database.\n </p>"
-					if submission_summary['resubmissions']:
-						response += "<p> - <a href= " + resubmissions_file_url + ">" + str(submission_summary['resubmissions']) \
-							+ "</a> existing values were already found.\n</p>"
-					if submission_summary['conflicts']:
-						response += "<p> - <a href= " + conflicts_file_url + ">" + str(submission_summary['conflicts']) \
-							+ "</a> conflicts with existing values were found and not submitted.\n</p>"
-					body = response
-					html = render_template(
-						'emails/upload_report.html',
-						response = response
-					)
-					send_email(subject, app.config['ADMINS'][0], recipients, body, html)
-				return {
-					'status': 'SUCCESS',
-					'result': response
+	@celery.task(bind=True)
+	def async_submit(self, username, upload_object):
+		try:
+			with get_driver().session() as neo4j_session:
+				# clean up the file removing empty lines and whitespace, lower case headers for matching in db
+				upload_object.trim_file()
+				# parse this trimmed file for errors, sets parse_result attribute to upload_object
+				parse_result = upload_object.parse_rows()
+				if parse_result.long_enough():
+					return {
+						'status': 'ERRORS',
+						'result': parse_result
 					}
-	except ServiceUnavailable as exc:
-		raise self.retry(exc=exc)
+				else:
+					# if not too many errors continue to db check (reducing the number of client feedback loops)
+					db_check_result = neo4j_session.read_transaction(
+						upload_object.db_check
+					)
+				if db_check_result.row_errors():
+					return {
+						'status': 'ERRORS',
+						'result': db_check_result
+					}
+				else:
+					# submit data
+					submission_result = neo4j_session.write_transaction(
+						upload_object.submit
+					)
+					# create summary dict
+					submission_summary = submission_result.summary()
+					# create files
+					conflicts_file = submission_result.conflicts_file()
+					resubmissions_file = submission_result.resubmissions_file()
+					submitted_file = submission_result.submitted_file()
+					# now need app context for the following (this is running asynchronously)
+					with app.app_context():
+						# create urls
+						if conflicts_file:
+							conflicts_file_url = url_for(
+								'download_file',
+								username = username,
+								filename = conflicts_file,
+								_external = True
+							)
+						else:
+							conflicts_file_url = None
+						if resubmissions_file:
+							resubmissions_file_url = url_for(
+								'download_file',
+								username = username,
+								filename = resubmissions_file,
+								_external = True
+							)
+						else:
+							resubmissions_file_url = None
+						if submitted_file:
+							submitted_file_url = url_for(
+								'download_file',
+								username = username,
+								filename = submitted_file,
+								_external = True
+							)
+						else:
+							submitted_file_url = None
+						# send result of merger in an email
+						subject = "BreedCAFS upload summary"
+						recipients = [User(username).find('')['email']]
+						response = "Submission report:\n "
+						if submission_summary['submitted']:
+							response += "<p> - <a href= " + submitted_file_url + ">" + str(submission_summary['submitted']) \
+								+ "</a> new values were submitted to the database.\n </p>"
+						if submission_summary['resubmissions']:
+							response += "<p> - <a href= " + resubmissions_file_url + ">" + str(submission_summary['resubmissions']) \
+								+ "</a> existing values were already found.\n</p>"
+						if submission_summary['conflicts']:
+							response += "<p> - <a href= " + conflicts_file_url + ">" + str(submission_summary['conflicts']) \
+								+ "</a> conflicts with existing values were found and not submitted.\n</p>"
+						response = "Submission report: "
+						body = "Submission_report: \n"
+						body += " - " + str(submission_summary['submitted']) + 'new values were submitted to the database.\n'
+						body += "   These are available at the following url: " + submitted_file_url + "\n"
+						body += " - " + str(submission_summary['resubmissions']) + 'existing values were already found.\n'
+						body += "   These are available at the following url: " + resubmissions_file_url + "\n"
+						body += " - " + str(submission_summary['conflicts']) + 'conflicts with existing values were found and not submitted.\n'
+						body += "   These are available at the following url: " + conflicts_file_url + "\n"
+						html = render_template(
+							'emails/upload_report.html',
+							response = response
+						)
+						send_email(subject, app.config['ADMINS'][0], recipients, body, html)
+					return {
+						'status': 'SUCCESS',
+						'result': response
+						}
+		except ServiceUnavailable as exc:
+			raise self.retry(exc=exc)
