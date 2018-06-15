@@ -70,26 +70,67 @@ class RowParseResult:
 		else:
 			self.errors[field].append(error_type)
 
-
 	def headers(self):
 		return self.row_data.keys()
 
-	def html_row (self, headers):
+	def get_row_data(self):
+			return self.row_data
+
+	def get_row_errors(self):
+			return self.errors
+
+	def html_row (self, fieldnames):
 		row_string = '<tr><td>' + str(self.row_num) + '</td>'
-		for column in headers:
-			if column in self.errors:
-				row_string += '<td bgcolor = #FFFF00 title = "'
-				for error in self.errors[column]:
-					row_string += ' - ' + str(error) + ':' + str(self.error_comments[column][error]) + '\n'
-				row_string += '">' + str(self.row_data[column]) + '</td>'
+		for field in fieldnames:
+			if not self.row_data[field]:
+				row_string += '<td></td>'
 			else:
-				row_string += '<td>' + str(self.row_data[column]) + '</td>'
+				if not field in self.errors:
+					row_string += '<td>' + str(self.row_data[field]) + '</td>'
+				else:
+					if not field in self.error_comments:
+						if field in fieldnames:
+							row_string += '<td bgcolor = #FFFF00 title = "' \
+								+ str(self.error_comments['value']['format']) + '">' \
+								+ str(self.row_data[field]) + '</td>'
+						else:
+							row_string += '<td bgcolor = #FFFF00 title = "unknown error">' + str(self.row_data[field]) + '</td>'
+					else:
+						row_string += '<td bgcolor = #FFFF00 title = "Errors: '
+						for error in self.errors[field]:
+							if not error in self.error_comments[field]:
+								row_string += ' - unknown error\n'
+							else:
+								row_string += ' - ' + str(error) + ':' + str(self.error_comments[field][error]) + '\n'
+						row_string += '">' + str(self.row_data[field]) + '</td>'
 		return row_string
 
 class ParseResult:
-	def __init__(self, submission_type):
+	def __init__(self, submission_type, fieldnames):
 		self.submission_type = submission_type
+		self.fieldnames = fieldnames
+		self.field_errors = None
+		self.field_found = None
 		self.parse_result = None
+
+	def add_field_error(self, field, type):
+		if not self.field_errors:
+			self.field_errors = {}
+		self.field_errors[field] = type
+
+	# this is needed to create a list of found fields in case the error is found at one level in a table but not others
+	# the list is removed from field_errors at the end of parsing
+	def add_field_found(self, field):
+		if not self.field_found:
+			self.field_found = []
+		self.field_found.append(field)
+
+	def field_found_list(self):
+		return self.field_found
+
+	def rem_field_error(self, field):
+		if field in self.field_errors:
+			del self.field_errors[field]
 
 	def parse_row(self, line_num, row_data):
 		submission_type = self.submission_type
@@ -138,19 +179,30 @@ class ParseResult:
 	def row_errors(self):
 		return self.parse_result
 
+	def field_errors_dict(self):
+		return self.field_errors
+
 	def html_table(self):
+		max_length = 100
 		# create a html table string with tooltip for details
 		if self.parse_result:
-			# get the headers from the original file and match by lowercase
-			headers = self.parse_result[next(iter(self.parse_result))].headers()
 			header_string = '<tr><th><p>Line#</p></th>'
-			for i in headers:
-				header_string += '<th><p>' + str(i) + '</p></th>'
+			for field in self.fieldnames:
+				if self.field_errors:
+					if field in self.field_errors:
+						header_string += '<th bgcolor = #FFFF00 title = "' + str(self.field_errors[field]) \
+							+ '"><p>' + str(field) + '</p></th>'
+					else:
+						header_string += '<th><p>' + str(field) + '</p></th>'
+				else:
+					header_string += '<th><p>' + str(field) + '</p></th>'
 			header_string += '</tr>'
 			html_table = header_string
 			# construct each row and append to growing table
-			for item in self.parse_result:
-				row_string = self.parse_result[item].html_row(headers)
+			for i, item in enumerate(self.parse_result):
+				if i >= max_length:
+					return html_table
+				row_string = self.parse_result[item].html_row(self.fieldnames)
 				html_table += row_string
 			return html_table
 		else:
@@ -226,10 +278,10 @@ class SubmissionResult:
 
 	def summary(self):
 		return {
-		"conflicts": len(self.conflicts),
-		"resubmissions": len(self.resubmissions),
-		"submitted": len(self.submitted)
-	}
+			"conflicts": len(self.conflicts),
+			"resubmissions": len(self.resubmissions),
+			"submitted": len(self.submitted)
+		}
 
 	def parse_record(self, record):
 		submission_type = self.submission_type
@@ -246,7 +298,7 @@ class SubmissionResult:
 		if submission_type == "FB":
 			submission_item.fb_item(record['timestamp'])
 		else: #  submission type == 'table'
-			submission_item.table_item(record['date'], record['time'])
+			submission_item.table_item(record['table_date'], record['table_time'])
 		if not record['found']:
 			self.submitted.append(submission_item)
 		elif submission_item.conflict():
@@ -456,13 +508,14 @@ class Upload:
 	def check_headers(self):
 		with open(self.file_path) as uploaded_file:
 			file_dict = DictReaderInsensitive(uploaded_file)
-			file_headers = set(file_dict.fieldnames)
+			self.fieldnames = file_dict.fieldnames
+			fieldnames = set(self.fieldnames)
 			if self.submission_type == 'FB':
 				required = set(['uid', 'trait', 'value', 'timestamp', 'person', 'location'])
 			else:  # submission_type == 'table'
 				required = set(['uid', 'date', 'time'])
-			if not required.issubset(file_headers):
-				missing_headers = required.symmetric_difference(file_headers)
+			if not required.issubset(fieldnames):
+				missing_headers = required - fieldnames
 				return "This file is missing the following headers: " + str([i for i in missing_headers])
 			else:
 				return None
@@ -494,7 +547,7 @@ class Upload:
 	def parse_rows(self):
 		trimmed_file_path = self.trimmed_file_path
 		submission_type = self.submission_type
-		parse_result = ParseResult(submission_type)
+		parse_result = ParseResult(submission_type, self.fieldnames)
 		self.parse_result = parse_result
 		with open(trimmed_file_path, 'r') as trimmed_file:
 			trimmed_dict = DictReaderInsensitive(trimmed_file)
@@ -509,13 +562,13 @@ class Upload:
 
 	def db_check(
 		self,
-		tx
+		tx,
+		parse_result
 	):
 		username = self.username
 		trimmed_file_path = self.trimmed_file_path
 		trimmed_filename = os.path.basename(trimmed_file_path)
 		submission_type = self.submission_type
-		parse_result = self.parse_result
 		with open(trimmed_file_path, 'r') as trimmed_file:
 			trimmed_dict = DictReaderInsensitive(trimmed_file)
 			if submission_type == "FB":
@@ -525,6 +578,32 @@ class Upload:
 					filename = ("file:///" + username + '/' + trimmed_filename),
 					submission_type = submission_type
 				)]
+				for row_data in trimmed_dict:
+					line_num = int(trimmed_dict.line_num)
+					# 0 based list call and have to account for header row so -2
+					item = check_result[line_num - 2]
+					if not item['uid']:
+						parse_result.merge_error(
+							line_num,
+							row_data,
+							"uid",
+							"missing"
+						)
+					if not item['trait']:
+						parse_result.merge_error(
+							line_num,
+							row_data,
+							"trait",
+							"missing"
+						)
+					if not item['value']:
+						if item['trait']:
+							parse_result.merge_error(
+								line_num,
+								row_data,
+								"value",
+								"format"
+							)
 			else:
 				required = ['uid', 'date', 'time', 'person']
 				index_headers = [
@@ -550,31 +629,39 @@ class Upload:
 					submission_type = submission_type,
 					traits = traits
 				)]
-			for row_data in trimmed_dict:
-				line_num = int(trimmed_dict.line_num)
-				# 0 based list call and have to account for header row so -2
-				item = check_result[line_num -2]
-				if not item['uid']:
-					parse_result.merge_error(
-						line_num,
-						row_data,
-						"uid",
-						"missing"
-					)
-				if not item['trait']:
-					parse_result.merge_error(
-						line_num,
-						row_data,
-						"trait",
-						"missing"
-					)
-				if not item['value']:
-					parse_result.merge_error(
-						line_num,
-						row_data,
-						"value",
-						"format"
-					)
+				for row_data in trimmed_dict:
+					line_num = int(trimmed_dict.line_num)
+					# 0 based list call and have to account for header row so -2
+					item_num = line_num -2
+					for i, trait in enumerate(traits):
+						item = check_result[item_num * len(traits) + i]
+						if not item['uid']:
+							parse_result.merge_error(
+								line_num,
+								row_data,
+								"uid",
+								"missing"
+							)
+						#this isn't so simple with mixed levels, sometimes the trait is found for some levels.
+						if not item['trait']:
+							parse_result.add_field_error(
+								trait,
+								"This trait is not found. Please check your spelling. This may also be because the trait is not registered at the level of these items"
+							)
+						else:
+							#this is to handle mixed levels, otherwise the upload would fail if a trait was only found for some levels
+							parse_result.add_field_found(trait)
+						if not item['value']:
+							if all([row_data[trait], item['trait']]):
+								parse_result.merge_error(
+									line_num,
+									row_data,
+									trait,
+									"format"
+								)
+				if parse_result.field_found_list():
+					for field in parse_result.field_found_list():
+						parse_result.rem_field_error(field)
 			return parse_result
 
 	def submit(
@@ -645,9 +732,10 @@ class Upload:
 				else:
 					# if not too many errors continue to db check (reducing the number of client feedback loops)
 					db_check_result = neo4j_session.read_transaction(
-						upload_object.db_check
+						upload_object.db_check,
+						parse_result
 					)
-				if db_check_result.row_errors():
+				if any([db_check_result.field_errors_dict(), db_check_result.row_errors()]):
 					return {
 						'status': 'ERRORS',
 						'result': db_check_result
@@ -698,22 +786,21 @@ class Upload:
 						recipients = [User(username).find('')['email']]
 						response = "Submission report:\n "
 						if submission_summary['submitted']:
-							response += "<p> - <a href= " + submitted_file_url + ">" + str(submission_summary['submitted']) \
+							response += "<p> - <a href= " + str(submitted_file_url) + ">" + str(submission_summary['submitted']) \
 								+ "</a> new values were submitted to the database.\n </p>"
 						if submission_summary['resubmissions']:
-							response += "<p> - <a href= " + resubmissions_file_url + ">" + str(submission_summary['resubmissions']) \
+							response += "<p> - <a href= " + str(resubmissions_file_url) + ">" + str(submission_summary['resubmissions']) \
 								+ "</a> existing values were already found.\n</p>"
 						if submission_summary['conflicts']:
-							response += "<p> - <a href= " + conflicts_file_url + ">" + str(submission_summary['conflicts']) \
+							response += "<p> - <a href= " + str(conflicts_file_url) + ">" + str(submission_summary['conflicts']) \
 								+ "</a> conflicts with existing values were found and not submitted.\n</p>"
-						response = "Submission report: "
 						body = "Submission_report: \n"
 						body += " - " + str(submission_summary['submitted']) + 'new values were submitted to the database.\n'
-						body += "   These are available at the following url: " + submitted_file_url + "\n"
+						body += "   These are available at the following url: " + str(submitted_file_url) + "\n"
 						body += " - " + str(submission_summary['resubmissions']) + 'existing values were already found.\n'
-						body += "   These are available at the following url: " + resubmissions_file_url + "\n"
+						body += "   These are available at the following url: " + str(resubmissions_file_url) + "\n"
 						body += " - " + str(submission_summary['conflicts']) + 'conflicts with existing values were found and not submitted.\n'
-						body += "   These are available at the following url: " + conflicts_file_url + "\n"
+						body += "   These are available at the following url: " + str(conflicts_file_url) + "\n"
 						html = render_template(
 							'emails/upload_report.html',
 							response = response

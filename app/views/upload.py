@@ -68,11 +68,23 @@ def taskstatus(task_id):
 	else:
 		result = task.get()
 		if result['status'] == 'ERRORS':
-			error_table = result['result'].html_table()
+			if result['result'].row_errors():
+				error_table = result['result'].html_table()
+			elif result['result'].field_errors_dict():
+				errors_dict = result['result'].field_errors_dict()
+				error_table = '<p>The uploaded table includes the below unrecognised fields. ' \
+							'Please check the spelling of any traits ' \
+							'and ensure they are appropriate to the level of items included ' \
+							'in this file:</p>'
+				for i in errors_dict:
+					error_table += '<p> - ' + str(i) + '</p>\n'
 			return jsonify({
 				'status': 'ERRORS',
 				'result': error_table
 			})
 		else:
-			return jsonify({'status': task.status, 'result':result})
+			return jsonify({
+				'status': task.status,
+				'result':result
+			})
 
