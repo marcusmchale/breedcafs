@@ -276,12 +276,32 @@ class Create:
 							' t.group = toLower(trim($group)), '
 							' t.name = $trait, '
 							' t.format = toLower(trim($format)), '
-							' t.default_value = $default_value, '
-							' t.minimum = $minimum, '
-							' t.maximum = $maximum, '
+							' t.default_value = CASE '
+							'	WHEN size(trim($default_value)) = 0 '
+							'	THEN Null '
+							'	ELSE $default_value '
+							'	END, '
+							' t.minimum = CASE '
+							'	WHEN size(trim($minimum)) = 0 '
+							'	THEN Null '
+							'	ELSE $minimum '
+							'	END, '
+							' t.maximum = CASE '
+							'	WHEN size(trim($maximum)) = 0 '
+							'	THEN Null '
+							'	ELSE $maximum '
+							'	END, '
 							' t.details = $details, '
-							' t.categories_fb = $categories, '
-							' t.category_list = split($categories, "/"), '
+							' t.categories_fb = CASE '
+							'	WHEN size(trim($categories)) = 0 '
+							'	THEN Null '
+							' 	Else $categories '
+							'	END, '
+							' t.category_list  = CASE '
+							'	WHEN size(trim($categories)) = 0 '
+							'	THEN Null '
+							' 	Else split($categories, "/") '
+							'	END, '
 							' t.found = False, '
 							' s2.time = timestamp() '
 						' ON MATCH SET t.found = True '
@@ -489,14 +509,23 @@ class Create:
 					if not record['r.found']:
 						print('Rootstock relationship created between ' + record['var.name'] + " and " + record['rootstock.name'] )
 		# # Assign variety as a text field but with list of categories still and later check for categories when uploading
-		variety_list = list(set(sorted(inbreds) + sorted(hybrids) + sorted(grafts)))
+		variety_list = []
+		for i in sorted(inbreds):
+			if i not in variety_list:
+				variety_list.append(i)
+		for i in sorted(hybrids):
+			if i not in variety_list:
+				variety_list.append(i)
+		for i in sorted(grafts):
+			if i not in variety_list:
+				variety_list.append(i)
 		variety_trait_create = tx.run(
 			'MATCH (u:User {username_lower: toLower(trim($username))}) '
 				' -[:SUBMITTED]->(: Submissions) '
 				' -[:SUBMITTED]->(: Traits) '
 				' -[:SUBMITTED]-(ut: TreeTraits) '
 			' WITH ut '
-			' MERGE (ut)-[s2: SUBMITTED]->(t: TreeTrait { '
+			' MERGE (ut)-[s2: SUBMITTED]->(t: Trait: TreeTrait { '
 					' name_lower: "variety name (text)" '
 				' }) '
 				' ON CREATE SET '
@@ -570,7 +599,7 @@ class Create:
 				' -[:SUBMITTED]->(:Traits) '
 				' -[:SUBMITTED]-(ut:TreeTraits) '
 				' WITH ut '
-				' MERGE (ut)-[s2 : SUBMITTED]->(t : TreeTrait { '
+				' MERGE (ut)-[s2 : SUBMITTED]->(t : Trait: TreeTrait { '
 						' name_lower: "el frances code (text)" '
 					' }) '
 					' ON CREATE SET '

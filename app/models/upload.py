@@ -43,7 +43,7 @@ class RowParseResult:
 				"format": "Time format does not match the required input (e.g. 13:00)"
 			},
 			"uid": {
-				"format": "UID doesn't match BreedCAFS pattern: "
+				"format": "UID doesn't match BreedCAFS pattern: \n"
 						  "  - plots are integers (e.g. '1')\n"
 						  "  - blocks include the plot and block ID separated by '_B' (e.g. '1_B1')\n"
 						  "  - trees include the plot and tree ID separated by '_T' (e.g. '1_T1')\n"
@@ -58,17 +58,39 @@ class RowParseResult:
 						   "that this trait is found among those supported by BreedCAFS "
 						   "for the level of data you are submitting."
 			},
-			"value": {
-				"format": "The value entered does not conform to expectations of that trait. "
-						  "Please check the trait details available from this "
-						  "and if the trait is categorical please check that this value is registered. "
+			"other": {
+				"format": {
+					"numeric":"Expected a numeric value",
+					"boolean": "Expected a boolean value ('True/False or Yes/No')",
+					"percent": "Expected a percent or simple numeric value (e.g. 50% or 50)",
+					"location": "Location coordinates are recorded as two numeric values "
+								"separated by a semicolon (';') e.g. ('53.2707;-9.0568')",
+					"date":"Expected date value format 'YYYY-MM-DD'(e.g. 2018-01-01)",
+					"counter": "Expected an integer value (no decimal points or fractions)",
+					"multicat": "Expected any of the following categories separated by a colon (':'): \n",
+					"categorical": "Expected one of the following categories only: \n",
+					"text": "Text field value error. \n"
+				}
 			}
 		}
-	def add_error(self, field, error_type):
+	def add_error(
+			self,
+			field,
+			error_type,
+			# optional arguments only relevant to value errors
+			trait_name = None,
+			trait_format = None,
+			category_list = None
+	):
 		if field not in self.errors:
-			self.errors[field] = [error_type]
+			self.errors[field] = {
+					'error_type': error_type,
+					'trait_name': trait_name,
+					'trait_format': trait_format,
+					'category_list': category_list
+				}
 		else:
-			self.errors[field].append(error_type)
+			pass
 
 	def headers(self):
 		return self.row_data.keys()
@@ -82,27 +104,37 @@ class RowParseResult:
 	def html_row (self, fieldnames):
 		row_string = '<tr><td>' + str(self.row_num) + '</td>'
 		for field in fieldnames:
-			if not self.row_data[field]:
-				row_string += '<td></td>'
+			#if not self.row_data[field]:
+			#	row_string += '<td></td>'
+			#else:
+			if field not in self.errors:
+				row_string += '<td>' + str(self.row_data[field]) + '</td>'
 			else:
-				if not field in self.errors:
-					row_string += '<td>' + str(self.row_data[field]) + '</td>'
+				row_string += '<td bgcolor = #FFFF00 title = "'
+				field_error_type = self.errors[field]['error_type']
+				field_trait_name = self.errors[field]['trait_name']
+				field_trait_format = self.errors[field]['trait_format']
+				field_category_list = self.errors[field]['category_list']
+				# if it is a simple error (time format, UID format or UID/Trait not found)
+				if field in self.error_comments:
+					row_string += self.error_comments[field][field_error_type]
 				else:
-					if not field in self.error_comments:
-						if field in fieldnames:
-							row_string += '<td bgcolor = #FFFF00 title = "' \
-								+ str(self.error_comments['value']['format']) + '">' \
-								+ str(self.row_data[field]) + '</td>'
-						else:
-							row_string += '<td bgcolor = #FFFF00 title = "unknown error">' + str(self.row_data[field]) + '</td>'
-					else:
-						row_string += '<td bgcolor = #FFFF00 title = "Errors: '
-						for error in self.errors[field]:
-							if not error in self.error_comments[field]:
-								row_string += ' - unknown error\n'
+					row_string += self.error_comments['other'][field_error_type][field_trait_format]
+					if field_trait_name == 'variety name (text)':
+						row_string += 'Expected one of the following variety names: \n'
+					elif field_trait_name == 'el frances code':
+						row_string += 'Expected one of the following codes: \n'
+					elif field_trait_name == 'synthetic fertiliser n:p:k ratio':
+						row_string += 'Expected N:P:K ratio format, e.g. 1:1:1'
+					elif 'time' in field_trait_name:
+						row_string += 'Expected time format as HH:MM e.g. 13:01'
+					if field_category_list:
+						for i, cat in enumerate(field_category_list):
+							if i == 0:
+								row_string += str(cat)
 							else:
-								row_string += ' - ' + str(error) + ':' + str(self.error_comments[field][error]) + '\n'
-						row_string += '">' + str(self.row_data[field]) + '</td>'
+								row_string += ', ' + str(cat)
+				row_string += '">' + str(self.row_data[field]) + '</td>'
 		return row_string
 
 class ParseResult:
@@ -166,15 +198,25 @@ class ParseResult:
 				"format"
 			)
 
-	def merge_error(self, line_num, row_data, field, error_type):
+	def merge_error(
+			self,
+			line_num,
+			row_data,
+			field,
+			error_type,
+			# optional arguments only relevant to value errors
+			trait_name = None,
+			trait_format = None,
+			category_list = None,
+	):
 		if not self.parse_result:
 			self.parse_result = {}
 		parse_result = self.parse_result
 		if line_num in parse_result:
-			parse_result[line_num].add_error(field, error_type)
+			parse_result[line_num].add_error(field, error_type, trait_name, trait_format, category_list)
 		else:
 			parse_result[line_num] = RowParseResult(line_num, row_data)
-			parse_result[line_num].add_error(field, error_type)
+			parse_result[line_num].add_error(field, error_type, trait_name, trait_format, category_list)
 
 	def row_errors(self):
 		return self.parse_result
@@ -209,7 +251,7 @@ class ParseResult:
 			return None
 
 	def long_enough(self):
-		max_length = 10
+		max_length = 100
 		if self.parse_result:
 			if len(self.parse_result) >= max_length:
 				return True
@@ -541,7 +583,8 @@ class Upload:
 				# remove rows without entries
 				if any(field.strip() for field in row):
 					for field in file_dict.fieldnames:
-						row[field] = row[field].strip()
+						if row[field]:
+							row[field] = row[field].strip()
 					file_writer.writerow(row)
 
 	def parse_rows(self):
@@ -597,13 +640,34 @@ class Upload:
 							"missing"
 						)
 					if not item['value']:
-						if item['trait']:
-							parse_result.merge_error(
-								line_num,
-								row_data,
-								"value",
-								"format"
-							)
+						if all([item['trait'],item['uid']]) :
+							if 'category_list' in item:
+								parse_result.merge_error(
+									line_num,
+									row_data,
+									"value",
+									"format",
+									item['trait'],
+									item['format'],
+									item['category_list']
+								)
+							elif 'format' in item:
+								parse_result.merge_error(
+									line_num,
+									row_data,
+									"value",
+									"format",
+									item['trait'],
+									item['format']
+								)
+							else :
+								parse_result.merge_error(
+									line_num,
+									row_data,
+									"value",
+									"format",
+									item['trait']
+								)
 			else:
 				required = ['uid', 'date', 'time', 'person']
 				index_headers = [
@@ -652,13 +716,34 @@ class Upload:
 							#this is to handle mixed levels, otherwise the upload would fail if a trait was only found for some levels
 							parse_result.add_field_found(trait)
 						if not item['value']:
-							if all([row_data[trait], item['trait']]):
-								parse_result.merge_error(
-									line_num,
-									row_data,
-									trait,
-									"format"
-								)
+							if all([row_data[trait], item['trait'], item['uid']]):
+								if 'category_list' in item:
+									parse_result.merge_error(
+										line_num,
+										row_data,
+										trait,
+										"format",
+										item['trait'],
+										item['format'],
+										item['category_list']
+									)
+								elif 'format' in item:
+									parse_result.merge_error(
+										line_num,
+										row_data,
+										trait,
+										"format",
+										item['trait'],
+										item['format']
+									)
+								else :
+									parse_result.merge_error(
+										line_num,
+										row_data,
+										trait,
+										"format",
+										item['trait']
+									)
 				if parse_result.field_found_list():
 					for field in parse_result.field_found_list():
 						parse_result.rem_field_error(field)
