@@ -158,10 +158,10 @@ class Fields:
 			}
 			neo4j_session.write_transaction(neo4j_query, Cypher.id_lock, lock_parameters)
 			add_parameters = {
-				'plotID' : plotID,
-				'start' : start,
-				'end' : end,
-				'replicates' : replicates,
+				'plotID': plotID,
+				'start': start,
+				'end': end,
+				'replicates': replicates,
 				'username': session['username']
 			}
 			result = neo4j_session.write_transaction(neo4j_query, Cypher.branches_add, add_parameters)
@@ -175,10 +175,10 @@ class Fields:
 			}
 			neo4j_session.write_transaction(neo4j_query, Cypher.id_lock, lock_parameters)
 			add_parameters = {
-				'plotID' : plotID,
-				'start' : start,
-				'end' : end,
-				'replicates' : replicates,
+				'plotID': plotID,
+				'start': start,
+				'end': end,
+				'replicates': replicates,
 				'username': session['username']
 			}
 			result = neo4j_session.write_transaction(neo4j_query, Cypher.leaves_add, add_parameters)

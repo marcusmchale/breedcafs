@@ -126,7 +126,7 @@ $("#submit_samples").click( function(e) {
 				flash_submitted = "<div id='samples_flash' class='flash'> " + response.submitted + " </div>";
 				$("#samples_flash").replaceWith(flash_submitted);
 			}  else {
-				$("#files_flash").remove();
+				$("#samples_flash").remove();
                 for (i in response) {
                     for (var key in response[i]){
                         if (response[i].hasOwnProperty(key)) {

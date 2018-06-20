@@ -8,27 +8,21 @@ from flask import (
 	redirect,
 	url_for,
 	render_template,
-	make_response,
 	jsonify,
 	request
 )
 from app.models import (
-	Lists,
 	Fields,
 	User,
 	Download,
-	Samples,
 )
 from app.forms import (
 	LocationForm,
 	RecordForm,
 	CreateTraits,
 	SampleRegForm,
-	AddTissueForm,
-	AddStorageForm,
 )
-from app.emails import send_static_attachment, send_email
-from flask.views import MethodView
+from app.emails import send_email
 
 @app.route('/record', methods=['GET', 'POST'])
 def record():
@@ -140,7 +134,7 @@ def generate_files():
 						else:
 							file_details_dict = Download(session['username']).get_table_csv(form_data)
 						if file_details_dict == None:
-							return jsonify({'submitted': "TEST"})
+							return jsonify({'submitted': "No entries found that match your selection"})
 					#create html block with urls
 					url_list_html = ''
 					for file in file_details_dict:

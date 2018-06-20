@@ -1,6 +1,5 @@
 import os
 import unicodecsv as csv 
-#import cStringIO
 from app import app
 from app.cypher import Cypher
 from neo4j_driver import get_driver, neo4j_query
@@ -53,11 +52,25 @@ class Samples:
 			if not os.path.isdir(os.path.join(app.instance_path, app.config['DOWNLOAD_FOLDER'], session['username'])):
 				os.mkdir(os.path.join(app.instance_path, app.config['DOWNLOAD_FOLDER'], session['username']))
 			#prepare variables to write the file
-			fieldnames= ['UID', 'PlotID', 'TreeID', 'TreeName', 'SampleID', 'Date', 'Tissue', 'Storage', 'Block', 'Plot', 'Farm', 'Region', 'Country']
-			time = datetime.now().strftime('%Y%m%d-%H%M%S')
+			fieldnames = [
+				'Country',
+				'Region',
+				'Farm',
+				'Plot',
+				'PlotUID',
+				'Block',
+				'BlockUID',
+				'TreeUID',
+				'TreeCustomID',
+				'Variety',
+				'SampleUID',
+				'Tissue',
+				'Storage',
+				'Date'
+			]
 			first_sample_id = id_list[0]['SampleID']
 			last_sample_id = id_list[-1]['SampleID']
-			filename = time + '_plot_' + str(plotID) + '_S' + str(first_sample_id) + '_to_S' + str(last_sample_id) + '.csv'
+			filename = 'plot_' + str(plotID) + '_S' + str(first_sample_id) + '_to_S' + str(last_sample_id) + '.csv'
 			file_path = os.path.join(app.instance_path, app.config['DOWNLOAD_FOLDER'], session['username'], filename)
 			#make the file
 			with open(file_path, 'w') as file:
@@ -67,17 +80,16 @@ class Samples:
 					extrasaction='ignore')
 				writer.writeheader()
 				for row in id_list:
-					to_title_case = ['Tissue', 'Storage', 'Block', 'Plot', 'Farm', 'Region', 'Country']
-					for item in to_title_case:
-						row[item] = str(row[item]).title() if row[item] else None
 					writer.writerow(row)
 				file_size = file.tell()
 			#return file details
-			return { "filename":filename,
-				"file_path":file_path,
-				"file_size":file_size,
-				"first_sample_id":first_sample_id,
-				"last_sample_id":last_sample_id }
+			return {
+				"filename": filename,
+				"file_path": file_path,
+				"file_size": file_size,
+				"first_sample_id": first_sample_id,
+				"last_sample_id": last_sample_id
+			}
 		else:
 			return id_list
 	def get_samples(self, parameters):
@@ -114,7 +126,7 @@ class Samples:
 		#now parse out ranges of values provided, first from trees if provided a range, then from samples 
 		#not sure if there is an order to processing of where statements..but would be better to do trees first anyway i guess
 		if any(
-			[key != '' in parameters for key in [
+			[parameters[key] != '' for key in [
 				'trees_start',
 				'trees_end',
 				'start_time',
@@ -122,7 +134,7 @@ class Samples:
 				'samples_start',
 				'samples_end',
 				'replicates']
-			 ]
+			]
 		):
 			q = q + ' WHERE '
 			filters_list = []
@@ -133,8 +145,10 @@ class Samples:
 			filters_list.append('sample.id >= $samples_start') if parameters['samples_start'] != '' else None
 			filters_list.append('sample.id <= $samples_end') if parameters['samples_end'] != '' else None
 			filters_list.append('sample.replicates >= $replicates') if parameters['replicates'] != '' else None
-			for filter in filters_list:
-				q = q + ' ' + filter + ' AND'
+			for i, filter in enumerate(filters_list):
+				if i != 0:
+					q = q + ' AND '
+				q = q + filter
 		# get block name
 		q = (q + ' OPTIONAL MATCH (tree) '
 			' -[:IS_IN {current: True}]->(:BlockTrees) '
@@ -148,22 +162,23 @@ class Samples:
 		# build the return statement
 		q = q + (
 			' RETURN { '
-				' UID: sample.uid, '
 				' Country : country.name, '
 				' Region : region.name, '
 				' Farm : farm.name, '
 				' Plot : plot.name, '
-				' PlotID : plot.uid, '
+				' PlotUID : plot.uid, '
 				' Block : block.name, '
-				' BlockID : block.id, '
+				' BlockUID : block.uid, '
+				' TreeUID : tree.uid, '
 				' TreeCustomID : tree.custom_id, '
-				' TreeID : tree.id, '
-				' BranchID : branch.id, '
-				' LeafID : leaf.id, '
-				' SampleID : sample.id, '
+				' Variety: tree.variety, '
+				' BranchUID : branch.uid, '
+				' LeafUID : leaf.uid, '
+				' SampleUID: sample.uid, '
 				' Tissue : tissue.name, '
 				' Storage : storage.name, '
-				' Date : sample.date '
+				' Date : sample.date, '
+				' SampleID : sample.id '
 			' } '
 		)
 		#and order by sample id

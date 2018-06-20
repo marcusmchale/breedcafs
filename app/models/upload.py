@@ -9,7 +9,7 @@ import unicodecsv as csv
 from datetime import datetime
 from werkzeug.utils import secure_filename
 
-from celery.contrib import rdb
+#from celery.contrib import rdb
 
 
 class DictReaderInsensitive(csv.DictReader):
@@ -122,7 +122,7 @@ class RowParseResult:
 					row_string += self.error_comments['other'][field_error_type][field_trait_format]
 					if field_trait_name == 'variety name (text)':
 						row_string += 'Expected one of the following variety names: \n'
-					elif field_trait_name == 'el frances code':
+					elif field_trait_name == 'el frances code (text)':
 						row_string += 'Expected one of the following codes: \n'
 					elif field_trait_name == 'synthetic fertiliser n:p:k ratio':
 						row_string += 'Expected N:P:K ratio format, e.g. 1:1:1'
@@ -161,8 +161,9 @@ class ParseResult:
 		return self.field_found
 
 	def rem_field_error(self, field):
-		if field in self.field_errors:
-			del self.field_errors[field]
+		if self.field_errors:
+			if field in self.field_errors:
+				del self.field_errors[field]
 
 	def parse_row(self, line_num, row_data):
 		submission_type = self.submission_type

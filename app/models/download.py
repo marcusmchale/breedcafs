@@ -17,7 +17,7 @@ from app.models import (
 	Fields)
 
 #User class related (all uploads are tied to a user) yet more specifically regarding uploads
-class Download(User):
+class Download:
 	def __init__(self, username):
 		self.username = username
 	def make_csv_file(self, fieldnames, id_list, filename):
@@ -28,7 +28,12 @@ class Download(User):
 		time = datetime.now().strftime('%Y%m%d-%H%M%S')
 		filename = time + '_' + filename
 		file_path = os.path.join(app.instance_path, app.config['DOWNLOAD_FOLDER'], session['username'], filename)
-		#make the file
+		# handle case where user is making more than one file a minute
+		if os.path.isfile(file_path):
+			time = datetime.now().strftime('%Y%m%d-%H%M%S')
+			filename = time + '_' + filename
+			file_path = os.path.join(app.instance_path, app.config['DOWNLOAD_FOLDER'], session['username'], filename)
+		# make the file
 		with open(file_path, 'w') as file:
 			writer = csv.DictWriter(file,
 				fieldnames = fieldnames,
@@ -36,20 +41,9 @@ class Download(User):
 				extrasaction = 'ignore')
 			writer.writeheader()
 			for row in id_list:
-				to_title_case = set(fieldnames).intersection([
-					'Variety',
-					'Tissue',
-					'Storage',
-					'Block',
-					'Plot',
-					'Farm',
-					'Region',
-					'Country'])
-				for item in to_title_case:
-					row[item] = str(row[item]).title() if row[item] else None
 				writer.writerow(row)
 			file_size = file.tell()
-		#return file details
+		# return file details
 		return {
 			"filename":filename,
 			"file_path":file_path,
@@ -532,20 +526,20 @@ class Download(User):
 			parameters = {}
 			query = 'MATCH (c:Country '
 			if form_data['country'] != '':
-				query += '{name: $country}'
+				query += '{name_lower: toLower($country)}'
 				parameters['country'] = form_data['country']
 			query += ')<-[:IS_IN]-(r:Region '
 			if form_data['region'] != '':
-				query += '{name: $region}'
+				query += '{name_lower: toLower($region)}'
 				parameters['region'] = form_data['region']
 			query += ')<-[:IS_IN]-(f:Farm '
 			if form_data['farm'] != '':
-				query += '{name: $farm}'
+				query += '{name_lower: toLower($farm)}'
 				parameters['farm'] = form_data['farm']
 			query += (
 				' )<-[IS_IN]-(p:Plot) '
-				' RETURN {'
-				'	UID: p.uid, '
+				' RETURN { '
+				'	PlotUID: p.uid, '
 				'	Plot: p.name, '
 				'	Farm: f.name, '
 				'	Region: r.name, '
@@ -563,18 +557,18 @@ class Download(User):
 			if len(id_list) == 0:
 				return None
 			fieldnames = [
-				'UID',
 				'Country',
 				'Region',
 				'Farm',
-				'Plot'
+				'Plot',
+				'PlotUID'
 			]
 			if 'farm' in parameters:
-				filename = parameters['farm'] + '_'
+				filename = form_data['farm'] + '_'
 			elif 'region' in parameters:
-				filename = parameters['region'] + '_'
+				filename = form_data['region'] + '_'
 			elif 'country' in parameters:
-				filename = parameters['country'] + '_'
+				filename = form_data['country'] + '_'
 			else:
 				filename = ''
 			csv_file_details = self.make_csv_file(
@@ -586,7 +580,15 @@ class Download(User):
 			plotID = int(form_data['plot'])
 			if form_data['trait_level'] == 'block':
 				# make the file and return a dictionary with filename, file_path and file_size
-				fieldnames = ['UID', 'PlotID', 'BlockID', 'Block', 'Plot', 'Farm', 'Region', 'Country']
+				fieldnames = [
+					'Country',
+					'Region',
+					'Farm',
+					'Plot',
+					'PlotUID',
+					'Block',
+					'BlockUID'
+				]
 				id_list = Fields.get_blocks(plotID)
 				if len(id_list) == 0:
 					return None
@@ -596,16 +598,16 @@ class Download(User):
 				trees_end = int(form_data['trees_end'] if form_data['trees_end'] else 999999)
 				# make the file and return filename, path, size
 				fieldnames = [
-					'UID',
 					'Country',
 					'Region',
 					'Farm',
 					'Plot',
-					'PlotID',
+					'PlotUID',
 					'Block',
-					'BlockID',
-					'TreeName',
-					'TreeID',
+					'BlockUID',
+					'TreeUID',
+					'TreeCustomID',
+					'Variety'
 				]
 				id_list = Fields.get_trees(plotID, trees_start, trees_end)
 				if len(id_list) == 0:
@@ -618,7 +620,19 @@ class Download(User):
 					'treeIDs_' + str(first_tree_id) + '-' + str(last_tree_id) + '.csv'
 				)
 			elif form_data['trait_level'] == 'branch':
-				fieldnames = ['UID', 'Country', 'Region', 'Farm', 'Plot', 'PlotID', 'Block', 'BlockID', 'TreeName', 'TreeID', 'BranchID']
+				fieldnames = [
+					'Country',
+					'Region',
+					'Farm',
+					'Plot',
+					'PlotUID',
+					'Block',
+					'BlockUID',
+					'TreeUID',
+					'TreeCustomID',
+					'Variety',
+					'BranchUID'
+				]
 				if form_data['old_new_ids'] == 'old':
 					parameters = {
 						'country': form_data['country'],
@@ -651,7 +665,20 @@ class Download(User):
 						'branchIDs.csv'
 					)
 			elif form_data['trait_level'] == 'leaf':
-				fieldnames = ['UID', 'Country', 'Region', 'Farm', 'Plot', 'PlotID', 'Block', 'BlockID', 'TreeName', 'TreeID', 'BranchID', 'LeafID']
+				fieldnames = [
+					'Country',
+					'Region',
+					'Farm',
+					'Plot',
+					'PlotUID',
+					'Block',
+					'BlockUID',
+					'TreeUID',
+					'TreeCustomID',
+					'Variety',
+					'BranchUID',
+					'LeafUID'
+				]
 				if form_data['old_new_ids'] == 'old':
 					parameters = {
 						'country': form_data['country'],
@@ -691,6 +718,7 @@ class Download(User):
 					'plotID': int(plotID),
 					'trees_start': int(form_data['trees_start']) if form_data['trees_start'] else '',
 					'trees_end': int(form_data['trees_end']) if form_data['trees_end'] else '',
+					'replicates': int(form_data['replicates']) if form_data['replicates'] else "",
 					'tissue': form_data['tissue'],
 					'storage': form_data['storage'],
 					'start_time': int((datetime.strptime(form_data['date_from'], '%Y-%m-%d') -	datetime(1970, 1, 1)).total_seconds() * 1000) if form_data['date_from'] != '' else '',
@@ -700,19 +728,19 @@ class Download(User):
 				}
 				# build the file and return filename etc.
 				fieldnames = [
-					'UID',
 					'Country',
 					'Region',
 					'Farm',
 					'Plot',
-					'PlotID',
+					'PlotUID',
 					'Block',
-					'BlockID',
-					'TreeName',
-					'TreeID',
-					'BranchID',
-					'LeafID',
-					'SampleID',
+					'BlockUID',
+					'TreeUID',
+					'TreeCustomID',
+					'Variety',
+					'BranchUID',
+					'LeafUID',
+					'SampleUID',
 					'Tissue',
 					'Storage',
 					'Date'
@@ -721,13 +749,12 @@ class Download(User):
 				if len(id_list) == 0:
 					return None
 				sample_replicates = int(form_data['sample_replicates']) if form_data['sample_replicates'] else 1
-				if sample_replicates != 1:
-					fieldnames.insert(11, 'Replicate')
+				if sample_replicates > 1:
+					fieldnames.append('ReplicateUID')
 					id_list_reps = []
 					for sample in id_list:
 						for i in range(sample_replicates):
-							sample['UID'] = str(sample['PlotID']) + "_S" + str(sample['SampleID']) + "." + str(int(i + 1))
-							sample['Replicate'] = i + 1
+							sample['ReplicateUID'] = str(sample['SampleUID']) + "." + str(int(i + 1))
 							id_list_reps.append(sample.copy())
 					id_list = id_list_reps
 				csv_file_details = self.make_csv_file(
@@ -756,7 +783,8 @@ class Download(User):
 		if not os.path.isdir(os.path.join(app.instance_path, app.config['DOWNLOAD_FOLDER'], self.username)):
 			os.mkdir(os.path.join(app.instance_path, app.config['DOWNLOAD_FOLDER'], self.username))
 		#set variables for file creation
-		fieldnames = ['name',
+		fieldnames = [
+			'name',
 			'format',
 			'defaultValue',
 			'minimum',
@@ -764,7 +792,8 @@ class Download(User):
 			'details',
 			'categories',
 			'isVisible',
-			'realPosition']
+			'realPosition'
+		]
 		#make the file
 		file_details = self.make_csv_file(fieldnames, selected_traits, form_data['trait_level'] + '.trt')
 		return file_details
@@ -775,20 +804,20 @@ class Download(User):
 			parameters = {}
 			query = 'MATCH (c:Country '
 			if form_data['country'] != '':
-				query += '{name: $country}'
+				query += '{name_lower: toLower($country)}'
 				parameters['country'] = form_data['country']
 			query += ')<-[:IS_IN]-(r:Region '
 			if form_data['region'] != '':
-				query += '{name: $region}'
+				query += '{name_lower: toLower($region)}'
 				parameters['region'] = form_data['region']
 			query += ')<-[:IS_IN]-(f:Farm '
 			if form_data['farm'] != '':
-				query += '{name: $farm}'
+				query += '{name_lower: toLower($farm)}'
 				parameters['farm'] = form_data['farm']
 			query += (
 				' )<-[IS_IN]-(p:Plot) '
 				' RETURN {'
-				' UID : p.uid, '
+				' PlotUID : p.uid, '
 				' Plot : p.name, '
 				' Farm : f.name, '
 				' Region : r.name, '
@@ -796,11 +825,11 @@ class Download(User):
 				' ORDER BY p.uid'
 			)
 			fieldnames = [
-				'UID',
 				'Country',
 				'Region',
 				'Farm',
-				'Plot'
+				'Plot',
+				'PlotUID'
 			]
 			with get_driver().session() as neo4j_session:
 				result = neo4j_session.read_transaction(
@@ -813,14 +842,13 @@ class Download(User):
 			if form_data['trait_level'] == 'block':
 				# make the file and return a dictionary with filename, file_path and file_size
 				fieldnames = [
-					'UID',
 					'Country',
 					'Region',
 					'Farm',
 					'Plot',
-					'PlotID',
+					'PlotUID',
 					'Block',
-					'BlockID'
+					'BlockUID'
 				]
 				id_list = Fields.get_blocks(plotID)
 			if form_data['trait_level'] == 'tree':
@@ -828,31 +856,31 @@ class Download(User):
 				trees_end = int(form_data['trees_end'] if form_data['trees_end'] else 999999)
 				# make the file and return filename, path, size
 				fieldnames = [
-					'UID',
 					'Country',
 					'Region',
 					'Farm',
 					'Plot',
-					'PlotID',
+					'PlotUID',
 					'Block',
-					'BlockID',
-					'TreeName',
-					'TreeID'
+					'BlockUID',
+					'TreeUID',
+					'TreeCustomID',
+					'Variety'
 				]
 				id_list = Fields.get_trees(plotID, trees_start, trees_end)
 			if form_data['trait_level'] == 'branch':
 				fieldnames = [
-					'UID',
 					'Country',
 					'Region',
 					'Farm',
 					'Plot',
-					'PlotID',
+					'PlotUID',
 					'Block',
-					'BlockID',
-					'TreeName',
-					'TreeID',
-					'BranchID'
+					'BlockUID',
+					'TreeCustomID',
+					'TreeUID',
+					'Variety',
+					'BranchUID'
 				]
 				if form_data['old_new_ids'] == 'old':
 					parameters = {
@@ -874,18 +902,17 @@ class Download(User):
 					id_list = existing_ids
 			if form_data['trait_level'] == 'leaf':
 				fieldnames = [
-					'UID',
 					'Country',
 					'Region',
 					'Farm',
 					'Plot',
-					'PlotID',
+					'PlotUID',
 					'Block',
-					'BlockID',
-					'TreeName',
-					'TreeID',
-					'BranchID',
-					'LeafID'
+					'BlockUID',
+					'TreeCustomID',
+					'TreeUID',
+					'BranchUID',
+					'LeafUID'
 				]
 				if form_data['old_new_ids'] == 'old':
 					parameters = {
@@ -906,6 +933,22 @@ class Download(User):
 				else:
 					id_list = existing_ids
 			if form_data['trait_level'] == 'sample':
+				fieldnames = [
+					'Country',
+					'Region',
+					'Farm',
+					'Plot',
+					'PlotUID',
+					'Block',
+					'BlockUID',
+					'TreeUID',
+					'TreeCustomID',
+					'Variety',
+					'SampleUID',
+					'Tissue',
+					'Storage',
+					'Date'
+				]
 				parameters = {
 					'country': form_data['country'],
 					'region': form_data['region'],
@@ -929,22 +972,6 @@ class Download(User):
 					'samples_end': int(form_data['samples_end']) if form_data['samples_end'] else ""
 				}
 				# build the file and return filename etc.
-				fieldnames = [
-					'UID',
-					'Country',
-					'Region',
-					'Farm',
-					'Plot',
-					'PlotID',
-					'Block',
-					'BlockID',
-					'TreeName',
-					'TreeID',
-					'SampleID',
-					'Date',
-					'Tissue',
-					'Storage',
-					]
 				id_list = Samples().get_samples(parameters)
 		#check we have found matching ID's, if not return None
 		if len(id_list) == 0:
@@ -952,12 +979,11 @@ class Download(User):
 		#if requesting replicates for samples then create these in the id_list
 		sample_replicates = int(form_data['sample_replicates']) if form_data['sample_replicates'] else 1
 		if sample_replicates != 1:
-			fieldnames.insert(11, 'Replicate')
+			fieldnames.insert(15, 'ReplicateUID')
 			id_list_reps = []
 			for sample in id_list:
 				for i in range(sample_replicates):
-					sample['UID'] = str(sample['PlotID']) + "_S" + str(sample['SampleID']) + "." + str(int(i + 1))
-					sample['Replicate'] = i + 1
+					sample['ReplicateUID'] = str(sample['SampleUID']) + "." + str(int(i + 1))
 					id_list_reps.append(sample.copy())
 			id_list = id_list_reps
 		#then we get the traits list from the form

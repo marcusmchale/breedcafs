@@ -592,7 +592,10 @@ class Create:
 				else:
 					print "New variety created"
 		# now create the TreeTrait
-		code_list = list(set([str(i[0]).lower() for i in el_frances_code]))
+		code_list = []
+		for i in el_frances_code:
+			if str(i[0]).lower() not in code_list:
+				code_list.append(str(i[0]).lower())
 		el_frances_code_trait_create = tx.run(
 			'MATCH (u:User {username_lower:toLower(trim($username))}) '
 				' -[:SUBMITTED]->(:Submissions) '
