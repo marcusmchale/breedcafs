@@ -9,7 +9,7 @@ import unicodecsv as csv
 from datetime import datetime
 from werkzeug.utils import secure_filename
 
-#from celery.contrib import rdb
+from celery.contrib import rdb
 
 
 class DictReaderInsensitive(csv.DictReader):
@@ -144,11 +144,16 @@ class ParseResult:
 		self.field_errors = None
 		self.field_found = None
 		self.parse_result = None
+		self.unique_keys = None
+		self.duplicate_keys = None
 
 	def add_field_error(self, field, type):
 		if not self.field_errors:
 			self.field_errors = {}
 		self.field_errors[field] = type
+
+	def get_unique_keys(self):
+		return self.unique_keys
 
 	# this is needed to create a list of found fields in case the error is found at one level in a table but not others
 	# the list is removed from field_errors at the end of parsing
@@ -167,37 +172,59 @@ class ParseResult:
 
 	def parse_row(self, line_num, row_data):
 		submission_type = self.submission_type
-		if submission_type == "FB":
-			if not Parsers.timestamp_fb_format(row_data['timestamp']):
-				self.merge_error(
-					line_num,
-					row_data,
-					"timestamp",
-					"format"
-				)
-		else:  # submission_type == "table":
-			if not Parsers.date_format(row_data['date']):
-				self.merge_error(
-					line_num,
-					row_data,
-					"date",
-					"format"
-				)
-			if not Parsers.time_format(row_data['time']):
-				self.merge_error(
-					line_num,
-					row_data,
-					"time",
-					"format"
-				)
+		if not self.unique_keys:
+			self.unique_keys = set()
 		# check uid formatting
-		if not Parsers.uid_format(row_data['uid']):
+		parsed_uid = Parsers.uid_format(row_data['uid'])
+		if not parsed_uid:
 			self.merge_error(
 				line_num,
 				row_data,
 				"uid",
 				"format"
 			)
+		# check time formatting and for FB use trait in unique key.
+		if submission_type == "FB":
+			parsed_timestamp = Parsers.timestamp_fb_format(row_data['timestamp'])
+			if not parsed_timestamp:
+				self.merge_error(
+					line_num,
+					row_data,
+					"timestamp",
+					"format"
+				)
+			unique_key = (parsed_uid, parsed_timestamp, row_data['trait'])
+			if unique_key not in self.unique_keys:
+				self.unique_keys.add((unique_key))
+			else:
+				if not self.duplicate_keys:
+					self.duplicate_keys = {}
+				self.duplicate_keys[line_num] = row_data
+		# Check time, and for trait duplicates in tables simply check for duplicate fields in header
+		else:  # submission_type == "table":
+			parsed_date = Parsers.date_format(row_data['date'])
+			parsed_time = Parsers.time_format(row_data['time'])
+			if not parsed_date:
+				self.merge_error(
+					line_num,
+					row_data,
+					"date",
+					"format"
+				)
+			if not parsed_time:
+				self.merge_error(
+					line_num,
+					row_data,
+					"time",
+					"format"
+				)
+			unique_key = (parsed_uid, parsed_time, parsed_date)
+			if unique_key not in self.unique_keys:
+				self.unique_keys.add(unique_key)
+			else:
+				if not self.duplicate_keys:
+					self.duplicate_keys = {}
+				self.duplicate_keys[line_num] = row_data
 
 	def merge_error(
 			self,
@@ -225,6 +252,37 @@ class ParseResult:
 	def field_errors_dict(self):
 		return self.field_errors
 
+	def duplicate_keys_dict(self):
+		return self.duplicate_keys
+
+	def duplicate_keys_table(self):
+		if not self.duplicate_keys:
+			return '<p>duplicated keys found</p>'
+		else:
+			max_length = 50
+			if self.submission_type == "FB":
+				response = '<p>The uploaded file contains duplicated unique keys ' \
+						   ' (the combination of UID, timestamp and trait).' \
+						   ' The following lines duplicate preceding lines in the file: </p>'
+			else:
+				response = '<p>The uploaded table contains duplicated unique keys ' \
+						   '(the combination of UID, date and time). ' \
+						   ' The following lines duplicate preceding lines in the file: </p>'
+			header_string = '<tr><th><p>Line#</p></th>'
+			for field in self.fieldnames:
+				header_string += '<th><p>' + str(field) + '</p></th>'
+			html_table = header_string + '</tr>'
+			# construct each row and append to growing table
+			for i, row_num in enumerate(self.duplicate_keys):
+				if i >= max_length:
+					return html_table
+				row_string = '<tr><td>' + str(row_num) + '</td>'
+				for field in self.fieldnames:
+					row_string += '<td>' + self.duplicate_keys[row_num][field] + '</td>'
+				row_string += '</tr>'
+				html_table += row_string
+			return response + '<table>' + html_table + '</table>'
+
 	def html_table(self):
 		max_length = 100
 		# create a html table string with tooltip for details
@@ -247,7 +305,7 @@ class ParseResult:
 					return html_table
 				row_string = self.parse_result[item].html_row(self.fieldnames)
 				html_table += row_string
-			return html_table
+			return '<table>' + html_table + '</table>'
 		else:
 			return None
 
@@ -468,7 +526,7 @@ class Parsers:
 			]):
 				return False
 			else:
-				return True
+				return timestamp
 		except ValueError:
 			return False
 
@@ -477,7 +535,7 @@ class Parsers:
 		date_string = str(date_string).strip()
 		try:
 			datetime.strptime(date_string, '%Y-%m-%d')
-			return True
+			return date_string
 		except ValueError:
 			return False
 
@@ -494,7 +552,7 @@ class Parsers:
 			]):
 				return False
 			else:
-				return True
+				return time_string
 		except ValueError:
 			return False
 
@@ -510,7 +568,7 @@ class Parsers:
 					uid.split("_")[1][0] in ["B", "T", "R", "L", "S"],
 					uid.split("_")[1][1:].isdigit()
 				]):
-					return True
+					return uid
 				else:
 					return False
 			else:
@@ -552,6 +610,8 @@ class Upload:
 		with open(self.file_path) as uploaded_file:
 			file_dict = DictReaderInsensitive(uploaded_file)
 			self.fieldnames = file_dict.fieldnames
+			if len(self.fieldnames) > len(set(self.fieldnames)):
+				return "This file contains duplicated header fields. This is not supported"
 			fieldnames = set(self.fieldnames)
 			if self.submission_type == 'FB':
 				required = set(['uid', 'trait', 'value', 'timestamp', 'person', 'location'])
@@ -811,6 +871,11 @@ class Upload:
 				# parse this trimmed file for errors, sets parse_result attribute to upload_object
 				parse_result = upload_object.parse_rows()
 				if parse_result.long_enough():
+					return {
+						'status': 'ERRORS',
+						'result': parse_result
+					}
+				elif parse_result.duplicate_keys_dict():
 					return {
 						'status': 'ERRORS',
 						'result': parse_result

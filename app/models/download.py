@@ -20,15 +20,16 @@ from app.models import (
 class Download:
 	def __init__(self, username):
 		self.username = username
-	def make_csv_file(self, fieldnames, id_list, filename):
+	def make_csv_file(self, fieldnames, id_list, filename, with_time = True):
 		#create user download path if not found
 		if not os.path.isdir(os.path.join(app.instance_path, app.config['DOWNLOAD_FOLDER'], self.username)):
 			os.mkdir(os.path.join(app.instance_path, app.config['DOWNLOAD_FOLDER'], self.username))
 		#prepare variables to write the file
 		time = datetime.now().strftime('%Y%m%d-%H%M%S')
-		filename = time + '_' + filename
+		if with_time:
+			filename = time + '_' + filename
 		file_path = os.path.join(app.instance_path, app.config['DOWNLOAD_FOLDER'], session['username'], filename)
-		# handle case where user is making more than one file a minute
+		# handle case where user is making more than one file a minute (per second filenames)
 		if os.path.isfile(file_path):
 			time = datetime.now().strftime('%Y%m%d-%H%M%S')
 			filename = time + '_' + filename
@@ -71,72 +72,89 @@ class Download:
 		self.farm = farm
 		self.plotID = plotID
 		self.blockUID = blockUID
-		traits = [i.encode('utf-8') for i in traits]
-		self.traits=traits
+		self.traits = traits
 		self.start_time = start_time
 		self.end_time = end_time
 		#build query strings - always be careful not to allow injection when doing this!!
 		#all of the input needs to be validated (in this case it is already done by WTForms checking against selectfield options)
 		#but as I am not entirely sure about the security of this layer I am adding another check of the values that are used to concatenate the string
 		node_label = str(level).title() + 'Trait'
-		TRAITS = Lists(node_label).create_list('name')
+		all_level_traits = Lists(node_label).create_list('name_lower')
+		traits = [str(i) for i in traits if i in all_level_traits]
 		#First I limit the data nodes to those submitted by members of an affiliated institute
 		user_data_query = ( 
-			' MATCH (:User {username: $username}) '
+			' MATCH (:User {username_lower: toLower($username)}) '
 			' -[:AFFILIATED {confirmed :true}] '
 			' ->(partner:Partner) '
 			' WITH partner '			
 			' MATCH (partner)<-[:AFFILIATED {data_shared :true}] '
 			' -(user:User) '
 			' -[:SUBMITTED*5]->(data:Data) '
-			' WITH user.name as user_name, partner.name as partner_name, data' )
+			' WITH user.name as user_name, partner.name as partner_name, data '
+		)
 		#this section first as not dependent on level but part of query build
 		if country == "" :
-			frc = (' -[:IS_IN]->(farm:Farm) '
-				' -[:IS_IN]->(region:Region) '
-				' -[:IS_IN]->(country:Country) ')
+			frc = (
+				' -[:IS_IN]->(farm: Farm) '
+				' -[:IS_IN]->(region: Region) '
+				' -[:IS_IN]->(country: Country) '
+			)
 		elif country != "" and region == "":
-			frc = (' -[:IS_IN]->(farm:Farm) '
-				' -[:IS_IN]->(region:Region) '
-				' -[:IS_IN]->(country:Country {name:$country}) ')
+			frc = (
+				' -[:IS_IN]->(farm: Farm) '
+				' -[:IS_IN]->(region: Region) '
+				' -[:IS_IN]->(country: Country {name_lower: toLower($country)}) '
+			)
 		elif region != "" and farm == "" :
 			frc = (' <-[:IS_IN]->(farm:Farm) '
-				' -[:IS_IN]->(region:Region {name:$region}) '
-				' -[:IS_IN]->(country:Country {name:$country}) ')
+				' -[:IS_IN]->(region:Region {name_lower: toLower($region)}) '
+				' -[:IS_IN]->(country:Country {name_lower: toLower($country)}) ')
 		elif farm != "" :
-			frc = (' -[:IS_IN]->(farm:Farm {name:$farm}) '
-				' -[:IS_IN]->(region:Region {name:$region}) '
-				' -[:IS_IN]->(country:Country {name:$country}) ')
+			frc = (' -[:IS_IN]->(farm:Farm {name_lower: toLower($farm)}) '
+				' -[:IS_IN]->(region:Region {name_lower: toLower($region)}) '
+				' -[:IS_IN]->(country:Country {name_lower: toLower($country)}) ')
 		#then level dependent stuff
-		if level == 'sample' and set(traits).issubset(set(TRAITS)):
+		if level == 'sample':
 			index_fieldnames = [
-				'User',
-				'Partner',
 				'Country',
 				'Region',
-				'Farm', 
-				'Plot', 
+				'Farm',
+				'Plot',
+				'PlotUID',
 				'Block',
-				'PlotID',
-				'TreeID',
-				'SampleID',
-				'UID']
-			td = ( ' MATCH (trait:SampleTrait) '
-				' WHERE (trait.name) IN ' + str(traits) +
-				' WITH user_name, partner_name, data, trait '
-				' MATCH (trait) '
-					' <-[:FOR_TRAIT]-(:PlotSampleTrait) '
-					' <-[:DATA_FOR]-(tst:TreeSampleTrait) '
-					' <-[:DATA_FOR]-(sst:SampleSampleTrait) '
-					' <-[:DATA_FOR]-(data), '
-					' (sst)-[:FROM_SAMPLE]->(sample:Sample), '
-					' (tst)-[:FROM_TREE]->(tree:Tree) '
-				)
+				'BlockUID',
+				'TreeUID',
+				'TreeCustomID',
+				'Variety',
+				'BranchUID',
+				'LeafUID',
+				'SampleUID',
+				'Tissue',
+				'Storage',
+				'Date'
+			]
+			td = (
+				' MATCH '
+				'	(trait:SampleTrait) '
+				'	<-[FOR_TRAIT*2]-(sample_trait) '
+				'	<-[DATA_FOR]-(data)'
+				' WHERE (trait.name_lower) IN ' + str(traits) +
+				' WITH user_name, partner_name, data, trait, sample_trait '
+				' MATCH '
+				'	(sample_trait) '
+				'	-[:FOR_ITEM]->(sample:Sample) '
+				'	-[:FROM_TREE*2]->(tree:Tree), '
+				'	(sample)'
+				'	-[:COLLECTED_AS*2]->(tist) '
+				'	-[:OF_TISSUE]->(tissue), '
+				'	(tist)-[:STORED_IN]->(storage), '
+				'	(tree) '
+			)
 			#if no plot selected
 			if plotID == "" :
 				tdp = td + ( ' -[:IS_IN]->(PlotTrees) '
 					' -[:IS_IN]->(plot:Plot) ' )
-				query = tdp + frc 
+				#query = tdp + frc
 				optional_block = ( ' OPTIONAL MATCH (tree) '
 					' -[:IS_IN]->(:BlockTrees) '
 					' -[:IS_IN]->(block:Block) ' )
@@ -144,46 +162,70 @@ class Download:
 			elif blockUID == "" and plotID != "" :
 				tdp = td + ( ' -[:IS_IN]->(PlotTrees) '
 					' -[:IS_IN]->(plot:Plot {uid:$plotID}) ' )
-				query = tdp + frc 
+				#query = tdp + frc
 				optional_block = ( ' OPTIONAL MATCH (tree) '
 					' -[:IS_IN]->(:BlockTrees) '
 					' -[:IS_IN]->(block:Block) ')
-			#if blockID is defined
-			elif blockUID != "":
+			#else blockID is defined
+			else: # blockUID != "":
 				tdp = td + ( '-[:IS_IN]->(:BlockTrees) '
 					' -[:IS_IN]->(block:Block {uid:$blockUID}) '
 					' -[:IS_IN]->(:PlotBlocks) '
 					' -[:IS_IN]->(plot:Plot) ')
-				query = tdp + frc
+				#query = tdp + frc
 				optional_block = ''
+			optional_block += (
+				' OPTIONAL MATCH '
+				'	(sample)-[:FROM_BRANCH {current: True}]->(branch:Branch) '
+				' OPTIONAL MATCH '
+				'	(sample)-[:FROM_LEAF {current:True}]->(leaf:Leaf) '
+			)
 			#and generate the return statement
 			if data_format == 'table':
 				response = ( 
 					#need a with statement to allow order by with COLLECT
 					' WITH '
-						' sample.uid as UID, '
-						' sample.id as SampleID, '
-						' plot.uid as PlotID, '
-						' tree.id as TreeID, '
-						' block.name as Block, '
-						' plot.name as Plot, '
-						' farm.name as Farm, '
-						' region.name as Region, '
-						' country.name as Country, '
-						' COLLECT([trait.name, data.value]) as Traits '
+					' 	country.name as Country, '
+					' 	region.name as Region, '
+					' 	farm.name as Farm, '
+					' 	plot.name as Plot, '
+					' 	plot.uid as PlotUID, '
+					' 	block.name as Block, '
+					' 	block.uid as BlockUID, '
+					' 	tree.uid as TreeUID, '
+					' 	tree.custom_id as TreeCustomID, '
+					' 	tree.variety as Variety, '
+					' 	branch.uid as BranchUID, '
+					' 	leaf.uid as LeafUID, '
+					' 	sample.uid as SampleUID, '
+					'	tissue.name as Tissue, '
+					'	storage.name as Storage, '
+					'	sample.date as Date, '
+					' 	sample.id as SampleID, '
+					'	COLLECT([trait.name, data.value]) as Traits '
 					' RETURN '
-						' { UID : UID ,'
-						' PlotID : PlotID, '
-						' TreeID : TreeID, '
-						' SampleID : SampleID, '
-						' Block : Block, '
-						' Plot : Plot, '
-						' Farm : Farm, '
-						' Region : Region, '
-						' Country : Country, '
-						' Traits : Traits } '
+					'	{ ' 
+					'		Country : Country, '
+					'		Region : Region, '
+					'		Farm : Farm, '
+					'		Plot : Plot, '
+					'		PlotUID : PlotUID, '
+					'		Block : Block, '
+					'		BlockUID: BlockUID, '
+					'		TreeUID : TreeUID, '
+					'		TreeCustomID: TreeCustomID, '
+					'		Variety: Variety, '
+					'		BranchUID: BranchUID, '
+					'		LeafUID: LeafUID, '
+					'		SampleUID : SampleUID ,'
+					'		Tissue: Tissue, '
+					'		Storage: Storage, '
+					'		Date: Date, '
+					'		SampleID : SampleID, '
+					'		Traits : Traits } '
 					' ORDER BY '
-						' PlotID, SampleID ' )
+						' PlotUID, SampleID '
+				)
 			elif data_format == 'db':
 				response = (
 					' RETURN {'
@@ -193,11 +235,20 @@ class Download:
 						' Region : region.name, '
 						' Farm : farm.name, '
 						' Plot : plot.name, '
+						' PlotUID: plot.uid, '
 						' Block : block.name, '
-						' PlotID : plot.uid, '
-						' TreeID : tree.id, '
+						' BlockUID : block.uid, '
+						' TreeUID : tree.uid, '
+						' TreeCustomID: tree.custom_id,	'
+						' Variety: tree.variety, '
+						' SampleUID : sample.uid, '
+						' BranchUID: branch.uid, '
+						' LeafUID: leaf.uid, '
+						' SampleUID : sample.uid, '
+						' Tissue: tissue.name, '
+						' Storage: storage.name, '
+						' Date: sample.date, '
 						' SampleID : sample.id, '
-						' UID : sample.uid, '
 						' Trait : trait.name, '
 						' Value : data.value, '
 						' Location : data.location, '
@@ -206,7 +257,126 @@ class Download:
 					' } '
 					' ORDER BY plot.uid, sample.id, trait.name, apoc.date.format(data.time) '
 					)
-		if level == 'tree' and set(traits).issubset(set(TRAITS)):
+		elif level == 'leaf':
+			index_fieldnames = [
+				'Country',
+				'Region',
+				'Farm',
+				'Plot',
+				'PlotUID',
+				'Block',
+				'BlockUID',
+				'TreeUID',
+				'TreeCustomID',
+				'Variety',
+				'BranchUID',
+				'LeafUID'
+			]
+			td = (
+				' MATCH '
+				'	(trait:LeafTrait) '
+				'	<-[:FOR_TRAIT*2]-(leaf_trait) '
+				'	<-[:DATA_FOR]-(data) '
+				' WHERE (trait.name_lower) IN ' + str(traits) +
+				' WITH user_name, partner_name, data, trait, leaf_trait '
+				' MATCH '
+				'	(leaf_trait) '
+				'	-[:FOR_ITEM]->(leaf:Leaf) '
+				'	-[:FROM_TREE*2]->(tree:Tree) '
+			)
+			#if no plot selected
+			if plotID == "":
+				tdp = td + ( ' -[:IS_IN]->(PlotTrees) '
+					' -[:IS_IN]->(plot:Plot) ' )
+				#query = tdp + frc
+				optional_block = ( ' OPTIONAL MATCH (tree) '
+					' -[:IS_IN {current:True}]->(:BlockTrees) '
+					' -[:IS_IN]->(block:Block) ' )
+			#if plotID is defined (but no blockUID)
+			elif blockUID == "" and plotID != "":
+				tdp = td + ( ' -[:IS_IN]->(PlotTrees) '
+					' -[:IS_IN]->(plot:Plot {uid:$plotID}) ' )
+				#query = tdp + frc
+				optional_block = ( ' OPTIONAL MATCH (tree) '
+					' -[:IS_IN {current:True}]->(:BlockTrees) '
+					' -[:IS_IN]->(block:Block) ')
+			#if blockID is defined
+			else: # blockUID != "":
+				tdp = td + ( '-[:IS_IN {current:True}]->(:BlockTrees) '
+					' -[:IS_IN]->(block:Block {uid:$blockUID}) '
+					' -[:IS_IN]->(:PlotBlocks) '
+					' -[:IS_IN]->(plot:Plot) ')
+				#query = tdp + frc
+				optional_block = ''
+			optional_block += (
+				' OPTIONAL MATCH '
+				'	(leaf)-[:FROM_BRANCH {current: True}]->(branch:Branch) '
+			)
+			#and generate the return statement
+			if data_format == 'table':
+				response = (
+					#need a with statement to allow order by with COLLECT
+					' WITH '
+					' 	country.name as Country, '
+					' 	region.name as Region, '
+					' 	farm.name as Farm, '
+					' 	plot.name as Plot, '
+					' 	plot.uid as PlotUID, '
+					' 	block.name as Block, '
+					' 	block.uid as BlockUID, '
+					' 	tree.uid as TreeUID, '
+					' 	tree.custom_id as TreeCustomID, '
+					' 	tree.variety as Variety, '
+					' 	branch.uid as BranchUID, '
+					' 	leaf.uid as LeafUID, '
+					' 	leaf.id as LeafID, '
+					'	COLLECT([trait.name, data.value]) as Traits '
+					' RETURN '
+					'	{ ' 
+					'		Country : Country, '
+					'		Region : Region, '
+					'		Farm : Farm, '
+					'		Plot : Plot, '
+					'		PlotUID : PlotUID, '
+					'		Block : Block, '
+					'		BlockUID: BlockUID, '
+					'		TreeUID : TreeUID, '
+					'		TreeCustomID: TreeCustomID, '
+					'		Variety: Variety, '
+					'		BranchUID: BranchUID, '
+					'		LeafUID: LeafUID, '
+					'		LeafID: LeafID, '
+					'		Traits : Traits } '
+					' ORDER BY '
+						' PlotUID, LeafID '
+				)
+			elif data_format == 'db':
+				response = (
+					' RETURN {'
+						' User : user_name, '
+						' Partner : partner_name,'
+						' Country : country.name, ' 
+						' Region : region.name, '
+						' Farm : farm.name, '
+						' Plot : plot.name, '
+						' PlotUID: plot.uid, '
+						' Block : block.name, '
+						' BlockUID : block.uid, '
+						' TreeUID : tree.uid, '
+						' TreeCustomID: tree.custom_id,	'
+						' Variety: tree.variety, '
+						' BranchUID: branch.uid, '
+						' LeafUID: leaf.uid, '
+						' LeafID: leaf.id, '
+						' Trait : trait.name, '
+						' Value : data.value, '
+						' Location : data.location, '
+						' Recorded_at : apoc.date.format(data.time), '
+						' Recorded_by: data.person '
+					' } '
+					' ORDER BY plot.uid, leaf.id, trait.name, apoc.date.format(data.time) '
+					)
+		elif level == 'tree':
 			index_fieldnames = [
 				'User',
 				'Partner',
@@ -231,7 +401,7 @@ class Download:
 			if plotID == "" :
 				tdp = td + ( ' -[:IS_IN]->(PlotTrees) '
 					' -[:IS_IN]->(plot:Plot) ' )
-				query = tdp + frc 
+				#query = tdp + frc
 				optional_block = ( ' OPTIONAL MATCH (tree) '
 					' -[:IS_IN]->(:BlockTrees) '
 					' -[:IS_IN]->(block:Block) ')
@@ -239,7 +409,7 @@ class Download:
 			elif blockUID == "" and plotID != "" :
 				tdp = td + ( ' -[:IS_IN]->(PlotTrees) '
 					' -[:IS_IN]->(plot:Plot {uid:$plotID}) ' )
-				query = tdp + frc 
+				#query = tdp + frc
 				optional_block = ( ' OPTIONAL MATCH (tree) '
 					' -[:IS_IN]->(:BlockTrees) '
 					' -[:IS_IN]->(block:Block) ')
@@ -249,7 +419,7 @@ class Download:
 					' -[:IS_IN]->(block:Block {uid:$blockUID}) '
 					' -[:IS_IN]->(:PlotBlocks) '
 					' -[:IS_IN]->(plot:Plot) ')
-				query = tdp + frc
+				#query = tdp + frc
 				optional_block = ''
 			#and generate the return statement
 			if data_format == 'table':
@@ -298,7 +468,7 @@ class Download:
 					' } '
 					' ORDER BY plot.uid, tree.id, trait.name, apoc.date.format(data.time) '
 					)
-		elif level == 'block' and set(traits).issubset(set(TRAITS)):
+		elif level == 'block':
 			optional_block = ''
 			index_fieldnames = [
 				'User',
@@ -331,7 +501,7 @@ class Download:
 				tdp = td + ( ') '
 					' -[:IS_IN]->(:PlotBlocks)'
 					' -[:IS_IN]->(plot:Plot) ' )
-			query = tdp + frc
+			#query = tdp + frc
 			if data_format == 'table':
 				response = ( 
 					#need a with statement to allow order by with COLLECT
@@ -379,7 +549,7 @@ class Download:
 					' } '
 					' ORDER BY plot.uid, block.id, trait.name, apoc.date.format(data.time) '
 					)
-		elif level == 'plot' and set(traits).issubset(set(TRAITS)):
+		elif level == 'plot':
 			optional_block = ''
 			index_fieldnames = [
 				'User',
@@ -396,7 +566,7 @@ class Download:
 					' <-[:FOR_TRAIT]-(ppt:PlotPlotTrait) '
 					' <-[:DATA_FOR]-(data), ' 
 					' (ppt)-[:FROM_PLOT]->(plot:Plot) ' )
-			query = tdp + frc
+			#query = tdp + frc
 			if data_format == 'table':
 				response = ( 
 					#need a with statement to allow order by with COLLECT
@@ -445,9 +615,10 @@ class Download:
 		else:
 			time_condition = ''
 		#finalise query, get data 
-		query = user_data_query + query + time_condition + optional_block + response
+		query = user_data_query + tdp + frc + time_condition + optional_block + response
 		with get_driver().session() as neo4j_session:
 			result = neo4j_session.read_transaction(self._get_csv, query)
+		import pdb; pdb.set_trace()
 		#check if any data found, if not return none
 		if len(result) == 0:
 			return None
@@ -473,8 +644,7 @@ class Download:
 				#[[trait_fieldnames.add(i[0]) for i in record.pop('Traits')] for record in result]
 			#replaced the above with using the fieldnames of traits from the form, this will provide a predictable output from a user perspective )
 			#will also allow me to do all this as a stream once the files get larger - thanks Tony for this advice
-			if set(traits).issubset(set(TRAITS)):
-				trait_fieldnames = traits
+			trait_fieldnames = traits
 			#now create the csv file from result and fieldnames
 			fieldnames =  index_fieldnames + list(trait_fieldnames)
 		elif data_format == 'db':
@@ -493,11 +663,7 @@ class Download:
 				quoting=csv.QUOTE_ALL,
 				extrasaction='ignore')
 			writer.writeheader()
-			for i, item in enumerate(result):
-				to_title_case = set(fieldnames).intersection(
-					['Variety', 'Tissue', 'Storage', 'Block', 'Plot', 'Farm', 'Region', 'Country'])
-				for item in to_title_case:
-					row[item] = str(row[item]).title() if row[item] else None
+			for item in result:
 				writer.writerow(item)
 			file_size = file.tell()
 		return { "filename":filename,
@@ -659,10 +825,15 @@ class Download:
 				else:
 					if len(existing_ids) == 0:
 						return None
+					first_branch_id = existing_ids[0]['BranchID']
+					last_branch_id = existing_ids[-1]['BranchID']
+					filename = 'plot_' + str(plotID) + '_R' + str(first_branch_id) + '_to_R' + str(
+						last_branch_id) + '.csv'
 					csv_file_details = self.make_csv_file(
 						fieldnames,
 						existing_ids,
-						'branchIDs.csv'
+						filename,
+						with_time = False
 					)
 			elif form_data['trait_level'] == 'leaf':
 				fieldnames = [
@@ -705,10 +876,15 @@ class Download:
 				else:
 					if len(existing_ids) == 0:
 						return None
+					first_leaf_id = existing_ids[0]['LeafID']
+					last_leaf_id = existing_ids[-1]['LeafID']
+					filename = 'plot_' + str(plotID) + '_L' + str(first_leaf_id) + '_to_L' + str(
+						last_leaf_id) + '.csv'
 					csv_file_details = self.make_csv_file(
 						fieldnames,
 						existing_ids,
-						'leafIDs.csv'
+						filename,
+						with_time = False
 					)
 			elif form_data['trait_level'] == 'sample':
 				parameters = {

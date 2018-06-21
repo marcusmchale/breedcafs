@@ -36,6 +36,8 @@ update_storage = function(set_storage = "") {
 
 $( window ).load(update_tissues).load(update_storage)
 
+$('#email_checkbox').prop("checked", true);
+
 //Submit tissue
 $("#submit_tissue").click( function(e) {
 	e.preventDefault();

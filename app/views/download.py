@@ -69,7 +69,7 @@ def generate_csv():
 					plotID = int(plotID)
 				blockUID = request.form['block']
 				#selected traits of current level as flat list
-				traits = [item for sublist in [request.form.getlist(i) for i in request.form if all([ i.startswith(level + '-'), 'csrf_token' not in i])] for item in sublist]
+				traits = [item for sublist in [request.form.getlist(i) for i in request.form if all([i.startswith(level + '-'), 'csrf_token' not in i])] for item in sublist]
 				#get selected data format
 				data_format = request.form['data_format']
 				#convert the date to epoch time (ms)

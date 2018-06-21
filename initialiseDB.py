@@ -274,7 +274,7 @@ class Create:
 						' ON CREATE SET '
 							' t.level = toLower(trim($level)), '
 							' t.group = toLower(trim($group)), '
-							' t.name = $trait, '
+							' t.name = trim($trait), '
 							' t.format = toLower(trim($format)), '
 							' t.default_value = CASE '
 							'	WHEN size(trim($default_value)) = 0 '

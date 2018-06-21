@@ -72,6 +72,7 @@ $('#old_new_ids').change(function () {
     if (this.value === 'new') {
         $('#new_ids').show();
         $('#old_ids').hide();
+        $('#email_checkbox').prop("checked", true);
    }
 });
 

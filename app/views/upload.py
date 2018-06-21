@@ -68,6 +68,8 @@ def taskstatus(task_id):
 	else:
 		result = task.get()
 		if result['status'] == 'ERRORS':
+			if result['result'].duplicate_keys_dict():
+				error_table = result['result'].duplicate_keys_table()
 			if result['result'].row_errors():
 				error_table = result['result'].html_table()
 			elif result['result'].field_errors_dict():

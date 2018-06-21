@@ -44,32 +44,40 @@ $('#block').hide();
 
 //TRAITS
 //remove submit traits buttons (these are loaded with the traits forms)
-$('#submit_block_traits').remove();
-$('#submit_tree_traits').remove();
+//$('#submit_block_traits').remove();
+//$('#submit_tree_traits').remove();
 
 //also load set trait level undefined by default and only display level traits when selected
 $('#trait_level').val('0');
-$('#sample_traits,#tree_traits,#block_traits,#plot_traits').hide();
+$('#sample_traits,#leaf_traits,#branch_traits,#tree_traits,#block_traits,#plot_traits').hide();
 
 $('#trait_level').change(function () {
 	$(".flash").remove();
 	if (this.value === '') {
-		$('#sample_traits,#tree_traits,#block_traits,#plot_traits').hide();
+		$('#sample_traits,#leaf_traits,#branch_traits,#tree_traits,#block_traits,#plot_traits').hide();
 	}
 	else if (this.value === 'sample') {
-		$('#tree_traits,#block_traits,#plot_traits').hide();
+		$('#leaf_traits,#branch_traits,#tree_traits,#block_traits,#plot_traits').hide();
 		$('#sample_traits').show();
 	}
+	else if (this.value === 'leaf') {
+		$('#sample_traits,#branch_traits,#tree_traits,#block_traits,#plot_traits').hide();
+		$('#leaf_traits').show();
+	}
+	else if (this.value === 'branch') {
+		$('#sample_traits,#leaf_traits,#tree_traits,#block_traits,#plot_traits').hide();
+		$('#branch_traits').show();
+	}
 	else if (this.value === 'tree') {
-		$('#sample_traits,#block_traits,#plot_traits').hide();
+		$('#sample_traits,#leaf_traits,#branch_traits,#block_traits,#plot_traits').hide();
 		$('#tree_traits').show();
 	}
 	else if (this.value === 'block') {
-		$('#sample_traits,#tree_traits,#plot_traits').hide();
+		$('#sample_traits,#leaf_traits,#branch_traits,#tree_traits,#plot_traits').hide();
 		$('#block_traits').show();
 	}
 	else if (this.value === 'plot') {
-		$('#sample_traits,#tree_traits,#block_traits').hide();
+		$('#sample_traits,#leaf_traits,#branch_traits,#tree_traits,#block_traits').hide();
 		$('#plot_traits').show();
 	}
 })
