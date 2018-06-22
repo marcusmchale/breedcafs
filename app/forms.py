@@ -497,7 +497,7 @@ class CreateTraits(FlaskForm):
 			traits = sorted(Lists(level.title() + 'Trait').get_nodes(), key = lambda dict: dict['name'])
 			#merge this into our nested defaultdict[level] with group as key and list of traits as value
 			for trait in traits:
-				self.levels_groups_traits[level][trait['group']].append((trait['name_lower'], trait['details']))
+				self.levels_groups_traits[level][trait['group']].append((trait['name'], trait['details']))
 			#and create empty attributes for each group
 			for group in self.levels_groups_traits[level]:
 				setattr(CreateTraits, group, SelectMultipleField(group,

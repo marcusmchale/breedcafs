@@ -34,8 +34,8 @@ class Chart:
 			#connect counters to block/plot
 			for node in nodes:
 				if str(node['id']).endswith('_count_node'):
-					rels.append({'source':node['id'], 
-						'type':'FROM_COUNTER', 
+					rels.append({'source':node['id'],
+						'type':'FROM_COUNTER',
 						'id':(node['id'] + '_' + node['id'].split('_')[0]),
 						'target': int(node['id'].split('_')[0])})
 			#then uniquify

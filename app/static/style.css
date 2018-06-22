@@ -116,22 +116,22 @@ svg {
 					fill-opacity:1;
 					}
 
-.Trees{
+.Tree{
 					stroke: black;
 					fill: #009900;
 					fill-opacity:0.8
 					}
-.Branches{
+.Branch{
 					stroke: black;
 					fill: #669900;
 					fill-opacity:0.8
 					}
-.Leaves{
+.Leaf{
 					stroke: black;
 					fill: #99cc00;
 					fill-opacity:0.8
 					}
-.Samples{
+.Sample{
 					stroke: black;
 					fill: #cccc00;
 					fill-opacity:0.8
