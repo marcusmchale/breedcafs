@@ -415,6 +415,11 @@ class SubmissionResult:
 		if len(self.conflicts) == 0:
 			return None
 		else:
+			if not os.path.isdir(download_path):
+				os.mkdir(download_path)
+				gid = grp.getgrnam(app.config['CELERYGRPNAME']).gr_gid
+				os.chown(download_path, -1, gid)
+				os.chmod(download_path, 0775)
 			conflicts_filename = os.path.splitext(filename)[0] + '_conflicts.csv'
 			conflicts_file_path = os.path.join(
 				app.instance_path,
@@ -450,6 +455,11 @@ class SubmissionResult:
 		if len(self.resubmissions) == 0:
 			return None
 		else:
+			if not os.path.isdir(download_path):
+				os.mkdir(download_path)
+				gid = grp.getgrnam(app.config['CELERYGRPNAME']).gr_gid
+				os.chown(download_path, -1, gid)
+				os.chmod(download_path, 0775)
 			resubmissions_filename = os.path.splitext(filename)[0] + '_resubmissions.csv'
 			resubmissions_file_path = os.path.join(
 				app.instance_path,
@@ -484,6 +494,11 @@ class SubmissionResult:
 		if len(self.submitted) == 0:
 			return None
 		else:
+			if not os.path.isdir(download_path):
+				os.mkdir(download_path)
+				gid = grp.getgrnam(app.config['CELERYGRPNAME']).gr_gid
+				os.chown(download_path, -1, gid)
+				os.chmod(download_path, 0775)
 			submitted_filename = os.path.splitext(filename)[0] + '_submitted.csv'
 			submitted_file_path = os.path.join(
 				app.instance_path,
