@@ -1,4 +1,5 @@
 from app import app, os, celery, ServiceUnavailable
+import grp
 from app.cypher import Cypher
 from app.emails import send_email
 from flask import render_template, url_for
@@ -592,8 +593,11 @@ class Upload:
 
 	def file_save(self, file_data):
 		# create user upload path if not found
-		if not os.path.isdir(os.path.join(app.instance_path, app.config['UPLOAD_FOLDER'], self.username)):
-			os.mkdir(os.path.join(app.instance_path, app.config['UPLOAD_FOLDER'], self.username))
+		upload_path = os.path.join(app.instance_path, app.config['UPLOAD_FOLDER'], self.username)
+		if not os.path.isdir(upload_path):
+			os.mkdir(upload_path)
+			gid = grp.getgrnam(app.config('celery_group_name')).gr_gid
+			os.chown(upload_path, -1, gid)
 		file_data.save(self.file_path)
 
 	def is_valid_csv(self):

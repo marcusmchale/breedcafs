@@ -22,8 +22,11 @@ class Download:
 		self.username = username
 	def make_csv_file(self, fieldnames, id_list, filename, with_time = True):
 		#create user download path if not found
-		if not os.path.isdir(os.path.join(app.instance_path, app.config['DOWNLOAD_FOLDER'], self.username)):
-			os.mkdir(os.path.join(app.instance_path, app.config['DOWNLOAD_FOLDER'], self.username))
+		download_path = os.path.join(app.instance_path, app.config['DOWNLOAD_FOLDER'], self.username)
+		if not os.path.isdir(download_path):
+			os.mkdir(download_path)
+			gid = grp.getgrnam(app.config('celery_group_name')).gr_gid
+			os.chown(upload_path, -1, gid)
 		#prepare variables to write the file
 		time = datetime.now().strftime('%Y%m%d-%H%M%S')
 		if with_time:
