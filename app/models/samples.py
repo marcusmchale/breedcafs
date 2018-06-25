@@ -63,10 +63,10 @@ class Samples:
 				'TreeUID',
 				'TreeCustomID',
 				'Variety',
-				'SampleUID',
 				'Tissue',
 				'Storage',
-				'Date'
+				'SampleDate',
+				'UID'
 			]
 			first_sample_id = id_list[0]['SampleID']
 			last_sample_id = id_list[-1]['SampleID']
@@ -109,7 +109,7 @@ class Samples:
 			q = q + ' {uid:$plotID}'
 		q = (q + ')<-[:FROM_PLOT]-(:PlotSamples) '
 			+ ' <-[:FROM_PLOT]-(pts:PlotTissueStorage) '
-			+ ' <-[:FROM_PLOT]-(sample),')
+			+ ' <-[:COLLECTED_AS]-(sample),')
 		#collect the Tissue/Storage container
 		q = (q + ' (pts)-[:COLLECTED_AS]->(TiSt:TissueStorage) '
 			+ ' -[:OF_TISSUE]->(tissue:Tissue ')
@@ -174,10 +174,10 @@ class Samples:
 				' Variety: tree.variety, '
 				' BranchUID : branch.uid, '
 				' LeafUID : leaf.uid, '
-				' SampleUID: sample.uid, '
 				' Tissue : tissue.name, '
 				' Storage : storage.name, '
-				' Date : sample.date, '
+				' SampleDate : sample.date, '
+				' UID: sample.uid, '
 				' SampleID : sample.id '
 			' } '
 		)

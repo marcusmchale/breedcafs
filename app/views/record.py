@@ -112,7 +112,7 @@ def generate_files():
 							#		storage,
 							#		date,
 							#		False)
-					#now create the index files requested: plots/blocks/trees/branches/leaves/samples.csv
+					# now create the index files requested: plots/blocks/trees/branches/leaves/samples.csv
 					if form_data['template_format'] == 'fb':
 						if all([form_data['trait_level'] in ['branch','leaf'], form_data['old_new_ids'] == 'new']):
 							csv_file_details = Download(session['username']).get_index_csv(form_data, id_list)
@@ -133,9 +133,9 @@ def generate_files():
 							file_details_dict = Download(session['username']).get_table_csv(form_data, id_list)
 						else:
 							file_details_dict = Download(session['username']).get_table_csv(form_data)
-						if file_details_dict == None:
+						if file_details_dict is None:
 							return jsonify({'submitted': "No entries found that match your selection"})
-					#create html block with urls
+					# create html block with urls
 					url_list_html = ''
 					for file in file_details_dict:
 						item = str(

@@ -128,10 +128,10 @@ class Download:
 				'Variety',
 				'BranchUID',
 				'LeafUID',
-				'SampleUID',
+				'UID',
 				'Tissue',
 				'Storage',
-				'Date'
+				'SampleDate'
 			]
 			td = (
 				' MATCH '
@@ -217,7 +217,7 @@ class Download:
 					'		Variety: Variety, '
 					'		BranchUID: BranchUID, '
 					'		LeafUID: LeafUID, '
-					'		SampleUID : SampleUID ,'
+					'		UID : SampleUID ,'
 					'		Tissue: Tissue, '
 					'		Storage: Storage, '
 					'		Date: Date, '
@@ -244,7 +244,7 @@ class Download:
 						' SampleUID : sample.uid, '
 						' BranchUID: branch.uid, '
 						' LeafUID: leaf.uid, '
-						' SampleUID : sample.uid, '
+						' UID : sample.uid, '
 						' Tissue: tissue.name, '
 						' Storage: storage.name, '
 						' Date: sample.date, '
@@ -270,7 +270,7 @@ class Download:
 				'TreeCustomID',
 				'Variety',
 				'BranchUID',
-				'LeafUID'
+				'UID'
 			]
 			td = (
 				' MATCH '
@@ -344,7 +344,7 @@ class Download:
 					'		TreeCustomID: TreeCustomID, '
 					'		Variety: Variety, '
 					'		BranchUID: BranchUID, '
-					'		LeafUID: LeafUID, '
+					'		UID: LeafUID, '
 					'		LeafID: LeafID, '
 					'		Traits : Traits } '
 					' ORDER BY '
@@ -366,7 +366,7 @@ class Download:
 						' TreeCustomID: tree.custom_id,	'
 						' Variety: tree.variety, '
 						' BranchUID: branch.uid, '
-						' LeafUID: leaf.uid, '
+						' UID: leaf.uid, '
 						' LeafID: leaf.id, '
 						' Trait : trait.name, '
 						' Value : data.value, '
@@ -388,7 +388,7 @@ class Download:
 				'TreeUID',
 				'TreeCustomID',
 				'Variety',
-				'BranchUID',
+				'UID',
 			]
 			td = (
 				' MATCH '
@@ -456,7 +456,7 @@ class Download:
 					'		TreeUID : TreeUID, '
 					'		TreeCustomID: TreeCustomID, '
 					'		Variety: Variety, '
-					'		BranchUID: BranchUID, '
+					'		UID: BranchUID, '
 					'		BranchID: BranchID,'
 					'		Traits : Traits } '
 					' ORDER BY '
@@ -477,7 +477,7 @@ class Download:
 						' TreeUID : tree.uid, '
 						' TreeCustomID: tree.custom_id,	'
 						' Variety: tree.variety, '
-						' BranchUID: branch.uid, '
+						' UID: branch.uid, '
 						' BranchID: branch.id, '
 						' Trait : trait.name, '
 						' Value : data.value, '
@@ -496,7 +496,7 @@ class Download:
 				'PlotUID',
 				'Block',
 				'BlockUID',
-				'TreeUID',
+				'UID',
 				'TreeCustomID',
 				'Variety'
 			]
@@ -561,7 +561,7 @@ class Download:
 					'		PlotUID : PlotUID, '
 					'		Block : Block, '
 					'		BlockUID: BlockUID, '
-					'		TreeUID : TreeUID, '
+					'		UID : TreeUID, '
 					'		TreeCustomID: TreeCustomID, '
 					'		Variety: Variety, '
 					'		TreeID: TreeID,'
@@ -581,7 +581,7 @@ class Download:
 						' PlotUID: plot.uid, '
 						' Block : block.name, '
 						' BlockUID : block.uid, '
-						' TreeUID : tree.uid, '
+						' UID : tree.uid, '
 						' TreeCustomID: tree.custom_id,	'
 						' Variety: tree.variety, '
 						' TreeID: tree.id, '
@@ -601,7 +601,7 @@ class Download:
 				'Plot',
 				'PlotUID',
 				'Block',
-				'BlockUID'
+				'UID'
 			]
 			td = (
 				' MATCH '
@@ -649,7 +649,7 @@ class Download:
 					'		Plot : Plot, '
 					'		PlotUID : PlotUID, '
 					'		Block : Block, '
-					'		BlockUID: BlockUID, '
+					'		UID: BlockUID, '
 					'		BlockID: BlockID,'
 					'		Traits : Traits } '
 					' ORDER BY '
@@ -666,7 +666,7 @@ class Download:
 						' Plot : plot.name, '
 						' PlotUID: plot.uid, '
 						' Block : block.name, '
-						' BlockUID : block.uid, '
+						' UID : block.uid, '
 						' BlockID: block.id, '
 						' Trait : trait.name, '
 						' Value : data.value, '
@@ -682,7 +682,7 @@ class Download:
 				'Region',
 				'Farm',
 				'Plot',
-				'PlotUID'
+				'UID'
 			]
 			tdp = (
 				' MATCH '
@@ -713,7 +713,7 @@ class Download:
 					'		Region : Region, '
 					'		Farm : Farm, '
 					'		Plot : Plot, '
-					'		PlotUID : PlotUID, '
+					'		UID : PlotUID, '
 					'		Traits : Traits } '
 					' ORDER BY '
 						' PlotUID '
@@ -727,7 +727,7 @@ class Download:
 						' Region : region.name, '
 						' Farm : farm.name, '
 						' Plot : plot.name, '
-						' PlotUID: plot.uid, '
+						' UID: plot.uid, '
 						' Trait : trait.name, '
 						' Value : data.value, '
 						' Location : data.location, '
@@ -835,7 +835,7 @@ class Download:
 			query += (
 				' )<-[IS_IN]-(p:Plot) '
 				' RETURN { '
-				'	PlotUID: p.uid, '
+				'	UID: p.uid, '
 				'	Plot: p.name, '
 				'	Farm: f.name, '
 				'	Region: r.name, '
@@ -857,7 +857,7 @@ class Download:
 				'Region',
 				'Farm',
 				'Plot',
-				'PlotUID'
+				'UID'
 			]
 			if 'farm' in parameters:
 				filename = form_data['farm'] + '_'
@@ -883,7 +883,7 @@ class Download:
 					'Plot',
 					'PlotUID',
 					'Block',
-					'BlockUID'
+					'UID'
 				]
 				id_list = Fields.get_blocks(plotID)
 				if len(id_list) == 0:
@@ -901,9 +901,9 @@ class Download:
 					'PlotUID',
 					'Block',
 					'BlockUID',
-					'TreeUID',
+					'Variety',
 					'TreeCustomID',
-					'Variety'
+					'UID'
 				]
 				id_list = Fields.get_trees(plotID, trees_start, trees_end)
 				if len(id_list) == 0:
@@ -925,9 +925,9 @@ class Download:
 					'Block',
 					'BlockUID',
 					'TreeUID',
-					'TreeCustomID',
 					'Variety',
-					'BranchUID'
+					'TreeCustomID',
+					'UID'
 				]
 				if form_data['old_new_ids'] == 'old':
 					parameters = {
@@ -978,7 +978,7 @@ class Download:
 					'TreeCustomID',
 					'Variety',
 					'BranchUID',
-					'LeafUID'
+					'UID'
 				]
 				if form_data['old_new_ids'] == 'old':
 					parameters = {
@@ -1046,10 +1046,10 @@ class Download:
 					'Variety',
 					'BranchUID',
 					'LeafUID',
-					'SampleUID',
 					'Tissue',
 					'Storage',
-					'Date'
+					'SampleDate',
+					'UID'
 				]
 				id_list = Samples().get_samples(parameters)
 				if len(id_list) == 0:
@@ -1123,7 +1123,7 @@ class Download:
 			query += (
 				' )<-[IS_IN]-(p:Plot) '
 				' RETURN {'
-				' PlotUID : p.uid, '
+				' UID : p.uid, '
 				' Plot : p.name, '
 				' Farm : f.name, '
 				' Region : r.name, '
@@ -1135,7 +1135,7 @@ class Download:
 				'Region',
 				'Farm',
 				'Plot',
-				'PlotUID'
+				'UID'
 			]
 			with get_driver().session() as neo4j_session:
 				result = neo4j_session.read_transaction(
@@ -1154,7 +1154,7 @@ class Download:
 					'Plot',
 					'PlotUID',
 					'Block',
-					'BlockUID'
+					'UID'
 				]
 				id_list = Fields.get_blocks(plotID)
 			if form_data['trait_level'] == 'tree':
@@ -1169,9 +1169,9 @@ class Download:
 					'PlotUID',
 					'Block',
 					'BlockUID',
-					'TreeUID',
+					'Variety',
 					'TreeCustomID',
-					'Variety'
+					'UID'
 				]
 				id_list = Fields.get_trees(plotID, trees_start, trees_end)
 			if form_data['trait_level'] == 'branch':
@@ -1186,7 +1186,7 @@ class Download:
 					'TreeCustomID',
 					'TreeUID',
 					'Variety',
-					'BranchUID'
+					'UID'
 				]
 				if form_data['old_new_ids'] == 'old':
 					parameters = {
@@ -1218,7 +1218,7 @@ class Download:
 					'TreeCustomID',
 					'TreeUID',
 					'BranchUID',
-					'LeafUID'
+					'UID'
 				]
 				if form_data['old_new_ids'] == 'old':
 					parameters = {
@@ -1250,10 +1250,10 @@ class Download:
 					'TreeUID',
 					'TreeCustomID',
 					'Variety',
-					'SampleUID',
 					'Tissue',
 					'Storage',
-					'Date'
+					'Date',
+					'UID'
 				]
 				parameters = {
 					'country': form_data['country'],
@@ -1306,6 +1306,7 @@ class Download:
 		#check that they are in the database
 		selected_traits = Lists(node_label).get_selected(selection, 'name')
 		#make the table file
+		fieldnames += ['Date','Time']
 		fieldnames += [trait['name'] for trait in selected_traits]
 		table_file = self.make_csv_file(fieldnames, id_list, 'table.csv')
 		#and a file that describes the trait details
