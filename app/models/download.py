@@ -1,6 +1,6 @@
 from app import app, os
+import grp
 from app.cypher import Cypher
-from user import User
 from lists import Lists
 from samples import Samples
 from neo4j_driver import (
@@ -26,8 +26,8 @@ class Download:
 		if not os.path.isdir(download_path):
 			os.mkdir(download_path)
 			gid = grp.getgrnam(app.config('celery_group_name')).gr_gid
-			os.chown(download_path_path, -1, gid)
-			os.chmod(download_path, 775)
+			os.chown(download_path, -1, gid)
+			os.chmod(download_path, 0775)
 		#prepare variables to write the file
 		time = datetime.now().strftime('%Y%m%d-%H%M%S')
 		if with_time:
@@ -788,8 +788,12 @@ class Download:
 		filename = time + '_data.csv'
 		file_path = os.path.join(app.instance_path, app.config['DOWNLOAD_FOLDER'], self.username, filename)
 		#create user download path if not found
-		if not os.path.isdir(os.path.join(app.instance_path, app.config['DOWNLOAD_FOLDER'], session['username'])):
-			os.mkdir(os.path.join(app.instance_path, app.config['DOWNLOAD_FOLDER'], session['username']))
+		download_path = os.path.join(app.instance_path, app.config['DOWNLOAD_FOLDER'], self.username)
+		if not os.path.isdir(download_path):
+			os.mkdir(download_path)
+			gid = grp.getgrnam(app.config('celery_group_name')).gr_gid
+			os.chown(download_path, -1, gid)
+			os.chmod(download_path, 0775)
 		#make the file
 		with open(file_path,'w') as file:
 			writer = csv.DictWriter(file, 
@@ -1090,8 +1094,12 @@ class Download:
 			trait['realPosition'] = str(i + 1)
 			trait['isVisible'] = 'True'
 		#create user download path if not found
-		if not os.path.isdir(os.path.join(app.instance_path, app.config['DOWNLOAD_FOLDER'], self.username)):
-			os.mkdir(os.path.join(app.instance_path, app.config['DOWNLOAD_FOLDER'], self.username))
+		download_path = os.path.join(app.instance_path, app.config['DOWNLOAD_FOLDER'], self.username)
+		if not os.path.isdir(download_path):
+			os.mkdir(download_path)
+			gid = grp.getgrnam(app.config('celery_group_name')).gr_gid
+			os.chown(download_path, -1, gid)
+			os.chmod(download_path, 0775)
 		#set variables for file creation
 		fieldnames = [
 			'name',

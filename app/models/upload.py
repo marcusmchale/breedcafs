@@ -598,7 +598,8 @@ class Upload:
 			os.mkdir(upload_path)
 			gid = grp.getgrnam(app.config('celery_group_name')).gr_gid
 			os.chown(upload_path, -1, gid)
-			os.chmod(upload_path, 775)
+			os.chmod(upload_path, 0775)
+			print gid, upload_path
 		file_data.save(self.file_path)
 
 	def is_valid_csv(self):

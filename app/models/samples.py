@@ -1,4 +1,4 @@
-import os
+import os, grp
 import unicodecsv as csv 
 from app import app
 from app.cypher import Cypher
@@ -49,8 +49,12 @@ class Samples:
 			return { "error" : "No sample codes generated. Please check the selected trees are registered"}
 		if get_file == True:
 			#create user download path if not found
-			if not os.path.isdir(os.path.join(app.instance_path, app.config['DOWNLOAD_FOLDER'], session['username'])):
-				os.mkdir(os.path.join(app.instance_path, app.config['DOWNLOAD_FOLDER'], session['username']))
+			download_path = os.path.join(app.instance_path, app.config['DOWNLOAD_FOLDER'], session['username'])
+			if not os.path.isdir(download_path):
+				os.mkdir(download_path)
+				gid = grp.getgrnam(app.config('celery_group_name')).gr_gid
+				os.chown(download_path, -1, gid)
+				os.chmod(download_path, 0775)
 			#prepare variables to write the file
 			fieldnames = [
 				'Country',
