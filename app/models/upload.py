@@ -596,10 +596,9 @@ class Upload:
 		upload_path = os.path.join(app.instance_path, app.config['UPLOAD_FOLDER'], self.username)
 		if not os.path.isdir(upload_path):
 			os.mkdir(upload_path)
-			gid = grp.getgrnam(app.config('celery_group_name')).gr_gid
+			gid = grp.getgrnam(app.config['CELERYGRPNAME']).gr_gid
 			os.chown(upload_path, -1, gid)
 			os.chmod(upload_path, 0775)
-			print gid, upload_path
 		file_data.save(self.file_path)
 
 	def is_valid_csv(self):

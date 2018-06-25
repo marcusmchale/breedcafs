@@ -25,7 +25,7 @@ class Download:
 		download_path = os.path.join(app.instance_path, app.config['DOWNLOAD_FOLDER'], self.username)
 		if not os.path.isdir(download_path):
 			os.mkdir(download_path)
-			gid = grp.getgrnam(app.config('celery_group_name')).gr_gid
+			gid = grp.getgrnam(app.config['CELERYGRPNAME']).gr_gid
 			os.chown(download_path, -1, gid)
 			os.chmod(download_path, 0775)
 		#prepare variables to write the file
@@ -791,7 +791,7 @@ class Download:
 		download_path = os.path.join(app.instance_path, app.config['DOWNLOAD_FOLDER'], self.username)
 		if not os.path.isdir(download_path):
 			os.mkdir(download_path)
-			gid = grp.getgrnam(app.config('celery_group_name')).gr_gid
+			gid = grp.getgrnam(app.config['CELERYGRPNAME']).gr_gid
 			os.chown(download_path, -1, gid)
 			os.chmod(download_path, 0775)
 		#make the file
@@ -1097,7 +1097,7 @@ class Download:
 		download_path = os.path.join(app.instance_path, app.config['DOWNLOAD_FOLDER'], self.username)
 		if not os.path.isdir(download_path):
 			os.mkdir(download_path)
-			gid = grp.getgrnam(app.config('celery_group_name')).gr_gid
+			gid = grp.getgrnam(app.config['CELERYGRPNAME']).gr_gid
 			os.chown(download_path, -1, gid)
 			os.chmod(download_path, 0775)
 		#set variables for file creation
