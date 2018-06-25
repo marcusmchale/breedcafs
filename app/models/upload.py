@@ -9,7 +9,7 @@ import unicodecsv as csv
 from datetime import datetime
 from werkzeug.utils import secure_filename
 
-from celery.contrib import rdb
+#from celery.contrib import rdb
 
 
 class DictReaderInsensitive(csv.DictReader):
@@ -815,6 +815,7 @@ class Upload:
 			tx
 	):
 		username = self.username
+		trimmed_file_path = self.trimmed_file_path
 		trimmed_file_path = self.trimmed_file_path
 		trimmed_filename = os.path.basename(trimmed_file_path)
 		submission_type = self.submission_type

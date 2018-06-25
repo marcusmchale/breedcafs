@@ -210,8 +210,9 @@ class Cypher:
 		' 	}) '
 		'	-[:SUBMITTED]->(: Submissions) '
 		'	-[:SUBMITTED]->(e: Emails) '
-		' SET e.allowed = FILTER (n in e.allowed WHERE NOT n IN toLower(trim($email))) '
-		' RETURN toLower(trim($email)) '
+		' WITH e, extract(x in $email | toLower(trim(x))) as emails'
+		' SET e.allowed = FILTER (n in e.allowed WHERE NOT n IN emails) '
+		' RETURN emails '
 	)
 	user_del = (
 		' MATCH '
@@ -320,6 +321,14 @@ class Cypher:
 		'		u.username_lower = toLower(trim(admin["username"])) '
 		' 	SET '
 		'		a.admin = NOT a.admin '
+		'	WITH u '
+		'		MATCH (u)-[a:AFFILIATED]->(:Partner) '
+		'		WITH u, collect(a.admin) as admin_rights '
+		'		set u.access = CASE '
+		'			WHEN true IN admin_rights '
+		'			THEN ["user","partner_admin"] '
+		'			ELSE ["user"] '
+		'			END '
 		' 	RETURN '
 		'		u.name '
 	)

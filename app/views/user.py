@@ -299,7 +299,7 @@ def remove_allowed_user():
 			if not set(session['access']).intersection(set(['global_admin','partner_admin'])):
 				flash ('You attempted to access a restricted page')
 				return redirect(url_for('index'))
-			else: 
+			else:
 				username = session['username']
 				remove_user_email_form = RemoveUserEmailForm.update(username)
 				if remove_user_email_form.validate_on_submit():
