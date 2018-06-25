@@ -11,6 +11,7 @@ $('#submission_type').val('FB');
 
 $('#upload_submit').click( function(e) {
 	e.preventDefault();
+	$('#upload_submit').prop('disabled', true);
 	remove_flash();
 	$('#error_table_div').empty()
 	wait_message = "Please wait for data to be submitted"
@@ -30,8 +31,12 @@ $('#upload_submit').click( function(e) {
 				if (response.hasOwnProperty('task_id')) {
 				    poll(response.task_id);
 				}
+				else {
+					$('#upload_submit').prop('disabled', false);
+				}
 			} else {
 				$("#upload_submit_flash").remove();
+				$('#upload_submit').prop('disabled', false);
 				for (var key in response){
 					if (response.hasOwnProperty(key)) {
 						flash = "<div id='flash_" + key + "' class='flash'>" + response[key][0] + "</div>";
@@ -41,6 +46,7 @@ $('#upload_submit').click( function(e) {
 			}
 		},
 		error: function(error) {
+			$('#upload_submit').attr("enabled", "enabled")
 		}
 	});
 	//button was hidden, reveal again.
@@ -60,16 +66,19 @@ $('#upload_submit').click( function(e) {
 							$('#upload_submit_flash').replaceWith("<div id='upload_submit_flash' class='flash'></div>");
 							message = "<p>Your file will be processed as soon as the database becomes available</p>"
 							$('#upload_submit_flash').append(message);
+							$('#upload_submit').prop('disabled', false);
 							poll(task_id);
 						}
 						if (response.status === 'ERRORS') {
 							$('#upload_submit_flash').replaceWith("<div id='response' class='flash'></div>");
 							$('#response').append("<p>Errors were found in the uploaded file:</p>");
 							$('#response').append('<div>' + response.result + '</div>');
+							$('#upload_submit').prop('disabled', false);
 							};
 					    if (response.status === 'SUCCESS') {
 					    	$('#upload_submit_flash').replaceWith("<div id='response' class='flash'></div>")
 					    	$('#response').append(response.result.result);
+					    	$('#upload_submit').prop('disabled', false);
 					    	load_graph();
 					    	};
 					}
@@ -80,6 +89,7 @@ $('#upload_submit').click( function(e) {
 							result_text += String()
 							flash_result = "<div id='upload_submit_flash' class='flash'> " + result_text +  "</div>";
 							$("#upload_submit_flash").replaceWith(flash_result);
+							$('#upload_submit').prop('disabled', false);
 						}
 					}
 				}

@@ -37,7 +37,7 @@ from neo4j.util import watch
 
 from app import views
 
-#these are the variable view rules for retrieving lists
+#these are the variable view rules for retrieving lists:
 app.add_url_rule('/location/countries/', 
 	view_func=views.countries.as_view('countries'), 
 	methods=['GET'])
