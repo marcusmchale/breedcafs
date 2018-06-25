@@ -26,7 +26,8 @@ class Download:
 		if not os.path.isdir(download_path):
 			os.mkdir(download_path)
 			gid = grp.getgrnam(app.config('celery_group_name')).gr_gid
-			os.chown(upload_path, -1, gid)
+			os.chown(download_path_path, -1, gid)
+			os.chmod(download_path, 775)
 		#prepare variables to write the file
 		time = datetime.now().strftime('%Y%m%d-%H%M%S')
 		if with_time:
