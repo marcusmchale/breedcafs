@@ -1365,7 +1365,7 @@ class Cypher:
 		'			AND toInteger(trim(split(value, "-")[1])) >= 1 '
 		'			AND toInteger(trim(split(value, "-")[1])) <= 31 '
 		'			THEN '
-		'				apoc.date.parse(value,"ms","yyyy-MM-dd HH:mm:sszzz") '
+		'				trim(value) '
 		'			ELSE '
 		'				Null '
 		'			END '
