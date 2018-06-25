@@ -415,6 +415,7 @@ class SubmissionResult:
 		if len(self.conflicts) == 0:
 			return None
 		else:
+			download_path = os.path.join(app.instance_path, app.config['DOWNLOAD_FOLDER'], self.username)
 			if not os.path.isdir(download_path):
 				os.mkdir(download_path)
 				gid = grp.getgrnam(app.config['CELERYGRPNAME']).gr_gid
@@ -455,6 +456,7 @@ class SubmissionResult:
 		if len(self.resubmissions) == 0:
 			return None
 		else:
+			download_path = os.path.join(app.instance_path, app.config['DOWNLOAD_FOLDER'], self.username)
 			if not os.path.isdir(download_path):
 				os.mkdir(download_path)
 				gid = grp.getgrnam(app.config['CELERYGRPNAME']).gr_gid
@@ -494,6 +496,7 @@ class SubmissionResult:
 		if len(self.submitted) == 0:
 			return None
 		else:
+			download_path = os.path.join(app.instance_path, app.config['DOWNLOAD_FOLDER'], self.username)
 			if not os.path.isdir(download_path):
 				os.mkdir(download_path)
 				gid = grp.getgrnam(app.config['CELERYGRPNAME']).gr_gid
