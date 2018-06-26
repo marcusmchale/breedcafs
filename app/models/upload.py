@@ -10,7 +10,7 @@ import unicodecsv as csv
 from datetime import datetime
 from werkzeug.utils import secure_filename
 
-#from celery.contrib import rdb
+from celery.contrib import rdb
 
 
 class DictReaderInsensitive(csv.DictReader):
@@ -759,12 +759,16 @@ class Upload:
 					'region',
 					'farm',
 					'plot',
+					'plotuid',
 					'block',
+					'blockuid',
 					'variety',
-					'treeid',
+					'treeuid',
 					'treecustomid',
-					'branchid',
-					'leafid',
+					'branchuid',
+					'leafuid',
+					'sampleuid',
+					'uid',
 					'tissue',
 					'storage'
 				]
@@ -839,7 +843,6 @@ class Upload:
 	):
 		username = self.username
 		trimmed_file_path = self.trimmed_file_path
-		trimmed_file_path = self.trimmed_file_path
 		trimmed_filename = os.path.basename(trimmed_file_path)
 		submission_type = self.submission_type
 		filename = self.filename
@@ -862,12 +865,15 @@ class Upload:
 					'region',
 					'farm',
 					'plot',
+					'plotuid',
 					'block',
+					'blockuid',
 					'variety',
-					'treeid',
+					'treeuid',
 					'treecustomid',
-					'branchid',
-					'leafid',
+					'branchuid',
+					'leafuid',
+					'sampleuid',
 					'tissue',
 					'storage'
 				]
