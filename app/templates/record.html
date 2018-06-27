@@ -20,6 +20,8 @@
 			<div id=tree_ids>
 				<br>
 				<dt>Tree ID range:</dt>
+				<p>ID is the number from the end of a UID, e.g. from 1_T2 the ID is 2.\n</p>
+				<p>The other parameters denote the plot (1) and the level (T = Tree)</p>
 				<dd>{{ record_form.trees_start(placeholder=record_form.trees_start.description) }}
 				{{ record_form.trees_end(placeholder=record_form.trees_end.description) }} </dd>
 				<br>
@@ -33,6 +35,8 @@
 						<dd>{{ record_form.date_from(placeholder = record_form.date_from.description) }}
 							{{ record_form.date_to(placeholder = record_form.date_to.description) }}</dd>
 						<a>Sample ID range:</a>
+						<p>ID is the number from the end of a UID, e.g. from 1_S2 the ID is 2.\n</p>
+						<p>The other parameters denote the plot (1) and the level (S = Sample)</p>
 						<dd>{{ record_form.samples_start(placeholder = record_form.samples_start.description) }}
 							{{ record_form.samples_end(placeholder = record_form.samples_end.description) }}
 						</dd>
@@ -60,6 +64,8 @@
 					<div id=branch_ids>
 						<br>
 						<dt>Branch ID range:</dt>
+						<p>ID is the number from the end of a UID, e.g. from 1_R2 the ID is 2.\n</p>
+						<p>The other parameters denote the plot (1) and the level (R = Branch)</p>
 						<dd>{{ record_form.branches_start(placeholder=record_form.branches_start.description) }}
 						{{ record_form.branches_end(placeholder=record_form.branches_end.description) }} </dd>
 						<br>
@@ -67,6 +73,8 @@
 					<div id=leaf_ids>
 						<br>
 						<dt>Leaf ID range:</dt>
+						<p>ID is the number from the end of a UID, e.g. from 1_L2 the ID is 2.\n</p>
+						<p>The other parameters denote the plot (1) and the level (L = Leaf)</p>
 						<dd>{{ record_form.leaves_start(placeholder=record_form.leaves_start.description) }}
 						{{ record_form.leaves_end(placeholder=record_form.leaves_end.description) }} </dd>
 						<br>
