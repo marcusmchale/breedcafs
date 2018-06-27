@@ -125,7 +125,6 @@ def password_reset():
 				flash('This email is not registered')
 				return redirect(url_for('password_reset'))
 			user = User("").find(email)
-			import pdb; pdb.set_trace()
 			if user:
 				if user['confirmed'] == True:
 					name = user['name']
