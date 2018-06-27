@@ -1584,7 +1584,8 @@ class Cypher:
 		# Now update "special" trait values
 		# if "assign to block" 
 		' FOREACH (n IN CASE '
-		'	WHEN trait.level = "tree" '
+		'	WHEN d.value = value '
+		'	AND trait.level = "tree" '
 		'	AND trait.name_lower = "assign to block" '
 		'	AND block_trees_update IS NOT NULL '
 		'		THEN [1] ELSE [] END | '
@@ -1603,7 +1604,8 @@ class Cypher:
 		' ) '
 		# if trait is branch id then link to branch
 		' FOREACH (n IN CASE '
-		'	WHEN trait.level in ["leaf","sample"] '
+		'	WHEN d.value = value '
+		'	AND trait.level in ["leaf","sample"] '
 		'	AND trait.name_lower = "assign to branch" '
 		'	AND branch_update IS NOT NULL '
 		'	THEN [1] ELSE [] END | '
@@ -1619,7 +1621,8 @@ class Cypher:
 		' ) '
 		# if trait is leaf id then link to leaf
 		' FOREACH (n IN CASE '
-		'	WHEN trait.level = "sample" '
+		'	WHEN d.value = value '
+		'	AND trait.level = "sample" '
 		'	AND trait.name_lower = "assign to leaf" '
 		'	AND leaf_update IS NOT NULL '
 		'	THEN [1] ELSE [] END | '
@@ -1635,7 +1638,8 @@ class Cypher:
 		' ) '
 		# if variety trait
 		' FOREACH (n IN CASE '
-		'	WHEN trait.level = "tree" '
+		'	WHEN d.value = value '
+		'	AND trait.level = "tree" '
 		'	AND trait.name_lower IN ["variety name (text)", "el frances code (text)"] '
 		'	AND variety_update IS NOT NULL '
 		'		THEN [1] ELSE [] END | '
@@ -1657,7 +1661,8 @@ class Cypher:
 		' ) '
 		# if custom tree ID set custom id parameter. 
 		' FOREACH (n IN CASE '
-		'	WHEN trait.level = "tree" '
+		'	WHEN d.value = value '
+		'	AND trait.level = "tree" '
 		'	AND trait.name_lower = "custom tree id" '
 		'	AND d.value IS NOT NULL '
 		'		THEN [1] ELSE [] END | '
