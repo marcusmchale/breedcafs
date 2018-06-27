@@ -32,7 +32,7 @@ class RegistrationForm(FlaskForm):
 	partner = SelectField('Partner:', [InputRequired()])
 	username = StringField('Username:', [InputRequired(), 
 		Length(min=1, max=20, message='Maximum 20 characters'),
-		Regexp('([^\x00-\x7F]|\w)+', message='Username contains illegal characters')],
+		Regexp("([^\x00-\x7F]|\w)+$", message='Username contains illegal characters')],
 		filters=[strip_filter],
 		description = "Enter a username")
 	email = StringField('Email Address:', [InputRequired(), Email(), Length(min=1, 
@@ -194,7 +194,7 @@ class AddCountry(FlaskForm):
 	strip_filter = lambda x: x.strip() if x else None
 	text_country = StringField('Country text input', 
 		[InputRequired(),
-		Regexp('([^\x00-\x7F]|\w)+', message='Country name contains illegal characters'),
+		Regexp('([^\x00-\x7F]|\w)+$', message='Country name contains illegal characters'),
 		Length(min=1, max=50, message='Maximum 50 characters')],
 		filters=[strip_filter],
 		description = "Add new country")
@@ -205,7 +205,7 @@ class AddRegion(FlaskForm):
 	strip_filter = lambda x: x.strip() if x else None
 	text_region = StringField('Region text input', 
 		[InputRequired(),
-		Regexp('([^\x00-\x7F]|\w)+', message='Region name contains illegal characters'),
+		Regexp('([^\x00-\x7F]|\w)+$', message='Region name contains illegal characters'),
 		Length(min=1, max=50, message='Maximum 50 characters')],
 		filters=[strip_filter],
 		description = "Add new region")
@@ -216,7 +216,7 @@ class AddFarm(FlaskForm):
 	strip_filter = lambda x: x.strip() if x else None
 	text_farm = StringField('Farm text input', 
 		[InputRequired(),
-		Regexp('([^\x00-\x7F]|\w)+', message='Farm name contains illegal characters'),
+		Regexp('([^\x00-\x7F]|\w)+$', message='Farm name contains illegal characters'),
 		Length(min=1, max=50, message='Maximum 50 characters')],
 		filters=[strip_filter],
 		description = "Add new farm")
@@ -227,7 +227,7 @@ class AddPlot(FlaskForm):
 	strip_filter = lambda x: x.strip() if x else None
 	text_plot = StringField('Plot text input',
 		[InputRequired(),
-		Regexp('([^\x00-\x7F]|\w)+', message='Plot name contains illegal characters'),
+		Regexp('([^\x00-\x7F]|\w)+$', message='Plot name contains illegal characters'),
 		Length(min=1, max=50, message='Maximum 50 characters')],
 		filters=[strip_filter],
 		description = "Add new plot")
@@ -245,7 +245,7 @@ class AddBlock(FlaskForm):
 	strip_filter = lambda x: x.strip() if x else None
 	text_block = StringField('Block text input',
 		[InputRequired(),
-		Regexp('([^\x00-\x7F]|\w)+', message='Block name contains illegal characters'),
+		Regexp('([^\x00-\x7F]|\w|[+-])+$', message='Block name contains illegal characters'),
 		Length(min=1, max=50, message='Maximum 50 characters')],
 		filters=[strip_filter],
 		description = "Add new block")
@@ -271,7 +271,7 @@ class AddTissueForm(FlaskForm):
 	strip_filter = lambda x: x.strip() if x else None
 	text_tissue = StringField('Tissue type text',	
 		[InputRequired(), 
-		Regexp('([^\x00-\x7F]|\w)+', message='Tissue name contains illegal characters'),
+		Regexp("([^\x00-\x7F]|\w)+$", message='Tissue name contains illegal characters'),
 		Length(min=1, max=100, message='Maximum 100 characters')],
 		filters=[strip_filter],
 		description = "Add new tissue")
@@ -282,7 +282,7 @@ class AddStorageForm(FlaskForm):
 	strip_filter = lambda x: x.strip() if x else None
 	text_storage = StringField('Storage type text',	
 		[InputRequired(), 
-		Regexp('([^\x00-\x7F]|\w)+', message='Storage name contains illegal characters'),
+		Regexp("([^\x00-\x7F]|\w|[+-])+$", message='Storage name contains illegal characters'),
 		Length(min=1, max=100, message='Maximum 100 characters')],
 		filters=[strip_filter],
 		description = "Add new storage method")

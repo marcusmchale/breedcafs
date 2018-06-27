@@ -119,7 +119,7 @@ def add_tissue():
 					new_tissue = Samples().add_tissue(text_tissue)
 					return jsonify({"submitted": new_tissue[0]['name'].title()})
 			else:
-				return jsonify({form.errors})
+				return jsonify([form.errors])
 		except ServiceUnavailable:
 			flash("Database unavailable")
 			return redirect(url_for('index'))
@@ -156,7 +156,7 @@ def add_storage():
 					new_storage = Samples().add_storage(text_storage)
 					return jsonify({"submitted": new_storage[0]['name'].title()})
 			else:
-				return jsonify({[form.errors]})
+				return jsonify([form.errors])
 		except ServiceUnavailable:
 			flash("Database unavailable")
 			return redirect(url_for('index'))
