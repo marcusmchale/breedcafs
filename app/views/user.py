@@ -125,24 +125,26 @@ def password_reset():
 				flash('This email is not registered')
 				return redirect(url_for('password_reset'))
 			user = User("").find(email)
-			if user['confirmed'] == True:
-				name = user['name']
-				username = user['username']
-				ts = URLSafeTimedSerializer(app.config['SECRET_KEY'])
-				token = ts.dumps(email, salt=app.config["PASSWORD_RESET_SALT"])
-				subject = "BreedCAFS database password reset request"
-				recipients = [email]
-				confirm_url = url_for('confirm_password_reset', token=token,_external=True)
-				body = ("Hi " + name + ". Someone recently requested to reset the password for your user account for the BreedCAFS database."
-				" If you would like to proceed then please visit the following address: " + confirm_url +
-				" As a reminder, your username for this account is " + username)
-				html = render_template('emails/password_reset.html', 
-					confirm_url=confirm_url, 
-					username=username,
-					name=name)
-				send_email(subject, app.config['ADMINS'][0], recipients, body, html )
-				flash('Please check your email to confirm password reset')
-				return redirect(url_for('login'))
+			import pdb; pdb.set_trace()
+			if user:
+				if user['confirmed'] == True:
+					name = user['name']
+					username = user['username']
+					ts = URLSafeTimedSerializer(app.config['SECRET_KEY'])
+					token = ts.dumps(email, salt=app.config["PASSWORD_RESET_SALT"])
+					subject = "BreedCAFS database password reset request"
+					recipients = [email]
+					confirm_url = url_for('confirm_password_reset', token=token,_external=True)
+					body = ("Hi " + name + ". Someone recently requested to reset the password for your user account for the BreedCAFS database."
+					" If you would like to proceed then please visit the following address: " + confirm_url +
+					" As a reminder, your username for this account is " + username)
+					html = render_template('emails/password_reset.html',
+						confirm_url=confirm_url,
+						username=username,
+						name=name)
+					send_email(subject, app.config['ADMINS'][0], recipients, body, html )
+					flash('Please check your email to confirm password reset')
+					return redirect(url_for('login'))
 			else:
 				flash('User is not confirmed - please register')
 		return render_template('password_reset.html', form=form, title='Password reset')
