@@ -145,8 +145,10 @@ def password_reset():
 					send_email(subject, app.config['ADMINS'][0], recipients, body, html )
 					flash('Please check your email to confirm password reset')
 					return redirect(url_for('login'))
+				else:
+					flash('User is not confirmed - please register and confirm')
 			else:
-				flash('User is not confirmed - please register')
+				flash('User is not registered')
 		return render_template('password_reset.html', form=form, title='Password reset')
 	except (ServiceUnavailable):
 		flash("Database unavailable")
