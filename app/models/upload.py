@@ -129,6 +129,8 @@ class RowParseResult:
 						row_string += 'Expected N:P:K ratio format, e.g. 1:1:1'
 					elif 'time' in field_trait_name:
 						row_string += 'Expected time format as HH:MM e.g. 13:01'
+					elif 'assign to' in field_trait_name:
+						row_string += 'Expected a valid UID for the relevant trait. (e.g. 1_B1) '
 					if field_category_list:
 						for i, cat in enumerate(field_category_list):
 							if i == 0:

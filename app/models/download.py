@@ -599,7 +599,7 @@ class Download:
 						' Recorded_at : apoc.date.format(data.time), '
 						' Recorded_by: data.person '
 					' } '
-					' ORDER BY plot.uid, branch.id, trait.name, apoc.date.format(data.time) '
+					' ORDER BY plot.uid, tree.id, trait.name, apoc.date.format(data.time) '
 					)
 		elif level == 'block':
 			index_fieldnames = [
