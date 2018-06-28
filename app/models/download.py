@@ -46,6 +46,10 @@ class Download:
 				extrasaction = 'ignore')
 			writer.writeheader()
 			for row in id_list:
+				for item in row:
+					if isinstance(row[item], list):
+						row[item] = [i.encode() for i in row[item]]
+				#for key, value in row:
 				writer.writerow(row)
 			file_size = file.tell()
 		# return file details
@@ -1330,7 +1334,7 @@ class Download:
 			'minimum',
 			'maximum',
 			'details',
-			'categories'
+			'category_list'
 		]
 		details_file = self.make_csv_file(trait_fieldnames, selected_traits, 'details.csv')
 		return {

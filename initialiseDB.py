@@ -292,7 +292,7 @@ class Create:
 							'	ELSE $maximum '
 							'	END, '
 							' t.details = $details, '
-							' t.categories_fb = CASE '
+							' t.categories = CASE '
 							'	WHEN size(trim($categories)) = 0 '
 							'	THEN Null '
 							' 	Else $categories '
