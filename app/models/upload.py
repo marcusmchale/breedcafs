@@ -276,7 +276,7 @@ class ParseResult:
 			# construct each row and append to growing table
 			for i, row_num in enumerate(self.duplicate_keys):
 				if i >= max_length:
-					return html_table
+					return response + '<table>' + html_table + '</table>'
 				row_string = '<tr><td>' + str(row_num) + '</td>'
 				for field in self.fieldnames:
 					row_string += '<td>' + self.duplicate_keys[row_num][field] + '</td>'
@@ -589,7 +589,15 @@ class Parsers:
 				]):
 					return uid
 				else:
-					return False
+					if all([
+						uid.split("_")[0].isdigit(),
+						uid.split("_")[1][0] == "S",
+						uid.split("_")[1].split(".")[0][1:].isdigit(),
+						uid.split("_")[1].split(".")[1].isdigit()
+					]):
+						return uid
+					else:
+						return False
 			else:
 				return False
 
@@ -670,7 +678,6 @@ class Upload:
 						if row[field]:
 							row[field] = row[field].strip()
 					file_writer.writerow(row)
-
 	def parse_rows(self):
 		trimmed_file_path = self.trimmed_file_path
 		submission_type = self.submission_type
@@ -769,6 +776,7 @@ class Upload:
 					'leafuid',
 					'sampleuid',
 					'uid',
+					'sampledate',
 					'tissue',
 					'storage'
 				]

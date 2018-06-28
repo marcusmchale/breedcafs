@@ -224,9 +224,9 @@ def add_samples():
 							file_details['file_path']
 						)
 						return jsonify({'submitted': (
-								'You successfully registered ' + str(tissue) + ' samples. '
+								'You successfully registered ' + str(tissue) + ' samples.<br> '
 								+ 'These are described in the following file: '
-								+ '<a href="' + download_url + '">' + file_details['filename'] + '</a>.'
+								+ '<a href="' + download_url + '">' + file_details['filename'] + '</a>.<br>'
 								+ ' This file has also been sent to your email address ')}
 						)
 					else:
@@ -241,15 +241,15 @@ def add_samples():
 							file_details['file_path']
 						)
 						return jsonify({'submitted': (
-								'You successfully registered ' + str(tissue) + ' samples. '
+								'You successfully registered ' + str(tissue) + ' samples.<br> '
 								+ 'These are described in the following file : '
-								+ '<a href="' + download_url + '">' + file_details['filename'] + '</a>.'
+								+ '<a href="' + download_url + '">' + file_details['filename'] + '</a>.<br>'
 								+ ' This link has also been sent to your email address. ')})
 				else:
 					return jsonify(
 						{
 							'submitted': (
-									'You successfully registered ' + str(tissue) + ' samples. '
+									'You successfully registered ' + str(tissue) + ' samples.<br>'
 									+ 'These are described in the following file : '
 									+ '<a href="' + download_url + '">' + file_details['filename']
 									+ '</a>'

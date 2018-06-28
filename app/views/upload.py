@@ -70,7 +70,7 @@ def taskstatus(task_id):
 		if result['status'] == 'ERRORS':
 			if result['result'].duplicate_keys_dict():
 				error_table = result['result'].duplicate_keys_table()
-			if result['result'].row_errors():
+			elif result['result'].row_errors():
 				error_table = result['result'].html_table()
 			elif result['result'].field_errors_dict():
 				errors_dict = result['result'].field_errors_dict()
@@ -87,6 +87,6 @@ def taskstatus(task_id):
 		else:
 			return jsonify({
 				'status': task.status,
-				'result':result
+				'result': result
 			})
 

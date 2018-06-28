@@ -204,7 +204,7 @@ class Download:
 					' 	sample.uid as SampleUID, '
 					'	tissue.name as Tissue, '
 					'	storage.name as Storage, '
-					'	sample.date as Date, '
+					'	sample.date as SampleDate, '
 					' 	sample.id as SampleID, '
 					'	COLLECT([trait.name, data.value]) as Traits '
 					' RETURN '
@@ -224,7 +224,7 @@ class Download:
 					'		UID : SampleUID ,'
 					'		Tissue: Tissue, '
 					'		Storage: Storage, '
-					'		Date: Date, '
+					'		SampleDate: SampleDate, '
 					'		SampleID : SampleID, '
 					'		Traits : Traits } '
 					' ORDER BY '
@@ -251,7 +251,7 @@ class Download:
 						' UID : sample.uid, '
 						' Tissue: tissue.name, '
 						' Storage: storage.name, '
-						' Date: sample.date, '
+						' SampleDate: sample.date, '
 						' SampleID : sample.id, '
 						' Trait : trait.name, '
 						' Value : data.value, '
@@ -1064,11 +1064,12 @@ class Download:
 					return None
 				sample_replicates = int(form_data['sample_replicates']) if form_data['sample_replicates'] else 1
 				if sample_replicates > 1:
-					fieldnames.append('ReplicateUID')
+					fieldnames.insert(15, 'SampleUID')
 					id_list_reps = []
 					for sample in id_list:
+						sample['SampleUID'] = sample['UID']
 						for i in range(sample_replicates):
-							sample['ReplicateUID'] = str(sample['SampleUID']) + "." + str(int(i + 1))
+							sample['UID'] = str(sample['SampleUID']) + "." + str(int(i + 1))
 							id_list_reps.append(sample.copy())
 					id_list = id_list_reps
 				csv_file_details = self.make_csv_file(
@@ -1264,7 +1265,7 @@ class Download:
 					'Variety',
 					'Tissue',
 					'Storage',
-					'Date',
+					'SampleDate',
 					'UID'
 				]
 				parameters = {
@@ -1296,12 +1297,13 @@ class Download:
 			return None
 		#if requesting replicates for samples then create these in the id_list
 		sample_replicates = int(form_data['sample_replicates']) if form_data['sample_replicates'] else 1
-		if sample_replicates != 1:
-			fieldnames.insert(15, 'ReplicateUID')
+		if sample_replicates > 1:
+			fieldnames.insert(13, 'SampleUID')
 			id_list_reps = []
 			for sample in id_list:
+				sample['SampleUID'] = sample['UID']
 				for i in range(sample_replicates):
-					sample['ReplicateUID'] = str(sample['SampleUID']) + "." + str(int(i + 1))
+					sample['UID'] = str(sample['SampleUID']) + "." + str(int(i + 1))
 					id_list_reps.append(sample.copy())
 			id_list = id_list_reps
 		#then we get the traits list from the form

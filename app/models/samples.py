@@ -70,7 +70,7 @@ class Samples:
 				'Tissue',
 				'Storage',
 				'SampleDate',
-				'UID'
+				'SampleUID'
 			]
 			first_sample_id = id_list[0]['SampleID']
 			last_sample_id = id_list[-1]['SampleID']
