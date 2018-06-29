@@ -1,4 +1,4 @@
-from app import app, ServiceUnavailable
+from app import app, ServiceUnavailable, AuthError
 from flask import ( flash, redirect, url_for, session, render_template, jsonify)
 from app.models import Upload
 from app.forms import UploadForm
@@ -16,7 +16,7 @@ def upload():
 				form = form,
 				title = 'Upload'
 			)
-		except ServiceUnavailable:
+		except (ServiceUnavailable, AuthError):
 			flash("Database unavailable")
 			return redirect(url_for('index'))
 
@@ -49,7 +49,7 @@ def upload_submit():
 				# as an asynchronous function with celery
 				# result is stored in redis and accessible from the status/task_id endpoint
 				task = Upload.async_submit.apply_async(args = [username, upload_object])
-			except ServiceUnavailable:
+			except (ServiceUnavailable, AuthError):
 				return jsonify({'submitted':'The database is currently unavailable - please try again later'})
 			return jsonify({'submitted': (
 				'Your file has been uploaded and is being checked before submission to the database.\n'

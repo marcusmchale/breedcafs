@@ -1,4 +1,4 @@
-from app import app, ServiceUnavailable
+from app import app, ServiceUnavailable, AuthError
 from app.cypher import Cypher
 from neo4j_driver import get_driver
 from datetime import datetime
@@ -43,7 +43,7 @@ class Chart:
 			rels={rel['id']:rel for rel in rels}.values()
 			#and create the d3 input
 			return jsonify({"nodes":nodes, "links":rels})
-		except (ServiceUnavailable):
+		except (ServiceUnavailable, AuthError):
 			return jsonify({"status":"Database unavailable"})
 	def _get_plots_treecount(self, tx):
 		return [record for record in tx.run(Cypher.get_plots_treecount)]

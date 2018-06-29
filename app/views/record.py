@@ -1,6 +1,7 @@
 from app import (
 	app,
-	ServiceUnavailable
+	ServiceUnavailable,
+	AuthError
 )
 from flask import (
 	session,
@@ -54,7 +55,7 @@ def record():
 				sample_reg_form = sample_reg_form,
 				title = 'Record'
 			)
-		except ServiceUnavailable:
+		except (ServiceUnavailable, AuthError):
 			flash("Database unavailable")
 			return redirect(url_for('index'))
 
@@ -190,7 +191,7 @@ def generate_files():
 			else:
 				errors = jsonify([record_form.errors])
 				return errors
-		except ServiceUnavailable:
+		except (ServiceUnavailable, AuthError):
 			flash("Database unavailable")
 			return redirect(url_for('index'))
 

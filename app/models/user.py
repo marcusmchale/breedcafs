@@ -1,4 +1,4 @@
-from app import app, logging, celery, redis_store, ServiceUnavailable
+from app import app, logging, celery, redis_store, ServiceUnavailable, AuthError
 from app.cypher import Cypher
 from passlib.hash import bcrypt
 from neo4j_driver import get_driver
@@ -50,7 +50,7 @@ class User:
 		try:
 			with get_driver().session() as neo4j_session:
 				return set([item for sublist in [i['e.allowed'] for i in neo4j_session.read_transaction(User._get_allowed_emails)] for item in sublist])
-		except (ServiceUnavailable):
+		except (ServiceUnavailable, AuthError):
 			logging.error('Get allowed emails failed due to service unavailable')
 			return {'error':'The database is unavailable, please try again later.'}
 	@staticmethod
@@ -61,7 +61,7 @@ class User:
 			with get_driver().session() as neo4j_session:
 				result = neo4j_session.read_transaction(self._get_user_allowed_emails)
 				return [record[0] for record in result][0]
-		except (ServiceUnavailable):
+		except (ServiceUnavailable, AuthError):
 			logging.error('Get user allowed email failed due to service unavailable')
 			return {'error':'The database is unavailable, please try again later.'}
 	def _get_user_allowed_emails(self, tx):
@@ -72,7 +72,7 @@ class User:
 			with get_driver().session() as neo4j_session:
 				result = neo4j_session.write_transaction(self._add_allowed_email)
 				return [record[0] for record in result]
-		except (ServiceUnavailable):
+		except (ServiceUnavailable,AuthError):
 			logging.error('Add allowed email failed due to service unavailable')
 			return {'error':'The database is unavailable, please try again later.'}
 	def _add_allowed_email(self, tx):
@@ -85,7 +85,7 @@ class User:
 			with get_driver().session() as neo4j_session:
 				result = neo4j_session.write_transaction(self._remove_allowed_email)
 				return [record[0] for record in result]
-		except (ServiceUnavailable):
+		except (ServiceUnavailable, AuthError):
 			logging.error('Remove allowed email failed due to service unavailable')
 			return {'error':'The database is unavailable, please try again later.'}
 	def _remove_allowed_email(self, tx):
@@ -167,7 +167,7 @@ class User:
 					return {'error':'Username is not confirmed. Please check your email to confirm'}
 			else:
 				return {'error':'Username is not registered'}
-		except (ServiceUnavailable):
+		except (ServiceUnavailable, AuthError):
 			logging.error('Neo4j database is unavailable')
 			return {'error':'The database is unavailable, please try again later.'}
 #These are classmethods as they don't need a username

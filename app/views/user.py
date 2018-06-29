@@ -1,4 +1,4 @@
-from app import app, ServiceUnavailable, logging
+from app import app, ServiceUnavailable, AuthError, logging
 from flask import (request, 
 	session, 
 	redirect, 
@@ -65,7 +65,7 @@ def register():
 				logging.info('Error registering user:' + str(e))
 				flash('Error with registration please contact an administrator')
 		return render_template('register.html', form=form, title='Register') 
-	except (ServiceUnavailable):
+	except (ServiceUnavailable, AuthError):
 		flash("Database unavailable")
 		return redirect(url_for('index'))
 
@@ -81,7 +81,7 @@ def confirm(token):
 		except:
 			flash('Please register again and confirm within 24hrs')
 			return redirect(url_for('register'))
-	except (ServiceUnavailable):
+	except (ServiceUnavailable, AuthError):
 		flash("Database unavailable")
 		return redirect(url_for('index'))
 
@@ -149,7 +149,7 @@ def password_reset():
 			else:
 				flash('User is not registered')
 		return render_template('password_reset.html', form=form, title='Password reset')
-	except (ServiceUnavailable):
+	except (ServiceUnavailable, AuthError):
 		flash("Database unavailable")
 		return redirect(url_for('index'))
 
@@ -170,7 +170,7 @@ def confirm_password_reset(token):
 		return render_template('confirm_password_reset.html', 
 			form=form, 
 			token=token)
-	except (ServiceUnavailable):
+	except (ServiceUnavailable, AuthError):
 		flash("Database unavailable")
 		return redirect(url_for('index'))
 
@@ -260,7 +260,7 @@ def user_admin():
 				user_admin_form = user_admin_form,
 				add_user_email_form = add_user_email_form,
 				remove_user_email_form = remove_user_email_form)
-		except (ServiceUnavailable):
+		except (ServiceUnavailable, AuthError):
 			flash("Database unavailable")
 			return redirect(url_for('index'))
 
@@ -287,7 +287,7 @@ def add_allowed_user():
 						return jsonify({'error':'This email address is already allowed '})
 				else:
 					return jsonify({'error':add_user_email_form.errors["user_email"]})
-		except (ServiceUnavailable):
+		except (ServiceUnavailable, AuthError):
 			flash ("Database unavailable")
 			return redirect(url_for('index'))
 
@@ -311,7 +311,7 @@ def remove_allowed_user():
 					return jsonify({'success':result})
 				else:
 					return jsonify({'error':add_user_email_form.errors["user_email"]})
-		except (ServiceUnavailable):
+		except (ServiceUnavailable, AuthError):
 			flash ("Database unavailable")
 			return redirect(url_for('index'))
 
@@ -329,7 +329,7 @@ def get_user_allowed_emails():
 				return redirect(url_for('index'))
 			else: 
 				return jsonify(User(session['username']).get_user_allowed_emails())
-		except (ServiceUnavailable):
+		except (ServiceUnavailable, AuthError):
 			flash ("Database unavailable")
 			return redirect(url_for('index'))
 
@@ -345,7 +345,7 @@ def partner_admin():
 			try:
 				form = PartnerAdminForm.update()
 				return render_template('partner_admin.html', form=form)
-			except (ServiceUnavailable):
+			except (ServiceUnavailable, AuthError):
 				flash("Database unavailable")
 				return redirect(url_for('index'))
 		else:
@@ -415,7 +415,7 @@ def confirm_users():
 						return jsonify({'error':'No users selected'})
 				else:
 					return jsonify({'error':'Unexpected form values'})
-			except (ServiceUnavailable):
+			except (ServiceUnavailable, AuthError):
 				flash("Database unavailable")
 				return redirect(url_for('admin'))
 		else:
@@ -479,7 +479,7 @@ def confirm_partner_admins():
 						return jsonify({'success':[record[0] for record in users]})
 					else:
 						return jsonify({'error':'No users selected'})
-			except (ServiceUnavailable):
+			except (ServiceUnavailable, AuthError):
 				flash("Database unavailable")
 				return redirect(url_for('admin'))
 		else:

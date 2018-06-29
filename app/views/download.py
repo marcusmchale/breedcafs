@@ -1,5 +1,5 @@
 import os
-from app import app, ServiceUnavailable
+from app import app, ServiceUnavailable, AuthError
 from flask import (redirect, 
 	flash,
 	url_for, 
@@ -42,7 +42,7 @@ def download():
 				plot_traits_form = plot_traits_form,
 				level = 'all',
 				title='Download')
-		except (ServiceUnavailable):
+		except (ServiceUnavailable, AuthError):
 			flash("Database unavailable")
 			return redirect(url_for('index'))
 
@@ -122,7 +122,7 @@ def generate_csv():
 			else:
 				errors = jsonify([download_form.errors, traits_form.errors])
 				return errors
-		except (ServiceUnavailable):
+		except (ServiceUnavailable, AuthError):
 			flash("Database unavailable")
 			return redirect(url_for('index'))
 
@@ -142,6 +142,6 @@ def download_file(username, filename):
 			else:
 				flash('File no longer exists on the server, please generate a new file for download')
 				return redirect(url_for('download'))
-		except (ServiceUnavailable):
+		except (ServiceUnavailable, AuthError):
 			flash("Database unavailable")
 			return redirect(url_for('index'))

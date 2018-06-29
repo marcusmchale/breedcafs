@@ -1,4 +1,4 @@
-from app import app, ServiceUnavailable
+from app import app, ServiceUnavailable, AuthError
 from flask import (session, 
 	flash, 
 	request, 
@@ -38,7 +38,7 @@ class countries(MethodView):
 				response = make_response(jsonify(countries))
 				response.content_type = 'application/json'
 				return response
-			except (ServiceUnavailable):
+			except (ServiceUnavailable, AuthError):
 				flash("Database unavailable")
 				return redirect(url_for('index'))
 
@@ -54,7 +54,7 @@ class regions(MethodView):
 				response = make_response(jsonify([(REGIONS[i].lower(),REGIONS[i]) for i, items in enumerate(REGIONS)]))
 				response.content_type = 'application/json'
 				return response
-			except (ServiceUnavailable):
+			except (ServiceUnavailable, AuthError):
 				flash("Database unavailable")
 				return redirect(url_for('index'))
 
@@ -70,7 +70,7 @@ class farms(MethodView):
 				response = make_response(jsonify([(FARMS[i].lower(),FARMS[i]) for i, items in enumerate(FARMS)]))
 				response.content_type = 'application/json'
 				return response
-			except (ServiceUnavailable):
+			except (ServiceUnavailable, AuthError):
 				flash("Database unavailable")
 				return redirect(url_for('index'))
 
@@ -85,7 +85,7 @@ class plots(MethodView):
 				response = make_response(jsonify(plots))
 				response.content_type = 'application/json'
 				return response
-			except (ServiceUnavailable):
+			except (ServiceUnavailable, AuthError):
 				flash("Database unavailable")
 				return redirect(url_for('index'))
 
@@ -100,7 +100,7 @@ class blocks(MethodView):
 				response = make_response(jsonify(blocks))
 				response.content_type = 'application/json'
 				return response
-			except (ServiceUnavailable):
+			except (ServiceUnavailable, AuthError):
 				flash("Database unavailable")
 				return redirect(url_for('index'))
 
@@ -115,7 +115,7 @@ class treecount(MethodView):
 				response = make_response(jsonify(treecount))
 				response.content_type = 'application/json'
 				return response
-			except (ServiceUnavailable):
+			except (ServiceUnavailable, AuthError):
 				flash("Database unavailable")
 				return redirect(url_for('index'))
 
@@ -142,7 +142,7 @@ def create():
 				add_block_form = add_block_form,
 				add_trees_form = add_trees_form,
 				title = 'Register fields and submit details')
-		except (ServiceUnavailable):
+		except (ServiceUnavailable, AuthError):
 				flash("Database unavailable")
 				return redirect(url_for('index'))
 
@@ -165,7 +165,7 @@ def add_country():
 					return jsonify({"submitted": result[0]})
 			else:
 				return jsonify([form.errors])
-		except (ServiceUnavailable):
+		except (ServiceUnavailable, AuthError):
 			flash("Database unavailable")
 			return redirect(url_for('index'))
 
@@ -191,7 +191,7 @@ def add_region():
 						return jsonify({"submitted": result[0]})
 			else:
 				return jsonify([form.errors])
-		except (ServiceUnavailable):
+		except (ServiceUnavailable, AuthError):
 				flash("Database unavailable")
 				return redirect(url_for('index'))
 
@@ -218,7 +218,7 @@ def add_farm():
 						return jsonify({"submitted": result[0]})
 			else:
 				return jsonify([form.errors])
-		except (ServiceUnavailable):
+		except (ServiceUnavailable, AuthError):
 				flash("Database unavailable")
 				return redirect(url_for('index'))
 
@@ -246,7 +246,7 @@ def add_plot():
 						return jsonify({"submitted": {'uid': result[0]['uid'], 'name': result[0]['name']}})
 			else:
 				return jsonify([form.errors])
-		except (ServiceUnavailable):
+		except (ServiceUnavailable, AuthError):
 				flash("Database unavailable")
 				return redirect(url_for('index'))
 
@@ -274,7 +274,7 @@ def add_block():
 			else:
 				errors = jsonify([location_form.errors, add_block_form.errors])
 				return errors
-		except (ServiceUnavailable):
+		except (ServiceUnavailable, AuthError):
 				flash("Database unavailable")
 				return redirect(url_for('index'))
 
@@ -296,7 +296,7 @@ def add_trees():
 			else:
 				errors = jsonify([location_form.errors, add_trees_form.errors])
 				return errors
-		except (ServiceUnavailable):
+		except (ServiceUnavailable, AuthError):
 				flash("Database unavailable")
 				return redirect(url_for('index'))
 

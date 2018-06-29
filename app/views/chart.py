@@ -15,6 +15,6 @@ def json_submissions():
 def json_plots_treecount():
 	try:
 		return Chart().get_plots_treecount()
-	except ServiceUnavailable:
+	except (ServiceUnavailable, AuthError):
 		flash("Database unavailable")
 		return redirect(url_for('index'))

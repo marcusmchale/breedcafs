@@ -1,6 +1,7 @@
 from app import (
 	app,
-	ServiceUnavailable
+	ServiceUnavailable,
+	AuthError
 )
 from flask import (
 	session,
@@ -56,7 +57,7 @@ def collect():
 				add_storage_form=add_storage_form,
 				title='Collect'
 			)
-		except ServiceUnavailable:
+		except (ServiceUnavailable, AuthError):
 			flash("Database unavailable")
 			return redirect(url_for('index'))
 
@@ -82,7 +83,7 @@ def sample_reg():
 				custom_sample_form=custom_sample_form,
 				title='Sample registration'
 			)
-		except ServiceUnavailable:
+		except (ServiceUnavailable, AuthError):
 			flash("Database unavailable")
 			return redirect(url_for('index'))
 
@@ -98,7 +99,7 @@ class tissues(MethodView):
 				response = make_response(jsonify(tissues))
 				response.content_type = 'application/json'
 				return response
-			except ServiceUnavailable:
+			except (ServiceUnavailable, AuthError):
 				flash("Database unavailable")
 				return redirect(url_for('index'))
 
@@ -120,7 +121,7 @@ def add_tissue():
 					return jsonify({"submitted": new_tissue[0]['name'].title()})
 			else:
 				return jsonify([form.errors])
-		except ServiceUnavailable:
+		except (ServiceUnavailable, AuthError):
 			flash("Database unavailable")
 			return redirect(url_for('index'))
 
@@ -135,7 +136,7 @@ class storage_methods(MethodView):
 				response = make_response(jsonify(storage_methods))
 				response.content_type = 'application/json'
 				return response
-			except ServiceUnavailable:
+			except (ServiceUnavailable, AuthError):
 				flash("Database unavailable")
 				return redirect(url_for('index'))
 
@@ -157,7 +158,7 @@ def add_storage():
 					return jsonify({"submitted": new_storage[0]['name'].title()})
 			else:
 				return jsonify([form.errors])
-		except ServiceUnavailable:
+		except (ServiceUnavailable, AuthError):
 			flash("Database unavailable")
 			return redirect(url_for('index'))
 
@@ -259,7 +260,7 @@ def add_samples():
 			else:
 				errors = jsonify([location_form.errors, sample_form.errors])
 				return errors
-		except ServiceUnavailable:
+		except (ServiceUnavailable, AuthError):
 			flash("Database unavailable")
 			return redirect(url_for('index'))
 
@@ -355,6 +356,6 @@ def get_samples():
 			else:
 				errors = jsonify([location_form.errors, sample_form.errors, custom_sample_form.errors])
 				return errors
-		except (ServiceUnavailable):
+		except (ServiceUnavailable, AuthError):
 			flash("Database unavailable")
 			return redirect(url_for('index'))

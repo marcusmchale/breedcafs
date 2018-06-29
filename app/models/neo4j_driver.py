@@ -1,7 +1,8 @@
 from app import (app,
 	os,
 	GraphDatabase, 
-	ServiceUnavailable, 
+	ServiceUnavailable,
+	AuthError,
 	watch, 
 	logging)
 
@@ -28,5 +29,3 @@ def get_driver():
 
 def neo4j_query(tx, query, parameters):
 	return tx.run(query, parameters)
-
-

@@ -32,7 +32,7 @@ celery.conf.update(
 #and also use redis (not just with celery) for basic local datastore like login attempts and caching
 redis_store = StrictRedis(host= 'localhost', port = 6379, db=0)
 
-from neo4j.v1 import GraphDatabase, ServiceUnavailable
+from neo4j.v1 import GraphDatabase, ServiceUnavailable, AuthError
 from neo4j.util import watch
 
 from app import views
