@@ -574,7 +574,7 @@ class Parsers:
 				return False
 			else:
 				return time_string
-		except ValueError:
+		except (ValueError, IndexError):
 			return False
 
 	@staticmethod

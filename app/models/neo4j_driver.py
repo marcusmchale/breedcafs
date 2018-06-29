@@ -13,7 +13,13 @@ def get_driver():
 	if Driver_holder.driver:
 		return Driver_holder.driver
 	uri = "bolt://localhost:7687"
-	Driver_holder.driver = GraphDatabase.driver(uri, auth=(os.environ['NEO4J_USERNAME'], os.environ['NEO4J_PASSWORD']))
+	Driver_holder.driver = GraphDatabase.driver(
+		uri,
+		auth=(
+			os.environ['NEO4J_USERNAME'],
+			os.environ['NEO4J_PASSWORD']
+		)
+	)
 	watch("neo4j.bolt", logging.INFO, open(app.config['NEO4J_DRIVER_LOG'], 'w+'))
 	return Driver_holder.driver
 
