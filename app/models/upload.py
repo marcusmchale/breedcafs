@@ -548,7 +548,7 @@ class Parsers:
 				return False
 			else:
 				return timestamp
-		except ValueError:
+		except (ValueError, IndexError):
 			return False
 
 	@staticmethod
