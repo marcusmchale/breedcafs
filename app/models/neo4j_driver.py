@@ -18,7 +18,10 @@ def get_driver():
 		auth=(
 			os.environ['NEO4J_USERNAME'],
 			os.environ['NEO4J_PASSWORD']
-		)
+		),
+		connection_timeout = 5,
+		connection_acquisition_timeout = 5,
+		max_retry_time = 5
 	)
 	watch("neo4j.bolt", logging.INFO, open(app.config['NEO4J_DRIVER_LOG'], 'w+'))
 	return Driver_holder.driver
