@@ -20,27 +20,28 @@ driver = GraphDatabase.driver(uri, auth=auth)
 allowed_emails = config.allowed_emails
 
 partners = [
-	{'OPERATES_IN':['France', 'Vietnam','Cameroon', 'Costa Rica', 'French Guiana', 'El Salvador'], 'BASED_IN':'France', 'name':'CIRAD', 'fullname':'Centre de Coopération Internationale en Recherche Agronomique pour le Développement'},
-	{'OPERATES_IN':None, 'BASED_IN':'France', 'name':'Eurofins', 'fullname':'Eurofins Analytics'},
-	{'OPERATES_IN':None, 'BASED_IN':'Portugal', 'name':'ISD', 'fullname':'Instituto Superior de Agronomia'},
-	{'OPERATES_IN':None, 'BASED_IN':'Portugal', 'name':'NOVA ID FCT', 'fullname':'Associação para a Inovação e Desenvolvimento da FCT'},
-	{'OPERATES_IN':None, 'BASED_IN':'Ireland', 'name':'NUIG', 'fullname':'National University of Ireland, Galway'},
-	{'OPERATES_IN':None, 'BASED_IN':'Denmark', 'name':'UCPH', 'fullname':'Københavns Universitet'},
-	{'OPERATES_IN':None, 'BASED_IN':'Italy', 'name':'IllyCaffe', 'fullname':'IllyCaffe S.P.A'},
-	{'OPERATES_IN':None, 'BASED_IN':'Nicaragua', 'name':'NicaFrance', 'fullname':'Fundación Nicafrance'},
-	{'OPERATES_IN':['Nicaragua'], 'BASED_IN':'Netherlands', 'name':'SNV', 'fullname':'Stichting SNV Nederlandse Ontwikkelingsorganisatie'},
-	{'OPERATES_IN':None, 'BASED_IN':'France', 'name':'IRD', 'fullname':'Institut de Recherche pour le Développement'},
-	{'OPERATES_IN':None, 'BASED_IN':'France', 'name':'UM', 'fullname':'Université de Montpellier'},
-	{'OPERATES_IN':None, 'BASED_IN':'Germany', 'name':'MPG', 'fullname':'Max-Planck-Gesellschaft zur Förderung der Wissenschaften e. V.'},
-	{'OPERATES_IN':None, 'BASED_IN':'Germany', 'name':'RWTH', 'fullname':'Rheinisch-Westfälische Technische Hochschule Aachen'},
-	{'OPERATES_IN':None, 'BASED_IN':'United States of America', 'name':'WCR', 'fullname':'World Coffee Research'},
-	{'OPERATES_IN':None, 'BASED_IN':'United States of America', 'name':'ABR', 'fullname':'Arizona State University'},
-	{'OPERATES_IN':None, 'BASED_IN':'Cameroon', 'name':'IRAD', 'fullname':'Institut de Recherche Agricole pour le Développement'},
-	{'OPERATES_IN':None, 'BASED_IN':'Vietnam', 'name':'ICRAF', 'fullname':'International Center for Research in AgroForestry'},
-	{'OPERATES_IN':None, 'BASED_IN':'Vietnam', 'name':'NOMAFSI', 'fullname':'Northern Mountainous Agriculture and Forestry Science Institute'},
-	{'OPERATES_IN':None, 'BASED_IN':'Sweden', 'name':'Arvid', 'fullname':'Arvid Nordquist HAB'},
-	{'OPERATES_IN':None, 'BASED_IN':'Vietnam', 'name':'AGI', 'fullname':'Agricultural Genetics Institute'}
+	{'OPERATES_IN':None, 'BASED_IN':'Ireland', 'name':'NUIG', 'fullname':'National University of Ireland, Galway'}
 ]
+# {'OPERATES_IN':['France', 'Vietnam','Cameroon', 'Costa Rica', 'French Guiana', 'El Salvador'], 'BASED_IN':'France', 'name':'CIRAD', 'fullname':'Centre de Coopération Internationale en Recherche Agronomique pour le Développement'},
+# {'OPERATES_IN':None, 'BASED_IN':'France', 'name':'Eurofins', 'fullname':'Eurofins Analytics'},
+# {'OPERATES_IN':None, 'BASED_IN':'Portugal', 'name':'ISD', 'fullname':'Instituto Superior de Agronomia'},
+# {'OPERATES_IN':None, 'BASED_IN':'Portugal', 'name':'NOVA ID FCT', 'fullname':'Associação para a Inovação e Desenvolvimento da FCT'},
+# {'OPERATES_IN':None, 'BASED_IN':'Ireland', 'name':'NUIG', 'fullname':'National University of Ireland, Galway'},
+# {'OPERATES_IN':None, 'BASED_IN':'Denmark', 'name':'UCPH', 'fullname':'Københavns Universitet'},
+# {'OPERATES_IN':None, 'BASED_IN':'Italy', 'name':'IllyCaffe', 'fullname':'IllyCaffe S.P.A'},
+# {'OPERATES_IN':None, 'BASED_IN':'Nicaragua', 'name':'NicaFrance', 'fullname':'Fundación Nicafrance'},
+# {'OPERATES_IN':['Nicaragua'], 'BASED_IN':'Netherlands', 'name':'SNV', 'fullname':'Stichting SNV Nederlandse Ontwikkelingsorganisatie'},
+# {'OPERATES_IN':None, 'BASED_IN':'France', 'name':'IRD', 'fullname':'Institut de Recherche pour le Développement'},
+# {'OPERATES_IN':None, 'BASED_IN':'France', 'name':'UM', 'fullname':'Université de Montpellier'},
+# {'OPERATES_IN':None, 'BASED_IN':'Germany', 'name':'MPG', 'fullname':'Max-Planck-Gesellschaft zur Förderung der Wissenschaften e. V.'},
+# {'OPERATES_IN':None, 'BASED_IN':'Germany', 'name':'RWTH', 'fullname':'Rheinisch-Westfälische Technische Hochschule Aachen'},
+# {'OPERATES_IN':None, 'BASED_IN':'United States of America', 'name':'WCR', 'fullname':'World Coffee Research'},
+# {'OPERATES_IN':None, 'BASED_IN':'United States of America', 'name':'ABR', 'fullname':'Arizona State University'},
+# {'OPERATES_IN':None, 'BASED_IN':'Cameroon', 'name':'IRAD', 'fullname':'Institut de Recherche Agricole pour le Développement'},
+# {'OPERATES_IN':None, 'BASED_IN':'Vietnam', 'name':'ICRAF', 'fullname':'International Center for Research in AgroForestry'},
+# {'OPERATES_IN':None, 'BASED_IN':'Vietnam', 'name':'NOMAFSI', 'fullname':'Northern Mountainous Agriculture and Forestry Science Institute'},
+# {'OPERATES_IN':None, 'BASED_IN':'Sweden', 'name':'Arvid', 'fullname':'Arvid Nordquist HAB'},
+# {'OPERATES_IN':None, 'BASED_IN':'Vietnam', 'name':'AGI', 'fullname':'Agricultural Genetics Institute'}
 
 trial_varieties = config.varieties
 el_frances_code = config.el_frances_code
@@ -54,7 +55,7 @@ indexes = [
 	#{'label': 'Country', 'property': 'name'},
 	{'label': 'Region', 'property': 'name_lower'},
 	{'label': 'Farm', 'property': 'name_lower'},
-	{'label': 'Plot', 'property': 'name_lower'},
+	{'label': 'Trial', 'property': 'name_lower'},
 	{'label': 'Block', 'property': 'id'},
 	{'label': 'Tree', 'property': 'id'},
 	{'label': 'Branch', 'property': 'id'},
@@ -71,8 +72,7 @@ indexes = [
 constraints = [
 	{'node': 'User', 'property': 'username_lower', 'constraint': 'IS UNIQUE'},
 	{'node': 'Partner', 'property': 'name_lower', 'constraint': 'IS UNIQUE'},
-	{'node': 'FarmTrait','property': 'name_lower', 'constraint': 'IS UNIQUE'},
-	{'node': 'PlotTrait', 'property': 'name_lower', 'constraint': 'IS UNIQUE'},
+	{'node': 'TrialTrait', 'property': 'name_lower', 'constraint': 'IS UNIQUE'},
 	{'node': 'BlockTrait', 'property': 'name_lower', 'constraint': 'IS UNIQUE'},
 	{'node': 'TreeTrait', 'property': 'name_lower', 'constraint': 'IS UNIQUE'},
 	{'node': 'BranchTrait', 'property': 'name_lower', 'constraint': 'IS UNIQUE'},
@@ -139,15 +139,13 @@ class Create:
 			' ON MATCH SET '
 				' u.found = True '
 			' MERGE (u)-[:SUBMITTED]->(sub:Submissions) '
-				' MERGE (sub)-[:SUBMITTED]->(counter:Counter {name: "plot", count: 0}) '
+				' MERGE (sub)-[:SUBMITTED]->(counter:Counter {name: "trial", count: 0}) '
 				' MERGE (sub)-[:SUBMITTED]->(:Emails {allowed : $allowed_emails})'
 				' MERGE (sub)-[:SUBMITTED]->(:Partners) '
-				' MERGE (sub)-[:SUBMITTED]->(:Trials) '
 				' MERGE (sub)-[:SUBMITTED]->(locations:Locations) '
 					' MERGE (locations)-[:SUBMITTED]->(:Countries) '
 				' MERGE (sub)-[:SUBMITTED]->(traits:Traits) '
-					' MERGE (traits)-[:SUBMITTED]->(:FarmTraits) '
-					' MERGE (traits)-[:SUBMITTED]->(:PlotTraits) '
+					' MERGE (traits)-[:SUBMITTED]->(:TrialTraits) '
 					' MERGE (traits)-[:SUBMITTED]->(:BlockTraits) '
 					' MERGE (traits)-[:SUBMITTED]->(:TreeTraits) '
 					' MERGE (traits)-[:SUBMITTED]->(:BranchTraits) '
@@ -323,46 +321,8 @@ class Create:
 						print ('Created: '+ level + 'Trait ' + trait['name'])
 					else:
 						print ('Error with merger of ' + level +'Trait ' + trait['name'])
-	def varieties(self, tx, varieties):
-		#first build the trials connected country
-		trials = {"props":[]}
-		for wp in trial_varieties:
-			for trial in wp['trials']:
-				trials['props'].append({
-					'number':trial['number'],
-					'name':trial['name'],
-					'wp':wp['WP'],
-					'country':trial['country']
-					})
-		trial_create = tx.run(
-			' MATCH (u:User {username_lower: toLower($username)}) '
-				' -[:SUBMITTED]->(:Submissions) '
-				' -[:SUBMITTED]->(ut:Trials)  ' 
-				' WITH ut '
-				' UNWIND $trials as trial '
-					' MATCH (country: Country {name_lower: toLower(trim(trial.country))}) '
-					' MERGE (ut) '
-						' -[s:SUBMITTED]->(n : Trial {'
-								' name_lower : toLower(trim(trial.name)) '
-							'}) '
-						' -[:PERFORMED_IN]->(country) '
-						' ON MATCH SET'
-							' n.found = True '
-						' ON CREATE SET '
-							' n.name = trial.name, '
-							' n.number = toInteger(trial.number), '
-							' n.work_package = toInteger(trial.wp), '				
-							' s.time = timestamp(), n.found = False '
-					' RETURN n.number, n.name, country.name, n.found ',
-			username = self.username,
-			trials = trials['props']
-		)
-		print 'Creating trials:'
-		for record in trial_create:
-			if record['n.found']:
-				print("Trial already registered: " + str([record[0], record[1], record[2]]))
-			else : print record[0], record[1], record[2]
-		#build a list of varieties connected to trial and group
+	def varieties(self, tx, trial_varieties):
+		# build a list of varieties connected to trial and group
 		varieties = list()
 		for wp in trial_varieties:
 			for trial in wp['trials']:
@@ -379,7 +339,6 @@ class Create:
 					' -[:SUBMITTED]->(:Submissions) '
 					' -[:SUBMITTED]->(varieties:Varieties) '
 			' UNWIND $varieties as variety '
-				' MATCH (trial:Trial {number: variety.trial}) '
 				' MATCH (varieties)-[:SUBMITTED]->(type) '
 					' WHERE toLower(labels(type)[0]) contains toLower(variety.type) '
 				' MERGE '
@@ -393,9 +352,6 @@ class Create:
 						' var.found = False '
 					' ON MATCH SET '
 						' var.found = True '
-				' MERGE '
-					' (var)-[r1: GROWN_IN]->(trial) '
-					' ON CREATE SET r1.time = timestamp() '
 				' MERGE '
 					' (type)-[r2: SUBMITTED]->(var) '
 					' ON CREATE SET r2.time = timestamp() '
@@ -638,8 +594,7 @@ else:
 	with driver.session() as session:
 		session.write_transaction(Create('start').user)
 		session.write_transaction(Create('start').partners, partners)
-		session.write_transaction(Create('start').traits, 'traits/farm_traits.csv', 'Farm')
-		session.write_transaction(Create('start').traits, 'traits/plot_traits.csv', 'Plot')
+		session.write_transaction(Create('start').traits, 'traits/trial_traits.csv', 'Trial')
 		session.write_transaction(Create('start').traits, 'traits/block_traits.csv', 'Block')
 		session.write_transaction(Create('start').traits, 'traits/tree_traits.csv', 'Tree')
 		session.write_transaction(Create('start').traits, 'traits/branch_traits.csv', 'Branch')

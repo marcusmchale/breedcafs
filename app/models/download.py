@@ -626,7 +626,7 @@ class Download:
 				tdp = td + ( ' {uid:$blockUID}) '
 					' -[:IS_IN]->(:PlotBlocks) '
 					' -[:IS_IN]->(plot:Plot) ' )
-			elif blockUID == "" and plotID != "" :
+			elif blockUID == "" and plotID != "":
 				tdp = td + ( ') '
 					' -[:IS_IN]->(:PlotBlocks)'
 					' -[:IS_IN]->(plot:Plot {uid:$plotID}) ' )

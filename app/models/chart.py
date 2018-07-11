@@ -1,14 +1,14 @@
-from app import app, ServiceUnavailable, AuthError
+from app import (
+	# app,
+	ServiceUnavailable,
+	AuthError
+)
 from app.cypher import Cypher
 from neo4j_driver import get_driver
 from datetime import datetime
 from flask import jsonify
-#Get dicts of values matching a node in the database then generate list for forms
 
 class Chart:
-	#def __init__(self):
-	#	pass
-	new = 'test'
 	def _get_submissions_range(self, tx):
 		result = [record for record in tx.run(Cypher.get_submissions_range, 
 			username=self.username, 
@@ -31,7 +31,7 @@ class Chart:
 				nodes.extend(({'id':record['d_id'],'label':record['d_label'],'name':record['d_name']},
 					{'id':record['n_id'],'label':record['n_label'],'name':record['n_name']}))
 				rels.append({'id':record['r_id'],'source':record['r_start'],'type':record['r_type'],'target':record['r_end']})
-			#connect counters to block/plot
+			#connect counters to block/trial
 			for node in nodes:
 				if str(node['id']).endswith('_count_node'):
 					rels.append({'source':node['id'],
@@ -45,12 +45,12 @@ class Chart:
 			return jsonify({"nodes":nodes, "links":rels})
 		except (ServiceUnavailable, AuthError):
 			return jsonify({"status":"Database unavailable"})
-	def _get_plots_treecount(self, tx):
-		return [record for record in tx.run(Cypher.get_plots_treecount)]
+	def _get_trials_treecount(self, tx):
+		return [record for record in tx.run(Cypher.get_trials_treecount)]
 	#get lists of submitted nodes (rels and directly linked nodes too) in json format
-	def get_plots_treecount(self):
+	def get_trials_treecount(self):
 		with get_driver().session() as neo4j_session:
-			records = neo4j_session.read_transaction(self._get_plots_treecount)
+			records = neo4j_session.read_transaction(self._get_trials_treecount)
 		#collect all nodes/rels from records into nested dict
 		nested = {'name':'nodes','label':'root_node','children':[record[0] for record in records]}
 		return jsonify(nested)

@@ -195,14 +195,14 @@ class Fields:
 			}
 			result = neo4j_session.read_transaction(neo4j_query, Cypher.get_farms, parameters)
 			return [(record[0]['name']) for record in result]
-	def get_plots_tup(self, region, farm):
+	def get_trials_tup(self, region, farm):
 		with get_driver().session() as neo4j_session:
 			parameters = {
 				'country': self.country,
 				'region': region,
 				'farm': farm
 			}
-			result = neo4j_session.read_transaction(neo4j_query, Cypher.get_plots, parameters)
+			result = neo4j_session.read_transaction(neo4j_query, Cypher.get_trials, parameters)
 			return [(str(record[0]['uid']), record[0]['name'].title()) for record in result]
 	#get lists of items - these have plotID so don't need country
 	@staticmethod  # has plotID so doesn't need country

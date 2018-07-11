@@ -6,4 +6,4 @@ from chart import Chart
 from samples import Samples
 from download import Download
 from neo4j_driver import get_driver
-from app import celery
+# from app import celery

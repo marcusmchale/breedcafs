@@ -1,5 +1,10 @@
-from flask_mail import Mail, Message, Attachment
+from flask_mail import (
+	#Attachment,
+	Mail,
+	Message
+)
 from app import app
+
 mail = Mail(app)
 
 def send_email(subject, sender, recipients, text_body, html_body):
