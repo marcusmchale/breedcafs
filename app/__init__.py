@@ -2,7 +2,7 @@
 
 import os, logging
 from celery import Celery
-from redis import StrictRedis
+from redis import StrictRedis, exceptions
 from flask import Flask
 
 app = Flask(__name__, instance_relative_config=True)
@@ -29,44 +29,45 @@ celery.conf.update(
 	accept_content = ['pickle', 'json']
 )
 
-#and also use redis (not just with celery) for basic local datastore like login attempts and caching
+# and also use redis (not just with celery) for basic local data store like login attempts and caching
 redis_store = StrictRedis(host= 'localhost', port = 6379, db=0)
+redis_exceptions = exceptions
 
 from neo4j.v1 import GraphDatabase, ServiceUnavailable, AuthError
 from neo4j.util import watch
 
 from app import views
 
-#these are the variable view rules for retrieving lists:
+# these are the variable view rules for retrieving lists:
 app.add_url_rule('/location/countries/', 
-	view_func=views.countries.as_view('countries'), 
+	view_func=views.Countries.as_view('countries'),
 	methods=['GET'])
 
 app.add_url_rule('/location/<country>/', 
-	view_func=views.regions.as_view('regions'), 
+	view_func=views.Regions.as_view('regions'),
 	methods=['GET'])
 
 app.add_url_rule('/location/<country>/<region>/', 
-	view_func=views.farms.as_view('farms'), 
+	view_func=views.Farms.as_view('farms'),
 	methods=['GET'])
 
 app.add_url_rule('/location/<country>/<region>/<farm>/', 
-	view_func=views.plots.as_view('plots'), 
+	view_func=views.Trials.as_view('trials'),
 	methods=['GET'])
 
-app.add_url_rule('/location/blocks/<plotID>/',
-	view_func=views.blocks.as_view('blocks'), 
+app.add_url_rule('/location/blocks/<trial_uid>/',
+	view_func=views.Blocks.as_view('blocks'),
 	methods=['GET'])
 
-app.add_url_rule('/location/treecount/<plotID>/',
-	view_func=views.treecount.as_view('treecount'),
+app.add_url_rule('/location/treecount/<trial_uid>/',
+	view_func=views.TreeCount.as_view('treecount'),
 	methods=['GET'])
 
 app.add_url_rule('/sample_reg/tissues/', 
-	view_func=views.tissues.as_view('tissues'), 
+	view_func=views.Tissues.as_view('tissues'),
 	methods=['GET'])
 
 app.add_url_rule('/sample_reg/storage_methods/', 
-	view_func=views.storage_methods.as_view('storage_methods'), 
+	view_func=views.StorageMethods.as_view('storage_methods'),
 	methods=['GET'])
 

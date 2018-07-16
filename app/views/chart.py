@@ -1,4 +1,4 @@
-from app import app, ServiceUnavailable
+from app import app, ServiceUnavailable, AuthError
 from flask import session, flash, redirect, url_for
 from app.models import Chart
 from datetime import datetime, timedelta
@@ -11,10 +11,10 @@ def json_submissions():
 	return Chart().get_submissions_range(session['username'], yesterday, tomorrow)
 
 
-@app.route("/json_plots_treecount")
-def json_plots_treecount():
+@app.route("/json_trials_treecount")
+def json_trials_treecount():
 	try:
-		return Chart().get_plots_treecount()
+		return Chart().get_trials_treecount()
 	except (ServiceUnavailable, AuthError):
 		flash("Database unavailable")
 		return redirect(url_for('index'))

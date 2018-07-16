@@ -1,9 +1,9 @@
 //TRAITS
 //Set trait level undefined by default and only display traits when level selected
 $('#trait_level').val('0');
-traits = $('#plot_traits,#block_traits,#tree_traits,#branch_traits,#leaf_traits,#sample_traits');
+traits = $('#trial_traits,#block_traits,#tree_traits,#branch_traits,#leaf_traits,#sample_traits');
 traits.hide();
-id_forms = $('#plot,#tree_ids,#branch_ids,#leaf_ids,#sample_ids');
+id_forms = $('#trial,#tree_ids,#branch_ids,#leaf_ids,#sample_ids');
 id_forms.hide();
 $('#existing_ids').hide();
 
@@ -13,49 +13,49 @@ $('#trait_level').change(function () {
 		traits.hide();
 		id_forms.hide();
 	}
-	else if (this.value === 'plot') {
+	else if (this.value === 'trial') {
 		$('#block_traits, #tree_traits, #branch_traits, #leaf_traits, #sample_traits').hide();
-		$('#plot_traits').show();
+		$('#trial_traits').show();
 		$('#existing_ids').hide();
-		$('#plot, #tree_ids, #sample_ids').hide();
+		$('#trial, #tree_ids, #sample_ids').hide();
 	}
 	else if (this.value === 'block') {
-		$('#plot_traits, #tree_traits, #branch_traits, #leaf_traits, #sample_traits').hide();
+		$('#trial_traits, #tree_traits, #branch_traits, #leaf_traits, #sample_traits').hide();
 		$('#block_traits').show();
-		$('#plot').show();
+		$('#trial').show();
 		$('#existing_ids').hide();
 		$('#tree_ids, #sample_ids').hide();
 	}
 	else if (this.value === 'tree') {
-		$('#plot_traits,#block_traits,#branch_traits,#leaf_traits,#sample_traits').hide();
+		$('#trial_traits,#block_traits,#branch_traits,#leaf_traits,#sample_traits').hide();
 		$('#tree_traits').show();
-		$('#plot, #tree_ids').show();
+		$('#trial, #tree_ids').show();
 		$('#existing_ids').hide();
 		$('#branch_ids,#leaf_ids,#sample_ids').hide();
 	}
 	else if (this.value === 'branch') {
-		$('#plot_traits,#block_traits,#tree_traits,#leaf_traits,#sample_traits').hide();
+		$('#trial_traits,#block_traits,#tree_traits,#leaf_traits,#sample_traits').hide();
 		$('#branch_traits').show();
 		$('#existing_ids').show();
 		$('#old_new_ids').val('old');
 		$('#new_ids').hide();
-		$('#plot, #tree_ids, #branch_ids').show();
+		$('#trial, #tree_ids, #branch_ids').show();
 		$('#leaf_ids, #sample_ids').hide();
 	}
 	else if (this.value === 'leaf') {
-		$('#plot_traits,#block_traits,#tree_traits,#branch_traits,#sample_traits').hide();
+		$('#trial_traits,#block_traits,#tree_traits,#branch_traits,#sample_traits').hide();
 		$('#leaf_traits').show();
 		$('#existing_ids').show();
 		$('#old_new_ids').val('old');
 		$('#new_ids').hide();
-		$('#plot,#leaf_ids,#tree_ids').show();
+		$('#trial,#leaf_ids,#tree_ids').show();
 		$('#branch_ids,#sample_ids').hide();
 	}
 	else if (this.value === 'sample') {
-		$('#plot_traits,#block_traits,#tree_traits,#branch_traits,#leaf_traits').hide();
+		$('#trial_traits,#block_traits,#tree_traits,#branch_traits,#leaf_traits').hide();
 		$('#sample_traits').show();
 		$('#existing_ids').hide();
-		$('#plot, #sample_ids, #tree_ids').show();
+		$('#trial, #sample_ids, #tree_ids').show();
 		$('#branch_ids,#leaf_ids').hide();
 	}
 });
@@ -135,7 +135,7 @@ $('dl').each( function () {
 });
 
 //expand the general tab as defaults are set (and as example)
-//$('#select_all_plot-general').parent().next().show();
+//$('#select_all_trial-general').parent().next().show();
 //$('#select_all_block-general').parent().next().show();
 //$('#select_all_tree-general').parent().next().show();
 //$('#select_all_sample-general').parent().next().show();

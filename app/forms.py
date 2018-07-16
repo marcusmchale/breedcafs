@@ -39,7 +39,7 @@ def safe_password_check(form, field):
 
 # custom filters
 def strip_filter(x):
-	return x.strip if x else None
+	return x.strip() if x else None
 
 
 # user registration

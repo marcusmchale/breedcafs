@@ -5,7 +5,7 @@ $('#country').change(update_blocks).change(function () {
 	if (this.value === "") {
 		$('#region').hide().val("");
 		$('#farm').hide().val("");
-		$('#plot').hide().val("");
+		$('#trial').hide().val("");
 		$('#block').hide().val("");
 	} else {
 		$('#region').show();
@@ -14,7 +14,7 @@ $('#country').change(update_blocks).change(function () {
 $('#region').change(update_blocks).change(function () {
 	if (this.value === "") {
 		$('#farm').hide().val("");
-		$('#plot').hide().val("");
+		$('#trial').hide().val("");
 		$('#block').hide().val("");
 	} else {
 		$('#farm').show();
@@ -22,13 +22,13 @@ $('#region').change(update_blocks).change(function () {
 });
 $('#farm').change(update_blocks).change(function () {
 	if (this.value === "") {
-		$('#plot').hide().val("");
+		$('#trial').hide().val("");
 		$('#block').hide().val("");
 	} else {
-		$('#plot').show();
+		$('#trial').show();
 	}
 });
-$('#plot').change(update_blocks).change(function () {
+$('#trial').change(update_blocks).change(function () {
 	if (this.value === "") {
 		$('#block').hide().val("");
 	} else {
@@ -39,7 +39,7 @@ $('#plot').change(update_blocks).change(function () {
 //start hidden, only show when parent locale selected
 $('#region').hide();
 $('#farm').hide();
-$('#plot').hide();
+$('#trial').hide();
 $('#block').hide();
 
 //TRAITS
@@ -49,36 +49,36 @@ $('#block').hide();
 
 //also load set trait level undefined by default and only display level traits when selected
 $('#trait_level').val('0');
-$('#sample_traits,#leaf_traits,#branch_traits,#tree_traits,#block_traits,#plot_traits').hide();
+$('#sample_traits,#leaf_traits,#branch_traits,#tree_traits,#block_traits,#trial_traits').hide();
 
 $('#trait_level').change(function () {
 	$(".flash").remove();
 	if (this.value === '') {
-		$('#sample_traits,#leaf_traits,#branch_traits,#tree_traits,#block_traits,#plot_traits').hide();
+		$('#sample_traits,#leaf_traits,#branch_traits,#tree_traits,#block_traits,#trial_traits').hide();
 	}
 	else if (this.value === 'sample') {
-		$('#leaf_traits,#branch_traits,#tree_traits,#block_traits,#plot_traits').hide();
+		$('#leaf_traits,#branch_traits,#tree_traits,#block_traits,#trial_traits').hide();
 		$('#sample_traits').show();
 	}
 	else if (this.value === 'leaf') {
-		$('#sample_traits,#branch_traits,#tree_traits,#block_traits,#plot_traits').hide();
+		$('#sample_traits,#branch_traits,#tree_traits,#block_traits,#trial_traits').hide();
 		$('#leaf_traits').show();
 	}
 	else if (this.value === 'branch') {
-		$('#sample_traits,#leaf_traits,#tree_traits,#block_traits,#plot_traits').hide();
+		$('#sample_traits,#leaf_traits,#tree_traits,#block_traits,#trial_traits').hide();
 		$('#branch_traits').show();
 	}
 	else if (this.value === 'tree') {
-		$('#sample_traits,#leaf_traits,#branch_traits,#block_traits,#plot_traits').hide();
+		$('#sample_traits,#leaf_traits,#branch_traits,#block_traits,#trial_traits').hide();
 		$('#tree_traits').show();
 	}
 	else if (this.value === 'block') {
-		$('#sample_traits,#leaf_traits,#branch_traits,#tree_traits,#plot_traits').hide();
+		$('#sample_traits,#leaf_traits,#branch_traits,#tree_traits,#trial_traits').hide();
 		$('#block_traits').show();
 	}
-	else if (this.value === 'plot') {
+	else if (this.value === 'trial') {
 		$('#sample_traits,#leaf_traits,#branch_traits,#tree_traits,#block_traits').hide();
-		$('#plot_traits').show();
+		$('#trial_traits').show();
 	}
 })
 

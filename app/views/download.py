@@ -1,20 +1,34 @@
 import os
-from app import app, ServiceUnavailable, AuthError
-from flask import (redirect, 
+from app import (
+	app,
+	ServiceUnavailable,
+	AuthError
+)
+from flask import (
+	redirect,
 	flash,
 	url_for, 
 	request, 
 	session, 
 	render_template, 
 	jsonify,
-	send_from_directory)
-from app.models import (User, 
-	Download)
-from app.forms import (DownloadForm,
+	send_from_directory
+)
+from app.models import (
+	User,
+	Download
+)
+from app.forms import (
+	DownloadForm,
 	LocationForm, 
-	CreateTraits)
-from app.emails import send_email, send_static_attachment
+	CreateTraits
+)
+from app.emails import (
+	send_email,
+	send_static_attachment
+)
 from datetime import datetime
+
 
 @app.route('/download', methods=['GET', 'POST'])
 def download():
@@ -30,8 +44,9 @@ def download():
 			branch_traits_form = CreateTraits().update('branch')
 			tree_traits_form = CreateTraits().update('tree')
 			block_traits_form = CreateTraits().update('block')
-			plot_traits_form = CreateTraits().update('plot')
-			return render_template('download.html', 
+			trial_traits_form = CreateTraits().update('trial')
+			return render_template(
+				'download.html',
 				download_form = download_form,
 				location_form = location_form,
 				branch_traits_form=branch_traits_form,
@@ -39,12 +54,14 @@ def download():
 				sample_traits_form = sample_traits_form,
 				tree_traits_form = tree_traits_form,
 				block_traits_form = block_traits_form,
-				plot_traits_form = plot_traits_form,
+				trial_traits_form = trial_traits_form,
 				level = 'all',
-				title='Download')
+				title='Download'
+			)
 		except (ServiceUnavailable, AuthError):
 			flash("Database unavailable")
 			return redirect(url_for('index'))
+
 
 @app.route('/download/generate_csv', methods=['POST'])
 def generate_csv():
@@ -64,61 +81,104 @@ def generate_csv():
 				country = request.form['country']
 				region = request.form['region']
 				farm = request.form['farm']
-				plotID = request.form['plot']
-				if plotID != "" :
-					plotID = int(plotID)
-				blockUID = request.form['block']
-				#selected traits of current level as flat list
-				traits = [item for sublist in [request.form.getlist(i) for i in request.form if all([i.startswith(level + '-'), 'csrf_token' not in i])] for item in sublist]
-				#get selected data format
+				trial_uid = request.form['trial']
+				if trial_uid != "":
+					trial_uid = int(trial_uid)
+				block_uid = request.form['block']
+				# selected traits of current level as flat list
+				traits = [
+					item for sublist in [
+						request.form.getlist(i) for i in request.form if all(
+							[i.startswith(level + '-'), 'csrf_token' not in i]
+						)] for item in sublist
+				]
+				# get selected data format
 				data_format = request.form['data_format']
-				#convert the date to epoch time (ms)
+				# convert the date to epoch time (ms)
 				if start_date != "":
-					start_time = int((datetime.strptime(start_date, '%Y-%m-%d')-datetime(1970,1,1)).total_seconds()*1000)
+					start_time = int((datetime.strptime(start_date, '%Y-%m-%d')-datetime(1970, 1, 1)).total_seconds()*1000)
 				else:
 					start_time = ""
 				if end_date != "":
-					end_time = int((datetime.strptime(end_date, '%Y-%m-%d')-datetime(1970,1,1)).total_seconds()*1000)
+					end_time = int((datetime.strptime(end_date, '%Y-%m-%d')-datetime(1970, 1, 1)).total_seconds()*1000)
 				else:
 					end_time = ""
-				#make the file and return file details
-				file_details = Download(username).get_csv(country, region, farm, plotID, blockUID, level, traits, data_format, start_time, end_time)
-				#if result = none then no data was found
-				if file_details == None:
-					return jsonify({'submitted' : "No entries found that match your selection"})
-				#create a download url
-				download_url = url_for('download_file', 
+				# make the file and return file details
+				file_details = Download(username).get_csv(
+					country,
+					region,
+					farm,
+					trial_uid,
+					block_uid,
+					level,
+					traits,
+					data_format,
+					start_time,
+					end_time
+				)
+				# if result = none then no data was found
+				if not file_details:
+					return jsonify({'submitted': "No entries found that match your selection"})
+				# create a download url
+				download_url = url_for(
+					'download_file',
 					username = session['username'], 
 					filename=file_details['filename'],
-					_external = True)
-				#if request.form.get(level + '-email_checkbox'):
+					_external = True
+				)
+				# if request.form.get(level + '-email_checkbox'):
 				if request.form.get('block-email_checkbox'):
-					recipients=[User(session['username']).find('')['email']]
+					recipients = [User(session['username']).find('')['email']]
 					subject = "BreedCAFS: Data file generated"
-					body = ('You requested data from the BreedCAFS database. The file is attached (if less than 5mb) and available at the following address: ' + download_url )
-					html = render_template('emails/data_file.html', 
-						download_url = download_url)
+					body = (
+							'You requested data from the BreedCAFS database. '
+							'The file is attached (if less than 5mb) and available at the following address: '
+							+ download_url
+					)
+					html = render_template(
+						'emails/data_file.html',
+						download_url = download_url
+					)
 					if file_details['file_size'] < 5000000:
-						send_static_attachment(subject, 
+						send_static_attachment(
+							subject,
 							app.config['ADMINS'][0],
 							recipients, 
 							body, 
 							html,
 							file_details['filename'],
 							'text/csv',
-							file_details['file_path'])
-						return jsonify({'submitted':'Your file is ready for download: "<a href="' + download_url + '">' + file_details['filename'] + '</a>"'
-							+ ' A copy of this file has been sent to your email address'})
+							file_details['file_path']
+						)
+						return jsonify({
+							'submitted': (
+								'Your file is ready for download: '
+								'"<a href="' + download_url + '">' + file_details['filename'] + '</a>"'
+								' A copy of this file has been sent to your email address'
+							)
+						})
 					else:
-						send_email(subject,
+						send_email(
+							subject,
 							app.config['ADMINS'][0],
 							recipients, 
 							body, 
-							html)
-						return jsonify({'submitted':'Your file is ready for download: "<a href="' + download_url + '">' + file_details['filename'] + '</a>"'
-							+ ' A copy of this link has been sent to your email address'})
+							html
+						)
+						return jsonify({
+							'submitted': (
+								'Your file is ready for download: '
+								'"<a href="' + download_url + '">' + file_details['filename'] + '</a>"'
+								' A copy of this link has been sent to your email address'
+							)
+						})
 				else:
-					return jsonify({'submitted':'Your file is ready for download: "<a href="' + download_url + '">' + file_details['filename'] + '</a>"'})
+					return jsonify({
+						'submitted': (
+							'Your file is ready for download: '
+							'"<a href="' + download_url + '">' + file_details['filename'] + '</a>"'
+						)
+					})
 			else:
 				errors = jsonify([download_form.errors, traits_form.errors])
 				return errors
@@ -138,7 +198,11 @@ def download_file(username, filename):
 	else:
 		try:
 			if os.path.isfile(os.path.join(app.instance_path, app.config['DOWNLOAD_FOLDER'], username, filename)):
-				return send_from_directory(os.path.join(app.instance_path, app.config['DOWNLOAD_FOLDER'], username), filename, as_attachment = True)
+				return send_from_directory(
+					os.path.join(app.instance_path, app.config['DOWNLOAD_FOLDER'], username),
+					filename,
+					as_attachment = True
+				)
 			else:
 				flash('File no longer exists on the server, please generate a new file for download')
 				return redirect(url_for('download'))

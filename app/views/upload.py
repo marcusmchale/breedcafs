@@ -20,6 +20,7 @@ def upload():
 			flash("Database unavailable")
 			return redirect(url_for('index'))
 
+
 @app.route('/upload_submit', methods=['POST'])
 def upload_submit():
 	if 'username' not in session:
@@ -50,15 +51,16 @@ def upload_submit():
 				# result is stored in redis and accessible from the status/task_id endpoint
 				task = Upload.async_submit.apply_async(args = [username, upload_object])
 			except (ServiceUnavailable, AuthError):
-				return jsonify({'submitted':'The database is currently unavailable - please try again later'})
+				return jsonify({'submitted': 'The database is currently unavailable - please try again later'})
 			return jsonify({'submitted': (
 				'Your file has been uploaded and is being checked before submission to the database.\n'
 				'You will receive a report both here and via email that will either confirm your submission '
 				'or describe any issues that require your attention.'
 			),
-				'task_id': task.id })
+				'task_id': task.id})
 		else:
 			return jsonify(form.errors)
+
 
 @app.route('/status/<task_id>/')
 def taskstatus(task_id):
@@ -74,12 +76,16 @@ def taskstatus(task_id):
 				error_table = result['result'].html_table()
 			elif result['result'].field_errors_dict():
 				errors_dict = result['result'].field_errors_dict()
-				error_table = '<p>The uploaded table includes the below unrecognised fields. ' \
-							'Please check the spelling of any traits ' \
-							'and ensure they are appropriate to the level of items included ' \
-							'in this file:</p>'
+				error_table = (
+					'<p>The uploaded table includes the below unrecognised fields. ' 
+					'Please check the spelling of any traits ' 
+					'and ensure they are appropriate to the level of items included ' 
+					'in this file:</p>'
+				)
 				for i in errors_dict:
 					error_table += '<p> - ' + str(i) + '</p>\n'
+			else:
+				error_table = None
 			return jsonify({
 				'status': 'ERRORS',
 				'result': error_table
@@ -89,4 +95,3 @@ def taskstatus(task_id):
 				'status': task.status,
 				'result': result
 			})
-

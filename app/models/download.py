@@ -16,19 +16,21 @@ from datetime import datetime
 from app.models import (
 	Fields)
 
-#User class related (all uploads are tied to a user) yet more specifically regarding uploads
+
+# User class related (all uploads are tied to a user) yet more specifically regarding uploads
 class Download:
 	def __init__(self, username):
 		self.username = username
+
 	def make_csv_file(self, fieldnames, id_list, filename, with_time = True):
-		#create user download path if not found
+		# create user download path if not found
 		download_path = os.path.join(app.instance_path, app.config['DOWNLOAD_FOLDER'], self.username)
 		if not os.path.isdir(download_path):
 			os.mkdir(download_path)
 			gid = grp.getgrnam(app.config['CELERYGRPNAME']).gr_gid
 			os.chown(download_path, -1, gid)
 			os.chmod(download_path, 0775)
-		#prepare variables to write the file
+		# prepare variables to write the file
 		time = datetime.now().strftime('%Y%m%d-%H%M%S')
 		if with_time:
 			filename = time + '_' + filename
@@ -39,24 +41,26 @@ class Download:
 			filename = time + '_' + filename
 			file_path = os.path.join(app.instance_path, app.config['DOWNLOAD_FOLDER'], session['username'], filename)
 		# make the file
-		with open(file_path, 'w') as file:
-			writer = csv.DictWriter(file,
+		with open(file_path, 'w') as csv_file:
+			writer = csv.DictWriter(
+				csv_file,
 				fieldnames = fieldnames,
 				quoting = csv.QUOTE_ALL,
-				extrasaction = 'ignore')
+				extrasaction = 'ignore'
+			)
 			writer.writeheader()
 			for row in id_list:
 				for item in row:
 					if isinstance(row[item], list):
 						row[item] = [i.encode() for i in row[item]]
-				#for key, value in row:
+				# for key, value in row:
 				writer.writerow(row)
-			file_size = file.tell()
+			file_size = csv_file.tell()
 		# return file details
 		return {
-			"filename":filename,
-			"file_path":file_path,
-			"file_size":file_size,
+			"filename": filename,
+			"file_path": file_path,
+			"file_size": file_size,
 			"url": url_for(
 				'download_file',
 				username = self.username,
@@ -64,82 +68,79 @@ class Download:
 				_external = True
 			)
 		}
-	def get_csv(self,
+
+	def get_csv(
+			self,
 			country, 
 			region, 
 			farm, 
-			plotID, 
-			blockUID, 
+			trial_uid,
+			block_uid,
 			level, 
 			traits, 
 			data_format, 
 			start_time, 
 			end_time):
-		self.country = country
-		self.region = region
-		self.farm = farm
-		self.plotID = plotID
-		self.blockUID = blockUID
-		self.traits = traits
-		self.start_time = start_time
-		self.end_time = end_time
-		#build query strings - always be careful not to allow injection when doing this!!
-		#all of the input needs to be validated (in this case it is already done by WTForms checking against selectfield options)
-		#but as I am not entirely sure about the security of this layer I am adding another check of the values that are used to concatenate the string
+		# despite existing check with WTForms here we repeat the check of strings used to build query
 		node_label = str(level).title() + 'Trait'
 		all_level_traits = Lists(node_label).create_list('name')
 		traits = [str(i) for i in traits if i in all_level_traits]
-		#First I limit the data nodes to those submitted by members of an affiliated institute
-		user_data_query = ( 
+		# First limit the get the confirmed affiliated institutes and all data nodes submitted by these
+		# TODO put this filter at the end of the query, might be less db-hits
+		user_data_query = (
 			' MATCH (:User {username_lower: toLower($username)}) '
 			' -[:AFFILIATED {confirmed :true}] '
 			' ->(partner:Partner) '
-			' WITH partner '			
+			' WITH partner '
 			' MATCH (partner)<-[:AFFILIATED {data_shared :true}] '
 			' -(user:User) '
 			' -[:SUBMITTED*5]->(data:Data) '
 			' WITH user.name as user_name, partner.name as partner_name, data '
 		)
-		#this section first as not dependent on level but part of query build
-		if country == "" :
+		# this section first as not dependent on level but part of all queries
+		if farm != "":
 			frc = (
-				' -[:IS_IN]->(farm: Farm) '
-				' -[:IS_IN]->(region: Region) '
-				' -[:IS_IN]->(country: Country) '
+				' -[:IS_IN]->(farm:Farm {name_lower: toLower($farm)}) '
+				' -[:IS_IN]->(region:Region {name_lower: toLower($region)}) '
+				' -[:IS_IN]->(country:Country {name_lower: toLower($country)}) '
 			)
-		elif country != "" and region == "":
+		elif region != "":
+			frc = (
+				' <-[:IS_IN]->(farm:Farm) '
+				' -[:IS_IN]->(region:Region {name_lower: toLower($region)}) '
+				' -[:IS_IN]->(country:Country {name_lower: toLower($country)}) '
+			)
+		elif country != "":
 			frc = (
 				' -[:IS_IN]->(farm: Farm) '
 				' -[:IS_IN]->(region: Region) '
 				' -[:IS_IN]->(country: Country {name_lower: toLower($country)}) '
 			)
-		elif region != "" and farm == "" :
-			frc = (' <-[:IS_IN]->(farm:Farm) '
-				' -[:IS_IN]->(region:Region {name_lower: toLower($region)}) '
-				' -[:IS_IN]->(country:Country {name_lower: toLower($country)}) ')
-		elif farm != "" :
-			frc = (' -[:IS_IN]->(farm:Farm {name_lower: toLower($farm)}) '
-				' -[:IS_IN]->(region:Region {name_lower: toLower($region)}) '
-				' -[:IS_IN]->(country:Country {name_lower: toLower($country)}) ')
-		#then level dependent stuff
+		else:
+			frc = (
+				' -[:IS_IN]->(farm: Farm) '
+				' -[:IS_IN]->(region: Region) '
+				' -[:IS_IN]->(country: Country) '
+			)
+		# then build the level dependent query string
 		if level == 'sample':
 			index_fieldnames = [
 				'Country',
 				'Region',
 				'Farm',
-				'Plot',
-				'PlotUID',
+				'Trial',
+				'Trial UID',
 				'Block',
-				'BlockUID',
-				'TreeUID',
-				'TreeCustomID',
+				'Block UID',
+				'Tree UID',
+				'Tree Custom ID',
 				'Variety',
-				'BranchUID',
-				'LeafUID',
+				'Branch UID',
+				'Leaf UID',
 				'UID',
 				'Tissue',
 				'Storage',
-				'SampleDate'
+				'Date Sampled'
 			]
 			td = (
 				' MATCH '
@@ -158,126 +159,137 @@ class Download:
 				'	(tist)-[:STORED_IN]->(storage), '
 				'	(tree) '
 			)
-			#if no plot selected
-			if plotID == "" :
-				tdp = td + ( ' -[:IS_IN]->(PlotTrees) '
-					' -[:IS_IN]->(plot:Plot) ' )
-				#query = tdp + frc
-				optional_block = ( ' OPTIONAL MATCH (tree) '
-					' -[:IS_IN]->(:BlockTrees) '
-					' -[:IS_IN]->(block:Block) ' )
-			#if plotID is defined (but no blockUID)
-			elif blockUID == "" and plotID != "" :
-				tdp = td + ( ' -[:IS_IN]->(PlotTrees) '
-					' -[:IS_IN]->(plot:Plot {uid:$plotID}) ' )
-				#query = tdp + frc
-				optional_block = ( ' OPTIONAL MATCH (tree) '
-					' -[:IS_IN]->(:BlockTrees) '
-					' -[:IS_IN]->(block:Block) ')
-			#else blockID is defined
-			else: # blockUID != "":
-				tdp = td + ( '-[:IS_IN]->(:BlockTrees) '
-					' -[:IS_IN]->(block:Block {uid:$blockUID}) '
-					' -[:IS_IN]->(:PlotBlocks) '
-					' -[:IS_IN]->(plot:Plot) ')
-				#query = tdp + frc
+			# if block_uid is defined
+			if block_uid != "":
+				tdp = td + (
+					'-[:IS_IN]->(: BlockTrees) '
+					' -[:IS_IN]->(block: Block {uid: $block_uid}) '
+					' -[:IS_IN]->(: TrialBlocks) '
+					' -[:IS_IN]->(trial: Trial) '
+				)
 				optional_block = ''
+			# if trial_uid is defined
+			elif trial_uid != "":
+				tdp = td + (
+					' -[:IS_IN]->(: TrialTrees) '
+					' -[:IS_IN]->(trial: Trial {uid: $trial_uid}) '
+				)
+				optional_block = (
+					' OPTIONAL MATCH (tree) '
+					' -[:IS_IN]->(: BlockTrees) '
+					' -[:IS_IN]->(block: Block) '
+				)
+			# else no trial selected
+			else:
+				tdp = td + (
+					' -[:IS_IN]->(: TrialTrees) '
+					' -[:IS_IN]->(trial:Trial) '
+				)
+				optional_block = (
+					' OPTIONAL MATCH (tree) '
+					' -[:IS_IN]->(: BlockTrees) '
+					' -[:IS_IN]->(block: Block) '
+				)
 			optional_block += (
 				' OPTIONAL MATCH '
 				'	(sample)-[:FROM_BRANCH {current: True}]->(branch:Branch) '
 				' OPTIONAL MATCH '
 				'	(sample)-[:FROM_LEAF {current:True}]->(leaf:Leaf) '
 			)
-			#and generate the return statement
+			# generate the return statement
 			if data_format == 'table':
-				response = ( 
-					#need a with statement to allow order by with COLLECT
+				response = (
+					# need a with statement to allow order by with COLLECT
 					' WITH '
 					' 	country.name as Country, '
 					' 	region.name as Region, '
 					' 	farm.name as Farm, '
-					' 	plot.name as Plot, '
-					' 	plot.uid as PlotUID, '
+					' 	trial.name as Trial, '
+					'	trial.uid as `Trial UID`, '
 					' 	block.name as Block, '
-					' 	block.uid as BlockUID, '
-					' 	tree.uid as TreeUID, '
-					' 	tree.custom_id as TreeCustomID, '
+					' 	block.uid as `Block UID`, '
+					' 	tree.uid as `Tree UID`, '
+					' 	tree.custom_id as `Tree Custom ID`, '
 					' 	tree.variety as Variety, '
-					' 	branch.uid as BranchUID, '
-					' 	leaf.uid as LeafUID, '
-					' 	sample.uid as SampleUID, '
+					' 	branch.uid as `Branch UID`, '
+					' 	leaf.uid as `Leaf UID`, '
+					' 	sample.uid as `Sample UID`, '
 					'	tissue.name as Tissue, '
 					'	storage.name as Storage, '
-					'	sample.date as SampleDate, '
-					' 	sample.id as SampleID, '
+					'	sample.date as `Date Sampled`, '
+					' 	sample.id as `Sample ID`, '
 					'	COLLECT([trait.name, data.value]) as Traits '
 					' RETURN '
 					'	{ ' 
-					'		Country : Country, '
-					'		Region : Region, '
-					'		Farm : Farm, '
-					'		Plot : Plot, '
-					'		PlotUID : PlotUID, '
+					'		Country: Country, '
+					'		Region: Region, '
+					'		Farm: Farm, '
+					'		Trial: Trial, '
+					'		`Trial UID` : `Trial UID`, '
 					'		Block : Block, '
-					'		BlockUID: BlockUID, '
-					'		TreeUID : TreeUID, '
-					'		TreeCustomID: TreeCustomID, '
+					'		`Block UID`: `Block UID`, '
+					'		`Tree UID` : `Tree UID`, '
+					'		`Tree Custom ID`: `Tree Custom ID`, '
 					'		Variety: Variety, '
-					'		BranchUID: BranchUID, '
-					'		LeafUID: LeafUID, '
-					'		UID : SampleUID ,'
+					'		`Branch UID`: `Branch UID`, '
+					'		`Leaf UID`: `Leaf UID`, '
+					'		UID : `Sample UID` ,'
 					'		Tissue: Tissue, '
 					'		Storage: Storage, '
-					'		SampleDate: SampleDate, '
-					'		SampleID : SampleID, '
+					'		`Date Sampled`: `Date Sampled`, '
+					'		`Sample ID : `Sample ID`, '
 					'		Traits : Traits } '
 					' ORDER BY '
-						' PlotUID, SampleID '
+					'	`Trial UID`, `Sample ID` '
 				)
-			elif data_format == 'db':
+			else:  # if data_format == 'db':
 				response = (
 					' RETURN {'
-						' User : user_name, '
-						' Partner : partner_name,'
-						' Country : country.name, ' 
-						' Region : region.name, '
-						' Farm : farm.name, '
-						' Plot : plot.name, '
-						' PlotUID: plot.uid, '
-						' Block : block.name, '
-						' BlockUID : block.uid, '
-						' TreeUID : tree.uid, '
-						' TreeCustomID: tree.custom_id,	'
-						' Variety: tree.variety, '
-						' SampleUID : sample.uid, '
-						' BranchUID: branch.uid, '
-						' LeafUID: leaf.uid, '
-						' UID : sample.uid, '
-						' Tissue: tissue.name, '
-						' Storage: storage.name, '
-						' SampleDate: sample.date, '
-						' SampleID : sample.id, '
-						' Trait : trait.name, '
-						' Value : data.value, '
-						' Location : data.location, '
-						' Recorded_at : apoc.date.format(data.time), '
-						' Recorded_by: data.person '
+					'	User: user_name, '
+					'	Partner: partner_name,'
+					'	Country: country.name, ' 
+					'	Region: region.name, '
+					'	Farm: farm.name, '
+					'	Trial: trial.name, '
+					'	`Trial UID`: trial.uid, '
+					'	Block: block.name, '
+					'	`Block UID`: block.uid, '
+					'	`Tree UID`: tree.uid, '
+					'	`Tree Custom ID`: tree.custom_id,	'
+					'	Variety: tree.variety, '
+					'	`Sample UID`: sample.uid, '
+					'	`Branch UID`: branch.uid, '
+					'	`Leaf UID`: leaf.uid, '
+					'	UID : sample.uid, '
+					'	Tissue: tissue.name, '
+					'	Storage: storage.name, '
+					'	`Sample Date`: sample.date, '
+					'	`Sample ID`: sample.id, '
+					'	Trait: trait.name, '
+					'	Value: data.value, '
+					'	Location: data.location, '
+					'	`Recorded at`: apoc.date.format(data.time), '
+					'	`Recorded by`: data.person '
 					' } '
-					' ORDER BY plot.uid, sample.id, trait.name, apoc.date.format(data.time) '
+					' ORDER BY '
+					'	trial.uid, '
+					'	sample.id, '
+					'	trait.name, '
+					'	apoc.date.format(data.time) '
 					)
 		elif level == 'leaf':
 			index_fieldnames = [
 				'Country',
 				'Region',
 				'Farm',
-				'Plot',
-				'PlotUID',
+				'Trial',
+				'Trial UID',
 				'Block',
-				'BlockUID',
-				'TreeUID',
-				'TreeCustomID',
+				'Block UID',
+				'Tree UID',
+				'Tree Custom ID',
 				'Variety',
-				'BranchUID',
+				'Branch UID',
 				'UID'
 			]
 			td = (
@@ -292,115 +304,127 @@ class Download:
 				'	-[:FOR_ITEM]->(leaf:Leaf) '
 				'	-[:FROM_TREE*2]->(tree:Tree) '
 			)
-			#if no plot selected
-			if plotID == "":
-				tdp = td + ( ' -[:IS_IN]->(PlotTrees) '
-					' -[:IS_IN]->(plot:Plot) ' )
-				#query = tdp + frc
-				optional_block = ( ' OPTIONAL MATCH (tree) '
-					' -[:IS_IN {current:True}]->(:BlockTrees) '
-					' -[:IS_IN]->(block:Block) ' )
-			#if plotID is defined (but no blockUID)
-			elif blockUID == "" and plotID != "":
-				tdp = td + ( ' -[:IS_IN]->(PlotTrees) '
-					' -[:IS_IN]->(plot:Plot {uid:$plotID}) ' )
-				#query = tdp + frc
-				optional_block = ( ' OPTIONAL MATCH (tree) '
-					' -[:IS_IN {current:True}]->(:BlockTrees) '
-					' -[:IS_IN]->(block:Block) ')
-			#if blockID is defined
-			else: # blockUID != "":
-				tdp = td + ( '-[:IS_IN {current:True}]->(:BlockTrees) '
-					' -[:IS_IN]->(block:Block {uid:$blockUID}) '
-					' -[:IS_IN]->(:PlotBlocks) '
-					' -[:IS_IN]->(plot:Plot) ')
-				#query = tdp + frc
+
+			# if block_uid is defined
+			if block_uid != "":
+				tdp = td + (
+					'-[:IS_IN {current: True}]->(: BlockTrees) '
+					' -[:IS_IN]->(block: Block {uid: $block_uid}) '
+					' -[:IS_IN]->(: TrialBlocks) '
+					' -[:IS_IN]->(trial: Trial) '
+				)
 				optional_block = ''
+			# if trial_uid is defined
+			elif trial_uid != "":
+				tdp = td + (
+					' -[:IS_IN]->(: TrialTrees) '
+					' -[:IS_IN]->(trial: Trial {uid: $trial_uid}) '
+				)
+				optional_block = (
+					' OPTIONAL MATCH (tree) '
+					' -[:IS_IN {current: True}]->(: BlockTrees) '
+					' -[:IS_IN]->(block: Block) '
+				)
+			# no trial selected
+			else:
+				tdp = td + (
+					' -[:IS_IN]->(: TrialTrees) '
+					' -[:IS_IN]->(trial:Trial) '
+				)
+				optional_block = (
+					' OPTIONAL MATCH (tree) '
+					' -[:IS_IN {current:True}]->(: BlockTrees) '
+					' -[:IS_IN]->(block:Block) '
+				)
 			optional_block += (
 				' OPTIONAL MATCH '
 				'	(leaf)-[:FROM_BRANCH {current: True}]->(branch:Branch) '
 			)
-			#and generate the return statement
+			# and generate the return statement
 			if data_format == 'table':
 				response = (
-					#need a with statement to allow order by with COLLECT
+					# need a with statement to allow order by with COLLECT
 					' WITH '
-					' 	country.name as Country, '
-					' 	region.name as Region, '
-					' 	farm.name as Farm, '
-					' 	plot.name as Plot, '
-					' 	plot.uid as PlotUID, '
-					' 	block.name as Block, '
-					' 	block.uid as BlockUID, '
-					' 	tree.uid as TreeUID, '
-					' 	tree.custom_id as TreeCustomID, '
-					' 	tree.variety as Variety, '
-					' 	branch.uid as BranchUID, '
-					' 	leaf.uid as LeafUID, '
-					' 	leaf.id as LeafID, '
+					'	country.name as Country, '
+					'	region.name as Region, '
+					'	farm.name as Farm, '
+					'	trial.name as Trial, '
+					'	trial.uid as `Trial UID`, '
+					'	block.name as Block, '
+					'	block.uid as `Block UID`, '
+					'	tree.uid as `Tree UID`, '
+					'	tree.custom_id as `Tree Custom ID`, '
+					'	tree.variety as Variety, '
+					'	branch.uid as `Branch UID`, '
+					'	leaf.uid as `Leaf UID`, '
+					'	leaf.id as `Leaf ID`, '
 					'	COLLECT([trait.name, data.value]) as Traits '
 					' RETURN '
 					'	{ ' 
 					'		Country : Country, '
 					'		Region : Region, '
 					'		Farm : Farm, '
-					'		Plot : Plot, '
-					'		PlotUID : PlotUID, '
+					'		Trial : Trial, '
+					'		`Trial UID` : `Trial UID`, '
 					'		Block : Block, '
-					'		BlockUID: BlockUID, '
-					'		TreeUID : TreeUID, '
-					'		TreeCustomID: TreeCustomID, '
+					'		`Block UID`: `Block UID`, '
+					'		`Tree UID` : `Tree UID`, '
+					'		`Tree Custom ID`: `Tree Custom ID`, '
 					'		Variety: Variety, '
-					'		BranchUID: BranchUID, '
-					'		UID: LeafUID, '
-					'		LeafID: LeafID, '
+					'		`Branch UID`: `Branch UID`, '
+					'		UID: `Leaf UID`, '
+					'		`Leaf ID`: `Leaf ID`, '
 					'		Traits : Traits } '
 					' ORDER BY '
-						' PlotUID, LeafID '
+					'	`Trial UID`, `Leaf ID` '
 				)
-			elif data_format == 'db':
+			else:  # if data_format == 'db':
 				response = (
 					' RETURN {'
-						' User : user_name, '
-						' Partner : partner_name,'
-						' Country : country.name, ' 
-						' Region : region.name, '
-						' Farm : farm.name, '
-						' Plot : plot.name, '
-						' PlotUID: plot.uid, '
-						' Block : block.name, '
-						' BlockUID : block.uid, '
-						' TreeUID : tree.uid, '
-						' TreeCustomID: tree.custom_id,	'
-						' Variety: tree.variety, '
-						' BranchUID: branch.uid, '
-						' UID: leaf.uid, '
-						' LeafID: leaf.id, '
-						' Trait : trait.name, '
-						' Value : data.value, '
-						' Location : data.location, '
-						' Recorded_at : apoc.date.format(data.time), '
-						' Recorded_by: data.person '
+					'	User : user_name, '
+					'	Partner : partner_name,'
+					'	Country : country.name, ' 
+					'	Region : region.name, '
+					'	Farm : farm.name, '
+					'	Trial : trial.name, '
+					'	`Trial UID`: trial.uid, '
+					'	Block : block.name, '
+					'	`Block UID` : block.uid, '
+					'	`Tree UID` : tree.uid, '
+					'	`Tree Custom ID`: tree.custom_id,	'
+					'	Variety: tree.variety, '
+					'	`Branch UID`: branch.uid, '
+					'	UID: leaf.uid, '
+					'	`Leaf ID`: leaf.id, '
+					'	Trait : trait.name, '
+					'	Value : data.value, '
+					'	Location : data.location, '
+					'	`Recorded at` : apoc.date.format(data.time), '
+					'	`Recorded by`: data.person '
 					' } '
-					' ORDER BY plot.uid, leaf.id, trait.name, apoc.date.format(data.time) '
+					' ORDER BY '
+					'	trial.uid, '
+					'	leaf.id, '
+					'	trait.name, '
+					'	apoc.date.format(data.time) '
 					)
 		elif level == 'branch':
 			index_fieldnames = [
 				'Country',
 				'Region',
 				'Farm',
-				'Plot',
-				'PlotUID',
+				'Trial',
+				'Trial UID',
 				'Block',
-				'BlockUID',
-				'TreeUID',
-				'TreeCustomID',
+				'Block UID',
+				'Tree UID',
+				'Tree Custom ID',
 				'Variety',
 				'UID',
 			]
 			td = (
 				' MATCH '
-				'	(trait:BranchTrait) '
+				'	(trait: BranchTrait) '
 				'	<-[:FOR_TRAIT*2]-(branch_trait) '
 				'	<-[:DATA_FOR]-(data) '
 				' WHERE (trait.name) IN ' + str(traits) +
@@ -410,102 +434,113 @@ class Download:
 				'	-[:FOR_ITEM]->(branch:Branch) '
 				'	-[:FROM_TREE*2]->(tree:Tree) '
 			)
-			#if no plot selected
-			if plotID == "":
-				tdp = td + ( ' -[:IS_IN]->(PlotTrees) '
-					' -[:IS_IN]->(plot:Plot) ' )
-				#query = tdp + frc
-				optional_block = ( ' OPTIONAL MATCH (tree) '
-					' -[:IS_IN {current:True}]->(:BlockTrees) '
-					' -[:IS_IN]->(block:Block) ' )
-			#if plotID is defined (but no blockUID)
-			elif blockUID == "" and plotID != "":
-				tdp = td + ( ' -[:IS_IN]->(PlotTrees) '
-					' -[:IS_IN]->(plot:Plot {uid:$plotID}) ' )
-				#query = tdp + frc
-				optional_block = ( ' OPTIONAL MATCH (tree) '
-					' -[:IS_IN {current:True}]->(:BlockTrees) '
-					' -[:IS_IN]->(block:Block) ')
-			#if blockID is defined
-			else: # blockUID != "":
-				tdp = td + ( '-[:IS_IN {current:True}]->(:BlockTrees) '
+			# if block_uid is defined
+			if block_uid != "":
+				tdp = td + (
+					'-[:IS_IN {current:True}]->(:BlockTrees) '
 					' -[:IS_IN]->(block:Block {uid:$blockUID}) '
-					' -[:IS_IN]->(:PlotBlocks) '
-					' -[:IS_IN]->(plot:Plot) ')
-				#query = tdp + frc
+					' -[:IS_IN]->(:TrialBlocks) '
+					' -[:IS_IN]->(trial:Trial) '
+				)
 				optional_block = ''
-			#and generate the return statement
+			# if trial_uid is defined (but no block_uid)
+			elif trial_uid != "":
+				tdp = td + (
+					' -[:IS_IN]->(:TrialTrees) '
+					' -[:IS_IN]->(trial:Trial {uid: $trial_uid}) '
+				)
+				optional_block = (
+					' OPTIONAL MATCH (tree) '
+					' -[:IS_IN {current:True}]->(:BlockTrees) '
+					' -[:IS_IN]->(block:Block) '
+				)
+			# if no trial selected
+			else:
+				tdp = td + (
+					' -[:IS_IN]->(:TrialTrees) '
+					' -[:IS_IN]->(trial:Trial) '
+				)
+				optional_block = (
+					' OPTIONAL MATCH (tree) '
+					' -[:IS_IN {current:True}]->(:BlockTrees) '
+					' -[:IS_IN]->(block:Block) '
+				)
+			# generate the return statement
 			if data_format == 'table':
 				response = (
-					#need a with statement to allow order by with COLLECT
+					# need a with statement to allow order by with COLLECT
 					' WITH '
 					' 	country.name as Country, '
 					' 	region.name as Region, '
 					' 	farm.name as Farm, '
-					' 	plot.name as Plot, '
-					' 	plot.uid as PlotUID, '
+					' 	trial.name as Trial, '
+					' 	trial.uid as `Trial UID`, '
 					' 	block.name as Block, '
-					' 	block.uid as BlockUID, '
-					' 	tree.uid as TreeUID, '
-					' 	tree.custom_id as TreeCustomID, '
+					' 	block.uid as `Block UID`, '
+					' 	tree.uid as `Tree UID`, '
+					' 	tree.custom_id as `Tree Custom ID`, '
 					' 	tree.variety as Variety, '
-					' 	branch.uid as BranchUID, '
-					'	branch.id as BranchID,'
+					' 	branch.uid as `Branch UID`, '
+					'	branch.id as `Branch ID`,'
 					'	COLLECT([trait.name, data.value]) as Traits '
 					' RETURN '
 					'	{ ' 
-					'		Country : Country, '
-					'		Region : Region, '
-					'		Farm : Farm, '
-					'		Plot : Plot, '
-					'		PlotUID : PlotUID, '
-					'		Block : Block, '
-					'		BlockUID: BlockUID, '
-					'		TreeUID : TreeUID, '
-					'		TreeCustomID: TreeCustomID, '
+					'		Country: Country, '
+					'		Region: Region, '
+					'		Farm: Farm, '
+					'		Trial: Trial, '
+					'		`Trial UID`: `Trial UID`, '
+					'		Block: Block, '
+					'		`Block UID`: `Block UID`, '
+					'		`Tree UID`: `Tree UID`, '
+					'		`Tree Custom ID`: `Tree Custom ID`, '
 					'		Variety: Variety, '
-					'		UID: BranchUID, '
-					'		BranchID: BranchID,'
-					'		Traits : Traits } '
+					'		UID: `Branch UID`, '
+					'		`Branch ID`: `Branch ID`,'
+					'		Traits: Traits } '
 					' ORDER BY '
-						' PlotUID, BranchID '
+					'	`Trial UID`, `Branch ID` '
 				)
-			elif data_format == 'db':
+			else:  # if data_format == 'db':
 				response = (
 					' RETURN {'
-						' User : user_name, '
-						' Partner : partner_name,'
-						' Country : country.name, ' 
-						' Region : region.name, '
-						' Farm : farm.name, '
-						' Plot : plot.name, '
-						' PlotUID: plot.uid, '
-						' Block : block.name, '
-						' BlockUID : block.uid, '
-						' TreeUID : tree.uid, '
-						' TreeCustomID: tree.custom_id,	'
-						' Variety: tree.variety, '
-						' UID: branch.uid, '
-						' BranchID: branch.id, '
-						' Trait : trait.name, '
-						' Value : data.value, '
-						' Location : data.location, '
-						' Recorded_at : apoc.date.format(data.time), '
-						' Recorded_by: data.person '
+					'	User: user_name, '
+					'	Partner: partner_name,'
+					'	Country: country.name, ' 
+					'	Region: region.name, '
+					'	Farm: farm.name, '
+					'	Trial: trial.name, '
+					'	`Trial UID`: trial.uid, '
+					'	Block: block.name, '
+					'	`Block UID`: block.uid, '
+					'	`Tree UID`: tree.uid, '
+					'	`Tree Custom ID`: tree.custom_id,	'
+					'	Variety: tree.variety, '
+					'	UID: branch.uid, '
+					'	`Branch ID`: branch.id, '
+					'	Trait: trait.name, '
+					'	Value: data.value, '
+					'	Location: data.location, '
+					'	`Recorded at`: apoc.date.format(data.time), '
+					'	`Recorded_by`: data.person '
 					' } '
-					' ORDER BY plot.uid, branch.id, trait.name, apoc.date.format(data.time) '
+					' ORDER BY '
+					'	trial.uid, '
+					'	branch.id, '
+					'	trait.name, '
+					'	data.time '
 					)
 		elif level == 'tree':
 			index_fieldnames = [
 				'Country',
 				'Region',
 				'Farm',
-				'Plot',
-				'PlotUID',
+				'Trial',
+				'Trial UID',
 				'Block',
-				'BlockUID',
+				'Block UID',
 				'UID',
-				'TreeCustomID',
+				'Tree Custom ID',
 				'Variety'
 			]
 			td = (
@@ -514,106 +549,119 @@ class Download:
 				'	<-[:FOR_TRAIT*2]-(tree_trait) '
 				'	<-[:DATA_FOR]-(data) '
 				' WHERE (trait.name) IN ' + str(traits) +
-				' WITH user_name, partner_name, data, trait, tree_trait '
+				' WITH '
+				'	user_name, '
+				'	partner_name, '
+				'	data, '
+				'	trait, '
+				'	tree_trait '
 				' MATCH '
 				'	(tree_trait) '
 				'	-[:FOR_ITEM]->(tree:Tree) '
 			)
-			#if no plot selected
-			if plotID == "":
-				tdp = td + ( ' -[:IS_IN]->(PlotTrees) '
-					' -[:IS_IN]->(plot:Plot) ' )
-				#query = tdp + frc
-				optional_block = ( ' OPTIONAL MATCH (tree) '
-					' -[:IS_IN {current:True}]->(:BlockTrees) '
-					' -[:IS_IN]->(block:Block) ' )
-			#if plotID is defined (but no blockUID)
-			elif blockUID == "" and plotID != "":
-				tdp = td + ( ' -[:IS_IN]->(PlotTrees) '
-					' -[:IS_IN]->(plot:Plot {uid:$plotID}) ' )
-				#query = tdp + frc
-				optional_block = ( ' OPTIONAL MATCH (tree) '
-					' -[:IS_IN {current:True}]->(:BlockTrees) '
-					' -[:IS_IN]->(block:Block) ')
-			#if blockID is defined
-			else: # blockUID != "":
-				tdp = td + ( '-[:IS_IN {current:True}]->(:BlockTrees) '
-					' -[:IS_IN]->(block:Block {uid:$blockUID}) '
-					' -[:IS_IN]->(:PlotBlocks) '
-					' -[:IS_IN]->(plot:Plot) ')
-				#query = tdp + frc
+			# if block_uid is defined
+			if block_uid != "":
+				tdp = td + (
+					' -[:IS_IN {current: True}]->(: BlockTrees) '
+					' -[:IS_IN]->(block: Block {uid: $block_uid}) '
+					' -[:IS_IN]->(: TrialBlocks) '
+					' -[:IS_IN]->(trial: Trial) '
+				)
 				optional_block = ''
-			#and generate the return statement
+			# if trial_uid is defined
+			elif trial_uid != "":
+				tdp = td + (
+					' -[:IS_IN]->(TrialTrees) '
+					' -[:IS_IN]->(trial: Trial {uid:$trial_uid}) '
+				)
+				optional_block = (
+					' OPTIONAL MATCH (tree) '
+					' -[:IS_IN {current: True}]->(: BlockTrees) '
+					' -[:IS_IN]->(block: Block) '
+				)
+			# if no trial selected
+			else:
+				tdp = td + (
+					' -[:IS_IN]->(:TrialTrees) '
+					' -[:IS_IN]->(trial:Trial) '
+				)
+				optional_block = (
+					' OPTIONAL MATCH (tree) '
+					' -[:IS_IN {current:True}]->(:BlockTrees) '
+					' -[:IS_IN]->(block:Block) '
+				)
+			# and generate the return statement
 			if data_format == 'table':
 				response = (
-					#need a with statement to allow order by with COLLECT
+					# need WITH statement to allow order by with COLLECT
 					' WITH '
 					' 	country.name as Country, '
 					' 	region.name as Region, '
 					' 	farm.name as Farm, '
-					' 	plot.name as Plot, '
-					' 	plot.uid as PlotUID, '
+					' 	trial.name as Trial, '
+					' 	trial.uid as `Trial UID`, '
 					' 	block.name as Block, '
-					' 	block.uid as BlockUID, '
-					' 	tree.uid as TreeUID, '
-					' 	tree.custom_id as TreeCustomID, '
+					' 	block.uid as `Block UID`, '
+					' 	tree.uid as `Tree UID`, '
+					' 	tree.custom_id as `Tree Custom ID`, '
 					' 	tree.variety as Variety, '
-					'	tree.id as TreeID,'
+					'	tree.id as `Tree ID`,'
 					'	COLLECT([trait.name, data.value]) as Traits '
 					' RETURN '
 					'	{ ' 
-					'		Country : Country, '
-					'		Region : Region, '
-					'		Farm : Farm, '
-					'		Plot : Plot, '
-					'		PlotUID : PlotUID, '
-					'		Block : Block, '
-					'		BlockUID: BlockUID, '
-					'		UID : TreeUID, '
-					'		TreeCustomID: TreeCustomID, '
+					'		Country: Country, '
+					'		Region: Region, '
+					'		Farm: Farm, '
+					'		Trial: Trial, '
+					'		`Trial UID`: `Trial UID`, '
+					'		Block: Block, '
+					'		`Block UID`: `Block UID`, '
+					'		UID: `Tree UID`, '
+					'		`Tree Custom ID`: `Tree Custom ID`, '
 					'		Variety: Variety, '
-					'		TreeID: TreeID,'
-					'		Traits : Traits } '
+					'		`Tree ID`: TreeID,'
+					'		Traits: Traits '
+					'	} '
 					' ORDER BY '
-						' PlotUID, TreeID '
+					'	`Trial UID`, TreeID '
 				)
-			elif data_format == 'db':
+			else:  # if data_format == 'db':
 				response = (
 					' RETURN {'
-						' User : user_name, '
-						' Partner : partner_name,'
-						' Country : country.name, ' 
-						' Region : region.name, '
-						' Farm : farm.name, '
-						' Plot : plot.name, '
-						' PlotUID: plot.uid, '
-						' Block : block.name, '
-						' BlockUID : block.uid, '
-						' UID : tree.uid, '
-						' TreeCustomID: tree.custom_id,	'
-						' Variety: tree.variety, '
-						' TreeID: tree.id, '
-						' Trait : trait.name, '
-						' Value : data.value, '
-						' Location : data.location, '
-						' Recorded_at : apoc.date.format(data.time), '
-						' Recorded_by: data.person '
+					'	User : user_name, '
+					'	Partner : partner_name,'
+					'	Country : country.name, ' 
+					'	Region : region.name, '
+					'	Farm : farm.name, '
+					'	Trial : trial.name, '
+					'	`Trial UID`: trial.uid, '
+					'	Block : block.name, '
+					'	`Block UID` : block.uid, '
+					'	UID : tree.uid, '
+					'	`Tree Custom ID`: tree.custom_id,	'
+					'	Variety: tree.variety, '
+					'	`Tree ID`: tree.id, '
+					'	Trait : trait.name, '
+					'	Value : data.value, '
+					'	Location : data.location, '
+					'	`Recorded at` : apoc.date.format(data.time), '
+					'	`Recorded by`: data.person '
 					' } '
-					' ORDER BY plot.uid, tree.id, trait.name, apoc.date.format(data.time) '
+					' ORDER BY trial.uid, tree.id, trait.name, data.time '
 					)
 		elif level == 'block':
 			index_fieldnames = [
 				'Country',
 				'Region',
 				'Farm',
-				'Plot',
-				'PlotUID',
+				'Trial',
+				'Trial UID',
 				'Block',
 				'UID'
 			]
 			td = (
 				' MATCH '
-				'	(trait:BlockTrait) '
+				'	(trait: BlockTrait) '
 				'	<-[:FOR_TRAIT*2]-(block_trait) '
 				'	<-[:DATA_FOR]-(data) '
 				' WHERE (trait.name) IN ' + str(traits) +
@@ -622,20 +670,26 @@ class Download:
 				'	(block_trait) '
 				'	-[:FOR_ITEM]->(block:Block '
 			)
-			if blockUID != "" :
-				tdp = td + ( ' {uid:$blockUID}) '
-					' -[:IS_IN]->(:PlotBlocks) '
-					' -[:IS_IN]->(plot:Plot) ' )
-			elif blockUID == "" and plotID != "":
-				tdp = td + ( ') '
-					' -[:IS_IN]->(:PlotBlocks)'
-					' -[:IS_IN]->(plot:Plot {uid:$plotID}) ' )
-			elif plotID == "" :
-				tdp = td + ( ') '
-					' -[:IS_IN]->(:PlotBlocks)'
-					' -[:IS_IN]->(plot:Plot) ' )
+			if block_uid != "":
+				tdp = td + (
+					' {uid:$blockUID}) '
+					' -[:IS_IN]->(:TrialBlocks) '
+					' -[:IS_IN]->(trial:Trial) '
+				)
+			elif trial_uid != "":
+				tdp = td + (
+					') '
+					' -[:IS_IN]->(:TrialBlocks)'
+					' -[:IS_IN]->(trial:Trial {uid:$trial_uid}) '
+				)
+			else:
+				tdp = td + (
+					' ) '
+					' -[:IS_IN]->(:TrialBlocks)'
+					' -[:IS_IN]->(trial:Trial) '
+				)
 			optional_block = ''
-			#and generate the return statement
+			# and generate the return statement
 			if data_format == 'table':
 				response = (
 					# need a with statement to allow order by with COLLECT
@@ -643,108 +697,110 @@ class Download:
 					' 	country.name as Country, '
 					' 	region.name as Region, '
 					' 	farm.name as Farm, '
-					' 	plot.name as Plot, '
-					' 	plot.uid as PlotUID, '
+					' 	trial.name as Trial, '
+					' 	trial.uid as `Trial UID`, '
 					' 	block.name as Block, '
-					' 	block.uid as BlockUID, '
-					'	block.id as BlockID, '
+					' 	block.uid as `Block UID`, '
+					'	block.id as `Block ID`, '
 					'	COLLECT([trait.name, data.value]) as Traits '
 					' RETURN '
 					'	{ ' 
 					'		Country : Country, '
 					'		Region : Region, '
 					'		Farm : Farm, '
-					'		Plot : Plot, '
-					'		PlotUID : PlotUID, '
+					'		Trial : Trial, '
+					'		`Trial UID` : `Trial UID`, '
 					'		Block : Block, '
-					'		UID: BlockUID, '
-					'		BlockID: BlockID,'
+					'		UID: `Block UID`, '
+					'		`Block ID`: `Block ID`,'
 					'		Traits : Traits } '
 					' ORDER BY '
-					'	PlotUID, BlockID '
+					'	`Trial UID`, `Block ID` '
 				)
-			elif data_format == 'db':
+			else:  # if data_format == 'db':
 				response = (
-					' RETURN {'
-						' User : user_name, '
-						' Partner : partner_name,'
-						' Country : country.name, ' 
-						' Region : region.name, '
-						' Farm : farm.name, '
-						' Plot : plot.name, '
-						' PlotUID: plot.uid, '
-						' Block : block.name, '
-						' UID : block.uid, '
-						' BlockID: block.id, '
-						' Trait : trait.name, '
-						' Value : data.value, '
-						' Location : data.location, '
-						' Recorded_at : apoc.date.format(data.time), '
-						' Recorded_by: data.person '
+					' RETURN { '
+					'	User: user_name, '
+					'	Partner: partner_name,'
+					'	Country: country.name, ' 
+					'	Region: region.name, '
+					'	Farm: farm.name, '
+					'	Trial: trial.name, '
+					'	`Trial UID`: trial.uid, '
+					'	Block: block.name, '
+					'	UID: block.uid, '
+					'	`Block ID`: block.id, '
+					'	Trait: trait.name, '
+					'	Value: data.value, '
+					'	Location: data.location, '
+					'	`Recorded at`: apoc.date.format(data.time), '
+					'	`Recorded by`: data.person '
 					' } '
-					' ORDER BY plot.uid, block.id, trait.name, apoc.date.format(data.time) '
+					' ORDER BY '
+					'	trial.uid, block.id, trait.name, data.time '
 					)
-		elif level == 'plot':
+		else:  # level == 'trial':
 			index_fieldnames = [
 				'Country',
 				'Region',
 				'Farm',
-				'Plot',
+				'Trial',
 				'UID'
 			]
 			tdp = (
 				' MATCH '
-				'	(trait:PlotTrait) '
-				'	<-[:FOR_TRAIT]-(plot_trait) '
+				'	(trait:TrialTrait) '
+				'	<-[:FOR_TRAIT]-(trial_trait) '
 				'	<-[:DATA_FOR]-(data) '
 				' WHERE (trait.name) IN ' + str(traits) +
-				' WITH user_name, partner_name, data, trait, plot_trait '
+				' WITH user_name, partner_name, data, trait, trial_trait '
 				' MATCH '
-				'	(plot_trait) '
-				'	-[:FOR_ITEM]->(plot:Plot) '
+				'	(trial_trait) '
+				'	-[:FOR_ITEM]->(trial: Trial) '
 			)
 			optional_block = ''
-			#and generate the return statement
+			# and generate the return statement
 			if data_format == 'table':
 				response = (
-					#need a with statement to allow order by with COLLECT
+					# need a WITH statement to allow order by with COLLECT
 					' WITH '
-					' 	country.name as Country, '
-					' 	region.name as Region, '
-					' 	farm.name as Farm, '
-					' 	plot.name as Plot, '
-					' 	plot.uid as PlotUID, '
+					'	country.name as Country, '
+					'	region.name as Region, '
+					'	farm.name as Farm, '
+					'	trial.name as Trial, '
+					'	trial.uid as TrialUID, '
 					'	COLLECT([trait.name, data.value]) as Traits '
 					' RETURN '
 					'	{ ' 
-					'		Country : Country, '
-					'		Region : Region, '
-					'		Farm : Farm, '
-					'		Plot : Plot, '
-					'		UID : PlotUID, '
-					'		Traits : Traits } '
+					'		Country: Country, '
+					'		Region: Region, '
+					'		Farm: Farm, '
+					'		Trial: Trial, '
+					'		UID: `Trial UID`, '
+					'		Traits: Traits '
+					'	} '
 					' ORDER BY '
-						' PlotUID '
+					'	`Trial UID` '
 				)
-			elif data_format == 'db':
+			else:  # if data_format == 'db':
 				response = (
-					' RETURN {'
-						' User : user_name, '
-						' Partner : partner_name,'
-						' Country : country.name, ' 
-						' Region : region.name, '
-						' Farm : farm.name, '
-						' Plot : plot.name, '
-						' UID: plot.uid, '
-						' Trait : trait.name, '
-						' Value : data.value, '
-						' Location : data.location, '
-						' Recorded_at : apoc.date.format(data.time), '
-						' Recorded_by: data.person '
+					' RETURN { '
+					'	User: user_name, '
+					'	Partner: partner_name, '
+					'	Country: country.name, ' 
+					'	Region: region.name, '
+					'	Farm: farm.name, '
+					'	Trial: trial.name, '
+					'	UID: trial.uid, '
+					'	Trait: trait.name, '
+					'	Value: data.value, '
+					'	Location: data.location, '
+					'	`Recorded at`: apoc.date.format(data.time), '
+					'	`Recorded by`: data.person '
 					' } '
-					' ORDER BY plot.uid, trait.name, apoc.date.format(data.time) '
+					' ORDER BY trial.uid, trait.name, data.time '
 					)
-		#add conditional for data between time range
+		# add conditional for data between time range
 		if start_time != "" and end_time != "":
 			time_condition = ' WHERE data.time > $start_time AND data.time < $end_time '
 		elif start_time == "" and end_time != "":
@@ -753,84 +809,104 @@ class Download:
 			time_condition = ' WHERE data.time > $start_time '
 		else:
 			time_condition = ''
-		#finalise query, get data 
+		# finalise query, get data
 		query = user_data_query + tdp + frc + time_condition + optional_block + response
 		with get_driver().session() as neo4j_session:
-			result = neo4j_session.read_transaction(self._get_csv, query)
-		#check if any data found, if not return none
+			result = neo4j_session.read_transaction(
+				self._get_csv,
+				query,
+				country,
+				region,
+				farm,
+				trial_uid,
+				block_uid,
+				traits,
+				start_time,
+				end_time
+			)
+		# check if any data found, if not return none
 		if len(result) == 0:
 			return None
-		#prepare data and variablesto make file
+		# prepare data and variables to make file
 		if data_format == 'table':
-			#expand the traits and values as key:value pairs (each measure as an item in a list if more than one)
+			# expand the traits and values as key:value pairs (each measure as an item in a list if more than one)
 			for record in result:
 				for i in record["Traits"]:
 					if i[0] in record:
-						if isinstance(record[i[0]] , list):
+						if isinstance(record[i[0]], list):
 							record[i[0]].append(str(i[1]))
 						else:
-							record.update({i[0]:[record[i[0]]]})
+							record.update({i[0]: [record[i[0]]]})
 							record[i[0]].append(str(i[1]))
 					else:
-						record.update({i[0]:str(i[1])})
-			#the below line only returned the last measurement of the trait, now the above returns as a list.
-			#[[record.update({i[0]:i[1]}) for i in record['Traits']] for record in result]
-			#the below line was here and it worked but I have no idea how, in the python shell if gives a syntax error..
-			#[[record.update({i[0]:i[1] for i in record['Traits']})] for record in result] 
-				#now pop out the Traits key and add the returned trait names to a set of fieldnames
-				#trait_fieldnames = set()
-				#[[trait_fieldnames.add(i[0]) for i in record.pop('Traits')] for record in result]
-			#replaced the above with using the fieldnames of traits from the form, this will provide a predictable output from a user perspective )
-			#will also allow me to do all this as a stream once the files get larger - thanks Tony for this advice
+						record.update({i[0]: str(i[1])})
 			trait_fieldnames = traits
-			#now create the csv file from result and fieldnames
-			fieldnames =  index_fieldnames + trait_fieldnames
-		elif data_format == 'db':
-			fieldnames = index_fieldnames + ['Trait', 'Value', 'Location', 'Recorded_at', 'Recorded_by']
-		#create the file path
+			# now create the csv file from result and fieldnames
+			fieldnames = index_fieldnames + trait_fieldnames
+		else:  # if data_format == 'db':
+			fieldnames = index_fieldnames + ['Trait', 'Value', 'Location', 'Recorded at', 'Recorded by']
+		# create the file path
 		time = datetime.now().strftime('%Y%m%d-%H%M%S')
 		filename = time + '_data.csv'
 		file_path = os.path.join(app.instance_path, app.config['DOWNLOAD_FOLDER'], self.username, filename)
-		#create user download path if not found
+		# create user download path if not found
 		download_path = os.path.join(app.instance_path, app.config['DOWNLOAD_FOLDER'], self.username)
 		if not os.path.isdir(download_path):
 			os.mkdir(download_path)
 			gid = grp.getgrnam(app.config['CELERYGRPNAME']).gr_gid
 			os.chown(download_path, -1, gid)
 			os.chmod(download_path, 0775)
-		#make the file
-		with open(file_path,'w') as file:
-			writer = csv.DictWriter(file, 
-				fieldnames=fieldnames, 
-				quoting=csv.QUOTE_ALL,
-				extrasaction='ignore')
+		# make the file
+		with open(file_path, 'w') as csv_file:
+			writer = csv.DictWriter(
+				csv_file,
+				fieldnames = fieldnames,
+				quoting = csv.QUOTE_ALL,
+				extrasaction = 'ignore')
 			writer.writeheader()
 			for item in result:
 				writer.writerow(item)
-			file_size = file.tell()
-		return { "filename":filename,
-			"file_path":file_path,
-			"file_size":file_size }
-	def _get_csv(self, tx, query):
-		#perform transaction and return the simplified result (remove all the transaction metadata and just keep the result map)
+			file_size = csv_file.tell()
+		return {
+			"filename": filename,
+			"file_path": file_path,
+			"file_size": file_size
+		}
+
+	def _get_csv(
+			self,
+			tx,
+			query,
+			country,
+			region,
+			farm,
+			trial_uid,
+			block_uid,
+			traits,
+			start_time,
+			end_time
+	):
+		# perform transaction and return the simplified result
+		# remove all the transaction metadata and just keep the result map
 		return [record[0] for record in tx.run(
 			query,
 			username = self.username,
-			country = self.country,
-			region = self.region,
-			farm = self.farm,
-			plotID = self.plotID,
-			blockUID = self.blockUID,
-			traits = self.traits,
-			start_time = self.start_time,
-			end_time = self.end_time
+			country = country,
+			region =region,
+			farm = farm,
+			trial_uid = trial_uid,
+			block_uid = block_uid,
+			traits = traits,
+			start_time = start_time,
+			end_time = end_time
 		)]
+
 	def get_index_csv(
 			self,
 			form_data,
 			existing_ids = None
 	):
-		if form_data['trait_level'] == 'plot':
+		if form_data['trait_level'] == 'trial':
 			parameters = {}
 			query = 'MATCH (c:Country '
 			if form_data['country'] != '':
@@ -845,15 +921,15 @@ class Download:
 				query += '{name_lower: toLower($farm)}'
 				parameters['farm'] = form_data['farm']
 			query += (
-				' )<-[IS_IN]-(p:Plot) '
+				' )<-[IS_IN]-(trial:Trial) '
 				' RETURN { '
-				'	UID: p.uid, '
-				'	Plot: p.name, '
+				'	UID: trial.uid, '
+				'	Trial: trial.name, '
 				'	Farm: f.name, '
 				'	Region: r.name, '
 				'	Country: c.name '
 				' } '
-				' ORDER BY p.uid'
+				' ORDER BY trial.uid'
 			)
 			# make the file and return a dictionary with filename, file_path and file_size
 			with get_driver().session() as neo4j_session:
@@ -868,7 +944,7 @@ class Download:
 				'Country',
 				'Region',
 				'Farm',
-				'Plot',
+				'Trial',
 				'UID'
 			]
 			if 'farm' in parameters:
@@ -882,114 +958,83 @@ class Download:
 			csv_file_details = self.make_csv_file(
 				fieldnames,
 				id_list,
-				filename + 'plotIDs.csv'
+				filename + 'Trial_UIDs.csv'
 			)
-		elif form_data['trait_level'] in ['block','tree','branch','leaf','sample']:
-			plotID = int(form_data['plot'])
-			if form_data['trait_level'] == 'block':
-				# make the file and return a dictionary with filename, file_path and file_size
+		else:  # form_data['trait_level'] in ['block', 'tree', 'branch', 'leaf', 'sample']:
+			trial_uid = int(form_data['trial'])
+			if form_data['trait_level'] == 'sample':
+				parameters = {
+					'country': form_data['country'],
+					'region': form_data['region'],
+					'farm': form_data['farm'],
+					'trial_uid': int(trial_uid),
+					'trees_start': int(form_data['trees_start']) if form_data['trees_start'] else '',
+					'trees_end': int(form_data['trees_end']) if form_data['trees_end'] else '',
+					'replicates': int(form_data['replicates']) if form_data['replicates'] else "",
+					'tissue': form_data['tissue'],
+					'storage': form_data['storage'],
+					'start_time': int(
+						(
+							datetime.strptime(form_data['date_from'], '%Y-%m-%d')
+							- datetime(1970, 1, 1)
+						).total_seconds() * 1000) if form_data['date_from'] != '' else '',
+					'end_time': int(
+						(
+							datetime.strptime(form_data['date_to'], '%Y-%m-%d')
+							- datetime(1970, 1, 1)
+						).total_seconds() * 1000) if form_data['date_to'] != '' else '',
+					'samples_start': int(form_data['samples_start']) if form_data['samples_start'] else "",
+					'samples_end': int(form_data['samples_end']) if form_data['samples_end'] else ""
+				}
+				# build the file and return filename etc.
 				fieldnames = [
 					'Country',
 					'Region',
 					'Farm',
-					'Plot',
-					'PlotUID',
+					'Trial',
+					'Trial UID',
 					'Block',
-					'UID'
-				]
-				id_list = Fields.get_blocks(plotID)
-				if len(id_list) == 0:
-					return None
-				csv_file_details = self.make_csv_file(fieldnames, id_list, 'blockIDs.csv')
-			elif form_data['trait_level'] == 'tree':
-				trees_start = int(form_data['trees_start'] if form_data['trees_start'] else 0)
-				trees_end = int(form_data['trees_end'] if form_data['trees_end'] else 999999)
-				# make the file and return filename, path, size
-				fieldnames = [
-					'Country',
-					'Region',
-					'Farm',
-					'Plot',
-					'PlotUID',
-					'Block',
-					'BlockUID',
+					'Block UID',
+					'Tree UID',
+					'Tree Custom ID',
 					'Variety',
-					'TreeCustomID',
+					'Branch UID',
+					'Leaf UID',
+					'Tissue',
+					'Storage',
+					'Date Sampled',
 					'UID'
 				]
-				id_list = Fields.get_trees(plotID, trees_start, trees_end)
+				id_list = Samples().get_samples(parameters)
 				if len(id_list) == 0:
 					return None
-				first_tree_id = id_list[0]['TreeID']
-				last_tree_id = id_list[-1]['TreeID']
+				sample_replicates = int(form_data['sample_replicates']) if form_data['sample_replicates'] else 1
+				if sample_replicates > 1:
+					fieldnames.insert(15, 'Sample UID')
+					id_list_reps = []
+					for sample in id_list:
+						sample['Sample UID'] = sample['UID']
+						for i in range(sample_replicates):
+							sample['UID'] = str(sample['Sample UID']) + "." + str(int(i + 1))
+							id_list_reps.append(sample.copy())
+					id_list = id_list_reps
 				csv_file_details = self.make_csv_file(
 					fieldnames,
 					id_list,
-					'treeIDs_' + str(first_tree_id) + '-' + str(last_tree_id) + '.csv'
-				)
-			elif form_data['trait_level'] == 'branch':
-				fieldnames = [
-					'Country',
-					'Region',
-					'Farm',
-					'Plot',
-					'PlotUID',
-					'Block',
-					'BlockUID',
-					'TreeUID',
-					'Variety',
-					'TreeCustomID',
-					'UID'
-				]
-				if form_data['old_new_ids'] == 'old':
-					parameters = {
-						'country': form_data['country'],
-						'region': form_data['region'],
-						'farm': form_data['farm'],
-						'plotID': plotID,
-						'trees_start': int(form_data['trees_start']) if form_data['trees_start'] else 1,
-						'trees_end': int(form_data['trees_end']) if form_data['trees_end'] else 999999,
-						'start_time': int((datetime.strptime(form_data['date_from'], '%Y-%m-%d') -	datetime(1970, 1, 1)).total_seconds() * 1000) if form_data['date_from'] != '' else '',
-						'end_time': int((datetime.strptime(form_data['date_to'], '%Y-%m-%d')- datetime(1970, 1, 1)).total_seconds() * 1000) if form_data['date_to'] != '' else '',
-						'branches_start': int(form_data['branches_start']) if form_data['branches_start'] != '' else 1,
-						'branches_end': int(form_data['branches_end']) if form_data['branches_end'] != ''else 999999
-					}
-					with get_driver().session() as neo4j_session:
-						result = neo4j_session.read_transaction(neo4j_query, Cypher.branches_get, parameters)
-					id_list = [record[0] for record in result]
-					if len(id_list) == 0:
-						return None
-					csv_file_details = self.make_csv_file(
-						fieldnames,
-						id_list,
-						'branchIDs.csv'
-					)
-				else:
-					if len(existing_ids) == 0:
-						return None
-					first_branch_id = existing_ids[0]['BranchID']
-					last_branch_id = existing_ids[-1]['BranchID']
-					filename = 'plot_' + str(plotID) + '_R' + str(first_branch_id) + '_to_R' + str(
-						last_branch_id) + '.csv'
-					csv_file_details = self.make_csv_file(
-						fieldnames,
-						existing_ids,
-						filename,
-						with_time = False
-					)
+					'Sample_UIDs.csv')
 			elif form_data['trait_level'] == 'leaf':
 				fieldnames = [
 					'Country',
 					'Region',
 					'Farm',
-					'Plot',
-					'PlotUID',
+					'Trial',
+					'Trial UID',
 					'Block',
-					'BlockUID',
-					'TreeUID',
-					'TreeCustomID',
+					'Block UID',
+					'Tree UID',
+					'Tree Custom ID',
 					'Variety',
-					'BranchUID',
+					'Branch UID',
 					'UID'
 				]
 				if form_data['old_new_ids'] == 'old':
@@ -997,11 +1042,20 @@ class Download:
 						'country': form_data['country'],
 						'region': form_data['region'],
 						'farm': form_data['farm'],
-						'plotID': plotID,
+						'Trial UID': trial_uid,
 						'trees_start': int(form_data['trees_start']) if form_data['trees_start'] else 1,
 						'trees_end': int(form_data['trees_end']) if form_data['trees_end'] else 999999,
-						'start_time': int((datetime.strptime(form_data['date_from'], '%Y-%m-%d') -	datetime(1970, 1, 1)).total_seconds() * 1000) if form_data['date_from'] != '' else '',
-						'end_time': int((datetime.strptime(form_data['date_to'], '%Y-%m-%d')- datetime(1970, 1, 1)).total_seconds() * 1000) if form_data['date_to'] != '' else '',
+						'start_time': int(
+							(
+								datetime.strptime(form_data['date_from'], '%Y-%m-%d')
+								- datetime(1970, 1, 1)
+							).total_seconds() * 1000
+						) if form_data['date_from'] != '' else '',
+						'end_time': int(
+							(
+								datetime.strptime(form_data['date_to'], '%Y-%m-%d')
+								- datetime(1970, 1, 1)
+							).total_seconds() * 1000) if form_data['date_to'] != '' else '',
 						'leaves_start': int(form_data['leaves_start']) if form_data['leaves_start'] != '' else 1,
 						'leaves_end': int(form_data['leaves_end']) if form_data['leaves_end'] != ''else 999999
 					}
@@ -1013,14 +1067,14 @@ class Download:
 					csv_file_details = self.make_csv_file(
 						fieldnames,
 						id_list,
-						'leafIDs.csv'
+						'Leaf_UIDs.csv'
 					)
 				else:
 					if len(existing_ids) == 0:
 						return None
-					first_leaf_id = existing_ids[0]['LeafID']
-					last_leaf_id = existing_ids[-1]['LeafID']
-					filename = 'plot_' + str(plotID) + '_L' + str(first_leaf_id) + '_to_L' + str(
+					first_leaf_id = existing_ids[0]['Leaf ID']
+					last_leaf_id = existing_ids[-1]['Leaf ID']
+					filename = 'Trial_' + str(trial_uid) + '_L' + str(first_leaf_id) + '_to_L' + str(
 						last_leaf_id) + '.csv'
 					csv_file_details = self.make_csv_file(
 						fieldnames,
@@ -1028,67 +1082,118 @@ class Download:
 						filename,
 						with_time = False
 					)
-			elif form_data['trait_level'] == 'sample':
-				parameters = {
-					'country': form_data['country'],
-					'region': form_data['region'],
-					'farm': form_data['farm'],
-					'plotID': int(plotID),
-					'trees_start': int(form_data['trees_start']) if form_data['trees_start'] else '',
-					'trees_end': int(form_data['trees_end']) if form_data['trees_end'] else '',
-					'replicates': int(form_data['replicates']) if form_data['replicates'] else "",
-					'tissue': form_data['tissue'],
-					'storage': form_data['storage'],
-					'start_time': int((datetime.strptime(form_data['date_from'], '%Y-%m-%d') -	datetime(1970, 1, 1)).total_seconds() * 1000) if form_data['date_from'] != '' else '',
-					'end_time': int((datetime.strptime(form_data['date_to'], '%Y-%m-%d')- datetime(1970, 1, 1)).total_seconds() * 1000) if form_data['date_to'] != '' else '',
-					'samples_start': int(form_data['samples_start']) if form_data['samples_start'] else "",
-					'samples_end': int(form_data['samples_end']) if form_data['samples_end'] else ""
-				}
-				# build the file and return filename etc.
+			elif form_data['trait_level'] == 'branch':
 				fieldnames = [
 					'Country',
 					'Region',
 					'Farm',
-					'Plot',
-					'PlotUID',
+					'Trial',
+					'Trial UID',
 					'Block',
-					'BlockUID',
-					'TreeUID',
-					'TreeCustomID',
+					'Block UID',
+					'Tree UID',
 					'Variety',
-					'BranchUID',
-					'LeafUID',
-					'Tissue',
-					'Storage',
-					'SampleDate',
+					'Tree Custom ID',
 					'UID'
 				]
-				id_list = Samples().get_samples(parameters)
+				if form_data['old_new_ids'] == 'old':
+					parameters = {
+						'country': form_data['country'],
+						'region': form_data['region'],
+						'farm': form_data['farm'],
+						'trial_uid': trial_uid,
+						'trees_start': int(form_data['trees_start']) if form_data['trees_start'] else 1,
+						'trees_end': int(form_data['trees_end']) if form_data['trees_end'] else 999999,
+						'start_time': int(
+							(
+								datetime.strptime(form_data['date_from'], '%Y-%m-%d')
+								- datetime(1970, 1, 1)
+							).total_seconds() * 1000
+						) if form_data['date_from'] != '' else '',
+						'end_time': int(
+							(
+								datetime.strptime(form_data['date_to'], '%Y-%m-%d')
+								- datetime(1970, 1, 1)
+							).total_seconds() * 1000
+						) if form_data['date_to'] != '' else '',
+						'branches_start': int(form_data['branches_start']) if form_data['branches_start'] != '' else 1,
+						'branches_end': int(form_data['branches_end']) if form_data['branches_end'] != ''else 999999
+					}
+					with get_driver().session() as neo4j_session:
+						result = neo4j_session.read_transaction(neo4j_query, Cypher.branches_get, parameters)
+					id_list = [record[0] for record in result]
+					if len(id_list) == 0:
+						return None
+					csv_file_details = self.make_csv_file(
+						fieldnames,
+						id_list,
+						'Branch_UIDs.csv'
+					)
+				else:
+					if len(existing_ids) == 0:
+						return None
+					first_branch_id = existing_ids[0]['Branch ID']
+					last_branch_id = existing_ids[-1]['Branch ID']
+					filename = 'trial_' + str(trial_uid) + '_R' + str(first_branch_id) + '_to_R' + str(
+						last_branch_id) + '.csv'
+					csv_file_details = self.make_csv_file(
+						fieldnames,
+						existing_ids,
+						filename,
+						with_time = False
+					)
+			elif form_data['trait_level'] == 'tree':
+				trees_start = int(form_data['trees_start'] if form_data['trees_start'] else 0)
+				trees_end = int(form_data['trees_end'] if form_data['trees_end'] else 999999)
+				# make the file and return filename, path, size
+				fieldnames = [
+					'Country',
+					'Region',
+					'Farm',
+					'Trial',
+					'Trial UID',
+					'Block',
+					'Block UID',
+					'Variety',
+					'Tree Custom ID',
+					'UID'
+				]
+				id_list = Fields.get_trees(trial_uid, trees_start, trees_end)
 				if len(id_list) == 0:
 					return None
-				sample_replicates = int(form_data['sample_replicates']) if form_data['sample_replicates'] else 1
-				if sample_replicates > 1:
-					fieldnames.insert(15, 'SampleUID')
-					id_list_reps = []
-					for sample in id_list:
-						sample['SampleUID'] = sample['UID']
-						for i in range(sample_replicates):
-							sample['UID'] = str(sample['SampleUID']) + "." + str(int(i + 1))
-							id_list_reps.append(sample.copy())
-					id_list = id_list_reps
+				first_tree_id = id_list[0]['Tree ID']
+				last_tree_id = id_list[-1]['Tree ID']
 				csv_file_details = self.make_csv_file(
 					fieldnames,
 					id_list,
-					'sampleIDs.csv')
+					'Tree_UIDs_' + str(first_tree_id) + '-' + str(last_tree_id) + '.csv'
+				)
+			else:  # form_data['trait_level'] == 'block':
+				# make the file and return a dictionary with filename, file_path and file_size
+				fieldnames = [
+					'Country',
+					'Region',
+					'Farm',
+					'Trial',
+					'Trial UID',
+					'Block',
+					'UID'
+				]
+				id_list = Fields.get_blocks(trial_uid)
+				if len(id_list) == 0:
+					return None
+				csv_file_details = self.make_csv_file(fieldnames, id_list, 'Block_UIDs.csv')
 		return csv_file_details
-		#return the file details
-	#creates the traits.trt file for import to Field-Book
-	#may need to replace 'name' with 'trait' in header but doesn't seem to affect Field-Book
+
+	# creates the traits.trt file for import to Field-Book
+	# TODO may need to replace 'name' with 'trait' in header but doesn't seem to affect Field-Book
 	def create_trt(self, form_data):
 		node_label = str(form_data['trait_level']).title() + 'Trait'
 		selection = [
 			item for sublist in [
-				form_data.getlist(i) for i in form_data if all(['csrf_token' not in i, form_data['trait_level'] + '-' in i])
+				form_data.getlist(i) for i in form_data if all(
+					['csrf_token' not in i, form_data['trait_level'] + '-' in i]
+				)
 			]
 			for item in sublist
 		]
@@ -1098,14 +1203,14 @@ class Download:
 		for i, trait in enumerate(selected_traits):
 			trait['realPosition'] = str(i + 1)
 			trait['isVisible'] = 'True'
-		#create user download path if not found
+		# create user download path if not found
 		download_path = os.path.join(app.instance_path, app.config['DOWNLOAD_FOLDER'], self.username)
 		if not os.path.isdir(download_path):
 			os.mkdir(download_path)
 			gid = grp.getgrnam(app.config['CELERYGRPNAME']).gr_gid
 			os.chown(download_path, -1, gid)
 			os.chmod(download_path, 0775)
-		#set variables for file creation
+		# set variables for file creation
 		fieldnames = [
 			'name',
 			'format',
@@ -1117,13 +1222,15 @@ class Download:
 			'isVisible',
 			'realPosition'
 		]
-		#make the file
+		# make the file
 		file_details = self.make_csv_file(fieldnames, selected_traits, form_data['trait_level'] + '.trt')
 		return file_details
+
 	def get_table_csv(self, form_data, existing_ids = None):
-		#create two files, one is the index + trait names + time details table, the other is a trait description file - specifying format and details of each trait value
+		# create two files, one is the index + trait names + time details table, the other is a trait description file
+		# - specifying format and details of each trait value
 		# starts with getting the index data (id_list) and fieldnames (to which the traits will be added)
-		if form_data['trait_level'] == 'plot':
+		if form_data['trait_level'] == 'trial':
 			parameters = {}
 			query = 'MATCH (c:Country '
 			if form_data['country'] != '':
@@ -1138,20 +1245,20 @@ class Download:
 				query += '{name_lower: toLower($farm)}'
 				parameters['farm'] = form_data['farm']
 			query += (
-				' )<-[IS_IN]-(p:Plot) '
+				' )<-[IS_IN]-(trial:Trial) '
 				' RETURN {'
-				' UID : p.uid, '
-				' Plot : p.name, '
+				' UID : trial.uid, '
+				' Trial : trial.name, '
 				' Farm : f.name, '
 				' Region : r.name, '
 				' Country : c.name }'
-				' ORDER BY p.uid'
+				' ORDER BY trial.uid'
 			)
 			fieldnames = [
 				'Country',
 				'Region',
 				'Farm',
-				'Plot',
+				'Trial',
 				'UID'
 			]
 			with get_driver().session() as neo4j_session:
@@ -1160,49 +1267,64 @@ class Download:
 					query,
 					parameters)
 				id_list = [record[0] for record in result]
-		elif form_data['trait_level'] in ['block', 'tree', 'branch', 'leaf', 'sample']:
-			plotID = int(form_data['plot'])
-			if form_data['trait_level'] == 'block':
-				# make the file and return a dictionary with filename, file_path and file_size
+		else:  # if form_data['trait_level'] in ['block', 'tree', 'branch', 'leaf', 'sample']:
+			trial_uid = int(form_data['trial'])
+			if form_data['trait_level'] == 'sample':
 				fieldnames = [
 					'Country',
 					'Region',
 					'Farm',
-					'Plot',
-					'PlotUID',
+					'Trial',
+					'Trial UID',
 					'Block',
+					'Block UID',
+					'Tree UID',
+					'Tree Custom ID',
+					'Variety',
+					'Tissue',
+					'Storage',
+					'Date Sampled',
 					'UID'
 				]
-				id_list = Fields.get_blocks(plotID)
-			if form_data['trait_level'] == 'tree':
-				trees_start = int(form_data['trees_start'] if form_data['trees_start'] else 0)
-				trees_end = int(form_data['trees_end'] if form_data['trees_end'] else 999999)
-				# make the file and return filename, path, size
+				parameters = {
+					'country': form_data['country'],
+					'region': form_data['region'],
+					'farm': form_data['farm'],
+					'trial_uid': trial_uid,
+					'trees_start': int(form_data['trees_start']) if form_data['trees_start'] else "",
+					'trees_end': int(form_data['trees_end']) if form_data['trees_end'] else "",
+					'replicates': int(form_data['replicates']) if form_data['replicates'] else "",
+					'tissue': form_data['tissue'],
+					'storage': form_data['storage'],
+					'start_time': int(
+						(
+							datetime.strptime(form_data['date_from'], '%Y-%m-%d')
+							- datetime(1970, 1, 1)
+						).total_seconds() * 1000
+					) if form_data['date_from'] else "",
+					'end_time': int(
+						(
+							datetime.strptime(form_data['date_to'], '%Y-%m-%d')
+							- datetime(1970, 1, 1)
+						).total_seconds() * 1000
+					) if form_data['date_to'] else "",
+					'samples_start': int(form_data['samples_start']) if form_data['samples_start'] else "",
+					'samples_end': int(form_data['samples_end']) if form_data['samples_end'] else ""
+				}
+				# build the file and return filename etc.
+				id_list = Samples().get_samples(parameters)
+			elif form_data['trait_level'] == 'leaf':
 				fieldnames = [
 					'Country',
 					'Region',
 					'Farm',
-					'Plot',
-					'PlotUID',
+					'Trial',
+					'Trial UID',
 					'Block',
-					'BlockUID',
-					'Variety',
-					'TreeCustomID',
-					'UID'
-				]
-				id_list = Fields.get_trees(plotID, trees_start, trees_end)
-			if form_data['trait_level'] == 'branch':
-				fieldnames = [
-					'Country',
-					'Region',
-					'Farm',
-					'Plot',
-					'PlotUID',
-					'Block',
-					'BlockUID',
-					'TreeCustomID',
-					'TreeUID',
-					'Variety',
+					'Block UID',
+					'Tree Custom ID',
+					'Tree UID',
+					'Branch UID',
 					'UID'
 				]
 				if form_data['old_new_ids'] == 'old':
@@ -1210,43 +1332,21 @@ class Download:
 						'country': form_data['country'],
 						'region': form_data['region'],
 						'farm': form_data['farm'],
-						'plotID': plotID,
+						'trial_uid': trial_uid,
 						'trees_start': int(form_data['trees_start']) if form_data['trees_start'] else 1,
 						'trees_end': int(form_data['trees_end']) if form_data['trees_end'] else 999999,
-						'start_time': int((datetime.strptime(form_data['date_from'], '%Y-%m-%d') -	datetime(1970, 1, 1)).total_seconds() * 1000) if form_data['date_from'] != '' else '',
-						'end_time': int((datetime.strptime(form_data['date_to'], '%Y-%m-%d')- datetime(1970, 1, 1)).total_seconds() * 1000) if form_data['date_to'] != '' else '',
-						'branches_start': int(form_data['branches_start']) if form_data['branches_start'] != '' else 1,
-						'branches_end': int(form_data['branches_end']) if form_data['branches_end'] != ''else 999999
-					}
-					with get_driver().session() as neo4j_session:
-						result = neo4j_session.read_transaction(neo4j_query, Cypher.branches_get, parameters)
-					id_list = [record[0] for record in result]
-				else:
-					id_list = existing_ids
-			if form_data['trait_level'] == 'leaf':
-				fieldnames = [
-					'Country',
-					'Region',
-					'Farm',
-					'Plot',
-					'PlotUID',
-					'Block',
-					'BlockUID',
-					'TreeCustomID',
-					'TreeUID',
-					'BranchUID',
-					'UID'
-				]
-				if form_data['old_new_ids'] == 'old':
-					parameters = {
-						'country': form_data['country'],
-						'region': form_data['region'],
-						'farm': form_data['farm'],
-						'plotID': plotID,
-						'trees_start': int(form_data['trees_start']) if form_data['trees_start'] else 1,
-						'trees_end': int(form_data['trees_end']) if form_data['trees_end'] else 999999,
-						'start_time': int((datetime.strptime(form_data['date_from'], '%Y-%m-%d') -	datetime(1970, 1, 1)).total_seconds() * 1000) if form_data['date_from'] != '' else '',
-						'end_time': int((datetime.strptime(form_data['date_to'], '%Y-%m-%d')- datetime(1970, 1, 1)).total_seconds() * 1000) if form_data['date_to'] != '' else '',
+						'start_time': int(
+							(
+								datetime.strptime(form_data['date_from'], '%Y-%m-%d')
+								- datetime(1970, 1, 1)
+							).total_seconds() * 1000)
+						if form_data['date_from'] != '' else '',
+						'end_time': int(
+							(
+								datetime.strptime(form_data['date_to'], '%Y-%m-%d')
+								- datetime(1970, 1, 1)
+							).total_seconds() * 1000)
+						if form_data['date_to'] != '' else '',
 						'leaves_start': int(form_data['leaves_start']) if form_data['leaves_start'] != '' else 1,
 						'leaves_end': int(form_data['leaves_end']) if form_data['leaves_end'] != ''else 999999
 					}
@@ -1255,79 +1355,109 @@ class Download:
 					id_list = [record[0] for record in result]
 				else:
 					id_list = existing_ids
-			if form_data['trait_level'] == 'sample':
+			elif form_data['trait_level'] == 'tree':
+				trees_start = int(form_data['trees_start'] if form_data['trees_start'] else 0)
+				trees_end = int(form_data['trees_end'] if form_data['trees_end'] else 999999)
+				# make the file and return filename, path, size
 				fieldnames = [
 					'Country',
 					'Region',
 					'Farm',
-					'Plot',
-					'PlotUID',
+					'Trial',
+					'Trial UID',
 					'Block',
-					'BlockUID',
-					'TreeUID',
-					'TreeCustomID',
+					'Block UID',
 					'Variety',
-					'Tissue',
-					'Storage',
-					'SampleDate',
+					'Tree Custom ID',
 					'UID'
 				]
-				parameters = {
-					'country': form_data['country'],
-					'region': form_data['region'],
-					'farm': form_data['farm'],
-					'plotID': plotID,
-					'trees_start': int(form_data['trees_start']) if form_data['trees_start'] else "",
-					'trees_end': int(form_data['trees_end']) if form_data['trees_end'] else "",
-					'replicates': int(form_data['replicates']) if form_data['replicates'] else "",
-					'tissue': form_data['tissue'],
-					'storage': form_data['storage'],
-					'start_time': int(
-						(datetime.strptime(form_data['date_from'], '%Y-%m-%d') -
-						datetime(1970, 1, 1)).total_seconds() * 1000
-					) if form_data['date_from'] else "",
-					'end_time': int(
-						(datetime.strptime(form_data['date_to'], '%Y-%m-%d')
-						- datetime(1970, 1, 1)).total_seconds() * 1000
-					) if form_data['date_to'] else "",
-					'samples_start': int(form_data['samples_start']) if form_data[
-					'samples_start'] else "",
-					'samples_end': int(form_data['samples_end']) if form_data['samples_end'] else ""
-				}
-				# build the file and return filename etc.
-				id_list = Samples().get_samples(parameters)
-		#check we have found matching ID's, if not return None
+				id_list = Fields.get_trees(trial_uid, trees_start, trees_end)
+			elif form_data['trait_level'] == 'branch':
+				fieldnames = [
+					'Country',
+					'Region',
+					'Farm',
+					'Trial',
+					'Trial UID',
+					'Block',
+					'Block UID',
+					'Tree Custom ID',
+					'Tree UID',
+					'Variety',
+					'UID'
+				]
+				if form_data['old_new_ids'] == 'old':
+					parameters = {
+						'country': form_data['country'],
+						'region': form_data['region'],
+						'farm': form_data['farm'],
+						'trial_uid': trial_uid,
+						'trees_start': int(form_data['trees_start']) if form_data['trees_start'] else 1,
+						'trees_end': int(form_data['trees_end']) if form_data['trees_end'] else 999999,
+						'start_time': int(
+							(
+								datetime.strptime(form_data['date_from'], '%Y-%m-%d')
+								- datetime(1970, 1, 1)
+							).total_seconds() * 1000) if form_data['date_from'] != '' else '',
+						'end_time': int(
+							(
+								datetime.strptime(form_data['date_to'], '%Y-%m-%d')
+								- datetime(1970, 1, 1)
+							).total_seconds() * 1000) if form_data['date_to'] != '' else '',
+						'branches_start': int(form_data['branches_start']) if form_data['branches_start'] != '' else 1,
+						'branches_end': int(form_data['branches_end']) if form_data['branches_end'] != ''else 999999
+					}
+					with get_driver().session() as neo4j_session:
+						result = neo4j_session.read_transaction(neo4j_query, Cypher.branches_get, parameters)
+					id_list = [record[0] for record in result]
+				else:
+					id_list = existing_ids
+			else:  # form_data['trait_level'] == 'block':
+				# make the file and return a dictionary with filename, file_path and file_size
+				fieldnames = [
+					'Country',
+					'Region',
+					'Farm',
+					'Trial',
+					'Trial UID',
+					'Block',
+					'UID'
+				]
+				id_list = Fields.get_blocks(trial_uid)
+		# check we have found matching ID's, if not return None
 		if len(id_list) == 0:
 			return None
-		#if requesting replicates for samples then create these in the id_list
+		# if requesting replicates for samples then create these in the id_list
 		sample_replicates = int(form_data['sample_replicates']) if form_data['sample_replicates'] else 1
 		if sample_replicates > 1:
-			fieldnames.insert(13, 'SampleUID')
+			fieldnames.insert(13, 'Sample UID')
 			id_list_reps = []
 			for sample in id_list:
-				sample['SampleUID'] = sample['UID']
+				sample['Sample UID'] = sample['UID']
 				for i in range(sample_replicates):
-					sample['UID'] = str(sample['SampleUID']) + "." + str(int(i + 1))
+					sample['UID'] = str(sample['Sample UID']) + "." + str(int(i + 1))
 					id_list_reps.append(sample.copy())
 			id_list = id_list_reps
-		#then we get the traits list from the form
+		# then we get the traits list from the form
 		node_label = str(form_data['trait_level']).title() + 'Trait'
 		selection = [
 			item for sublist in [
-				form_data.getlist(i) for i in form_data if all(['csrf_token' not in i, form_data['trait_level'] + '-' in i])
+				form_data.getlist(i) for i in form_data if all(
+					['csrf_token' not in i, form_data['trait_level'] + '-' in i]
+				)
 			]
 			for item in sublist
 		]
-		#if there are no selected traits exit here returning None
+		# if there are no selected traits exit here returning None
 		if len(selection) == 0:
 			return None
-		#check that they are in the database
+		# check that they are in the database
 		selected_traits = Lists(node_label).get_selected(selection, 'name')
-		#make the table file
-		fieldnames += ['Date','Time']
+		# make the table file
+		fieldnames += ['Date', 'Time']
 		fieldnames += [trait['name'] for trait in selected_traits]
 		table_file = self.make_csv_file(fieldnames, id_list, 'table.csv')
-		#and a file that describes the trait details
+		# and a file that describes the trait details
 		trait_fieldnames = [
 			'name',
 			'format',
@@ -1338,6 +1468,6 @@ class Download:
 		]
 		details_file = self.make_csv_file(trait_fieldnames, selected_traits, 'details.csv')
 		return {
-			'table':table_file,
-			'details':details_file
+			'table': table_file,
+			'details': details_file
 		}

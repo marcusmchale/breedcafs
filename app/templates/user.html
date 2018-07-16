@@ -4,7 +4,7 @@
 	<h2>User</h2>
 	<h3 id="confirmed"><label for="confirmed">Affiliations</label></h3><dd><ul id="confirmed"></ul></dd>
 		{% from "_formhelpers_admin.html" import render_field %}
-		<form action="{{ url_for('user') }}" method="post">
+		<form action="{{ url_for('user_page') }}" method="post">
 			{{ affiliation_form.csrf_token }}
 			{{ render_field(affiliation_form.pending)}}
 			<p>Please contact the relevant partner to request confirmation of pending affiliations.</p>

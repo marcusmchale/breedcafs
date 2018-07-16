@@ -8,14 +8,14 @@
 			{{ render_field (location_form.country) }}
 			{{ render_field (location_form.region) }}
 			{{ render_field (location_form.farm) }}
-			{{ render_field (location_form.plot) }}
+			{{ render_field (location_form.trial) }}
 			<a>Optional:</a>{{ render_field (location_form.block) }}
 			<p>The block can be entered for each tree in Field-Book but it is recommended to select it here</p>
-			<br><a>Add trees to the selected plot/block</a><br>
+			<br><a>Add trees to the selected trial/block</a><br>
 			{{ render_field (add_trees_form.count) }}
 			{{ render_field (add_trees_form.submit_trees) }}
 			{{ render_field (add_trees_form.email_checkbox_add) }}
-			<br><a>Download trees.csv for the selected plot:</a><br>
+			<br><a>Download trees.csv for the selected trial:</a><br>
 			{{ render_field (custom_trees_form.trees_start) }}
 			{{ render_field (custom_trees_form.trees_end) }}
 			{{ render_field (custom_trees_form.custom_trees_csv) }}
@@ -26,10 +26,10 @@
 
 {% block chart %}
 <div class="chart">
-	<p>Registered plots and counts of trees (click to expand/collapse)</p>
+	<p>Registered trials and counts of trees (click to expand/collapse)</p>
 	<svg width=500 height=500></svg>
 </div>
-<script>jsonData = "/json_plots_treecount";</script>
+<script>jsonData = "/json_trials_treecount";</script>
 <script src="{{ url_for('static', filename='d3.v4.min.js') }}"></script>
 <script src="{{ url_for('static', filename='d3_tree.js') }}"></script>
 <script src="{{ url_for('static', filename='jquery_1.8.3_min.js') }}"></script>

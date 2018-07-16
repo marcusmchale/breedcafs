@@ -2,8 +2,8 @@
 {% block body %}
 <div class="text_body">
 	{% from "_formhelpers_location_fields.html" import render_field %}
-	<h2>Register plots</h2>
-		<form action="{{ url_for('location_plots') }}" id="location_plots" method="post">
+	<h2>Register trials</h2>
+		<form action="{{ url_for('location_trials') }}" id="location_trials" method="post">
 			{{ location_form.csrf_token }}
 			{{ render_field (location_form.country) }}
 			{{ render_field (add_country.text_country) }} 
@@ -14,24 +14,24 @@
 			{{ render_field (location_form.farm) }}
 			{{ render_field (add_farm.text_farm) }} 
 			{{ render_field (add_farm.submit_farm) }}
-			{{ render_field (location_form.plot) }}
-			{{ render_field (add_plot.text_plot) }} 
-			{{ render_field (add_plot.submit_plot) }}
+			{{ render_field (location_form.trial) }}
+			{{ render_field (add_trial.text_trial) }}
+			{{ render_field (add_trial.submit_trial) }}
 			<br><br><br>
-			{{ render_field (plots_form.generate_plots_csv) }}
-			{{ render_field (plots_form.email_checkbox) }}
+			{{ render_field (trails_form.generate_trials_csv) }}
+			{{ render_field (trials_form.email_checkbox) }}
 		</form>
 </div>
 {% endblock %}
 {% block chart %}
 <div class="chart">
-	<p>Registered plots and counts of trees (click to expand/collapse)</p>
+	<p>Registered trial and counts of trees (click to expand/collapse)</p>
 	<svg width=500 height=500></svg>
 </div>
-<script>jsonData = "/json_plots_treecount";</script>
+<script>jsonData = "/json_trials_treecount";</script>
 <script src="{{ url_for('static', filename='d3.v4.min.js') }}"></script>
 <script src="{{ url_for('static', filename='d3_tree.js') }}"></script>
 <script src="{{ url_for('static', filename='jquery_1.8.3_min.js') }}"></script>
 <script src="{{ url_for('static', filename='jquery_location.js') }}"></script>
-<script src="{{ url_for('static', filename='jquery_plots.js') }}"></script>
+<script src="{{ url_for('static', filename='jquery_trials.js') }}"></script>
 {% endblock %}

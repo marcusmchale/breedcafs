@@ -1,20 +1,27 @@
-from app import (app,
+from app import (
+	app,
 	os,
 	GraphDatabase, 
-	ServiceUnavailable,
-	AuthError,
+	# ServiceUnavailable,
+	# AuthError,
 	watch, 
-	logging)
+	logging
+)
 
-#this was pulled out of the initialisation process for the app so that the site can handle server downtime for backups
-class Driver_holder:
+
+# this was pulled out of the initialisation process for the app so that the site can handle server downtime for backups
+class DriverHolder:
 	driver = None
 
+	def __init__(self):
+		pass
+
+
 def get_driver():
-	if Driver_holder.driver:
-		return Driver_holder.driver
+	if DriverHolder.driver:
+		return DriverHolder.driver
 	uri = "bolt://localhost:7687"
-	Driver_holder.driver = GraphDatabase.driver(
+	DriverHolder.driver = GraphDatabase.driver(
 		uri,
 		auth=(
 			os.environ['NEO4J_USERNAME'],
@@ -25,7 +32,8 @@ def get_driver():
 		max_retry_time = 5
 	)
 	watch("neo4j.bolt", logging.INFO, open(app.config['NEO4J_DRIVER_LOG'], 'w+'))
-	return Driver_holder.driver
+	return DriverHolder.driver
+
 
 def neo4j_query(tx, query, parameters):
 	return tx.run(query, parameters)

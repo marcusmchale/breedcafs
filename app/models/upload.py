@@ -10,7 +10,7 @@ import unicodecsv as csv
 from datetime import datetime
 from werkzeug.utils import secure_filename
 
-from celery.contrib import rdb
+# from celery.contrib import rdb
 
 
 class DictReaderInsensitive(csv.DictReader):
@@ -27,6 +27,7 @@ class DictInsensitive(dict):
 	# This class overrides the __getitem__ method to automatically strip() and lower() the input key
 	def __getitem__(self, key):
 		return dict.__getitem__(self, key.strip().lower())
+
 
 class RowParseResult:
 	def __init__(self, row_num, row_data):
@@ -45,28 +46,30 @@ class RowParseResult:
 			},
 			"uid": {
 				"format": "UID doesn't match BreedCAFS pattern: \n"
-						  "  - plots are integers (e.g. '1')\n"
-						  "  - blocks include the plot and block ID separated by '_B' (e.g. '1_B1')\n"
-						  "  - trees include the plot and tree ID separated by '_T' (e.g. '1_T1')\n"
-						  "  - branches include the plot and branch ID separated by '_Y' (e.g. '1_Y1')\n"
-						  "  - leaves include the plot and leaf ID separated by '_L' (e.g. '1_L1')\n"
-						  "  - samples include the plot and Sample ID separated by '_S' (e.g. '1_S1')\n",
+				"  - Trial UID should be an integers (e.g. '1')\n"
+				"  - Block UID should include the Trial and Block ID separated by '_B' (e.g. '1_B1')\n"
+				"  - Tree UID should include the Trial and Tree ID separated by '_T' (e.g. '1_T1')\n"
+				"  - Branch UID should include the Trial and Branch ID separated by '_Y' (e.g. '1_Y1')\n"
+				"  - Leaf UID should include the Trial and Leaf ID separated by '_L' (e.g. '1_L1')\n"
+				"  - Sample UID should include the Trial and Sample ID separated by '_S' (e.g. '1_S1')\n",
 				"missing": "This UID is not found in the database. "
 			},
 			"trait": {
 				"missing": "This trait is not found in the database. "
-						   "Please check the spelling and "
-						   "that this trait is found among those supported by BreedCAFS "
-						   "for the level of data you are submitting."
+				"Please check the spelling and "
+				"that this trait is found among those supported by BreedCAFS "
+				"for the level of data you are submitting."
 			},
 			"other": {
 				"format": {
-					"numeric":"Expected a numeric value",
+					"numeric": "Expected a numeric value",
 					"boolean": "Expected a boolean value ('True/False or Yes/No')",
 					"percent": "Expected a percent or simple numeric value (e.g. 50% or 50)",
-					"location": "Location coordinates are recorded as two numeric values "
-								"separated by a semicolon (';') e.g. ('53.2707;-9.0568')",
-					"date":"Expected date value format 'YYYY-MM-DD'(e.g. 2018-01-01)",
+					"location": (
+						"Location coordinates are recorded as two numeric values "
+						"separated by a semicolon (';') e.g. ('53.2707;-9.0568')"
+					),
+					"date": "Expected date value format 'YYYY-MM-DD'(e.g. 2018-01-01)",
 					"counter": "Expected an integer value (no decimal points or fractions)",
 					"multicat": "Expected any of the following categories separated by a colon (':'): \n",
 					"categorical": "Expected one of the following categories only: \n",
@@ -74,6 +77,7 @@ class RowParseResult:
 				}
 			}
 		}
+
 	def add_error(
 			self,
 			field,
@@ -102,12 +106,9 @@ class RowParseResult:
 	def get_row_errors(self):
 			return self.errors
 
-	def html_row (self, fieldnames):
+	def html_row(self, fieldnames):
 		row_string = '<tr><td>' + str(self.row_num) + '</td>'
 		for field in fieldnames:
-			#if not self.row_data[field]:
-			#	row_string += '<td></td>'
-			#else:
 			if field not in self.errors:
 				row_string += '<td>' + str(self.row_data[field]) + '</td>'
 			else:
@@ -140,6 +141,7 @@ class RowParseResult:
 				row_string += '">' + str(self.row_data[field]) + '</td>'
 		return row_string
 
+
 class ParseResult:
 	def __init__(self, submission_type, fieldnames):
 		self.submission_type = submission_type
@@ -150,10 +152,10 @@ class ParseResult:
 		self.unique_keys = None
 		self.duplicate_keys = None
 
-	def add_field_error(self, field, type):
+	def add_field_error(self, field, error_type):
 		if not self.field_errors:
 			self.field_errors = {}
-		self.field_errors[field] = type
+		self.field_errors[field] = error_type
 
 	def get_unique_keys(self):
 		return self.unique_keys
@@ -198,7 +200,7 @@ class ParseResult:
 				)
 			unique_key = (parsed_uid, parsed_timestamp, row_data['trait'])
 			if unique_key not in self.unique_keys:
-				self.unique_keys.add((unique_key))
+				self.unique_keys.add(unique_key)
 			else:
 				if not self.duplicate_keys:
 					self.duplicate_keys = {}
@@ -264,13 +266,17 @@ class ParseResult:
 		else:
 			max_length = 50
 			if self.submission_type == "FB":
-				response = '<p>The uploaded file contains duplicated unique keys ' \
-						   ' (the combination of UID, timestamp and trait).' \
-						   ' The following lines duplicate preceding lines in the file: </p>'
+				response = (
+					'<p>The uploaded file contains duplicated unique keys '
+					' (the combination of UID, timestamp and trait).'
+					' The following lines duplicate preceding lines in the file: </p>'
+				)
 			else:
-				response = '<p>The uploaded table contains duplicated unique keys ' \
-						   '(the combination of UID, date and time). ' \
-						   ' The following lines duplicate preceding lines in the file: </p>'
+				response = (
+					'<p>The uploaded table contains duplicated unique keys '
+					'(the combination of UID, date and time). '
+					' The following lines duplicate preceding lines in the file: </p>'
+				)
 			header_string = '<tr><th><p>Line#</p></th>'
 			for field in self.fieldnames:
 				header_string += '<th><p>' + str(field) + '</p></th>'
@@ -319,6 +325,7 @@ class ParseResult:
 				return True
 		return False
 
+
 class ItemSubmissionResult:
 	def __init__(
 			self,
@@ -339,6 +346,9 @@ class ItemSubmissionResult:
 		self.uid = uid
 		self.trait = trait
 		self.time = datetime.fromtimestamp(int(time) / 1000).strftime("%Y-%m-%d %H:%M:%S")
+		self.timestamp = None
+		self.table_date = None
+		self.table_time = None
 
 	def fb_item(self, timestamp):
 		self.timestamp = timestamp
@@ -366,10 +376,11 @@ class ItemSubmissionResult:
 		}
 		if submission_type == "FB":
 			item_dict['timestamp'] = self.timestamp
-		else: #  submission type == 'table'
+		else:  # submission type == 'table'
 			item_dict['table_date'] = self.table_date
 			item_dict['table_time'] = self.table_time
 		return item_dict
+
 
 class SubmissionResult:
 	def __init__(self, username, filename, submission_type):
@@ -401,7 +412,7 @@ class SubmissionResult:
 		)
 		if submission_type == "FB":
 			submission_item.fb_item(record['timestamp'])
-		else: #  submission type == 'table'
+		else:  # submission type == 'table'
 			submission_item.table_item(record['table_date'], record['table_time'])
 		if not record['found']:
 			self.submitted.append(submission_item)
@@ -490,7 +501,6 @@ class SubmissionResult:
 					writer.writerow(item.as_dict(submission_type))
 		return resubmissions_filename
 
-
 	def submitted_file(self):
 		username = self.username
 		filename = self.filename
@@ -533,13 +543,14 @@ class SubmissionResult:
 class Parsers:
 	def __init__(self):
 		pass
+
 	@staticmethod
 	def timestamp_fb_format(timestamp_string):
 		timestamp = str(timestamp_string).strip()
 		try:
 			datetime.strptime(timestamp[0:19], '%Y-%m-%d %H:%M:%S')
 			if not all([
-				timestamp[-5] in ['+','-'],
+				timestamp[-5] in ['+', '-'],
 				int(timestamp[-4:-2]) < 24,
 				int(timestamp[-4:-2]) >= 0,
 				int(timestamp[-2:]) < 60,
@@ -603,6 +614,7 @@ class Parsers:
 			else:
 				return False
 
+
 class Upload:
 	def __init__(self, username, submission_type, raw_filename):
 		time = datetime.now().strftime('_%Y%m%d-%H%M%S_')
@@ -613,7 +625,7 @@ class Upload:
 		self.trimmed_file_path = None
 		self.parse_result = None
 		self.submission_result = None
-
+		self.fieldnames = None
 
 	@staticmethod
 	def allowed_file(filename):
@@ -647,9 +659,9 @@ class Upload:
 				return "This file contains duplicated header fields. This is not supported"
 			fieldnames = set(self.fieldnames)
 			if self.submission_type == 'FB':
-				required = set(['uid', 'trait', 'value', 'timestamp', 'person', 'location'])
+				required = {'uid', 'trait', 'value', 'timestamp', 'person', 'location'}
 			else:  # submission_type == 'table'
-				required = set(['uid', 'date', 'time'])
+				required = {'uid', 'date', 'time'}
 			if not required.issubset(fieldnames):
 				missing_headers = required - fieldnames
 				return "This file is missing the following headers: " + str([i for i in missing_headers])
@@ -680,6 +692,7 @@ class Upload:
 						if row[field]:
 							row[field] = row[field].strip()
 					file_writer.writerow(row)
+
 	def parse_rows(self):
 		trimmed_file_path = self.trimmed_file_path
 		submission_type = self.submission_type
@@ -733,7 +746,7 @@ class Upload:
 							"missing"
 						)
 					if not item['value']:
-						if all([item['trait'],item['uid']]) :
+						if all([item['trait'], item['uid']]):
 							if 'category_list' in item:
 								parse_result.merge_error(
 									line_num,
@@ -753,7 +766,7 @@ class Upload:
 									item['trait'],
 									item['format']
 								)
-							else :
+							else:
 								parse_result.merge_error(
 									line_num,
 									row_data,
@@ -767,18 +780,18 @@ class Upload:
 					'country',
 					'region',
 					'farm',
-					'plot',
-					'plotuid',
+					'trial',
+					'trial uid',
 					'block',
-					'blockuid',
+					'block uid',
 					'variety',
-					'treeuid',
-					'treecustomid',
-					'branchuid',
-					'leafuid',
-					'sampleuid',
+					'tree uid',
+					'tree custom id',
+					'branch uid',
+					'leaf uid',
+					'sample uid',
 					'uid',
-					'sampledate',
+					'date sampled',
 					'tissue',
 					'storage'
 				]
@@ -794,7 +807,7 @@ class Upload:
 				for row_data in trimmed_dict:
 					line_num = int(trimmed_dict.line_num)
 					# 0 based list call and have to account for header row so -2
-					item_num = line_num -2
+					item_num = line_num - 2
 					for i, trait in enumerate(traits):
 						item = check_result[item_num * len(traits) + i]
 						if not item['uid']:
@@ -804,14 +817,18 @@ class Upload:
 								"uid",
 								"missing"
 							)
-						#this isn't so simple with mixed levels, sometimes the trait is found for some levels.
+						# this isn't so simple with mixed levels, sometimes the trait is found for some levels.
 						if not item['trait']:
 							parse_result.add_field_error(
 								trait,
-								"This trait is not found. Please check your spelling. This may also be because the trait is not registered at the level of these items"
+								(
+									"This trait is not found. Please check your spelling. "
+									"This may also be because the trait is not registered at the level of these items"
+								)
 							)
 						else:
-							#this is to handle mixed levels, otherwise the upload would fail if a trait was only found for some levels
+							# this is to handle mixed levels,
+							# otherwise the upload would fail if a trait was only found for some levels
 							parse_result.add_field_found(trait)
 						if not item['value']:
 							if all([row_data[trait], item['trait'], item['uid']]):
@@ -834,7 +851,7 @@ class Upload:
 										item['trait'],
 										item['format']
 									)
-								else :
+								else:
 									parse_result.merge_error(
 										line_num,
 										row_data,
@@ -874,16 +891,16 @@ class Upload:
 					'country',
 					'region',
 					'farm',
-					'plot',
-					'plotuid',
+					'trial',
+					'trial uid',
 					'block',
-					'blockuid',
+					'block uid',
 					'variety',
-					'treeuid',
-					'treecustomid',
-					'branchuid',
-					'leafuid',
-					'sampleuid',
+					'tree uid',
+					'tree custom id',
+					'branch uid',
+					'leaf uid',
+					'sample uid',
 					'tissue',
 					'storage'
 				]
@@ -990,7 +1007,11 @@ class Upload:
 						body += "   These are available at the following url: " + str(submitted_file_url) + "\n"
 						body += " - " + str(submission_summary['resubmissions']) + 'existing values were already found.\n'
 						body += "   These are available at the following url: " + str(resubmissions_file_url) + "\n"
-						body += " - " + str(submission_summary['conflicts']) + 'conflicts with existing values were found and not submitted.\n'
+						body += (
+							" - "
+							+ str(submission_summary['conflicts'])
+							+ 'conflicts with existing values were found and not submitted.\n'
+						)
 						body += "   These are available at the following url: " + str(conflicts_file_url) + "\n"
 						html = render_template(
 							'emails/upload_report.html',

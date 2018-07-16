@@ -1,6 +1,7 @@
 from app import app
 from flask import flash, redirect, url_for, render_template, session
 
+
 @app.route('/help', methods=['GET'])
 def help():
 	if 'username' not in session:
