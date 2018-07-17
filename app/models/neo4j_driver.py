@@ -35,5 +35,9 @@ def get_driver():
 	return DriverHolder.driver
 
 
-def neo4j_query(tx, query, parameters):
-	return tx.run(query, parameters)
+def neo4j_query(tx, query, parameters = None):
+	try:
+		result = tx.run(query, parameters)
+		return result
+	except Exception as e:
+		logging.error("Error with neo4j_query:" + str(e))

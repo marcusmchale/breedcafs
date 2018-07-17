@@ -10,8 +10,6 @@ import unicodecsv as csv
 from datetime import datetime
 from werkzeug.utils import secure_filename
 
-# from celery.contrib import rdb
-
 
 class DictReaderInsensitive(csv.DictReader):
 	# overwrites csv.fieldnames property so uses without surrounding whitespace and in lowercase
@@ -340,12 +338,12 @@ class ItemSubmissionResult:
 	):
 		self.found = found
 		self.submitted_by = submitted_by
-		self.submitted_at = datetime.fromtimestamp(int(submitted_at) / 1000).strftime("%Y-%m-%d %H:%M:%S")
+		self.submitted_at = datetime.utcfromtimestamp(int(submitted_at) / 1000).strftime("%Y-%m-%d %H:%M:%S")
 		self.value = value
 		self.uploaded_value = uploaded_value
 		self.uid = uid
 		self.trait = trait
-		self.time = datetime.fromtimestamp(int(time) / 1000).strftime("%Y-%m-%d %H:%M:%S")
+		self.time = datetime.utcfromtimestamp(int(time) / 1000).strftime("%Y-%m-%d %H:%M:%S")
 		self.timestamp = None
 		self.table_date = None
 		self.table_time = None
@@ -617,7 +615,7 @@ class Parsers:
 
 class Upload:
 	def __init__(self, username, submission_type, raw_filename):
-		time = datetime.now().strftime('_%Y%m%d-%H%M%S_')
+		time = datetime.utcnow().strftime('_%Y%m%d-%H%M%S_')
 		self.username = username
 		self.filename = secure_filename(time + '_' + raw_filename)
 		self.submission_type = submission_type

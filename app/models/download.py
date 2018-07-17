@@ -31,13 +31,13 @@ class Download:
 			os.chown(download_path, -1, gid)
 			os.chmod(download_path, 0775)
 		# prepare variables to write the file
-		time = datetime.now().strftime('%Y%m%d-%H%M%S')
+		time = datetime.utcnow().strftime('%Y%m%d-%H%M%S')
 		if with_time:
 			filename = time + '_' + filename
 		file_path = os.path.join(app.instance_path, app.config['DOWNLOAD_FOLDER'], session['username'], filename)
 		# handle case where user is making more than one file a minute (per second filenames)
 		if os.path.isfile(file_path):
-			time = datetime.now().strftime('%Y%m%d-%H%M%S')
+			time = datetime.utcnow().strftime('%Y%m%d-%H%M%S')
 			filename = time + '_' + filename
 			file_path = os.path.join(app.instance_path, app.config['DOWNLOAD_FOLDER'], session['username'], filename)
 		# make the file
@@ -81,10 +81,6 @@ class Download:
 			data_format, 
 			start_time, 
 			end_time):
-		# despite existing check with WTForms here we repeat the check of strings used to build query
-		node_label = str(level).title() + 'Trait'
-		all_level_traits = Lists(node_label).create_list('name')
-		traits = [str(i) for i in traits if i in all_level_traits]
 		# First limit the get the confirmed affiliated institutes and all data nodes submitted by these
 		# TODO put this filter at the end of the query, might be less db-hits
 		user_data_query = (
@@ -147,7 +143,7 @@ class Download:
 				'	(trait:SampleTrait) '
 				'	<-[FOR_TRAIT*2]-(sample_trait) '
 				'	<-[DATA_FOR]-(data)'
-				' WHERE (trait.name) IN ' + str(traits) +
+				' WHERE (trait.name) IN $traits' 
 				' WITH user_name, partner_name, data, trait, sample_trait '
 				' MATCH '
 				'	(sample_trait) '
@@ -297,7 +293,7 @@ class Download:
 				'	(trait:LeafTrait) '
 				'	<-[:FOR_TRAIT*2]-(leaf_trait) '
 				'	<-[:DATA_FOR]-(data) '
-				' WHERE (trait.name) IN ' + str(traits) +
+				' WHERE (trait.name) IN $traits '
 				' WITH user_name, partner_name, data, trait, leaf_trait '
 				' MATCH '
 				'	(leaf_trait) '
@@ -361,20 +357,20 @@ class Download:
 					'	COLLECT([trait.name, data.value]) as Traits '
 					' RETURN '
 					'	{ ' 
-					'		Country : Country, '
-					'		Region : Region, '
-					'		Farm : Farm, '
-					'		Trial : Trial, '
-					'		`Trial UID` : `Trial UID`, '
+					'		Country: Country, '
+					'		Region: Region, '
+					'		Farm: Farm, '
+					'		Trial: Trial, '
+					'		`Trial UID`: `Trial UID`, '
 					'		Block : Block, '
 					'		`Block UID`: `Block UID`, '
-					'		`Tree UID` : `Tree UID`, '
+					'		`Tree UID`: `Tree UID`, '
 					'		`Tree Custom ID`: `Tree Custom ID`, '
 					'		Variety: Variety, '
 					'		`Branch UID`: `Branch UID`, '
 					'		UID: `Leaf UID`, '
 					'		`Leaf ID`: `Leaf ID`, '
-					'		Traits : Traits } '
+					'		Traits: Traits } '
 					' ORDER BY '
 					'	`Trial UID`, `Leaf ID` '
 				)
@@ -427,7 +423,7 @@ class Download:
 				'	(trait: BranchTrait) '
 				'	<-[:FOR_TRAIT*2]-(branch_trait) '
 				'	<-[:DATA_FOR]-(data) '
-				' WHERE (trait.name) IN ' + str(traits) +
+				' WHERE (trait.name) IN $traits'
 				' WITH user_name, partner_name, data, trait, branch_trait '
 				' MATCH '
 				'	(branch_trait) '
@@ -548,7 +544,7 @@ class Download:
 				'	(trait:TreeTrait) '
 				'	<-[:FOR_TRAIT*2]-(tree_trait) '
 				'	<-[:DATA_FOR]-(data) '
-				' WHERE (trait.name) IN ' + str(traits) +
+				' WHERE (trait.name) IN $traits '
 				' WITH '
 				'	user_name, '
 				'	partner_name, '
@@ -664,7 +660,7 @@ class Download:
 				'	(trait: BlockTrait) '
 				'	<-[:FOR_TRAIT*2]-(block_trait) '
 				'	<-[:DATA_FOR]-(data) '
-				' WHERE (trait.name) IN ' + str(traits) +
+				' WHERE (trait.name) IN $traits '
 				' WITH user_name, partner_name, data, trait, block_trait '
 				' MATCH '
 				'	(block_trait) '
@@ -752,7 +748,7 @@ class Download:
 				'	(trait:TrialTrait) '
 				'	<-[:FOR_TRAIT]-(trial_trait) '
 				'	<-[:DATA_FOR]-(data) '
-				' WHERE (trait.name) IN ' + str(traits) +
+				' WHERE (trait.name) IN $traits'
 				' WITH user_name, partner_name, data, trait, trial_trait '
 				' MATCH '
 				'	(trial_trait) '
@@ -768,7 +764,7 @@ class Download:
 					'	region.name as Region, '
 					'	farm.name as Farm, '
 					'	trial.name as Trial, '
-					'	trial.uid as TrialUID, '
+					'	trial.uid as `Trial UID`, '
 					'	COLLECT([trait.name, data.value]) as Traits '
 					' RETURN '
 					'	{ ' 
@@ -846,7 +842,7 @@ class Download:
 		else:  # if data_format == 'db':
 			fieldnames = index_fieldnames + ['Trait', 'Value', 'Location', 'Recorded at', 'Recorded by']
 		# create the file path
-		time = datetime.now().strftime('%Y%m%d-%H%M%S')
+		time = datetime.utcnow().strftime('%Y%m%d-%H%M%S')
 		filename = time + '_data.csv'
 		file_path = os.path.join(app.instance_path, app.config['DOWNLOAD_FOLDER'], self.username, filename)
 		# create user download path if not found

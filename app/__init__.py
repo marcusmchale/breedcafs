@@ -9,13 +9,13 @@ app = Flask(__name__, instance_relative_config=True)
 app.config.from_object('config')
 app.config.from_pyfile('config.py')
 
-#configure logging
+# configure logging
 logging.basicConfig(filename=app.config['BREEDCAFS_LOG'], 
 	level = logging.DEBUG,
 	format = '%(asctime)s %(levelname)-8s %(message)s',
 	datefmt= '%Y-%m-%d %H:%M:%S')
 
-#celery for scheduling large uploads
+# celery for scheduling large uploads
 celery = Celery(
 	app,
 	backend = app.config['CELERY_RESULT_BACKEND'],

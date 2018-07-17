@@ -389,7 +389,7 @@ $("#trees_end").val('')
 update_defaults = function() {
 	var sel_trial = $("#trial").find(":selected").val();
 	if (sel_trial !== "") {
-		$("#trees_start,trees_end").prop("disabled", true);
+		$("#trees_start, trees_end").prop("disabled", true);
 		var request = $.ajax({
 			type: 'GET',
 			url: "/location/treecount/" + sel_trial + '/',
@@ -405,7 +405,7 @@ update_defaults = function() {
 				$("#trees_start").val(1)
 			}
 			//and be sure to allow the user to edit
-			$("#trees_start,#trees_end").prop( "disabled", false);
+			$("#trees_start,#trees_end").prop("disabled", false);
 		});
 	}
 	else {

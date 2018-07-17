@@ -94,7 +94,8 @@ def sample_reg():
 
 
 class Tissues(MethodView):
-	def get(self):
+	@staticmethod
+	def get():
 		if 'username' not in session:
 			flash('Please log in')
 			return redirect(url_for('login'))
@@ -133,7 +134,8 @@ def add_tissue():
 
 
 class StorageMethods(MethodView):
-	def get(self):
+	@staticmethod
+	def get():
 		if 'username' not in session:
 			flash('Please log in')
 			return redirect(url_for('login'))
@@ -181,7 +183,7 @@ def add_samples():
 			location_form = LocationForm.update()
 			sample_form = SampleRegForm.update()
 			if all([location_form.validate_on_submit(), sample_form.validate_on_submit()]):
-				trial_uid = int(request.form['trial_uid'])
+				trial_uid = int(request.form['trial'])
 				start = int(request.form['trees_start']) if request.form['trees_start'] else 0
 				end = int(request.form['trees_end']) if request.form['trees_end'] else 999999
 				replicates = int(request.form['replicates'])
@@ -196,9 +198,9 @@ def add_samples():
 				# create a download url
 				download_url = url_for(
 					'download_file',
-					username=session['username'],
-					filename=file_details['filename'],
-					_external=True
+					username = session['username'],
+					filename = file_details['filename'],
+					_external = True
 				)
 				# if requested create email (and send as attachment if less than ~5mb)
 				if request.form.get('email_checkbox'):

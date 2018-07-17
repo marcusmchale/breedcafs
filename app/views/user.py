@@ -60,7 +60,6 @@ def register():
 				subject = "BreedCAFS database confirmation."
 				recipients = [email]
 				confirm_url = url_for('confirm', token = token, _external = True)
-				import pdb; pdb.set_trace()
 				body = (
 					"Your account on the BreedCAFS server was successfully created. Your username is" + username +
 					" Please visit the following link to activate your account:" + confirm_url

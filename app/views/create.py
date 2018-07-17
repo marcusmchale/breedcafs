@@ -117,7 +117,8 @@ class Blocks(MethodView):
 
 
 class TreeCount(MethodView):
-	def get(self, trial_uid):
+	@staticmethod
+	def get(trial_uid):
 		if 'username' not in session:
 			flash('Please log in')
 			return redirect(url_for('login'))

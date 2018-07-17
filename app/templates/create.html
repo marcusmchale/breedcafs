@@ -1,7 +1,7 @@
 {% extends "layout.html" %}	
 {% block body %}
 	<div class="text_body">
-		<h2>Create locations and trees</h2>
+		<h2>Create trials and register trees</h2>
 		<p>On this page you can register new fields and trees into the database for subsequent sampling and data collection</p> 
 		{% from "_formhelpers_location_fields.html" import render_field %}
 		<form action="{{ url_for('create') }}" id="create" method="post">
