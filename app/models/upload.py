@@ -205,6 +205,7 @@ class ParseResult:
 				self.duplicate_keys[line_num] = row_data
 		# Check time, and for trait duplicates in tables simply check for duplicate fields in header
 		else:  # submission_type == "table":
+			# check for date time info.
 			parsed_date = Parsers.date_format(row_data['date'])
 			parsed_time = Parsers.time_format(row_data['time'])
 			if not parsed_date:
@@ -343,10 +344,10 @@ class ItemSubmissionResult:
 		self.uploaded_value = uploaded_value
 		self.uid = uid
 		self.trait = trait
-		self.time = datetime.utcfromtimestamp(int(time) / 1000).strftime("%Y-%m-%d %H:%M:%S")
 		self.timestamp = None
 		self.table_date = None
 		self.table_time = None
+		self.time = datetime.utcfromtimestamp(int(time) / 1000).strftime("%Y-%m-%d %H:%M:%S")
 
 	def fb_item(self, timestamp):
 		self.timestamp = timestamp
@@ -359,6 +360,9 @@ class ItemSubmissionResult:
 		if self.value == self.uploaded_value:
 			return False
 		else:
+			if isinstance(self.value, list):
+				if set([i.lower() for i in self.uploaded_value.split(":")]) == set([y.lower() for y in self.value]):
+					return False
 			return True
 
 	def as_dict(self, submission_type):
@@ -398,6 +402,7 @@ class SubmissionResult:
 
 	def parse_record(self, record):
 		submission_type = self.submission_type
+		# quickly check date is after 1900 or fails on ItemSubmissionResult create
 		submission_item = ItemSubmissionResult(
 			record['found'],
 			record['submitted_by'],
@@ -564,7 +569,9 @@ class Parsers:
 	def date_format(date_string):
 		date_string = str(date_string).strip()
 		try:
-			datetime.strptime(date_string, '%Y-%m-%d')
+			time = datetime.strptime(date_string, '%Y-%m-%d')
+			# the below is just to make sure can render it again, strftime fails on dates pre-1990
+			datetime.strftime(time, '%Y')
 			return date_string
 		except ValueError:
 			return False
@@ -573,16 +580,8 @@ class Parsers:
 	def time_format(time_string):
 		time_string = str(time_string).strip()
 		try:
-			if not all([
-				time_string[2] == ':',
-				int(time_string[0:2]) < 24,
-				int(time_string[0:2]) >= 0,
-				int(time_string[3:5]) < 60,
-				int(time_string[3:5]) >= 0
-			]):
-				return False
-			else:
-				return time_string
+			datetime.strptime(time_string, '%H:%M')
+			return time_string
 		except (ValueError, IndexError):
 			return False
 
@@ -699,9 +698,42 @@ class Upload:
 		with open(trimmed_file_path, 'r') as trimmed_file:
 			trimmed_dict = DictReaderInsensitive(trimmed_file)
 			for row_data in trimmed_dict:
-				line_num = int(trimmed_dict.line_num)
-				# check timestamp formatting against regex
-				parse_result.parse_row(line_num, row_data)
+				#firstly, if a table check for trait data, if none then just skip
+				if self.submission_type == 'table':
+					# firstly check if trait data in the row and ignore if empty
+					required = ['uid', 'date', 'time', 'person']
+					index_headers = [
+						'country',
+						'region',
+						'farm',
+						'trial',
+						'trial uid',
+						'block',
+						'block uid',
+						'variety',
+						'tree uid',
+						'tree custom id',
+						'branch uid',
+						'leaf uid',
+						'sample uid',
+						'uid',
+						'date sampled',
+						'tissue',
+						'storage'
+					]
+					not_traits = required + index_headers
+					traits = set(row_data.keys()).difference(set(not_traits))
+					if ([row_data[trait] for trait in traits if row_data[trait]]):
+						line_num = int(trimmed_dict.line_num)
+						# check timestamp formatting against regex
+						parse_result.parse_row(line_num, row_data)
+						# if many errors already then return immediately
+					else:
+						pass
+				if submission_type == "FB":
+					line_num = int(trimmed_dict.line_num)
+					# check timestamp formatting against regex
+					parse_result.parse_row(line_num, row_data)
 				# if many errors already then return immediately
 				if parse_result.long_enough():
 					return parse_result

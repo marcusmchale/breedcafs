@@ -233,7 +233,7 @@ class Download:
 					'		Tissue: Tissue, '
 					'		Storage: Storage, '
 					'		`Date Sampled`: `Date Sampled`, '
-					'		`Sample ID : `Sample ID`, '
+					'		`Sample ID` : `Sample ID`, '
 					'		Traits : Traits } '
 					' ORDER BY '
 					'	`Trial UID`, `Sample ID` '
@@ -259,7 +259,7 @@ class Download:
 					'	UID : sample.uid, '
 					'	Tissue: tissue.name, '
 					'	Storage: storage.name, '
-					'	`Sample Date`: sample.date, '
+					'	`Date Sampled`: sample.date, '
 					'	`Sample ID`: sample.id, '
 					'	Trait: trait.name, '
 					'	Value: data.value, '
@@ -615,11 +615,11 @@ class Download:
 					'		UID: `Tree UID`, '
 					'		`Tree Custom ID`: `Tree Custom ID`, '
 					'		Variety: Variety, '
-					'		`Tree ID`: TreeID,'
+					'		`Tree ID`: `Tree ID`,'
 					'		Traits: Traits '
 					'	} '
 					' ORDER BY '
-					'	`Trial UID`, TreeID '
+					'	`Trial UID`, `Tree ID` '
 				)
 			else:  # if data_format == 'db':
 				response = (
@@ -828,14 +828,29 @@ class Download:
 			# expand the traits and values as key:value pairs (each measure as an item in a list if more than one)
 			for record in result:
 				for i in record["Traits"]:
-					if i[0] in record:
-						if isinstance(record[i[0]], list):
+					# if the trait hasn't appeared yet
+					if not i[0] in record:
+						# if the new value isn't a list just store it as a string
+						if not isinstance(i[1], list):
+							record.update({i[0]: str(i[1])})
+						# if the new value is a list (multicat)
+						# make all the elements of the list into strings
+						# and make a string out of this list of strings
+						else:
+							record.update({i[0]: str([str(y) for y in i[1]])})
+					# if the trait is already there
+					else:
+						# if the stored value for this trait is not a list
+						if not isinstance(record[i[0]], list):
+							#  - we make the existing value an item in a list
+							record.update({i[0]: [record[i[0]]]})
+						# Need to handle multicats that have lists of values as a single data point
+						# these always return a list (even if 1 element) so at least it is consistent
+						# in this case we can determine if it is a multicat by checking if the new value is a list
+						if not isinstance(i[1], list):
 							record[i[0]].append(str(i[1]))
 						else:
-							record.update({i[0]: [record[i[0]]]})
-							record[i[0]].append(str(i[1]))
-					else:
-						record.update({i[0]: str(i[1])})
+							record[i[0]].append(str([str(y) for y in i[1]]))
 			trait_fieldnames = traits
 			# now create the csv file from result and fieldnames
 			fieldnames = index_fieldnames + trait_fieldnames
@@ -1038,7 +1053,7 @@ class Download:
 						'country': form_data['country'],
 						'region': form_data['region'],
 						'farm': form_data['farm'],
-						'Trial UID': trial_uid,
+						'trial_uid': trial_uid,
 						'trees_start': int(form_data['trees_start']) if form_data['trees_start'] else 1,
 						'trees_end': int(form_data['trees_end']) if form_data['trees_end'] else 999999,
 						'start_time': int(
