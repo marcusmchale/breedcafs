@@ -1,0 +1,18 @@
+{% extends "layout.html" %}	
+{% block body %}
+<div class="text_body">
+	<h2>User</h2>
+	<h3 id="confirmed"><label for="confirmed">Affiliations</label></h3><dd><ul id="confirmed"></ul></dd>
+		{% from "_formhelpers_admin.html" import render_field %}
+		<form action="{{ url_for('user_page') }}" method="post">
+			{{ affiliation_form.csrf_token }}
+			{{ render_field(affiliation_form.pending)}}
+			<p>Please contact the relevant partner to request confirmation of pending affiliations.</p>
+			{{ render_field(affiliation_form.other)}}
+			{{ render_field(affiliation_form.submit_affiliations)}}
+		</form>
+	<p>Data you submit is accessible to all users with a confirmed affiliation to institutes marked with an asterix (*). These affiliations (established during registration) may not be removed. Confirmed affiliations cannot be removed, although you may be unconfirmed by the relevant partner administrator resulting in a loss of access to data from that partner.</p>
+</div>
+<script src="{{ url_for('static', filename='jquery_1.8.3_min.js') }}"></script>
+<script src="{{ url_for('static', filename='jquery_user.js') }}"></script>
+{% endblock %}
