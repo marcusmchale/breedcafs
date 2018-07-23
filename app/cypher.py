@@ -1262,13 +1262,13 @@ class Cypher:
 		'					THEN toUpper(value) '
 		'					ELSE Null '
 		'					END '
-		'			WHEN trait.name_lower = "variety name (text)" '
+		'			WHEN trait.name_lower = "variety name" '
 		'				THEN CASE '
 		'					WHEN toLower(value) in extract(item in trait.category_list | toLower(item)) '
 		'						THEN trim(value) '
 		'					ELSE Null '
 		'					END '
-		'			WHEN trait.name_lower = "el frances code (text)" '
+		'			WHEN trait.name_lower = "variety code" '
 		'				THEN CASE '
 		'					WHEN toLower(value) in extract(item in trait.category_list | toLower(item)) '
 		'						THEN trim(value) '
@@ -1449,7 +1449,7 @@ class Cypher:
 		'	is_in_block_current, block_counter_current, block_trees_update, block_counter_update, '
 		'	from_branch_current, branch_update, '
 		'	from_leaf_current, leaf_update '	
-		# In case trait is "variety name (text)" or "el frances code (text)" 
+		# In case trait is "variety name " or "variety code" 
 		# find current variety assignment
 		' OPTIONAL MATCH '
 		'	(item)-[is_variety_current: IS_VARIETY {current:True}]->()-[:IS_VARIETY]->(:Variety) '
@@ -1578,7 +1578,7 @@ class Cypher:
 		' FOREACH (n IN CASE '
 		'	WHEN d.value = value '
 		'	AND trait.level = "tree" '
-		'	AND trait.name_lower IN ["variety name (text)", "el frances code (text)"] '
+		'	AND trait.name_lower IN ["variety name", "variety code"] '
 		'	AND variety_update IS NOT NULL '
 		'		THEN [1] ELSE [] END | '
 		# Create per Trial per Variety node
