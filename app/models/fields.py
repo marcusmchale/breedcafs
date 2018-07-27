@@ -110,8 +110,6 @@ class Fields:
 				'field': field,
 				'username': session['username']
 			}
-			import pdb;
-			pdb.set_trace()
 			result = neo4j_session.write_transaction(neo4j_query, Cypher.field_add, parameters)
 			return [record[0] for record in result]
 

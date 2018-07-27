@@ -485,6 +485,7 @@ def create_variety_codes(tx, variety_codes):
 def create_field_counter(tx):
 	tx.run(' CREATE (:Counter {name: "field", count: 0})')
 
+
 def create_start_email(tx):
 	email = raw_input('Enter the email address to be first registrant: ')
 	print ('Adding email to allowed users: ' + email)
