@@ -1,21 +1,21 @@
 
 //generate blocks.csv
-$("#generate_trials_csv").click( function(e) {
+$("#generate_fields_csv").click( function(e) {
 	e.preventDefault();
 	remove_flash();
 	wait_message = "Please wait for file to be generated";
-	flash_wait = "<div id='generate_trials_flash' class='flash'>" + wait_message + "</div>";
+	flash_wait = "<div id='generate_fields_flash' class='flash'>" + wait_message + "</div>";
 	$("form").append(flash_wait)
-	var generate_trials_csv = $.ajax({
-		url: "/generate_trials_csv",
+	var generate_fields_csv = $.ajax({
+		url: "/generate_fields_csv",
 		data: $("form").serialize(),
 		type: 'POST',
 		success: function(response) {
 			if (response.hasOwnProperty('submitted')) {
-				flash_submitted = "<div id='generate_trials_flash' class='flash'>" + response.submitted + "</div>";
-				$("#generate_trials_flash").replaceWith(flash_submitted);
+				flash_submitted = "<div id='generate_fields_flash' class='flash'>" + response.submitted + "</div>";
+				$("#generate_fields_flash").replaceWith(flash_submitted);
 			} else {
-				$("#generate_trials_flash").remove();
+				$("#generate_fields_flash").remove();
 				for (var key in response[0]){
 					if (response[0].hasOwnProperty(key)) {
 						flash = "<div id='flash_" + key + "' class='flash'>" + response[0][key][0] + "</div>";

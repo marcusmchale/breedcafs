@@ -91,26 +91,26 @@ svg {
 					fill:black;
 					}
 
-.Country, .Region, .Farm, .Trial, .Block{
+.Country, .Region, .Farm, .Field, .Block{
 					stroke: black;
 					fill: #996633 ;
 					fill-opacity:0.4
 					}
 
-.collapsedCountry, .collapsedRegion, .collapsedFarm, .collapsedTrial{
+.collapsedCountry, .collapsedRegion, .collapsedFarm, .collapsedField{
 					stroke: green;
 					fill: #996633;
 					fill-opacity:0.8
 					}
 
 
-.textCountry, .textRegion, .textFarm, .textTrial{
+.textCountry, .textRegion, .textFarm, .textField{
 					stroke: black;
 					fill: black;
 					fill-opacity:1
 					}
 
-.countCountry, .countRegion, .countFarm, .countTrial{
+.countCountry, .countRegion, .countFarm, .countField{
 					stroke: black;
 					fill: black;
 					fill-opacity:1;

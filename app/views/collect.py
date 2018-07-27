@@ -44,7 +44,7 @@ def collect():
 			sample_traits_form = CreateTraits().update('sample')
 			tree_traits_form = CreateTraits().update('tree')
 			block_traits_form = CreateTraits().update('block')
-			trial_traits_form = CreateTraits().update('trial')
+			field_traits_form = CreateTraits().update('field')
 			sample_reg_form = SampleRegForm().update()
 			add_tissue_form = AddTissueForm()
 			add_storage_form = AddStorageForm()
@@ -55,7 +55,7 @@ def collect():
 				sample_traits_form = sample_traits_form,
 				tree_traits_form = tree_traits_form,
 				block_traits_form = block_traits_form,
-				trial_traits_form = trial_traits_form,
+				field_traits_form = field_traits_form,
 				sample_reg_form = sample_reg_form,
 				add_tissue_form = add_tissue_form,
 				add_storage_form = add_storage_form,
@@ -183,7 +183,7 @@ def add_samples():
 			location_form = LocationForm.update()
 			sample_form = SampleRegForm.update()
 			if all([location_form.validate_on_submit(), sample_form.validate_on_submit()]):
-				trial_uid = int(request.form['trial'])
+				field_uid = int(request.form['field'])
 				start = int(request.form['trees_start']) if request.form['trees_start'] else 0
 				end = int(request.form['trees_end']) if request.form['trees_end'] else 999999
 				replicates = int(request.form['replicates'])
@@ -191,7 +191,7 @@ def add_samples():
 				storage = request.form['storage']
 				date = request.form['date_collected']
 				# register samples, make file describing index information and return filename etc.
-				file_details = Samples().add_samples(trial_uid, start, end, replicates, tissue, storage, date, True)
+				file_details = Samples().add_samples(field_uid, start, end, replicates, tissue, storage, date, True)
 				# if result = none then no data was found
 				if 'error' in file_details:
 					return jsonify({'submitted': file_details['error']})
@@ -209,13 +209,13 @@ def add_samples():
 					body = (
 							"You registered " + str(replicates) + " replicates of " + str(tissue)
 							+ " samples stored in " + str(storage) + " on " + str(date) + " for trees from "
-							+ str(start) + " to " + str(end) + " in Trial #" + str(trial_uid) + "."
+							+ str(start) + " to " + str(end) + " in Field #" + str(field_uid) + "."
 							+ " These samples are described in a file available for download at the following address: "
 							+ download_url
 					)
 					html = render_template(
 						'emails/add_samples.html',
-						trial_uid = trial_uid,
+						field_uid = field_uid,
 						start = start,
 						end = end,
 						replicates = replicates,

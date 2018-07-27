@@ -35,7 +35,7 @@ def record():
 		try:
 			record_form = RecordForm()
 			location_form = LocationForm.update()
-			trial_traits_form = CreateTraits().update('trial')
+			field_traits_form = CreateTraits().update('field')
 			block_traits_form = CreateTraits().update('block')
 			tree_traits_form = CreateTraits().update('tree')
 			branch_traits_form = CreateTraits().update('branch')
@@ -47,7 +47,7 @@ def record():
 				location_form = location_form,
 				record_form = record_form,
 				level = 'all',
-				trial_traits_form = trial_traits_form,
+				field_traits_form = field_traits_form,
 				block_traits_form = block_traits_form,
 				tree_traits_form = tree_traits_form,
 				branch_traits_form = branch_traits_form,
@@ -75,7 +75,7 @@ def generate_files():
 				trait_level = request.form['trait_level']
 				traits_form = CreateTraits().update(trait_level)
 				# sample_reg_form = SampleRegForm().update(optional=True)
-				if trait_level == 'trial':
+				if trait_level == 'field':
 					location_form = LocationForm.update(optional = True)
 				else:
 					location_form = LocationForm.update(optional = False)
@@ -90,16 +90,16 @@ def generate_files():
 					]
 					if len(trait_selection) == 0:
 						return jsonify({'submitted': "Please select traits to include"})
-					trial_uid = int(form_data['trial']) if form_data['trial'] else None
+					field_uid = int(form_data['field']) if form_data['field'] else None
 					start = int(form_data['trees_start']) if form_data['trees_start'] else 1
 					end = int(form_data['trees_end']) if form_data['trees_end'] else 999999
 					replicates = int(form_data['replicates']) if form_data['replicates'] else 1
 					if trait_level in ['branch', 'leaf']:
 						if form_data['old_new_ids'] == 'new':  # create new IDs
 							if trait_level == 'branch':
-								id_list = Fields.add_branches(trial_uid, start, end, replicates)
+								id_list = Fields.add_branches(field_uid, start, end, replicates)
 							else:  # trait_level == 'leaf':
-								id_list = Fields.add_leaves(trial_uid, start, end, replicates)
+								id_list = Fields.add_leaves(field_uid, start, end, replicates)
 						else:
 							id_list = None
 					else:

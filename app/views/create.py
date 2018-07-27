@@ -21,8 +21,8 @@ from app.forms import (
 	AddCountry, 
 	AddRegion, 
 	AddFarm, 
-	AddTrial,
-	TrialsForm,
+	AddField,
+	FieldsForm,
 	AddBlock, 
 	# BlocksForm,
 	AddTreesForm
@@ -36,7 +36,7 @@ from flask.views import MethodView
 
 
 # endpoints to get locations as tuples for forms
-class Countries(MethodView):
+class ListCountries(MethodView):
 	def get(self):
 		if 'username' not in session:
 			flash('Please log in')
@@ -52,7 +52,7 @@ class Countries(MethodView):
 				return redirect(url_for('index'))
 
 
-class Regions(MethodView):
+class ListRegions(MethodView):
 	def get(self, country):
 		if 'username' not in session:
 			flash('Please log in')
@@ -68,14 +68,14 @@ class Regions(MethodView):
 				return redirect(url_for('index'))
 
 
-class Farms(MethodView):
+class ListFarms(MethodView):
 	def get(self, country, region):
 		if 'username' not in session:
 			flash('Please log in')
 			return redirect(url_for('login'))
 		else:
 			try:
-				farms = Fields(country).get_farms(region)
+				farms = Fields.get_farms(country, region)
 				response = make_response(jsonify([(i.lower(),i) for i in farms]))
 				response.content_type = 'application/json'
 				return response
@@ -84,15 +84,15 @@ class Farms(MethodView):
 				return redirect(url_for('index'))
 
 
-class Trials(MethodView):
+class ListFields(MethodView):
 	def get(self, country, region, farm):
 		if 'username' not in session:
 			flash('Please log in')
 			return redirect(url_for('login'))
 		else:
 			try:
-				trials = Fields(country).get_trials_tup(region, farm)
-				response = make_response(jsonify(trials))
+				fields = Fields.get_fields_tup(country, region, farm)
+				response = make_response(jsonify(fields))
 				response.content_type = 'application/json'
 				return response
 			except (ServiceUnavailable, AuthError):
@@ -100,14 +100,14 @@ class Trials(MethodView):
 				return redirect(url_for('index'))
 
 
-class Blocks(MethodView):
-	def get(self, trial_uid):
+class ListBlocks(MethodView):
+	def get(self, field_uid):
 		if 'username' not in session:
 			flash('Please log in')
 			return redirect(url_for('login'))
 		else:
 			try:
-				blocks = Fields.get_blocks_tup(trial_uid)
+				blocks = Fields.get_blocks_tup(field_uid)
 				response = make_response(jsonify(blocks))
 				response.content_type = 'application/json'
 				return response
@@ -118,13 +118,13 @@ class Blocks(MethodView):
 
 class TreeCount(MethodView):
 	@staticmethod
-	def get(trial_uid):
+	def get(field_uid):
 		if 'username' not in session:
 			flash('Please log in')
 			return redirect(url_for('login'))
 		else:
 			try:
-				tree_count = Fields.get_treecount(trial_uid)
+				tree_count = Fields.get_treecount(field_uid)
 				response = make_response(jsonify(tree_count))
 				response.content_type = 'application/json'
 				return response
@@ -144,7 +144,7 @@ def create():
 			add_country_form = AddCountry()
 			add_region_form = AddRegion()
 			add_farm_form = AddFarm()
-			add_trial_form = AddTrial()
+			add_field_form = AddField()
 			add_block_form = AddBlock()
 			add_trees_form = AddTreesForm()
 			return render_template(
@@ -153,7 +153,7 @@ def create():
 				add_country_form = add_country_form,
 				add_region_form = add_region_form,
 				add_farm_form = add_farm_form,
-				add_trial_form = add_trial_form,
+				add_field_form = add_field_form,
 				add_block_form = add_block_form,
 				add_trees_form = add_trees_form,
 				title = 'Register fields and submit details'
@@ -241,27 +241,27 @@ def add_farm():
 				return redirect(url_for('index'))
 
 
-@app.route('/add_trial', methods=["POST"])
-def add_trial():
+@app.route('/add_field', methods=["POST"])
+def add_field():
 	if 'username' not in session:
 		flash('Please log in')
 		return redirect(url_for('login'))
 	else:
 		try:
-			form = AddTrial()
+			form = AddField()
 			country = request.form['country']
 			region = request.form['region']
 			farm = request.form['farm']
-			text_trial = request.form['text_trial'].strip()
+			text_field = request.form['text_field'].strip()
 			if form.validate_on_submit():
 				if bool({country, region, farm} & {'', 'None'}):
-					return jsonify([{"farm": ["Please select a farm to add a new trial"]}])
+					return jsonify([{"farm": ["Please select a farm to add a new field"]}])
 				else:
-					found = Fields(country).find_trial(region, farm, text_trial)
+					found = Fields(country).find_field(region, farm, text_field)
 					if found:
 						return jsonify({"found": {'uid': found[0]['uid'], 'name': found[0]['name']}})
 					else:
-						result = Fields(country).add_trial(region, farm, text_trial)
+						result = Fields.add_field(country, region, farm, text_field)
 						return jsonify({"submitted": {'uid': result[0]['uid'], 'name': result[0]['name']}})
 			else:
 				return jsonify([form.errors])
@@ -280,16 +280,16 @@ def add_block():
 			location_form = LocationForm.update()
 			add_block_form = AddBlock()
 			if all([location_form.validate_on_submit(), add_block_form.validate_on_submit()]):
-				trial_uid = int(request.form['trial'])
+				field_uid = int(request.form['field'])
 				text_block = request.form['text_block'].strip()
-				if trial_uid in ['','None']:
+				if field_uid in ['','None']:
 					return jsonify([{"country": ["Please select a country to add a new region"]}])
 				else:
-					found = Fields.find_block(trial_uid, text_block)
+					found = Fields.find_block(field_uid, text_block)
 					if found:
 						return jsonify({"found": {'uid': found[0]['uid'], 'name': found[0]['name']}})
 					else:
-						result = Fields.add_block(trial_uid, text_block)
+						result = Fields.add_block(field_uid, text_block)
 						return jsonify({"submitted": {'uid': result[0]['uid'], 'name': result[0]['name']}})
 			else:
 				errors = jsonify([location_form.errors, add_block_form.errors])
@@ -309,10 +309,10 @@ def add_trees():
 			location_form = LocationForm.update()
 			add_trees_form = AddTreesForm()
 			if all([location_form.validate_on_submit(), add_trees_form.validate_on_submit()]):
-				trial_uid = int(request.form['trial'])
+				field_uid = int(request.form['field'])
 				count = int(request.form['count'])
 				block_uid = request.form['block'] if request.form['block'] != '' else None
-				new_tree_count = Fields.add_trees(trial_uid, count, block_uid)[0]
+				new_tree_count = Fields.add_trees(field_uid, count, block_uid)[0]
 				return jsonify({'submitted' : str(new_tree_count) + ' trees registered</a>'})
 			else:
 				errors = jsonify([location_form.errors, add_trees_form.errors])

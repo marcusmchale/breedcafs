@@ -257,7 +257,7 @@ class LocationForm(FlaskForm):
 	country = SelectField('Country')
 	region = SelectField('Region')
 	farm = SelectField('Farm')
-	trial = SelectField('Trial')
+	field = SelectField('Field')
 	block = SelectField('Block',  [Optional()])
 
 	@staticmethod
@@ -272,29 +272,37 @@ class LocationForm(FlaskForm):
 			key=lambda tup: tup[0]
 		)
 		farms = sorted(
-			set(Fields(form.country.data).get_farms(form.region.data)),
+			set(Fields.get_farms(form.country.data, form.region.data)),
 			key=lambda tup: tup[0]
 		)
-		trials = sorted(
-			set(Fields(form.country.data).get_trials_tup(form.region.data, form.farm.data)),
+		fields = sorted(
+			# in current version of WTForms the default value is coerced to u'None so have to handle it here like this
+			# means can't use None as a value though
+			# TODO fixed in v3 of WTForms - upgrade when released and remove the if statements below
+			# https://github.com/wtforms/wtforms/pull/288
+			set(Fields.get_fields_tup(
+				form.country.data if form.country.data != (u'None') else None,
+				form.region.data if form.region.data != (u'None') else None,
+				form.farm.data if form.farm.data != (u'None') else None
+			)),
 			key=lambda tup: tup[1]
 		)
-		blocks = sorted(set(Fields.get_blocks_tup(form.trial.data)), key=lambda tup: tup[0])
+		blocks = sorted(set(Fields.get_blocks_tup(form.field.data)), key=lambda tup: tup[0])
 		form.country.choices = [('', 'Select Country')] + countries
 		form.region.choices = [('', 'Select Region')] + [(i.lower(), i) for i in regions]
 		form.farm.choices = [('', 'Select Farm')] + [(i.lower(), i) for i in farms]
-		form.trial.choices = [('', 'Select Trial')] + trials
+		form.field.choices = [('', 'Select Field')] + fields
 		form.block.choices = [('', 'Select Block')] + blocks
 		if optional:
 			form.country.validators = [Optional()]
 			form.region.validators = [Optional()]
 			form.farm.validators = [Optional()]
-			form.trial.validators = [Optional()]
+			form.field.validators = [Optional()]
 		else:
 			form.country.validators = [InputRequired()]
 			form.region.validators = [InputRequired()]
 			form.farm.validators = [InputRequired()]
-			form.trial.validators = [InputRequired()]
+			form.field.validators = [InputRequired()]
 		return form
 
 
@@ -343,26 +351,26 @@ class AddFarm(FlaskForm):
 	submit_farm = SubmitField('+')
 
 
-class AddTrial(FlaskForm):
-	id = "add_trial"
-	text_trial = StringField(
-		'Trial text input',
+class AddField(FlaskForm):
+	id = "add_field"
+	text_field = StringField(
+		'Field text input',
 		[
 			InputRequired(),
-			Regexp('([^\x00-\x7F]|\w|\s)+$', message='Trial name contains illegal characters'),
+			Regexp('([^\x00-\x7F]|\w|\s)+$', message='Field name contains illegal characters'),
 			Length(min=1, max=50, message='Maximum 50 characters')
 		],
 		filters = [strip_filter],
-		description = "Add new trial"
+		description = "Add new field"
 	)
-	submit_trial = SubmitField('+')
+	submit_field = SubmitField('+')
 
 
-# Trials
-class TrialsForm(FlaskForm):  # get details of trial
-	id = "trials_csv_form"
+# Fields
+class FieldsForm(FlaskForm):  # get details of field
+	id = "fields_csv_form"
 	email_checkbox = BooleanField('Email checkbox')
-	generate_trials_csv = SubmitField('Generate trials.csv')
+	generate_fields_csv = SubmitField('Generate fields.csv')
 
 
 # Blocks
@@ -495,7 +503,7 @@ class RecordForm(FlaskForm):
 		[InputRequired()],
 		choices = [
 			('', 'Select Level'),
-			('trial', 'Trial'),
+			('field', 'Field'),
 			('block', 'Block'),
 			('tree', 'Tree'),
 			('branch', 'Branch'),
@@ -506,7 +514,7 @@ class RecordForm(FlaskForm):
 	template_format = SelectField(
 		'Template format',
 		[InputRequired()],
-		choices = [('', 'Select Format'), ('fb', 'Field Book'), ('csv', 'CSV template')]
+		choices = [('', 'Select Format'), ('csv', 'Table'), ('fb', 'Field Book')]
 	)
 	trees_start = IntegerField(
 		'Start TreeID',
@@ -611,7 +619,8 @@ class UploadForm(FlaskForm):
 	submission_type = SelectField(
 		'Submission type:',
 		[InputRequired()],
-		choices = sorted([('FB', 'Field Book CSV'), ('table', 'Table Template CSV')], key=lambda tup: tup[1])
+		#choices = sorted([('table', 'Table (.csv)'), ('FB', 'Field Book (.csv)')], key=lambda tup: tup[1])
+		choices = [('table', 'Table (.csv)'), ('FB', 'Field Book (.csv)')]
 	)
 	file = FileField(
 		'Select a file:',
@@ -627,7 +636,7 @@ class DownloadForm(FlaskForm):
 		[InputRequired()],
 		choices = [
 			('', 'Select Level'),
-			('trial', 'Trial'),
+			('field', 'Field'),
 			('block', 'Block'),
 			('tree', 'Tree'),
 			('branch', 'Branch'),
@@ -650,7 +659,7 @@ class DownloadForm(FlaskForm):
 	data_format = SelectField(
 		'Data format',
 		[InputRequired()],
-		choices = [('', 'Select Format'), ('db', 'Database'), ('table', 'Table')]
+		choices = [('', 'Select Format'), ('table', 'Table'), ('db', 'Database')]
 	)
 	submit_download = SubmitField('Generate file')
 
@@ -662,7 +671,7 @@ class CreateTraits(FlaskForm):
 	def __init__(self, *args, **kwargs):
 		super(CreateTraits, self).__init__(*args, **kwargs)
 		# the updates are methods so that flask can load while the database is unavailable
-		levels = ['trial', 'block', 'tree', 'branch', 'leaf', 'sample']
+		levels = ['field', 'block', 'tree', 'branch', 'leaf', 'sample']
 		self.levels_groups_traits = defaultdict(lambda: defaultdict(list))
 		# fill this dictionary
 		for level in levels:

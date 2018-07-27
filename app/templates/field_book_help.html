@@ -1,0 +1,41 @@
+{% extends "layout.html" %}
+{% block body %}
+<div class="text_body">
+	<h2>Field-Book Setup</h2>
+		<p>Install Field Book from the Play Store. Search for "Field Book" by WheatGenetics.<br>
+		Once installed you will need to place the "fields" and "traits" files (see above) into the appropriate directories. This can be acheived by many methods, including by downloading the files directly from this site onto your device then using your device file manager. <i>The Field Book app also provides a facility to use the "Dropbox" service to import these files.</i></p>
+		<ul>
+			<li>Place the "fields.csv" (fields.csv/blocks.csv/trees.csv/samples.csv as appropriate) files into Field-Book's field import directory (/fieldBook/field_import).</li>
+			<li>Place the "traits.trt" (field.trt/block.trt/tree.trt/sample.trt as appropriate) into Field-Book's trait directory (/fieldBook/trait).</li>
+		</ul>
+
+	<h2>Data collection</h2>
+		<ul>
+			<li>Launch the app and in the menu set person and location (re-enter location each time you move to a new field).</li>
+			<li>Select Fields => Add (plus symbol) => Local => Select your "fields.csv" (fields.csv/blocks.csv/trees.csv/samples.csv as appropriate). </li>
+				<ul>
+					<li>As Unique identifier select UID</li>
+					<li>As primary and secondary order select fields as appropriate to the order you will collect data from these items </li>
+				</ul>
+			<li>Select Traits => List (three dots at top right) => Import/Export => Import ==> Select your block.trt or tree.trt as appropriate</li>
+			<li>Once these are imported you can switch between traits without losing data recorded from these traits.
+			<li>Be careful to select the appropriate traits before collecting data (blocks vs trees).
+		</ul>
+		<p>	Note that each unique identifier coming from the "fields.csv" file can not be duplicated. If you wish to update your fields (e.g. consolidating multiple files into one using the custom file feature) make sure to upload all collected data to this site first (see below), as all data collected against those unique identifiers will be removed from your device. Then you may delete the old fields file and replace it with the new custom version. Alternatively, if you are adding a new block of trees you may simply wish to leave these in a separate fields file.</p>
+
+	<h2>Exporting data from Field Book</h2>
+		<p>From the  Field Book app click the icon in the top left => select "Settings" => then "Export".<br></p>
+			<ul>
+				<li>Under "Format" check the box for "Database"</li>
+				<li>Under "Field columns" select "Only unique identifier" <i>(either option will work)</i></li>
+				<li>Under "Traits" select "All traits"<br>
+				<li>Then click "OK"</li>
+			</ul>
+		<img width=150px src="static/fieldbook.png">
+		<p>Depending on your device this may prompt you to share the file, at which point you may save it locally or even email it to yourself.</p><br>
+		<h3>Submit data</h3>
+		<a href="{{ url_for('upload') }}"><img src = "{{ url_for('static', filename='upload.svg') }}"></a><br>
+		<p>Select the submission type <i>(currently only Field Book submissions are supported)</i> then select the file with "Browse..." and click "Upload". You will receive a confirmation of the number of data points registered (and the number already found).</p><br>
+		<p>Note, a maximum of 64 traits may be exported at once. If you need to collect information on more than 64 traits then this may be exported as multiple files by selecting the active traits in Field Book</p><br>
+</div>
+{% endblock %}

@@ -1,4 +1,4 @@
-{% set levels = ['trial','block','tree','branch','leaf','sample',] %}
+{% set levels = ['field','block','tree','branch','leaf','sample',] %}
 {% if level in levels %}
 	{{ traits_form.csrf_token }}
 	{% for field in traits_form %}
@@ -14,8 +14,8 @@
 
 {% if level == 'all' %}
 	{% for level in levels %}
-		{% if level == 'trial' %}
-			{% set traits_form = trial_traits_form %}
+		{% if level == 'field' %}
+			{% set traits_form = field_traits_form %}
 		{% endif %}
 		{% if level == 'block' %}
 				{% set traits_form = block_traits_form %}

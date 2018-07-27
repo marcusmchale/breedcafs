@@ -1,96 +1,184 @@
 {% extends "layout.html" %}	
 {% block body %}
 <div class="text_body">
-<h1>Field-book</h1>
-<p>To assist field data collection and ensure standardised reporting, the BreedCAFS database tools support use of the <a href="http://wheatgenetics.org/field-book">Field Book</a> app for Android mobile devices. <br><br>To collect data with Field-Book you need two files, one that describes the "fields" (a .csv file), and another that describes the traits to be measured (a .trt file). Tools to generate both of these files (specific to the level of data; plot, block, tree or sample) are provided on this site.<br></p>
-
-<h2>Registration and unique identifiers</h2>
-	<a href="{{ url_for('create') }}"><img src = "{{ url_for('static', filename='create.svg') }}"></a>
-	<h3>Plots</h3>
-		<a href="/location_plots">Register plots</a><br><br>
-		<p>Here you can add new Countries, Regions, Farms and Plots to the database. Country names must be unique, while Region, Farm and Plot must be unique within their parent location. Each plot is assigned a unique identifier (an integer incrementing with each additional plot in the database) from which subsequent Block, Tree and Sample IDs will be incremented. <br>
-		This information can then be exported into a "fields.csv" file for Field Book, in this case named "plots.csv". The form allows you to filter the country, region and/or farm you wish to include in this file. The file contains the unique ID (UID) and name of each plot as well as the names for the parent farm, region and country.<br>
-		Create a plots.csv for your local area and use these to collect data at the plot level in Field Book (see below)
+	<h2>
+		Register fields and trees with
+		<a href="{{ url_for('create') }}"><img src = "{{ url_for('static', filename='create.svg') }}"></a>
+	</h2>
+		<h3>Locations</h3>
+			<p>
+				Countries, regions and farms provide context for submission and retrieval of data.
+				The "farm" represents a large farm/research facility
+				where multiple fields/growth environments are available.
+			</p>
+		<h3>Fields</h3>
+			<p>
+				The field is the experimental unit against which the "field" level trait data is recorded.
+				In a typical farm setting this will be a single field,
+				although it may represent an entire small-holder farm.
+				In research facilities with controlled growth environments,
+				the field will be a collection of chambers/glasshouses.
+			</p>
+			<p>
+				To facilitate the data submission and retrieval process,
+				each field is registered to a Country, Region and Farm  and assigned a unique identifier (UID).
+				For fields this UID is an integer (e.g. "1") that increments with each additional field in the database.
+			</p>
+		<h3>Blocks</h3>
+			<p>
+				In blocked experimental designs, conditions (nuisance factors) may vary between the experimental blocks
+				of a given field. To represent this variation, experimental blocks can be registered within each field
+				and	"block" level trait data can be recorded against these units. As such, the block traits are often
+				similar to those at the "field" level. The block may also represent a single growth chamber.
+			</p>
+			<p>
+				Blocks are assigned a UID that is incremented from the field UID.
+				As an example, "1_B2" is the UID for the second block registered within the field with UID 1.
+				Blocks are best added here so that subsequent trees may be registered directly into a block,
+				however the block UID may also be entered per tree later in Field Book.
+			</p>
+		<h3>Trees</h3>
+			<p>
+				The tree is the experimental unit against which the "tree" level trait data is recorded.
+				These traits will include experimental treatments being applied.
+			</p>
+			<p>
+				Each tree is registered within a field (optionally within a block)
+				and assigned a UID that also increments from the field UID.
+				As an example, "1_T2" is the UID for the second tree registered within the field with UID 1.
+			</p>
+	<h2>
+		Sample collection and/or registration with
+		<a href="{{ url_for('collect') }}"><img src = "{{ url_for('static', filename='collect.svg') }}"></a>
+	</h2>
+		<p>
+			Samples are the experimental unit against which the "sample" level trait data is recorded.
+			These will be a specific tissue from the tree that are stored in a particular way
+			depending on the analyses to be performed.
 		</p>
-	<h3>Blocks</h3>
-		<a href="/location_blocks">Register blocks</a><br><br>
-		<p>Here blocks can be registered to each plot and assigned a unique identifier. This includes the plot ID and a number that increments per plot, e.g. 1_B2 is the unique ID for block 2 in plot 1. Blocks are best added here so that subsequent trees may be registered directly into a block, however the block name may also be entered per tree later in Field Book (this risks complications emerging from typographical variations so please only use this option where necessary and take care to enter the names <b>identically</b> each time in Field Book.<br>
-		This information can then be exported into a "fields.csv" file for Field Book, in this case named "blocks.csv". This file contains the unique ID (UID) of each block, alongside the plot and block ID integers as well as the names for the block, plot, farm, region and country.<br>
-		Create a blocks.csv for each plot and use these to collect data at the block level in Field Book (see below)</p>
-	<h3>Trees</h3>
-		<a href="/location_trees">Register trees</a><br><br>
-		<p>Once plots have been registered, trees can be registered to assign their unique identifiers. If possible it is best to register the trees within a block at this point, though as mentioned above, the block can be later assigned using Field Book.<br>
-		As for blocks, the tree identifier includes the plot ID and a number that increments per tree, e.g. 1_T2 is the unique ID for tree 2 in plot 1.<br>
-		When you register trees this information is exported to a "fields.csv" file for Field Book, in this case we call it a "trees.csv" file, though it is to be handled in the same way as the "fields.csv file". This file contains the unique ID (UID) of each tree, alongside the plot and tree ID integers as well as the names for the block (if assigned), plot, farm, region and country.<br>
-		A custom trees.csv file may also be generated at any time for a selected plot and a supplied range of tree ID integers.<br>	
-		To assist with cases where trees are already assigned identifiers within each BreedCAFS team, trees can be assigned custom names using Field Book. These will be registered into the database when data is later uploaded and made available in these custom trees.csv file.<br>
-		Create a trees.csv for each plot and use these to collect data at the trees level in Field Book (see below)</p>
-	<h3>Samples</h3>
-		<a href="/sample_reg">Register samples</a><br><br>
-		<p>A similar facility allows the use of Field Book for sample data submission, and also to assist in the identification and tracking of samples. The form allows you to specify the plot, the range of tree ID integers, the number of replicate samples to be collected, the tissue type and storage method and the date they are to be collected.<br> Where the tissue type and/or storage method is not already registered in the database you may add these here.<br> A "samples.csv" file will be generated containing; a unique identifier (UID), the plot, tree and sample ID integers, the custom tree name (if assigned), the date, tissue and storage entered in the form, the names of the Block (if entered), Plot, Farm, Region and Country.<br>
-		Register samples prior to collection to allow labelling with these unique identifiers<br><br>
-		A custom samples.csv file can also be generated. This form filters the database based on the selection in the above sample registration form and further allows selection of a range of dates and/or tree ID integers.<br>
-		These custom samples.csv files can be used to identify the origin and details of individual samples in all further work. Internally, groups will likely partition these samples into sub-samples/aliquots according to their own demands. However, subsequent data generated from these samples should be registered in the database against these unique sample IDs.<br>
-		Create a samples.csv when you perform sample analyses and use it in Field Book to record data at the sample level (see below)</p>
+		<p>
+			Once trees are registered, we can generate UIDs for samples from these trees.
+			First select the trees (filtering by field and tree ID).
+			Then enter the above parameters,
+			along with the number of samples of this type collected from each tree (replicates)
+			and the date of collection.
+			Click to register the samples in the database and generate UIDs.
+			A file will be provided describing these UIDs for you to uniquely label the samples.
+		</p>
+	<h2>
+		Generate templates to record data with
+		<a href="{{ url_for('record') }}"><img src = "{{ url_for('static', filename='record.svg') }}"></a>
+	</h2>
+		<h3>Data formats</h3>
+			<p>
+				The database tools support both traditional tables
+				and the Field Book app for data collection and submission.
+			</p>
+			<h4>Tables</h4>
+				<p>
+					Tables are generated in "comma separated values" (.csv) files.
+					These are suited to import into spreadsheet software such as Microsoft Excel.
+				</p>
+				<p>
+					The first columns of each table will provide contextual information;
+					Country, Region, Farm, Field etc.
+					The last of these will be UID,
+					the unique identifier of the item to which the following values correspond.
+					The next two columns require the input of the date (formatted as YYYY-MM-DD, e.g. 2018-01-01)
+					and the time (formatted as HH:MM in 24 hour time, e.g. 13:00).
+					Subsequent columns contain a field label corresponding to a trait for which data can be entered.
+				</p>
+				<p>
+					An additional file is generated along with this table template. This "details" file describes
+					the types of values that are accepted for the traits you have selected.
+				</p>
+			<h4>Field Book</h4>
+				<p>
+					To assist field data collection and ensure standardised reporting,
+					the BreedCAFS database tools support use of the
+					<a href="http://wheatgenetics.org/field-book">Field Book</a> app for Android mobile devices.
+				</p>
+				<p>
+					To collect data with Field-Book you need two files, one that describes the "fields" (a .csv file),
+					and another that describes the traits to be measured (a .trt file).
+					Both of these files (specific to the level of data; field, block, tree, branch, leaf or sample)
+					are generated by this site.
+				</p>
+				<p>
+					For further guidance on using Field Book please see the
+					<a href="{{ url_for('field_book_help') }}">Field Book help</a> page
+				</p>
+			<h4>Trait selection</h4>
+				<p>
+					First select the level of the traits then explore the expanding groups of traits
+					to select those for which you are interested in recording data.
+				</p>
+			<h4>Location</h4>
+				<p>
+					Next you will be able to filter by location to select the appropriate items at that level
+					(e.g. trees for tree level traits).
+				</p>
+			<h4>File type</h4>
+				<p>
+					Select the desired format for the template files (Table or Field Book as described above) and click
+					to generate these files.
+				</p>
 
-<h2>Selecting traits</h2>
-	<a href="{{ url_for('create') }}"><img src = "{{ url_for('static', filename='create.svg') }}"></a>
-	<p><a href="/traits/plot">plot</a>/<a href="/traits/block">block/</a><a href="/traits/tree">tree</a>/<a href="/traits/sample">sample</a> traits<br><br>
-	Here you can select from a range of traits for which you may be collecting data in Field Book. The traits are grouped into various classes allowing you to select all within this class with a checkbox. Click on the text of the class (e.g. "agronomic") to expand/collapse the list, allowing you to select individual traits.<br>
-	At the bottom of the traits list is a button labeled "Create". Click this to generate a traits.trt file for the selected traits.</p>
-
-<h2>Field-Book Setup</h2>
-	<p>Install Field Book from the Play Store. Search for "Field Book" by WheatGenetics.<br>
-	Once installed you will need to place the "fields" and "traits" files (see above) into the appropriate directories. This can be acheived by many methods, including by downloading the files directly from this site onto your device then using your device file manager. <i>The Field Book app also provides a facility to use the "Dropbox" service to import these files.</i></p>
-	<ul>
-		<li>Place the "fields.csv" (plots.csv/blocks.csv/trees.csv/samples.csv as appropriate) files into Field-Book's field import directory (/fieldBook/field_import).</li>
-		<li>Place the "traits.trt" (plot.trt/block.trt/tree.trt/sample.trt as appropriate) into Field-Book's trait directory (/fieldBook/trait).</li>
-	</ul>
-
-<h2>Data collection</h2>
-	<ul>
-		<li>Launch the app and in the menu set person and location (re-enter location each time you move to a new field).</li>
-		<li>Select Fields => Add (plus symbol) => Local => Select your "fields.csv" (plots.csv/blocks.csv/trees.csv/samples.csv as appropriate). </li>
-			<ul>
-				<li>As Unique identifier select UID</li>
-				<li>As primary and secondary order select fields as appropriate to the order you will collect data from these items </li>
-			</ul>
-		<li>Select Traits => List (three dots at top right) => Import/Export => Import ==> Select your block.trt or tree.trt as appropriate</li>
-		<li>Once these are imported you can switch between traits without losing data recorded from these traits.
-		<li>Be careful to select the appropriate traits before collecting data (blocks vs trees).
-	</ul>
-	<p>	Note that each unique identifier coming from the "fields.csv" file can not be duplicated. If you wish to update your fields (e.g. consolidating multiple files into one using the custom file feature) make sure to upload all collected data to this site first (see below), as all data collected against those unique identifiers will be removed from your device. Then you may delete the old fields file and replace it with the new custom version. Alternatively, if you are adding a new block of trees you may simply wish to leave these in a separate fields file.</p>
-
-<h2>Exporting data from Field Book</h2>
-	<p>From the  Field Book app click the icon in the top left => select "Settings" => then "Export".<br></p>
-		<ul>
-			<li>Under "Format" check the box for "Database"</li>
-			<li>Under "Field columns" select "Only unique identifier" <i>(either option will work)</i></li>
-			<li>Under "Traits" select "All traits"<br>
-			<li>Then click "OK"</li>
-		</ul>
-	<img width=150px src="static/fieldbook.png">
-	<p>Depending on your device this may prompt you to share the file, at which point you may save it locally or even email it to yourself.</p><br>
-	<h3>Submit data</h3>
-	<a href="{{ url_for('upload') }}"><img src = "{{ url_for('static', filename='upload.svg') }}"></a><br>
-	<p>Select the submission type <i>(currently only Field Book submissions are supported)</i> then select the file with "Browse..." and click "Upload". You will receive a confirmation of the number of data points registered (and the number already found).</p><br>
-	<p>Note, a maximum of 64 traits may be exported at once. If you need to collect information on more than 64 traits then this may be exported as multiple files by selecting the active traits in Field Book</p><br>
-
-<h2>Retrieving data</h2>
-	<a href="{{ url_for('download') }}"><img src = "{{ url_for('static', filename='download_espresso.svg') }}"></a><br>
-	<p>Here you may retrieve data submitted by your affiliated partners, filtering by location and time period. You must select a level of data to retrieve (plot/block/tree or sample) and further select specific traits.<br>
-	Two formatting options are available, the first of which is in database format, similar to that in the exported Field Book files. This format contains information about who submitted the data (user and partner) as whell as when, where and by whom this data was collected. The second formatting option is a table format that may be useful in simple cases. Please note, that in the table format when multiple measurements are found for a single trait, these measures will be returned in the table as a list within a single 'cell' of the table.</p>
-
-<h2>User account</h2>
-	<a href="{{ url_for('user') }}"><img src = "{{ url_for('static', filename='user.svg') }}"></a><br>
-		<p> This page allows you to select and see the status of your affiliations. These affiliations control access to data in the database.<br>
-		Your primary affiliation (marked with a *) is the partner you selected during registration. This affiliation may not be removed and all data you submit will be accessible to users with confirmed affiliations to this partner.<br>
-		You may request/remove additional affiliations with this form by clicking 'Add/remove affiliations'. The relevant partner administrator (see below) can then confirm this affiliation, providing access (through the download portal) to data submitted by all users with a primary affiliation to this institute.<br>
-		<i>Partner administrator access is granted by a Global Administrator.</i></p>
+	<h2>
+		Retrieve data with
+		<a href="{{ url_for('download') }}">
+			<img src = "{{ url_for('static', filename='download_espresso.svg') }}">
+		</a>
+	</h2>
+		<p>
+			Retrieve data submitted by your affiliated partners, filtering by location and time period.
+			First select a level of data to retrieve (field/block/tree/branch/leaf or sample)
+			Then further select specific traits
+		</p>
+		<p>
+			Both database format (single row per item/time/trait) and table format (single row per item)
+			are provided.
+			The database format contains additional information about who submitted the data (user and partner)
+			as well as when, where and by whom (if using Field Book) this data was collected.
+			The table format may be useful in simple cases although please note:
+			when multiple data points are found for a single trait, these will be returned
+			as a list within a single cell of the table.
+		</p>
+	<h2>
+		Manage your account with
+		<a href="{{ url_for('user_page') }}"><img src = "{{ url_for('static', filename='user.svg') }}"></a>
+	</h2>
+		<p> This page allows you to select and see the status of your affiliations
+			that provide access to submitted data.
+		</p>
+		<p>
+			Your primary affiliation (marked with a *) is the partner you selected during registration.
+			This affiliation may not be removed and all data you submit will be accessible
+			to users with confirmed affiliations to this partner.
+		</p>
+		<p>
+			You may request/remove additional affiliations with this form by selecting the relevant partners
+			then clicking 'Add/remove affiliations'.
+			The partner administrator (see below) can then confirm this affiliation,
+			providing access to data submitted by users that registered with this institute
+			(i.e. have this as their primary affiliation).
+		<p><i>Partner administrator access is granted by a Global Administrator.</i></p>
 	{% if ('global_admin' in session.access) or ('partner_admin' in session.access) %}
-	<a href="{{ url_for('admin') }}"><img src = "{{ url_for('static', filename='admin.svg') }}"></a><br>
-		<p>Only administrators have access to this page. Here you can add new emails to the authorised list, allowing registration by new team members. You can also confirm/unconfirm registered users, providing/denying access to the data through the download portal.</p>
+	<h2>
+		Manage your team with
+		<a href="{{ url_for('admin') }}"><img src = "{{ url_for('static', filename='admin.svg') }}"></a>
+	</h2>
+		<p>
+			Only administrators have access to this page.
+			Here you can add new emails to the authorised list, allowing registration by new team members.
+			You can also confirm/unconfirm registered users,
+			providing/denying access to the data through the download portal.
+		</p>
 	{% endif %}
+	</div>
 
-</div>
+
+
+
+
 {% endblock %}

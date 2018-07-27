@@ -44,12 +44,12 @@ class RowParseResult:
 			},
 			"uid": {
 				"format": "UID doesn't match BreedCAFS pattern: \n"
-				"  - Trial UID should be an integers (e.g. '1')\n"
-				"  - Block UID should include the Trial and Block ID separated by '_B' (e.g. '1_B1')\n"
-				"  - Tree UID should include the Trial and Tree ID separated by '_T' (e.g. '1_T1')\n"
-				"  - Branch UID should include the Trial and Branch ID separated by '_Y' (e.g. '1_Y1')\n"
-				"  - Leaf UID should include the Trial and Leaf ID separated by '_L' (e.g. '1_L1')\n"
-				"  - Sample UID should include the Trial and Sample ID separated by '_S' (e.g. '1_S1')\n",
+				"  - Field UID should be an integers (e.g. '1')\n"
+				"  - Block UID should include the Field and Block ID separated by '_B' (e.g. '1_B1')\n"
+				"  - Tree UID should include the Field and Tree ID separated by '_T' (e.g. '1_T1')\n"
+				"  - Branch UID should include the Field and Branch ID separated by '_Y' (e.g. '1_Y1')\n"
+				"  - Leaf UID should include the Field and Leaf ID separated by '_L' (e.g. '1_L1')\n"
+				"  - Sample UID should include the Field and Sample ID separated by '_S' (e.g. '1_S1')\n",
 				"missing": "This UID is not found in the database. "
 			},
 			"trait": {
@@ -108,7 +108,7 @@ class RowParseResult:
 		row_string = '<tr><td>' + str(self.row_num) + '</td>'
 		for field in fieldnames:
 			if field not in self.errors:
-				row_string += '<td>' + str(self.row_data[field]) + '</td>'
+				row_string += '<td>' + str(self.row_data[field].encode('utf8')) + '</td>'
 			else:
 				row_string += '<td bgcolor = #FFFF00 title = "'
 				field_error_type = self.errors[field]['error_type']
@@ -314,6 +314,7 @@ class ParseResult:
 				row_string = self.parse_result[item].html_row(self.fieldnames)
 				html_table += row_string
 			return '<table>' + html_table + '</table>'
+
 		else:
 			return None
 
@@ -461,8 +462,12 @@ class SubmissionResult:
 					extrasaction = 'ignore'
 				)
 				writer.writeheader()
-				for item in self.conflicts:
-					writer.writerow(item.as_dict(submission_type))
+				for row in self.conflicts:
+					row_dict = row.as_dict(submission_type)
+					for item in row_dict:
+						if isinstance(row_dict[item], list):
+							row_dict[item] = str(':'.join([str(i).encode() for i in row_dict[item]]))
+					writer.writerow(row_dict)
 		return conflicts_filename
 
 	def resubmissions_file(self):
@@ -500,8 +505,12 @@ class SubmissionResult:
 					quoting = csv.QUOTE_ALL,
 					extrasaction = 'ignore')
 				writer.writeheader()
-				for item in self.resubmissions:
-					writer.writerow(item.as_dict(submission_type))
+				for row in self.resubmissions:
+					row_dict = row.as_dict(submission_type)
+					for item in row_dict:
+						if isinstance(row_dict[item], list):
+							row_dict[item] = str(':'.join([str(i).encode() for i in row_dict[item]]))
+					writer.writerow(row_dict)
 		return resubmissions_filename
 
 	def submitted_file(self):
@@ -538,8 +547,12 @@ class SubmissionResult:
 					quoting = csv.QUOTE_ALL,
 					extrasaction = 'ignore')
 				writer.writeheader()
-				for item in self.submitted:
-					writer.writerow(item.as_dict(submission_type))
+				for row in self.submitted:
+					row_dict = row.as_dict(submission_type)
+					for item in row_dict:
+						if isinstance(row_dict[item], list):
+							row_dict[item] = str(':'.join([str(i).encode() for i in row_dict[item]]))
+					writer.writerow(row_dict)
 		return submitted_filename
 
 
@@ -706,8 +719,8 @@ class Upload:
 						'country',
 						'region',
 						'farm',
-						'trial',
-						'trial uid',
+						'field',
+						'field uid',
 						'block',
 						'block uid',
 						'variety',
@@ -810,8 +823,8 @@ class Upload:
 					'country',
 					'region',
 					'farm',
-					'trial',
-					'trial uid',
+					'field',
+					'field uid',
 					'block',
 					'block uid',
 					'variety',
@@ -921,8 +934,8 @@ class Upload:
 					'country',
 					'region',
 					'farm',
-					'trial',
-					'trial uid',
+					'field',
+					'field uid',
 					'block',
 					'block uid',
 					'variety',

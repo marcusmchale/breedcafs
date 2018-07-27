@@ -11,10 +11,10 @@ def json_submissions():
 	return Chart().get_submissions_range(session['username'], yesterday, tomorrow)
 
 
-@app.route("/json_trials_treecount")
-def json_trials_treecount():
+@app.route("/json_fields_treecount")
+def json_fields_treecount():
 	try:
-		return Chart().get_trials_treecount()
+		return Chart().get_fields_treecount()
 	except (ServiceUnavailable, AuthError):
 		flash("Database unavailable")
 		return redirect(url_for('index'))

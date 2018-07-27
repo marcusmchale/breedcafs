@@ -44,7 +44,7 @@ class Chart:
 						'target': record['r_end']
 					}
 				)
-			# connect counters to block/trial
+			# connect counters to block/field
 			for node in nodes:
 				if str(node['id']).endswith('_count_node'):
 					rels.append(
@@ -66,9 +66,9 @@ class Chart:
 
 	# get lists of submitted nodes (relationships and directly linked nodes) in json format
 	@staticmethod
-	def get_trials_treecount():
+	def get_fields_treecount():
 		with get_driver().session() as neo4j_session:
-			result = neo4j_session.read_transaction(neo4j_query, Cypher.get_trials_treecount)
+			result = neo4j_session.read_transaction(neo4j_query, Cypher.get_fields_treecount)
 		records = [record for record in result]
 		nested = {
 			'name': 'nodes',

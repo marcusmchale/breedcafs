@@ -40,26 +40,26 @@ from app import views
 
 # these are the variable view rules for retrieving lists:
 app.add_url_rule('/location/countries/', 
-	view_func=views.Countries.as_view('countries'),
+	view_func=views.ListCountries.as_view('countries'),
 	methods=['GET'])
 
 app.add_url_rule('/location/<country>/', 
-	view_func=views.Regions.as_view('regions'),
+	view_func=views.ListRegions.as_view('regions'),
 	methods=['GET'])
 
 app.add_url_rule('/location/<country>/<region>/', 
-	view_func=views.Farms.as_view('farms'),
+	view_func=views.ListFarms.as_view('farms'),
 	methods=['GET'])
 
-app.add_url_rule('/location/<country>/<region>/<farm>/', 
-	view_func=views.Trials.as_view('trials'),
+app.add_url_rule('/location/<country>/<region>/<farm>/',
+	view_func=views.ListFields.as_view('fields'),
 	methods=['GET'])
 
-app.add_url_rule('/location/blocks/<trial_uid>/',
-	view_func=views.Blocks.as_view('blocks'),
+app.add_url_rule('/location/blocks/<field_uid>/',
+	view_func=views.ListBlocks.as_view('blocks'),
 	methods=['GET'])
 
-app.add_url_rule('/location/treecount/<trial_uid>/',
+app.add_url_rule('/location/treecount/<field_uid>/',
 	view_func=views.TreeCount.as_view('treecount'),
 	methods=['GET'])
 

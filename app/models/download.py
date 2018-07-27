@@ -52,7 +52,7 @@ class Download:
 			for row in id_list:
 				for item in row:
 					if isinstance(row[item], list):
-						row[item] = [i.encode() for i in row[item]]
+						row[item] = [str(i).encode() for i in row[item]]
 				# for key, value in row:
 				writer.writerow(row)
 			file_size = csv_file.tell()
@@ -74,7 +74,7 @@ class Download:
 			country, 
 			region, 
 			farm, 
-			trial_uid,
+			field_uid,
 			block_uid,
 			level, 
 			traits, 
@@ -124,8 +124,8 @@ class Download:
 				'Country',
 				'Region',
 				'Farm',
-				'Trial',
-				'Trial UID',
+				'Field',
+				'Field UID',
 				'Block',
 				'Block UID',
 				'Tree UID',
@@ -160,26 +160,26 @@ class Download:
 				tdp = td + (
 					'-[:IS_IN]->(: BlockTrees) '
 					' -[:IS_IN]->(block: Block {uid: $block_uid}) '
-					' -[:IS_IN]->(: TrialBlocks) '
-					' -[:IS_IN]->(trial: Trial) '
+					' -[:IS_IN]->(: FieldBlocks) '
+					' -[:IS_IN]->(field: Field) '
 				)
 				optional_block = ''
-			# if trial_uid is defined
-			elif trial_uid != "":
+			# if field_uid is defined
+			elif field_uid != "":
 				tdp = td + (
-					' -[:IS_IN]->(: TrialTrees) '
-					' -[:IS_IN]->(trial: Trial {uid: $trial_uid}) '
+					' -[:IS_IN]->(: FieldTrees) '
+					' -[:IS_IN]->(field: Field {uid: $field_uid}) '
 				)
 				optional_block = (
 					' OPTIONAL MATCH (tree) '
 					' -[:IS_IN]->(: BlockTrees) '
 					' -[:IS_IN]->(block: Block) '
 				)
-			# else no trial selected
+			# else no field selected
 			else:
 				tdp = td + (
-					' -[:IS_IN]->(: TrialTrees) '
-					' -[:IS_IN]->(trial:Trial) '
+					' -[:IS_IN]->(: FieldTrees) '
+					' -[:IS_IN]->(field:Field) '
 				)
 				optional_block = (
 					' OPTIONAL MATCH (tree) '
@@ -200,8 +200,8 @@ class Download:
 					' 	country.name as Country, '
 					' 	region.name as Region, '
 					' 	farm.name as Farm, '
-					' 	trial.name as Trial, '
-					'	trial.uid as `Trial UID`, '
+					' 	field.name as Field, '
+					'	field.uid as `Field UID`, '
 					' 	block.name as Block, '
 					' 	block.uid as `Block UID`, '
 					' 	tree.uid as `Tree UID`, '
@@ -220,8 +220,8 @@ class Download:
 					'		Country: Country, '
 					'		Region: Region, '
 					'		Farm: Farm, '
-					'		Trial: Trial, '
-					'		`Trial UID` : `Trial UID`, '
+					'		Field: Field, '
+					'		`Field UID` : `Field UID`, '
 					'		Block : Block, '
 					'		`Block UID`: `Block UID`, '
 					'		`Tree UID` : `Tree UID`, '
@@ -236,7 +236,7 @@ class Download:
 					'		`Sample ID` : `Sample ID`, '
 					'		Traits : Traits } '
 					' ORDER BY '
-					'	`Trial UID`, `Sample ID` '
+					'	`Field UID`, `Sample ID` '
 				)
 			else:  # if data_format == 'db':
 				response = (
@@ -246,8 +246,8 @@ class Download:
 					'	Country: country.name, ' 
 					'	Region: region.name, '
 					'	Farm: farm.name, '
-					'	Trial: trial.name, '
-					'	`Trial UID`: trial.uid, '
+					'	Field: field.name, '
+					'	`Field UID`: field.uid, '
 					'	Block: block.name, '
 					'	`Block UID`: block.uid, '
 					'	`Tree UID`: tree.uid, '
@@ -268,7 +268,7 @@ class Download:
 					'	`Recorded by`: data.person '
 					' } '
 					' ORDER BY '
-					'	trial.uid, '
+					'	field.uid, '
 					'	sample.id, '
 					'	trait.name, '
 					'	apoc.date.format(data.time) '
@@ -278,8 +278,8 @@ class Download:
 				'Country',
 				'Region',
 				'Farm',
-				'Trial',
-				'Trial UID',
+				'Field',
+				'Field UID',
 				'Block',
 				'Block UID',
 				'Tree UID',
@@ -306,26 +306,26 @@ class Download:
 				tdp = td + (
 					'-[:IS_IN {current: True}]->(: BlockTrees) '
 					' -[:IS_IN]->(block: Block {uid: $block_uid}) '
-					' -[:IS_IN]->(: TrialBlocks) '
-					' -[:IS_IN]->(trial: Trial) '
+					' -[:IS_IN]->(: FieldBlocks) '
+					' -[:IS_IN]->(field: Field) '
 				)
 				optional_block = ''
-			# if trial_uid is defined
-			elif trial_uid != "":
+			# if field_uid is defined
+			elif field_uid != "":
 				tdp = td + (
-					' -[:IS_IN]->(: TrialTrees) '
-					' -[:IS_IN]->(trial: Trial {uid: $trial_uid}) '
+					' -[:IS_IN]->(: FieldTrees) '
+					' -[:IS_IN]->(field: Field {uid: $field_uid}) '
 				)
 				optional_block = (
 					' OPTIONAL MATCH (tree) '
 					' -[:IS_IN {current: True}]->(: BlockTrees) '
 					' -[:IS_IN]->(block: Block) '
 				)
-			# no trial selected
+			# no field selected
 			else:
 				tdp = td + (
-					' -[:IS_IN]->(: TrialTrees) '
-					' -[:IS_IN]->(trial:Trial) '
+					' -[:IS_IN]->(: FieldTrees) '
+					' -[:IS_IN]->(field:Field) '
 				)
 				optional_block = (
 					' OPTIONAL MATCH (tree) '
@@ -344,8 +344,8 @@ class Download:
 					'	country.name as Country, '
 					'	region.name as Region, '
 					'	farm.name as Farm, '
-					'	trial.name as Trial, '
-					'	trial.uid as `Trial UID`, '
+					'	field.name as Field, '
+					'	field.uid as `Field UID`, '
 					'	block.name as Block, '
 					'	block.uid as `Block UID`, '
 					'	tree.uid as `Tree UID`, '
@@ -360,8 +360,8 @@ class Download:
 					'		Country: Country, '
 					'		Region: Region, '
 					'		Farm: Farm, '
-					'		Trial: Trial, '
-					'		`Trial UID`: `Trial UID`, '
+					'		Field: Field, '
+					'		`Field UID`: `Field UID`, '
 					'		Block : Block, '
 					'		`Block UID`: `Block UID`, '
 					'		`Tree UID`: `Tree UID`, '
@@ -372,7 +372,7 @@ class Download:
 					'		`Leaf ID`: `Leaf ID`, '
 					'		Traits: Traits } '
 					' ORDER BY '
-					'	`Trial UID`, `Leaf ID` '
+					'	`Field UID`, `Leaf ID` '
 				)
 			else:  # if data_format == 'db':
 				response = (
@@ -382,8 +382,8 @@ class Download:
 					'	Country : country.name, ' 
 					'	Region : region.name, '
 					'	Farm : farm.name, '
-					'	Trial : trial.name, '
-					'	`Trial UID`: trial.uid, '
+					'	Field : field.name, '
+					'	`Field UID`: field.uid, '
 					'	Block : block.name, '
 					'	`Block UID` : block.uid, '
 					'	`Tree UID` : tree.uid, '
@@ -399,7 +399,7 @@ class Download:
 					'	`Recorded by`: data.person '
 					' } '
 					' ORDER BY '
-					'	trial.uid, '
+					'	field.uid, '
 					'	leaf.id, '
 					'	trait.name, '
 					'	apoc.date.format(data.time) '
@@ -409,8 +409,8 @@ class Download:
 				'Country',
 				'Region',
 				'Farm',
-				'Trial',
-				'Trial UID',
+				'Field',
+				'Field UID',
 				'Block',
 				'Block UID',
 				'Tree UID',
@@ -435,26 +435,26 @@ class Download:
 				tdp = td + (
 					'-[:IS_IN {current:True}]->(:BlockTrees) '
 					' -[:IS_IN]->(block:Block {uid:$blockUID}) '
-					' -[:IS_IN]->(:TrialBlocks) '
-					' -[:IS_IN]->(trial:Trial) '
+					' -[:IS_IN]->(:FieldBlocks) '
+					' -[:IS_IN]->(field:Field) '
 				)
 				optional_block = ''
-			# if trial_uid is defined (but no block_uid)
-			elif trial_uid != "":
+			# if field_uid is defined (but no block_uid)
+			elif field_uid != "":
 				tdp = td + (
-					' -[:IS_IN]->(:TrialTrees) '
-					' -[:IS_IN]->(trial:Trial {uid: $trial_uid}) '
+					' -[:IS_IN]->(:FieldTrees) '
+					' -[:IS_IN]->(field:Field {uid: $field_uid}) '
 				)
 				optional_block = (
 					' OPTIONAL MATCH (tree) '
 					' -[:IS_IN {current:True}]->(:BlockTrees) '
 					' -[:IS_IN]->(block:Block) '
 				)
-			# if no trial selected
+			# if no field selected
 			else:
 				tdp = td + (
-					' -[:IS_IN]->(:TrialTrees) '
-					' -[:IS_IN]->(trial:Trial) '
+					' -[:IS_IN]->(:FieldTrees) '
+					' -[:IS_IN]->(field:Field) '
 				)
 				optional_block = (
 					' OPTIONAL MATCH (tree) '
@@ -469,8 +469,8 @@ class Download:
 					' 	country.name as Country, '
 					' 	region.name as Region, '
 					' 	farm.name as Farm, '
-					' 	trial.name as Trial, '
-					' 	trial.uid as `Trial UID`, '
+					' 	field.name as Field, '
+					' 	field.uid as `Field UID`, '
 					' 	block.name as Block, '
 					' 	block.uid as `Block UID`, '
 					' 	tree.uid as `Tree UID`, '
@@ -484,8 +484,8 @@ class Download:
 					'		Country: Country, '
 					'		Region: Region, '
 					'		Farm: Farm, '
-					'		Trial: Trial, '
-					'		`Trial UID`: `Trial UID`, '
+					'		Field: Field, '
+					'		`Field UID`: `Field UID`, '
 					'		Block: Block, '
 					'		`Block UID`: `Block UID`, '
 					'		`Tree UID`: `Tree UID`, '
@@ -495,7 +495,7 @@ class Download:
 					'		`Branch ID`: `Branch ID`,'
 					'		Traits: Traits } '
 					' ORDER BY '
-					'	`Trial UID`, `Branch ID` '
+					'	`Field UID`, `Branch ID` '
 				)
 			else:  # if data_format == 'db':
 				response = (
@@ -505,8 +505,8 @@ class Download:
 					'	Country: country.name, ' 
 					'	Region: region.name, '
 					'	Farm: farm.name, '
-					'	Trial: trial.name, '
-					'	`Trial UID`: trial.uid, '
+					'	Field: field.name, '
+					'	`Field UID`: field.uid, '
 					'	Block: block.name, '
 					'	`Block UID`: block.uid, '
 					'	`Tree UID`: tree.uid, '
@@ -521,7 +521,7 @@ class Download:
 					'	`Recorded_by`: data.person '
 					' } '
 					' ORDER BY '
-					'	trial.uid, '
+					'	field.uid, '
 					'	branch.id, '
 					'	trait.name, '
 					'	data.time '
@@ -531,8 +531,8 @@ class Download:
 				'Country',
 				'Region',
 				'Farm',
-				'Trial',
-				'Trial UID',
+				'Field',
+				'Field UID',
 				'Block',
 				'Block UID',
 				'UID',
@@ -560,26 +560,26 @@ class Download:
 				tdp = td + (
 					' -[:IS_IN {current: True}]->(: BlockTrees) '
 					' -[:IS_IN]->(block: Block {uid: $block_uid}) '
-					' -[:IS_IN]->(: TrialBlocks) '
-					' -[:IS_IN]->(trial: Trial) '
+					' -[:IS_IN]->(: FieldBlocks) '
+					' -[:IS_IN]->(field: Field) '
 				)
 				optional_block = ''
-			# if trial_uid is defined
-			elif trial_uid != "":
+			# if field_uid is defined
+			elif field_uid != "":
 				tdp = td + (
-					' -[:IS_IN]->(TrialTrees) '
-					' -[:IS_IN]->(trial: Trial {uid:$trial_uid}) '
+					' -[:IS_IN]->(FieldTrees) '
+					' -[:IS_IN]->(field: Field {uid:$field_uid}) '
 				)
 				optional_block = (
 					' OPTIONAL MATCH (tree) '
 					' -[:IS_IN {current: True}]->(: BlockTrees) '
 					' -[:IS_IN]->(block: Block) '
 				)
-			# if no trial selected
+			# if no field selected
 			else:
 				tdp = td + (
-					' -[:IS_IN]->(:TrialTrees) '
-					' -[:IS_IN]->(trial:Trial) '
+					' -[:IS_IN]->(:FieldTrees) '
+					' -[:IS_IN]->(field:Field) '
 				)
 				optional_block = (
 					' OPTIONAL MATCH (tree) '
@@ -594,8 +594,8 @@ class Download:
 					' 	country.name as Country, '
 					' 	region.name as Region, '
 					' 	farm.name as Farm, '
-					' 	trial.name as Trial, '
-					' 	trial.uid as `Trial UID`, '
+					' 	field.name as Field, '
+					' 	field.uid as `Field UID`, '
 					' 	block.name as Block, '
 					' 	block.uid as `Block UID`, '
 					' 	tree.uid as `Tree UID`, '
@@ -608,8 +608,8 @@ class Download:
 					'		Country: Country, '
 					'		Region: Region, '
 					'		Farm: Farm, '
-					'		Trial: Trial, '
-					'		`Trial UID`: `Trial UID`, '
+					'		Field: Field, '
+					'		`Field UID`: `Field UID`, '
 					'		Block: Block, '
 					'		`Block UID`: `Block UID`, '
 					'		UID: `Tree UID`, '
@@ -619,7 +619,7 @@ class Download:
 					'		Traits: Traits '
 					'	} '
 					' ORDER BY '
-					'	`Trial UID`, `Tree ID` '
+					'	`Field UID`, `Tree ID` '
 				)
 			else:  # if data_format == 'db':
 				response = (
@@ -629,8 +629,8 @@ class Download:
 					'	Country : country.name, ' 
 					'	Region : region.name, '
 					'	Farm : farm.name, '
-					'	Trial : trial.name, '
-					'	`Trial UID`: trial.uid, '
+					'	Field : field.name, '
+					'	`Field UID`: field.uid, '
 					'	Block : block.name, '
 					'	`Block UID` : block.uid, '
 					'	UID : tree.uid, '
@@ -643,15 +643,15 @@ class Download:
 					'	`Recorded at` : apoc.date.format(data.time), '
 					'	`Recorded by`: data.person '
 					' } '
-					' ORDER BY trial.uid, tree.id, trait.name, data.time '
+					' ORDER BY field.uid, tree.id, trait.name, data.time '
 					)
 		elif level == 'block':
 			index_fieldnames = [
 				'Country',
 				'Region',
 				'Farm',
-				'Trial',
-				'Trial UID',
+				'Field',
+				'Field UID',
 				'Block',
 				'UID'
 			]
@@ -669,20 +669,20 @@ class Download:
 			if block_uid != "":
 				tdp = td + (
 					' {uid:$blockUID}) '
-					' -[:IS_IN]->(:TrialBlocks) '
-					' -[:IS_IN]->(trial:Trial) '
+					' -[:IS_IN]->(:FieldBlocks) '
+					' -[:IS_IN]->(field:Field) '
 				)
-			elif trial_uid != "":
+			elif field_uid != "":
 				tdp = td + (
 					') '
-					' -[:IS_IN]->(:TrialBlocks)'
-					' -[:IS_IN]->(trial:Trial {uid:$trial_uid}) '
+					' -[:IS_IN]->(:FieldBlocks)'
+					' -[:IS_IN]->(field:Field {uid:$field_uid}) '
 				)
 			else:
 				tdp = td + (
 					' ) '
-					' -[:IS_IN]->(:TrialBlocks)'
-					' -[:IS_IN]->(trial:Trial) '
+					' -[:IS_IN]->(:FieldBlocks)'
+					' -[:IS_IN]->(field:Field) '
 				)
 			optional_block = ''
 			# and generate the return statement
@@ -693,8 +693,8 @@ class Download:
 					' 	country.name as Country, '
 					' 	region.name as Region, '
 					' 	farm.name as Farm, '
-					' 	trial.name as Trial, '
-					' 	trial.uid as `Trial UID`, '
+					' 	field.name as Field, '
+					' 	field.uid as `Field UID`, '
 					' 	block.name as Block, '
 					' 	block.uid as `Block UID`, '
 					'	block.id as `Block ID`, '
@@ -704,14 +704,14 @@ class Download:
 					'		Country : Country, '
 					'		Region : Region, '
 					'		Farm : Farm, '
-					'		Trial : Trial, '
-					'		`Trial UID` : `Trial UID`, '
+					'		Field : Field, '
+					'		`Field UID` : `Field UID`, '
 					'		Block : Block, '
 					'		UID: `Block UID`, '
 					'		`Block ID`: `Block ID`,'
 					'		Traits : Traits } '
 					' ORDER BY '
-					'	`Trial UID`, `Block ID` '
+					'	`Field UID`, `Block ID` '
 				)
 			else:  # if data_format == 'db':
 				response = (
@@ -721,8 +721,8 @@ class Download:
 					'	Country: country.name, ' 
 					'	Region: region.name, '
 					'	Farm: farm.name, '
-					'	Trial: trial.name, '
-					'	`Trial UID`: trial.uid, '
+					'	Field: field.name, '
+					'	`Field UID`: field.uid, '
 					'	Block: block.name, '
 					'	UID: block.uid, '
 					'	`Block ID`: block.id, '
@@ -733,26 +733,26 @@ class Download:
 					'	`Recorded by`: data.person '
 					' } '
 					' ORDER BY '
-					'	trial.uid, block.id, trait.name, data.time '
+					'	field.uid, block.id, trait.name, data.time '
 					)
-		else:  # level == 'trial':
+		else:  # level == 'field':
 			index_fieldnames = [
 				'Country',
 				'Region',
 				'Farm',
-				'Trial',
+				'Field',
 				'UID'
 			]
 			tdp = (
 				' MATCH '
-				'	(trait:TrialTrait) '
-				'	<-[:FOR_TRAIT]-(trial_trait) '
+				'	(trait:FieldTrait) '
+				'	<-[:FOR_TRAIT]-(field_trait) '
 				'	<-[:DATA_FOR]-(data) '
 				' WHERE (trait.name) IN $traits'
-				' WITH user_name, partner_name, data, trait, trial_trait '
+				' WITH user_name, partner_name, data, trait, field_trait '
 				' MATCH '
-				'	(trial_trait) '
-				'	-[:FOR_ITEM]->(trial: Trial) '
+				'	(field_trait) '
+				'	-[:FOR_ITEM]->(field: Field) '
 			)
 			optional_block = ''
 			# and generate the return statement
@@ -763,20 +763,20 @@ class Download:
 					'	country.name as Country, '
 					'	region.name as Region, '
 					'	farm.name as Farm, '
-					'	trial.name as Trial, '
-					'	trial.uid as `Trial UID`, '
+					'	field.name as Field, '
+					'	field.uid as `Field UID`, '
 					'	COLLECT([trait.name, data.value]) as Traits '
 					' RETURN '
 					'	{ ' 
 					'		Country: Country, '
 					'		Region: Region, '
 					'		Farm: Farm, '
-					'		Trial: Trial, '
-					'		UID: `Trial UID`, '
+					'		Field: Field, '
+					'		UID: `Field UID`, '
 					'		Traits: Traits '
 					'	} '
 					' ORDER BY '
-					'	`Trial UID` '
+					'	`Field UID` '
 				)
 			else:  # if data_format == 'db':
 				response = (
@@ -786,15 +786,15 @@ class Download:
 					'	Country: country.name, ' 
 					'	Region: region.name, '
 					'	Farm: farm.name, '
-					'	Trial: trial.name, '
-					'	UID: trial.uid, '
+					'	Field: field.name, '
+					'	UID: field.uid, '
 					'	Trait: trait.name, '
 					'	Value: data.value, '
 					'	Location: data.location, '
 					'	`Recorded at`: apoc.date.format(data.time), '
 					'	`Recorded by`: data.person '
 					' } '
-					' ORDER BY trial.uid, trait.name, data.time '
+					' ORDER BY field.uid, trait.name, data.time '
 					)
 		# add conditional for data between time range
 		if start_time != "" and end_time != "":
@@ -814,7 +814,7 @@ class Download:
 				country,
 				region,
 				farm,
-				trial_uid,
+				field_uid,
 				block_uid,
 				traits,
 				start_time,
@@ -875,8 +875,11 @@ class Download:
 				quoting = csv.QUOTE_ALL,
 				extrasaction = 'ignore')
 			writer.writeheader()
-			for item in result:
-				writer.writerow(item)
+			for row in result:
+				for item in row:
+					if isinstance(row[item], list):
+						row[item] = [str(i).encode() for i in row[item]]
+				writer.writerow(row)
 			file_size = csv_file.tell()
 		return {
 			"filename": filename,
@@ -891,7 +894,7 @@ class Download:
 			country,
 			region,
 			farm,
-			trial_uid,
+			field_uid,
 			block_uid,
 			traits,
 			start_time,
@@ -905,7 +908,7 @@ class Download:
 			country = country,
 			region =region,
 			farm = farm,
-			trial_uid = trial_uid,
+			field_uid = field_uid,
 			block_uid = block_uid,
 			traits = traits,
 			start_time = start_time,
@@ -917,7 +920,7 @@ class Download:
 			form_data,
 			existing_ids = None
 	):
-		if form_data['trait_level'] == 'trial':
+		if form_data['trait_level'] == 'field':
 			parameters = {}
 			query = 'MATCH (c:Country '
 			if form_data['country'] != '':
@@ -932,15 +935,15 @@ class Download:
 				query += '{name_lower: toLower($farm)}'
 				parameters['farm'] = form_data['farm']
 			query += (
-				' )<-[IS_IN]-(trial:Trial) '
+				' )<-[IS_IN]-(field:Field) '
 				' RETURN { '
-				'	UID: trial.uid, '
-				'	Trial: trial.name, '
+				'	UID: field.uid, '
+				'	Field: field.name, '
 				'	Farm: f.name, '
 				'	Region: r.name, '
 				'	Country: c.name '
 				' } '
-				' ORDER BY trial.uid'
+				' ORDER BY field.uid'
 			)
 			# make the file and return a dictionary with filename, file_path and file_size
 			with get_driver().session() as neo4j_session:
@@ -955,7 +958,7 @@ class Download:
 				'Country',
 				'Region',
 				'Farm',
-				'Trial',
+				'Field',
 				'UID'
 			]
 			if 'farm' in parameters:
@@ -969,16 +972,16 @@ class Download:
 			csv_file_details = self.make_csv_file(
 				fieldnames,
 				id_list,
-				filename + 'Trial_UIDs.csv'
+				filename + 'Field_UIDs.csv'
 			)
 		else:  # form_data['trait_level'] in ['block', 'tree', 'branch', 'leaf', 'sample']:
-			trial_uid = int(form_data['trial'])
+			field_uid = int(form_data['field'])
 			if form_data['trait_level'] == 'sample':
 				parameters = {
 					'country': form_data['country'],
 					'region': form_data['region'],
 					'farm': form_data['farm'],
-					'trial_uid': int(trial_uid),
+					'field_uid': int(field_uid),
 					'trees_start': int(form_data['trees_start']) if form_data['trees_start'] else '',
 					'trees_end': int(form_data['trees_end']) if form_data['trees_end'] else '',
 					'replicates': int(form_data['replicates']) if form_data['replicates'] else "",
@@ -1002,8 +1005,8 @@ class Download:
 					'Country',
 					'Region',
 					'Farm',
-					'Trial',
-					'Trial UID',
+					'Field',
+					'Field UID',
 					'Block',
 					'Block UID',
 					'Tree UID',
@@ -1038,8 +1041,8 @@ class Download:
 					'Country',
 					'Region',
 					'Farm',
-					'Trial',
-					'Trial UID',
+					'Field',
+					'Field UID',
 					'Block',
 					'Block UID',
 					'Tree UID',
@@ -1053,7 +1056,7 @@ class Download:
 						'country': form_data['country'],
 						'region': form_data['region'],
 						'farm': form_data['farm'],
-						'trial_uid': trial_uid,
+						'field_uid': field_uid,
 						'trees_start': int(form_data['trees_start']) if form_data['trees_start'] else 1,
 						'trees_end': int(form_data['trees_end']) if form_data['trees_end'] else 999999,
 						'start_time': int(
@@ -1085,7 +1088,7 @@ class Download:
 						return None
 					first_leaf_id = existing_ids[0]['Leaf ID']
 					last_leaf_id = existing_ids[-1]['Leaf ID']
-					filename = 'Trial_' + str(trial_uid) + '_L' + str(first_leaf_id) + '_to_L' + str(
+					filename = 'Field_' + str(field_uid) + '_L' + str(first_leaf_id) + '_to_L' + str(
 						last_leaf_id) + '.csv'
 					csv_file_details = self.make_csv_file(
 						fieldnames,
@@ -1098,8 +1101,8 @@ class Download:
 					'Country',
 					'Region',
 					'Farm',
-					'Trial',
-					'Trial UID',
+					'Field',
+					'Field UID',
 					'Block',
 					'Block UID',
 					'Tree UID',
@@ -1112,7 +1115,7 @@ class Download:
 						'country': form_data['country'],
 						'region': form_data['region'],
 						'farm': form_data['farm'],
-						'trial_uid': trial_uid,
+						'field_uid': field_uid,
 						'trees_start': int(form_data['trees_start']) if form_data['trees_start'] else 1,
 						'trees_end': int(form_data['trees_end']) if form_data['trees_end'] else 999999,
 						'start_time': int(
@@ -1145,7 +1148,7 @@ class Download:
 						return None
 					first_branch_id = existing_ids[0]['Branch ID']
 					last_branch_id = existing_ids[-1]['Branch ID']
-					filename = 'trial_' + str(trial_uid) + '_R' + str(first_branch_id) + '_to_R' + str(
+					filename = 'field_' + str(field_uid) + '_R' + str(first_branch_id) + '_to_R' + str(
 						last_branch_id) + '.csv'
 					csv_file_details = self.make_csv_file(
 						fieldnames,
@@ -1161,15 +1164,15 @@ class Download:
 					'Country',
 					'Region',
 					'Farm',
-					'Trial',
-					'Trial UID',
+					'Field',
+					'Field UID',
 					'Block',
 					'Block UID',
 					'Variety',
 					'Tree Custom ID',
 					'UID'
 				]
-				id_list = Fields.get_trees(trial_uid, trees_start, trees_end)
+				id_list = Fields.get_trees(field_uid, trees_start, trees_end)
 				if len(id_list) == 0:
 					return None
 				first_tree_id = id_list[0]['Tree ID']
@@ -1185,12 +1188,12 @@ class Download:
 					'Country',
 					'Region',
 					'Farm',
-					'Trial',
-					'Trial UID',
+					'Field',
+					'Field UID',
 					'Block',
 					'UID'
 				]
-				id_list = Fields.get_blocks(trial_uid)
+				id_list = Fields.get_blocks(field_uid)
 				if len(id_list) == 0:
 					return None
 				csv_file_details = self.make_csv_file(fieldnames, id_list, 'Block_UIDs.csv')
@@ -1241,7 +1244,7 @@ class Download:
 		# create two files, one is the index + trait names + time details table, the other is a trait description file
 		# - specifying format and details of each trait value
 		# starts with getting the index data (id_list) and fieldnames (to which the traits will be added)
-		if form_data['trait_level'] == 'trial':
+		if form_data['trait_level'] == 'field':
 			parameters = {}
 			query = 'MATCH (c:Country '
 			if form_data['country'] != '':
@@ -1256,20 +1259,20 @@ class Download:
 				query += '{name_lower: toLower($farm)}'
 				parameters['farm'] = form_data['farm']
 			query += (
-				' )<-[IS_IN]-(trial:Trial) '
+				' )<-[IS_IN]-(field:Field) '
 				' RETURN {'
-				' UID : trial.uid, '
-				' Trial : trial.name, '
+				' UID : field.uid, '
+				' Field : field.name, '
 				' Farm : f.name, '
 				' Region : r.name, '
 				' Country : c.name }'
-				' ORDER BY trial.uid'
+				' ORDER BY field.uid'
 			)
 			fieldnames = [
 				'Country',
 				'Region',
 				'Farm',
-				'Trial',
+				'Field',
 				'UID'
 			]
 			with get_driver().session() as neo4j_session:
@@ -1279,14 +1282,14 @@ class Download:
 					parameters)
 				id_list = [record[0] for record in result]
 		else:  # if form_data['trait_level'] in ['block', 'tree', 'branch', 'leaf', 'sample']:
-			trial_uid = int(form_data['trial'])
+			field_uid = int(form_data['field'])
 			if form_data['trait_level'] == 'sample':
 				fieldnames = [
 					'Country',
 					'Region',
 					'Farm',
-					'Trial',
-					'Trial UID',
+					'Field',
+					'Field UID',
 					'Block',
 					'Block UID',
 					'Tree UID',
@@ -1301,7 +1304,7 @@ class Download:
 					'country': form_data['country'],
 					'region': form_data['region'],
 					'farm': form_data['farm'],
-					'trial_uid': trial_uid,
+					'field_uid': field_uid,
 					'trees_start': int(form_data['trees_start']) if form_data['trees_start'] else "",
 					'trees_end': int(form_data['trees_end']) if form_data['trees_end'] else "",
 					'replicates': int(form_data['replicates']) if form_data['replicates'] else "",
@@ -1329,8 +1332,8 @@ class Download:
 					'Country',
 					'Region',
 					'Farm',
-					'Trial',
-					'Trial UID',
+					'Field',
+					'Field UID',
 					'Block',
 					'Block UID',
 					'Tree Custom ID',
@@ -1343,7 +1346,7 @@ class Download:
 						'country': form_data['country'],
 						'region': form_data['region'],
 						'farm': form_data['farm'],
-						'trial_uid': trial_uid,
+						'field_uid': field_uid,
 						'trees_start': int(form_data['trees_start']) if form_data['trees_start'] else 1,
 						'trees_end': int(form_data['trees_end']) if form_data['trees_end'] else 999999,
 						'start_time': int(
@@ -1374,22 +1377,22 @@ class Download:
 					'Country',
 					'Region',
 					'Farm',
-					'Trial',
-					'Trial UID',
+					'Field',
+					'Field UID',
 					'Block',
 					'Block UID',
 					'Variety',
 					'Tree Custom ID',
 					'UID'
 				]
-				id_list = Fields.get_trees(trial_uid, trees_start, trees_end)
+				id_list = Fields.get_trees(field_uid, trees_start, trees_end)
 			elif form_data['trait_level'] == 'branch':
 				fieldnames = [
 					'Country',
 					'Region',
 					'Farm',
-					'Trial',
-					'Trial UID',
+					'Field',
+					'Field UID',
 					'Block',
 					'Block UID',
 					'Tree Custom ID',
@@ -1402,7 +1405,7 @@ class Download:
 						'country': form_data['country'],
 						'region': form_data['region'],
 						'farm': form_data['farm'],
-						'trial_uid': trial_uid,
+						'field_uid': field_uid,
 						'trees_start': int(form_data['trees_start']) if form_data['trees_start'] else 1,
 						'trees_end': int(form_data['trees_end']) if form_data['trees_end'] else 999999,
 						'start_time': int(
@@ -1429,12 +1432,12 @@ class Download:
 					'Country',
 					'Region',
 					'Farm',
-					'Trial',
-					'Trial UID',
+					'Field',
+					'Field UID',
 					'Block',
 					'UID'
 				]
-				id_list = Fields.get_blocks(trial_uid)
+				id_list = Fields.get_blocks(field_uid)
 		# check we have found matching ID's, if not return None
 		if len(id_list) == 0:
 			return None

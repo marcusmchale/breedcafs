@@ -33,7 +33,10 @@ def confirm(question):
 # erase database
 def delete_database(tx):
 	tx.run('MATCH (n) DETACH DELETE n')
-	tx.run('CALL apoc.schema.assert ({}, {})')
+
+
+def clear_schema(tx):
+	tx.run('CALL apoc.schema.assert({}, {})')
 
 
 def create_indexes(tx, indexes):
@@ -69,7 +72,7 @@ def create_partners(tx, partner_list):
 			'	ON CREATE SET '
 			'		p.name = $name, '
 			'		p.fullname = $fullname, '
-			'		p.found = False, '
+			'		p.found = False '
 			'	ON MATCH SET '
 			'		p.found = True '
 			' MERGE '
@@ -78,7 +81,7 @@ def create_partners(tx, partner_list):
 			'	}) '
 			'	ON CREATE SET '
 			'		c.name = $based_in, '
-			'		c.found = False, '
+			'		c.found = False '
 			'	ON MATCH SET '
 			'		c.found = True '
 			' MERGE '
@@ -91,7 +94,8 @@ def create_partners(tx, partner_list):
 			' RETURN p.found, c.found, r.found ',
 			based_in = partner['BASED_IN'],
 			fullname = partner['fullname'],
-			name = partner['name'])
+			name = partner['name']
+		)
 		for record in partner_create:
 			if record['p.found'] and record['r.found'] and record['c.found']:
 				print (
@@ -180,8 +184,7 @@ def create_traits(tx, traits_file, level):
 				'				THEN Null '
 				'			ELSE split($categories, "/") '
 				'			END, '
-				'		t.found = False, '
-				'		s2.time = timestamp() '
+				'		t.found = False '
 				'	ON MATCH SET '
 				'		t.found = True '
 				' RETURN t.found ',
@@ -204,23 +207,19 @@ def create_traits(tx, traits_file, level):
 					print ('Error with merger of ' + level + 'Trait ' + trait['name'])
 
 
-def add_global_admin(tx):
-	username = raw_input('Enter the username that is to receive global_admin privileges: ')
-	print ('Adding global admin privilege to account: ' + username)
-	result = tx.run(
-		'MATCH (u:User {username: $username}) SET u.access = u.access + ["global_admin"]',
-		username = username
+def create_trials(tx, trials):
+	# set the category list of variety names trait to empty list
+	# FYI Field Book can't handle long lists of categories (more than 12)
+	# so we handle this trait as text i.e. trait.format = "text" '
+	tx.run(
+		' MATCH (trait: TreeTrait {name_lower: "variety name"}) '
+		' SET trait.category_list = [] '
 	)
-	return result
-
-
-def create_trials(self, tx, trials):
-	# register the established trials
 	for trial in trials:
 		# TODO major revision to handle the field trials that span multiple regions/farms.
-		# TODO revise this to give feedback and prevent overwrite (merge instead of create on trial)
-		# change dependency of trial on farm-> region-> country
-		# allow trial to span multiple farms
+		# for now allowing registering to Farm/Region without details - so that anchored for existing queries
+		# then returned farm/region will just not have name property etc.
+		# but need to change registering to separate trial from farm completely, and add farm to trial
 		if trial['farm']:
 			tx.run(
 				' MERGE '
@@ -244,19 +243,19 @@ def create_trials(self, tx, trials):
 				'	})-[:IS_IN]->(region) '
 				' ON CREATE SET farm.found = False '
 				' ON MATCH SET farm.found = True '
-				' CREATE ',
+				' MERGE '
 				'	(trial: Trial { '
-				'		uid: $uid'
-				'		name: $name'
+				'		uid: $uid, '
+				'		name: $name, '
 				'		name_lower: toLower($name) '
-				'	})-[:IS_IN]->(farm) ',
+				'	}) '
+				' -[: PERFORMED_IN]->(farm) ',
 				uid = trial['uid'],
 				name = trial['name'],
 				country = trial['country'],
 				region = trial['region'],
 				farm = trial['farm']
 			)
-		#
 		else:
 			if trial['region']:
 				tx.run(
@@ -274,14 +273,12 @@ def create_trials(self, tx, trials):
 					'	})-[:IS_IN]->(country) '
 					' ON CREATE SET region.found = False '
 					' ON MATCH SET region.found = True '
-					' CREATE ',
+					' MERGE '
 					'	(trial: Trial { '
-					'		uid: $uid'
-					'		name: $name'
+					'		uid: $uid, '
+					'		name: $name, '
 					'		name_lower: toLower($name) '
-					'	})-[:IS_IN]->(farm: Farm) '
-					'	-[:IS_IN]->(region) '
-					'	-[:IS_IN]->(country) ',
+					'	})-[: PERFORMED_IN]->(region) ',
 					uid = trial['uid'],
 					name = trial['name'],
 					country = trial['country'],
@@ -296,58 +293,63 @@ def create_trials(self, tx, trials):
 					'	}) '
 					' ON CREATE SET country.found = False '
 					' ON MATCH SET country.found = True '
-					' CREATE ',
+					' MERGE '
 					'	(trial: Trial { '
-					'		uid: $uid '
-					'		name: $name '
+					'		uid: $uid, '
+					'		name: $name, '
 					'		name_lower: toLower($name) '
-					'	})-[:IS_IN]->(farm: Farm) '
-					'	-[:IS_IN]->(region: Region) '
-					'	-[:IS_IN]->(country) ',
+					'	})-[:PERFORMED_IN]->(country) ',
 					uid = trial['uid'],
 					name = trial['name'],
 					country = trial['country']
 				)
-		# merge the trial_varieties_trait for this trial
+		# add a relationship between the trial and the "variety name" trait
+		# make this relationship contain a category list
+		# use this later with coalesce to obtain trial specific category lists
 		tx.run(
 			' MATCH '
 			'	(trial: Trial {uid:$uid}), '
 			'	(trait: TreeTrait {name_lower: "variety name"}) '
 			' MERGE '
-			'	(trial) '
-			'	<-[assessed_in: ASSESSED_IN]-(trait: Trait: TreeTrait { '
-			'		name_lower: "variety name" '
-			'	}) '
-			'	ON CREATE SET '
-			'		assessed_in.category_list = [], '
-			'		trait.name = "Variety name" ',
-			'		trait.level = "tree", '
-			'		trait.details = ("Variety name (from  for trial " + trial.uid) '
-			# this is frustrating but Field Book can't handle long lists of categories (more than 12)
-			# so we have to handle these traits as text
-			'		trait.format = "text" '
-			'		trait.group = "variety" ',
+			'	(trial)'
+			'		<-[assessed_in: ASSESSED_IN]-(trait) '
+			' SET assessed_in.category_list = [] ',
 			uid = trial['uid']
 		)
+		# now merge these varieties into the assessed_in relationship as a category_list
+		# but also collect all as categories on trait category_list
+		# will rely on a coalesce of assessed in and the trait category list to return items
+		# also create the varieties
 		for variety_type in trial['varieties']:
-			for variety in variety_type:
+			for variety in trial['varieties'][variety_type]:
 				variety_create = tx.run(
 					' MATCH '
-					'	(trial: Trial {'
-					'		uid: $trial'
-					'	})<-[:ASSESSED_IN]-(trait: TreeTrait {'
-					'		name_lower: "variety name"'
-					'	})'
+					'	(trial: Trial { '
+					'		uid: $trial '
+					'	})<-[assessed_in:ASSESSED_IN]-(trait: TreeTrait { '
+					'		name_lower: "variety name" '
+					'	}) '
+					' SET '
+					'	assessed_in.category_list = CASE '
+					'		WHEN $variety IN assessed_in.category_list '
+					'		THEN assessed_in.category_list '
+					'		ELSE assessed_in.category_list + $variety '
+					'		END, '
+					'	trait.category_list = CASE '
+					'		WHEN $variety IN trait.category_list '
+					'		THEN trait.category_list '
+					'		ELSE trait.category_list + $variety '
+					'		END '
 					' MERGE '
 					'	(variety: Variety { '
 					'		name_lower: toLower($variety) '
 					'	}) '
 					'	ON CREATE SET '
-					'		name = $variety, '
-					'		type = $variety_type '
-					'		found = False '
+					'		variety.name = $variety, '
+					'		variety.type = $variety_type, '
+					'		variety.found = False '
 					'	ON MATCH SET '
-					'		found = True '
+					'		variety.found = True '
 					' RETURN '
 					'	variety.name, variety.found ',
 					variety = variety,
@@ -359,7 +361,7 @@ def create_trials(self, tx, trials):
 	# build in any obvious relationships for hybrids to their parents
 	tx.run(
 		' MATCH '
-		'	(variety: Variety {type: "hybrid") '
+		'	(variety: Variety {type: "hybrid"}) '
 		' WITH '
 		'	variety, '
 		'	split(variety.name_lower, " x ") as parents '
@@ -368,7 +370,7 @@ def create_trials(self, tx, trials):
 		'	(maternal: Variety {name_lower: parents[0]}), '
 		'	(paternal: Variety {name_lower: parents[1]})'
 		' MERGE '
-		'	(variety)-[:MATERNAL_DONOR]->(maternal), '
+		'	(variety)-[:MATERNAL_DONOR]->(maternal) '
 		' MERGE '
 		'	(variety)-[:PATERNAL_DONOR]->(paternal) '
 	)
@@ -379,7 +381,7 @@ def create_trials(self, tx, trials):
 			'	(variety: Variety { '
 			'		type: "hybrid", '
 			'		name_lower: toLower($hybrid) '
-			'	}), '
+			'	}) '
 			'	ON CREATE SET '
 			'		variety.name = $hybrid '
 			' MERGE '
@@ -387,15 +389,15 @@ def create_trials(self, tx, trials):
 			'		name_lower: toLower($maternal_donor) '
 			'	}) '
 			'	ON CREATE SET '
-			'		maternal.name = $maternal_donor'
+			'		maternal.name = $maternal_donor '
 			' MERGE '
 			'	(paternal: Variety { '
 			'		name_lower: toLower($paternal_donor) '
-			'	})'
+			'	}) '
 			'	ON CREATE SET '
-			'		paternal.name = $paternal_donor'
+			'		paternal.name = $paternal_donor  '
 			' MERGE '
-			'	(variety)-[:MATERNAL_DONOR]->(maternal), '
+			'	(variety)-[:MATERNAL_DONOR]->(maternal) '
 			' MERGE '
 			'	(variety)-[:PATERNAL_DONOR]->(paternal) ',
 			hybrid = hybrid[0],
@@ -405,7 +407,7 @@ def create_trials(self, tx, trials):
 	# same for grafts (no additional lists here though)
 	tx.run(
 		' MATCH '
-		'	(variety: Variety {type: "graft") '
+		'	(variety: Variety {type: "graft"}) '
 		' WITH '
 		'	variety, '
 		'	split(variety.name_lower, " / ") as source_tissue '
@@ -414,47 +416,58 @@ def create_trials(self, tx, trials):
 		'	(scion: Variety {name_lower: source_tissue[0]}), '
 		'	(rootstock: Variety {name_lower: source_tissue[1]})'
 		' MERGE '
-		'	(variety)-[:SCION]->(scion), '
+		'	(variety)-[:SCION]->(scion) '
 		' MERGE '
 		'	(variety)-[:ROOTSTOCK]->(rootstock) '
 	)
 
 
-def variety_code (self, tx, variety_code):
-	for item in variety_code:
-		if item[1].lower() == item[2].lower():
+def create_variety_codes(tx, variety_codes):
+	# set the category list of variety codes trait to empty list
+	# FYI Field Book can't handle long lists of categories (more than 12)
+	# so we handle this trait as text i.e. trait.format = "text" '
+	tx.run(
+		' MATCH (trait: TreeTrait {name_lower: "variety code"}) '
+		' SET trait.category_list = [] '
+	)
+	for item in variety_codes:
+		if item[1].lower() == item[2].lower():  # if inbred
 			result = tx.run(
-				' MERGE (var:Variety { name_lower: toLower($variety) } ) '
-					' ON CREATE SET '
-						' var.name = $variety, '
-						' var.found = False '
-					' ON MATCH SET '
-						' var.found = True '
-				' SET var.el_frances_code = $code '
-				' SET var.el_frances_code_lower = toLower($code) '
+				' MATCH (trait: TreeTrait {name_lower: "variety code"}) '
+				' MERGE (var:Variety {name_lower: toLower($variety)}) '
+				'	ON CREATE SET '
+				'		var.name = $variety, '
+				'		var.found = False, '
+				'		trait.category_list = trait.category_list + $code '
+				'	ON MATCH SET '
+				'		var.found = True '
+				' SET var.code = $code '
+				' SET var.code_lower = toLower($code) '
 				' RETURN var.found ',
-				code = str(item[0]).lower(),
-				variety = str(item[1]).lower()
+				code = str(item[0]),
+				variety = str(item[1])
 			)
-		else:
-			result = tx.run (
+		else:  # hybrid
+			result = tx.run(
+				' MATCH (trait: TreeTrait {name_lower: "variety code"}) '
 				' MERGE (mat:Variety {name_lower: toLower($maternal)}) '
-					' ON CREATE SET '
-						' mat.name = $maternal '
+				'	ON CREATE SET '
+				'		mat.name = $maternal '
 				' MERGE (pat:Variety {name_lower: toLower($paternal)}) '
-					' ON CREATE SET '
-						' pat.name = $paternal '
+				'	ON CREATE SET '
+				'		pat.name = $paternal '
 				' MERGE '
-					' (mat)<-[:MATERNAL_DONOR]-(var:Variety) '
-						' -[:PATERNAL_DONOR]->(pat) '
+				'	(mat)<-[:MATERNAL_DONOR]-(var:Variety) '
+				'		-[:PATERNAL_DONOR]->(pat) '
 				' ON CREATE SET '
-					' var.name = ($maternal + " x " + $paternal), '
-					' var.found = False '
+				'	var.name = ($maternal + " x " + $paternal), '
+				'	var.found = False '
 				' ON MATCH SET '
-					' var.found = True '
+				'	var.found = True '
 				' SET '
-					' var.el_frances_code = $code, '
-					' var.el_frances_code_lower = toLower($code) '
+				'	var.code = $code, '
+				'	var.code_lower = toLower($code), '
+				'	trait.category_list = trait.category_list + $code '
 				' RETURN var.found ',
 				code = str(item[0]).lower(),
 				maternal = str(item[1]).lower(),
@@ -462,41 +475,26 @@ def variety_code (self, tx, variety_code):
 			)
 		print str(item[0]).lower(), str(item[1]).lower(), str(item[2]).lower()
 		for record in result:
-			print "Merging el Frances codes"
-			if record[0] == True:
+			print "Merging variety codes"
+			if record[0]:
 				print "Existing variety, code added"
 			else:
 				print "New variety created"
-	# now create the TreeTrait
-	code_list = []
-	for i in el_frances_code:
-		if str(i[0]).lower() not in code_list:
-			code_list.append(str(i[0]).lower())
-	el_frances_code_trait_create = tx.run(
-		'MATCH (u:User {username_lower:toLower(trim($username))}) '
-			' -[:SUBMITTED]->(:Submissions) '
-			' -[:SUBMITTED]->(:Traits) '
-			' -[:SUBMITTED]-(ut:TreeTraits) '
-			' WITH ut '
-			' MERGE (ut)-[s2 : SUBMITTED]->(t : Trait: TreeTrait { '
-					' name_lower: "el frances code (text)" '
-				' }) '
-				' ON CREATE SET '
-					' t.level = "tree", '
-					' t.group = "general", '
-					' t.name = "El Frances Code (text)", '
-					' t.format = "text", '
-					' t.category_list = $code_list, '
-					' t.details = "El Frances variety code", '
-					' t.found = False, '
-					' s2.time = timestamp() '
-				' ON MATCH SET t.found = True '
-			' RETURN t.name, t.found, t.category_list',
-			username = self.username,
-			code_list = code_list
+
+
+def create_field_counter(tx):
+	tx.run(' CREATE (:Counter {name: "field", count: 0})')
+
+def create_start_email(tx):
+	email = raw_input('Enter the email address to be first registrant: ')
+	print ('Adding email to allowed users: ' + email)
+	tx.run(
+		' CREATE (emails: Emails {'
+		'	allowed: $email '
+		' }) ',
+		email = [email]
 	)
-	for record in el_frances_code_trait_create:
-			print ("Created trait: " if not record[1] else "Found:"), record[0]
+
 
 if not confirm('Are you sure you want to proceed? This is should probably only be run when setting up the database'):
 	sys.exit()
@@ -505,6 +503,7 @@ else:
 		print('Performing a full reset of database')
 		with driver.session() as session:
 			session.write_transaction(delete_database)
+			session.write_transaction(clear_schema)
 			session.write_transaction(create_constraints, config.constraints)
 			session.write_transaction(create_indexes, config.indexes)
 	else: print('Attempting to create the following while retaining existing data:\n'
@@ -513,13 +512,14 @@ else:
 		'  * traits')
 	with driver.session() as session:
 		session.write_transaction(create_partners, config.partners)
-		session.write_transaction(Create('start').traits, 'traits/trial_traits.csv', 'Trial')
-		session.write_transaction(Create('start').traits, 'traits/block_traits.csv', 'Block')
-		session.write_transaction(Create('start').traits, 'traits/tree_traits.csv', 'Tree')
-		session.write_transaction(Create('start').traits, 'traits/branch_traits.csv', 'Branch')
-		session.write_transaction(Create('start').traits, 'traits/leaf_traits.csv', 'Leaf')
-		session.write_transaction(Create('start').traits, 'traits/sample_traits.csv', 'Sample')
-		session.write_transaction(Create('start').el_frances_code, config.el_frances_code)
+		session.write_transaction(create_traits, 'traits/field_traits.csv', 'Field')
+		session.write_transaction(create_traits, 'traits/block_traits.csv', 'Block')
+		session.write_transaction(create_traits, 'traits/tree_traits.csv', 'Tree')
+		session.write_transaction(create_traits, 'traits/branch_traits.csv', 'Branch')
+		session.write_transaction(create_traits, 'traits/leaf_traits.csv', 'Leaf')
+		session.write_transaction(create_traits, 'traits/sample_traits.csv', 'Sample')
 		session.write_transaction(create_trials, config.trials)
-		session.write_transaction(add_global_admin)
+		session.write_transaction(create_variety_codes, config.variety_codes)
+		session.write_transaction(create_field_counter)
+		session.write_transaction(create_start_email)
 	print ('Complete')

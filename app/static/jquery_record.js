@@ -1,9 +1,9 @@
 //TRAITS
 //Set trait level undefined by default and only display traits when level selected
 $('#trait_level').val('0');
-traits = $('#trial_traits,#block_traits,#tree_traits,#branch_traits,#leaf_traits,#sample_traits');
+traits = $('#field_traits,#block_traits,#tree_traits,#branch_traits,#leaf_traits,#sample_traits');
 traits.hide();
-id_forms = $('#trial,#tree_ids,#branch_ids,#leaf_ids,#sample_ids');
+id_forms = $('#field,#tree_ids,#branch_ids,#leaf_ids,#sample_ids');
 id_forms.hide();
 $('#existing_ids').hide();
 
@@ -13,49 +13,49 @@ $('#trait_level').change(function () {
 		traits.hide();
 		id_forms.hide();
 	}
-	else if (this.value === 'trial') {
+	else if (this.value === 'field') {
 		$('#block_traits, #tree_traits, #branch_traits, #leaf_traits, #sample_traits').hide();
-		$('#trial_traits').show();
+		$('#field_traits').show();
 		$('#existing_ids').hide();
-		$('#trial, #tree_ids, #sample_ids').hide();
+		$('#field, #tree_ids, #sample_ids').hide();
 	}
 	else if (this.value === 'block') {
-		$('#trial_traits, #tree_traits, #branch_traits, #leaf_traits, #sample_traits').hide();
+		$('#field_traits, #tree_traits, #branch_traits, #leaf_traits, #sample_traits').hide();
 		$('#block_traits').show();
-		$('#trial').show();
+		$('#field').show();
 		$('#existing_ids').hide();
 		$('#tree_ids, #sample_ids').hide();
 	}
 	else if (this.value === 'tree') {
-		$('#trial_traits,#block_traits,#branch_traits,#leaf_traits,#sample_traits').hide();
+		$('#field_traits,#block_traits,#branch_traits,#leaf_traits,#sample_traits').hide();
 		$('#tree_traits').show();
-		$('#trial, #tree_ids').show();
+		$('#field, #tree_ids').show();
 		$('#existing_ids').hide();
 		$('#branch_ids,#leaf_ids,#sample_ids').hide();
 	}
 	else if (this.value === 'branch') {
-		$('#trial_traits,#block_traits,#tree_traits,#leaf_traits,#sample_traits').hide();
+		$('#field_traits,#block_traits,#tree_traits,#leaf_traits,#sample_traits').hide();
 		$('#branch_traits').show();
 		$('#existing_ids').show();
 		$('#old_new_ids').val('old');
 		$('#new_ids').hide();
-		$('#trial, #tree_ids, #branch_ids').show();
+		$('#field, #tree_ids, #branch_ids').show();
 		$('#leaf_ids, #sample_ids').hide();
 	}
 	else if (this.value === 'leaf') {
-		$('#trial_traits,#block_traits,#tree_traits,#branch_traits,#sample_traits').hide();
+		$('#field_traits,#block_traits,#tree_traits,#branch_traits,#sample_traits').hide();
 		$('#leaf_traits').show();
 		$('#existing_ids').show();
 		$('#old_new_ids').val('old');
 		$('#new_ids').hide();
-		$('#trial,#leaf_ids,#tree_ids').show();
+		$('#field,#leaf_ids,#tree_ids').show();
 		$('#branch_ids,#sample_ids').hide();
 	}
 	else if (this.value === 'sample') {
-		$('#trial_traits,#block_traits,#tree_traits,#branch_traits,#leaf_traits').hide();
+		$('#field_traits,#block_traits,#tree_traits,#branch_traits,#leaf_traits').hide();
 		$('#sample_traits').show();
 		$('#existing_ids').hide();
-		$('#trial, #sample_ids, #tree_ids').show();
+		$('#field, #sample_ids, #tree_ids').show();
 		$('#branch_ids,#leaf_ids').hide();
 	}
 });
@@ -135,7 +135,7 @@ $('dl').each( function () {
 });
 
 //expand the general tab as defaults are set (and as example)
-//$('#select_all_trial-general').parent().next().show();
+//$('#select_all_field-general').parent().next().show();
 //$('#select_all_block-general').parent().next().show();
 //$('#select_all_tree-general').parent().next().show();
 //$('#select_all_sample-general').parent().next().show();

@@ -44,7 +44,7 @@ def download():
 			branch_traits_form = CreateTraits().update('branch')
 			tree_traits_form = CreateTraits().update('tree')
 			block_traits_form = CreateTraits().update('block')
-			trial_traits_form = CreateTraits().update('trial')
+			field_traits_form = CreateTraits().update('field')
 			return render_template(
 				'download.html',
 				download_form = download_form,
@@ -54,7 +54,7 @@ def download():
 				sample_traits_form = sample_traits_form,
 				tree_traits_form = tree_traits_form,
 				block_traits_form = block_traits_form,
-				trial_traits_form = trial_traits_form,
+				field_traits_form = field_traits_form,
 				level = 'all',
 				title='Download'
 			)
@@ -81,9 +81,9 @@ def generate_csv():
 				country = request.form['country']
 				region = request.form['region']
 				farm = request.form['farm']
-				trial_uid = request.form['trial']
-				if trial_uid != "":
-					trial_uid = int(trial_uid)
+				field_uid = request.form['field']
+				if field_uid != "":
+					field_uid = int(field_uid)
 				block_uid = request.form['block']
 				# selected traits of current level as flat list
 				traits = [
@@ -108,7 +108,7 @@ def generate_csv():
 					country,
 					region,
 					farm,
-					trial_uid,
+					field_uid,
 					block_uid,
 					level,
 					traits,

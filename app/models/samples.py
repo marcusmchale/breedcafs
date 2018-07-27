@@ -33,10 +33,10 @@ class Samples:
 			return [record[0] for record in result]
 
 	@staticmethod
-	def add_samples(trial_uid, start, end, replicates, tissue, storage, date, get_file):
+	def add_samples(field_uid, start, end, replicates, tissue, storage, date, get_file):
 		with get_driver().session() as neo4j_session:
 			add_parameters = {
-				'trial_uid': trial_uid,
+				'field_uid': field_uid,
 				'start': start,
 				'end': end,
 				'replicates': replicates,
@@ -65,8 +65,8 @@ class Samples:
 				'Country',
 				'Region',
 				'Farm',
-				'Trial',
-				'Trial UID',
+				'Field',
+				'Field UID',
 				'Block',
 				'Block UID',
 				'Tree UID',
@@ -79,7 +79,7 @@ class Samples:
 			]
 			first_sample_id = id_list[0]['Sample ID']
 			last_sample_id = id_list[-1]['Sample ID']
-			filename = 'Trial_' + str(trial_uid) + '_S' + str(first_sample_id) + '_to_S' + str(last_sample_id) + '.csv'
+			filename = 'Field_' + str(field_uid) + '_S' + str(first_sample_id) + '_to_S' + str(last_sample_id) + '.csv'
 			file_path = os.path.join(app.instance_path, app.config['DOWNLOAD_FOLDER'], session['username'], filename)
 			# make the file
 			with open(file_path, 'w') as csv_file:
@@ -117,12 +117,12 @@ class Samples:
 		q = q + ')<-[:IS_IN]-(farm:Farm '
 		if parameters['farm']:
 			q = q + '{name_lower:toLower($farm)} '
-		q = q + ')<-[:IS_IN]-(trial:Trial '
-		if parameters['trial_uid']:
-			q = q + ' {uid:$trial_uid}'
+		q = q + ')<-[:IS_IN]-(field:Field '
+		if parameters['field_uid']:
+			q = q + ' {uid:$field_uid}'
 		q = (
-				q + ')<-[:FROM_TRIAL]-(:TrialSamples) '
-				+ ' <-[:FROM_TRIAL]-(tts:TrialTissueStorage) '
+				q + ')<-[:FROM_FIELD]-(:FieldSamples) '
+				+ ' <-[:FROM_FIELD]-(tts:FieldTissueStorage) '
 				+ ' <-[:COLLECTED_AS]-(sample),'
 		)
 		# collect the Tissue/Storage container
@@ -192,8 +192,8 @@ class Samples:
 			'	Country : country.name, '
 			'	Region : region.name, '
 			'	Farm : farm.name, '
-			'	Trial : trial.name, '
-			'	`Trial UID`	: trial.uid, '
+			'	Field : field.name, '
+			'	`Field UID`	: field.uid, '
 			'	Block : block.name, '
 			'	`Block UID` : block.uid, '
 			'	`Tree UID` : tree.uid, '

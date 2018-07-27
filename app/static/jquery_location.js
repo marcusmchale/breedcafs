@@ -75,7 +75,7 @@ update_farms = function(set_farm = "") {
 				$("#farm").prop( "disabled", false);
 				}
 				$('#farm').val(set_farm);
-				update_trials();
+				update_fields();
 			},
 			error: function (error) {
 				console.log(error);
@@ -84,30 +84,30 @@ update_farms = function(set_farm = "") {
 	}
 };
 
-update_trials = function(set_trial = "") {
+update_fields = function(set_field = "") {
 	var sel_country = $("#country").find(":selected").val();
 	var sel_region = $("#region").find(":selected").val();
 	var sel_farm = $("#farm").find(":selected").val();
 	if (sel_farm === "") {
-		$("#trial").empty();
-		$("#trial").append($("<option></option>").attr("value", "").text("Select Trial"))
+		$("#field").empty();
+		$("#field").append($("<option></option>").attr("value", "").text("Select Field"))
 	}
 	else {
-		$("#trial").prop( "disabled", true);
+		$("#field").prop( "disabled", true);
 		var request = $.ajax({
 			type: 'GET',
 			url: "/location/" + sel_country + '/' + sel_region + '/' + sel_farm + '/',
 			success: function(response){
-				var trials = [["","Select Trial"]].concat(response).sort();
-				$("#trial").empty();
-				for (var i = 0; i < trials.length; i++) {
-					$("#trial").append(
+				var fields = [["","Select Field"]].concat(response).sort();
+				$("#field").empty();
+				for (var i = 0; i < fields.length; i++) {
+					$("#field").append(
 						$("<option></option>").attr(
-							"value", trials[i][0]).text(trials[i][1])
+							"value", fields[i][0]).text(fields[i][1])
 					);
-				$("#trial").prop( "disabled", false);
+				$("#field").prop( "disabled", false);
 				}
-				$('#trial').val(set_trial);
+				$('#field').val(set_field);
 				update_blocks();
 			},
 			error: function (error) {
@@ -118,8 +118,8 @@ update_trials = function(set_trial = "") {
 };
 
 update_blocks = function(set_block = "") {
-	var sel_trial = $("#trial").find(":selected").val();
-	if (sel_trial === "")  {
+	var sel_field = $("#field").find(":selected").val();
+	if (sel_field === "")  {
 		$("#block").empty();
 		$("#block").append($("<option></option>").attr("value", "").text("Select Block"))
 	}
@@ -127,7 +127,7 @@ update_blocks = function(set_block = "") {
 		$("#block").prop( "disabled", true);
 		var request = $.ajax({
 			type: 'GET',
-			url: "/location/blocks/" + sel_trial + '/',
+			url: "/location/blocks/" + sel_field + '/',
 			success: function(response){
 				var blocks = [["","Select Block"]].concat(response).sort();
 				$("#block").empty();
@@ -153,10 +153,10 @@ remove_flash = function() {
 }
 
 $( window ).load(update_countries)
-$("#country").change(update_regions).change(remove_flash);
-$("#region").change(update_farms).change(remove_flash);
-$("#farm").change(update_trials).change(remove_flash);
-$('#trial').change(update_blocks).change(remove_flash);
+$("#country").change(update_regions).change(update_fields).change(remove_flash);
+$("#region").change(update_farms).change(update_fields).change(remove_flash);
+$("#farm").change(update_fields).change(remove_flash);
+$('#field').change(update_blocks).change(remove_flash);
 
 //Disable submit on keypress "Enter" for all inputs boxes
 $("input").keypress( function(e) {
@@ -276,25 +276,25 @@ $("#submit_farm").click( function(e) {
 })
 
 
-$("#submit_trial").click( function(e) {
+$("#submit_field").click( function(e) {
 	e.preventDefault();
 	remove_flash();
-	var submit_trial = $.ajax({
-		url: "/add_trial",
+	var submit_field = $.ajax({
+		url: "/add_field",
 		data: $("form").serialize(),
 		type: 'POST',
 			success: function(response) {
 				if (response.hasOwnProperty('submitted')) {
-					flash = "<div id='trial_flash' class='flash'> Submitted: " + response['submitted']['name'] + " </div>";
-					$("#submit_trial").after(flash);
-					$("#text_trial").val("");
-					update_trials(response['submitted']['uid']);
+					flash = "<div id='field_flash' class='flash'> Submitted: " + response['submitted']['name'] + " </div>";
+					$("#submit_field").after(flash);
+					$("#text_field").val("");
+					update_fields(response['submitted']['uid']);
 					load_chart();
 				}  else if (response.hasOwnProperty('found')) {
-					flash = flash = "<div id='trial_flash' class='flash'> Found: " + response['found']['name'] + " </div>";
-					$("#submit_trial").after(flash);
-					update_trials(response['found']['uid']);
-					$("#text_trial").val("");
+					flash = flash = "<div id='field_flash' class='flash'> Found: " + response['found']['name'] + " </div>";
+					$("#submit_field").after(flash);
+					update_fields(response['found']['uid']);
+					$("#text_field").val("");
 				} else {
 					for (i in response) {
 						for (var key in response[i]){
@@ -312,7 +312,7 @@ $("#submit_trial").click( function(e) {
 	});
 })
 
-//Add new block to the trial
+//Add new block to the field
 $("#submit_block").click( function(e) {
 	e.preventDefault();
 	remove_flash();
@@ -387,12 +387,12 @@ $("#submit_trees").click( function(e) {
 $("#trees_end").val('')
 
 update_defaults = function() {
-	var sel_trial = $("#trial").find(":selected").val();
-	if (sel_trial !== "") {
+	var sel_field = $("#field").find(":selected").val();
+	if (sel_field !== "") {
 		$("#trees_start, trees_end").prop("disabled", true);
 		var request = $.ajax({
 			type: 'GET',
-			url: "/location/treecount/" + sel_trial + '/',
+			url: "/location/treecount/" + sel_field + '/',
 		});
 		request.done(function(data){
 			if (data[0] === 0) {
@@ -409,9 +409,9 @@ update_defaults = function() {
 		});
 	}
 	else {
-		//handling return to nothing entered on deselection of trial
+		//handling return to nothing entered on deselection of field
 		$("#trees_start,#trees_end").val('')
 	}
 };
 
-$('#trial').change(update_defaults);
+$('#field').change(update_defaults);

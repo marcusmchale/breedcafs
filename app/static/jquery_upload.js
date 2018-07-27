@@ -7,8 +7,6 @@ remove_flash = function() {
 	$(".flash").remove();
 }
 
-$('#submission_type').val('FB');
-
 $('#upload_submit').click( function(e) {
 	e.preventDefault();
 	$('#upload_submit').prop('disabled', true);
