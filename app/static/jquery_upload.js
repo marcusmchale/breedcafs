@@ -1,8 +1,4 @@
 
-//Render a calendar in jquery-ui for date selection
-$("#date").datepicker({ dateFormat: 'yy-mm-dd'});
-$('#time').timepicker({ dateFormat: 'hh-mm'});
-
 remove_flash = function() {
 	$(".flash").remove();
 }
@@ -77,19 +73,19 @@ $('#upload_submit').click( function(e) {
 					    	$('#upload_submit_flash').replaceWith("<div id='response' class='flash'></div>")
 					    	$('#response').append(response.result.result);
 					    	$('#upload_submit').prop('disabled', false);
-					    	load_graph();
+							load_graph("/json_submissions");
 					    	};
 					}
-					if (response.hasOwnProperty('result')) {
-						if (typeof response.result['new_data'] !== "undefined") {
-							result_text = String(response.result['new_data']) + " new records submitted, "
-							result_text += String(response.result['resubmissions']) + " records already found"
-							result_text += String()
-							flash_result = "<div id='upload_submit_flash' class='flash'> " + result_text +  "</div>";
-							$("#upload_submit_flash").replaceWith(flash_result);
-							$('#upload_submit').prop('disabled', false);
-						}
-					}
+					//if (response.hasOwnProperty('result')) {
+					//	if (typeof response.result['new_data'] !== "undefined") {
+					//		result_text = String(response.result['new_data']) + " new records submitted, "
+					//		result_text += String(response.result['resubmissions']) + " records already found"
+					//		result_text += String()
+					//		flash_result = "<div id='upload_submit_flash' class='flash'> " + result_text +  "</div>";
+					//		$("#upload_submit_flash").replaceWith(flash_result);
+					//		$('#upload_submit').prop('disabled', false);
+					//	}
+					//}
 				}
 			});
 		}, 1000);

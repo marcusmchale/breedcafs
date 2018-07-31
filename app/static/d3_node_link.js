@@ -3,7 +3,7 @@
 var svg = d3.select("svg"),
 	width = +svg.attr("width"),
 	height = +svg.attr("height"),
-	radius=20,
+	radius = 20,
 	node,
 	link;
 
@@ -15,22 +15,24 @@ var simulation = d3.forceSimulation()
 	    return d.radius
 	}).strength(1000))
 
-var load_graph = function() {
+
+var load_graph = function(data) {
+	console.log("LOADs");
 	// load graph (nodes,links) json from /graph endpoint
-	var data = "/json_submissions";
 	d3.json(data, function(error, graph) {
-		if (error) throw error;
+		if (error) console.warn(error);
 		else if (graph.hasOwnProperty('status')) {
-			console.log('status report');
 			$("svg").replaceWith("<div class='flash'>" + graph.status + "</div>")
 		}
 		else {
-		update(graph.links, graph.nodes);
+			update(graph.links, graph.nodes);
 		}
 	})
 }
 
+
 var update = function(links, nodes){
+	console.log("UPDATE");
 	link = svg.selectAll(".link")
 	.data(links)
 	.enter()
@@ -73,12 +75,12 @@ var update = function(links, nodes){
 
 var ticked = function() {
 	node
-		.attr("transform", function(d) { 
-			return "translate(" 
+		.attr("transform", function(d) {
+			return "translate("
 			+ Math.max(radius, Math.min(width-radius, d.x))
-			+"," 
+			+","
 			+ Math.max(radius, Math.min(height-radius, d.y))
-			+ ")"; 
+			+ ")";
 		});
 	link
 	    .attr("x1", function(d) { return Math.max(radius, Math.min(width-radius, d.source.x)); })
@@ -102,6 +104,4 @@ var dragged = function(d) {
 	d.fy = d3.event.y;
 }
 
-
-
-load_graph();
+load_graph('/json_submissions');

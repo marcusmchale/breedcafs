@@ -3,7 +3,7 @@
 <div class="text_body">
 	<h2>
 		Register fields and trees with
-		<a href="{{ url_for('create') }}"><img src = "{{ url_for('static', filename='create.svg') }}"></a>
+		<a href="{{ url_for('create') }}"><img src = "{{ url_for('static', filename='create_field.svg') }}"></a>
 	</h2>
 		<h3>Locations</h3>
 			<p>
@@ -26,25 +26,27 @@
 			</p>
 		<h3>Blocks</h3>
 			<p>
-				In blocked experimental designs, conditions (nuisance factors) may vary between the experimental blocks
-				of a given field. To represent this variation, experimental blocks can be registered within each field
-				and	"block" level trait data can be recorded against these units. As such, the block traits are often
-				similar to those at the "field" level. The block may also represent a single growth chamber.
+				Blocked experimental designs are often necessary to account for conditions (nuisance factors) that vary
+				within a given field. Similarly, in controlled growth experiments such variation is often also found
+				between growth chambers. To facilitate registering data with such experimental designs, "blocks" can be
+				registered within each field and trait data can then be recorded against these units. Accordingly,
+				the "block" level traits are often identical to those at the "field" level.
 			</p>
 			<p>
 				Blocks are assigned a UID that is incremented from the field UID.
 				As an example, "1_B2" is the UID for the second block registered within the field with UID 1.
-				Blocks are best added here so that subsequent trees may be registered directly into a block,
-				however the block UID may also be entered per tree later in Field Book.
+				Blocks are best added here so that subsequent trees may be registered directly into a block.
+				However, the block UID may also be entered per tree through the "Record" and "Upload" procedure.
 			</p>
 		<h3>Trees</h3>
 			<p>
 				The tree is the experimental unit against which the "tree" level trait data is recorded.
-				These traits will include experimental treatments being applied.
+				These traits include a number of different types of value, including not just
+				experimental data, but also treatments applied and contextual information such as custom identifiers.
 			</p>
 			<p>
 				Each tree is registered within a field (optionally within a block)
-				and assigned a UID that also increments from the field UID.
+				and assigned a UID that increments from the field UID.
 				As an example, "1_T2" is the UID for the second tree registered within the field with UID 1.
 			</p>
 	<h2>

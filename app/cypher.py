@@ -453,7 +453,7 @@ class Cypher:
 		'	(field:Field) '
 		'	-[:IS_IN*3]->(:Country {name_lower: toLower(trim($country))}) '
 		' RETURN '
-		'	properties (Field) '
+		'	properties (field) '
 	)
 	get_fields_region = (
 		' MATCH '
