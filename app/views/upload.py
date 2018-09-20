@@ -1,5 +1,7 @@
 from app import app, ServiceUnavailable, AuthError
-from flask import ( flash, redirect, url_for, session, render_template, jsonify)
+from flask import (
+	flash, redirect, url_for, session, render_template, jsonify
+)
 from app.models import Upload
 from app.forms import UploadForm
 

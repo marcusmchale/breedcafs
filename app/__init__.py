@@ -36,6 +36,7 @@ redis_exceptions = exceptions
 from neo4j.v1 import GraphDatabase, ServiceUnavailable, AuthError
 from neo4j.util import watch
 
+
 from app import views
 
 # these are the variable view rules for retrieving lists:

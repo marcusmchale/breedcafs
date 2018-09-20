@@ -10,7 +10,10 @@ from flask import (
 	json
 )
 from itsdangerous import URLSafeTimedSerializer
-from app.models import User, Lists
+from app.models import (
+	User,
+	SelectionList
+)
 from app.forms import (
 	RegistrationForm,
 	UserAdminForm,
@@ -219,7 +222,7 @@ def get_affiliations():
 		confirmed = set(affiliations['confirmed'])
 		pending = set(affiliations['pending'])
 		other = (
-			set(Lists('Partner').create_list_tup('name', 'fullname')) - confirmed - pending
+			set(SelectionList.get_partners()) - confirmed - pending
 			# also remove the one that had an asterix concatenated
 			- set([(i[0], i[1][:-2]) for i in pending if i[1].endswith(' *')])
 			- set([(i[0], i[1][:-2]) for i in confirmed if i[1].endswith(' *')])

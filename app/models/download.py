@@ -1,7 +1,9 @@
 from app import app, os
 import grp
 from app.cypher import Cypher
-from lists import Lists
+#from item_lists import ItemList
+#from lists import Lists
+#from item_lists import TraitList
 from samples import Samples
 from neo4j_driver import (
 	get_driver,
@@ -14,7 +16,8 @@ from flask import (
 import unicodecsv as csv
 from datetime import datetime
 from app.models import (
-	Fields)
+	Fields
+)
 
 
 # User class related (all uploads are tied to a user) yet more specifically regarding uploads
@@ -1243,47 +1246,183 @@ class Download:
 	def get_table_csv(self, form_data, existing_ids = None):
 		# create two files, one is the index + trait names + time details table, the other is a trait description file
 		# - specifying format and details of each trait value
-		# starts with getting the index data (id_list) and fieldnames (to which the traits will be added)
-		if form_data['trait_level'] == 'field':
-			parameters = {}
-			query = 'MATCH (c:Country '
-			if form_data['country'] != '':
-				query += '{name_lower: toLower($country)}'
-				parameters['country'] = form_data['country']
-			query += ')<-[:IS_IN]-(r:Region '
-			if form_data['region'] != '':
-				query += '{name_lower: toLower($region)}'
-				parameters['region'] = form_data['region']
-			query += ')<-[:IS_IN]-(f:Farm '
-			if form_data['farm'] != '':
-				query += '{name_lower: toLower($farm)}'
-				parameters['farm'] = form_data['farm']
-			query += (
-				' )<-[IS_IN]-(field:Field) '
-				' RETURN {'
-				' UID : field.uid, '
-				' Field : field.name, '
-				' Farm : f.name, '
-				' Region : r.name, '
-				' Country : c.name }'
-				' ORDER BY field.uid'
-			)
-			fieldnames = [
-				'Country',
-				'Region',
-				'Farm',
-				'Field',
-				'UID'
+		# check the traits selected
+		level = form_data['trait_level']
+		# create list of selected traits
+		selection = [
+			item for sublist in [
+				form_data.getlist(i) for i in form_data if all(
+					['csrf_token' not in i, level + '-' in i]
+				)
 			]
-			with get_driver().session() as neo4j_session:
-				result = neo4j_session.read_transaction(
-					neo4j_query,
-					query,
-					parameters)
-				id_list = [record[0] for record in result]
-		else:  # if form_data['trait_level'] in ['block', 'tree', 'branch', 'leaf', 'sample']:
-			field_uid = int(form_data['field'])
-			if form_data['trait_level'] == 'sample':
+			for item in sublist
+		]
+		# if there are no selected traits exit here returning None
+		if len(selection) == 0:
+			return None
+		selected_traits = TraitList.get_traits(level, selection)
+		# get the index data (id_list) and fieldnames (to which the traits will be added)#
+		# define the list of items
+		if existing_ids:
+			id_list = existing_ids
+		else:
+			# To find the selected items we first parse the form_data
+			#  - no selection is empty string, convert to None
+			#  - convert integers stored as strings to integers
+			#  - convert date to UTC timestamp (ms)
+			country = form_data['country'] if form_data['country'] != '' else None
+			region = form_data['region'] if form_data['region'] != '' else None
+			farm = form_data['farm'] if form_data['farm'] != '' else None
+			field_uid = int(form_data['field']) if form_data['field'].isdigit() else None
+			block_uid = form_data['block'] if form_data['block'] != '' else None
+			trees_start = int(form_data['trees_start']) if form_data['trees_start'].isdigit() else None
+			trees_end = int(form_data['trees_end']) if form_data['trees_end'].isdigit() else None
+			branches_start = int(form_data['branches_start']) if form_data['branches_start'].isdigit() else None
+			branches_end = int(form_data['branches_end']) if form_data['branches_end'].isdigit() else None
+			leaves_start = int(form_data['leaves_start']) if form_data['leaves_start'].isdigit() else None
+			leaves_end = int(form_data['leaves_end']) if form_data['leaves_end'].isdigit() else None
+			samples_start = int(form_data['samples_start']) if form_data['samples_start'].isdigit() else None
+			samples_end = int(form_data['samples_end']) if form_data['samples_end'].isdigit() else None
+			tissue = form_data['tissue'] if form_data['tissue'] != '' else None
+			storage = form_data['storage'] if form_data['storage'] != '' else None
+			replicates = int(form_data['sample_replicates']) if form_data['sample_replicates'].isdigit() else None
+			try:
+				start_time = int(
+					(datetime.strptime(form_data['date_from'], '%Y-%m-%d') - datetime(1970, 1,
+																					  1)).total_seconds() * 1000
+				) if form_data['date_from'] != '' else None
+			except ValueError:
+				start_time = None
+			try:
+				end_time = int(
+					(datetime.strptime(form_data['date_to'], '%Y-%m-%d') - datetime(1970, 1, 1)).total_seconds() * 1000
+				) if form_data['date_to'] != '' else None
+			except ValueError:
+				end_time = None
+			# then retrieve the list of filtered items at the corresponding level
+			if level == 'field':
+				id_list = ItemList.get_fields(
+					country=country,
+					region=region,
+					farm=farm)
+				fieldnames = [
+					'Country',
+					'Region',
+					'Farm',
+					'Field',
+					'UID'
+				]
+			elif level == 'block':
+				id_list = ItemList.get_blocks(
+					country=country,
+					region=region,
+					farm=farm,
+					field_uid=field_uid
+				)
+				fieldnames = [
+					'Country',
+					'Region',
+					'Farm',
+					'Field',
+					'Field UID',
+					'Block',
+					'UID'
+				]
+			elif level == 'tree':
+				id_list = ItemList.get_trees(
+					country=country,
+					region=region,
+					farm=farm,
+					field_uid=field_uid,
+					block_uid=block_uid,
+					trees_start=trees_start,
+					trees_end=trees_end
+				)
+				fieldnames = [
+					'Country',
+					'Region',
+					'Farm',
+					'Field',
+					'Field UID',
+					'Block',
+					'Block UID',
+					'Variety',
+					'Tree Custom ID',
+					'UID'
+				]
+			elif level == 'branch':
+				id_list = ItemList.get_leaves(
+					country=country,
+					region=region,
+					farm=farm,
+					field_uid=field_uid,
+					block_uid=block_uid,
+					trees_start=trees_start,
+					trees_end=trees_end,
+					branches_start=branches_start,
+					branches_end=branches_end
+				)
+				fieldnames = [
+					'Country',
+					'Region',
+					'Farm',
+					'Field',
+					'Field UID',
+					'Block',
+					'Block UID',
+					'Tree Custom ID',
+					'Tree UID',
+					'Variety',
+					'UID'
+				]
+			elif level == 'leaf':
+				id_list = ItemList.get_leaves(
+					country=country,
+					region=region,
+					farm=farm,
+					field_uid=field_uid,
+					block_uid=block_uid,
+					trees_start=trees_start,
+					trees_end=trees_end,
+					branches_start=branches_start,
+					branches_end=branches_end,
+					leaves_start=leaves_start,
+					leaves_end=leaves_end
+				)
+				fieldnames = [
+					'Country',
+					'Region',
+					'Farm',
+					'Field',
+					'Field UID',
+					'Block',
+					'Block UID',
+					'Tree Custom ID',
+					'Tree UID',
+					'Branch UID',
+					'UID'
+				]
+
+			elif level == 'sample':
+				id_list = ItemList.get_samples(
+					country=country,
+					region=region,
+					farm=farm,
+					field_uid=field_uid,
+					block_uid=block_uid,
+					trees_start=trees_start,
+					trees_end=trees_end,
+					branches_start=branches_start,
+					branches_end=branches_end,
+					leaves_start=leaves_start,
+					leaves_end=leaves_end,
+					samples_start=samples_start,
+					samples_end=samples_end,
+					tissue=tissue,
+					storage=storage,
+					start_time=start_time,
+					end_time=end_time
+				)
 				fieldnames = [
 					'Country',
 					'Region',
@@ -1300,173 +1439,19 @@ class Download:
 					'Date Sampled',
 					'UID'
 				]
-				parameters = {
-					'country': form_data['country'],
-					'region': form_data['region'],
-					'farm': form_data['farm'],
-					'field_uid': field_uid,
-					'trees_start': int(form_data['trees_start']) if form_data['trees_start'] else "",
-					'trees_end': int(form_data['trees_end']) if form_data['trees_end'] else "",
-					'replicates': int(form_data['replicates']) if form_data['replicates'] else "",
-					'tissue': form_data['tissue'],
-					'storage': form_data['storage'],
-					'start_time': int(
-						(
-							datetime.strptime(form_data['date_from'], '%Y-%m-%d')
-							- datetime(1970, 1, 1)
-						).total_seconds() * 1000
-					) if form_data['date_from'] else "",
-					'end_time': int(
-						(
-							datetime.strptime(form_data['date_to'], '%Y-%m-%d')
-							- datetime(1970, 1, 1)
-						).total_seconds() * 1000
-					) if form_data['date_to'] else "",
-					'samples_start': int(form_data['samples_start']) if form_data['samples_start'] else "",
-					'samples_end': int(form_data['samples_end']) if form_data['samples_end'] else ""
-				}
-				# build the file and return filename etc.
-				id_list = Samples().get_samples(parameters)
-			elif form_data['trait_level'] == 'leaf':
-				fieldnames = [
-					'Country',
-					'Region',
-					'Farm',
-					'Field',
-					'Field UID',
-					'Block',
-					'Block UID',
-					'Tree Custom ID',
-					'Tree UID',
-					'Branch UID',
-					'UID'
-				]
-				if form_data['old_new_ids'] == 'old':
-					parameters = {
-						'country': form_data['country'],
-						'region': form_data['region'],
-						'farm': form_data['farm'],
-						'field_uid': field_uid,
-						'trees_start': int(form_data['trees_start']) if form_data['trees_start'] else 1,
-						'trees_end': int(form_data['trees_end']) if form_data['trees_end'] else 999999,
-						'start_time': int(
-							(
-								datetime.strptime(form_data['date_from'], '%Y-%m-%d')
-								- datetime(1970, 1, 1)
-							).total_seconds() * 1000)
-						if form_data['date_from'] != '' else '',
-						'end_time': int(
-							(
-								datetime.strptime(form_data['date_to'], '%Y-%m-%d')
-								- datetime(1970, 1, 1)
-							).total_seconds() * 1000)
-						if form_data['date_to'] != '' else '',
-						'leaves_start': int(form_data['leaves_start']) if form_data['leaves_start'] != '' else 1,
-						'leaves_end': int(form_data['leaves_end']) if form_data['leaves_end'] != ''else 999999
-					}
-					with get_driver().session() as neo4j_session:
-						result = neo4j_session.read_transaction(neo4j_query, Cypher.leaves_get, parameters)
-					id_list = [record[0] for record in result]
-				else:
-					id_list = existing_ids
-			elif form_data['trait_level'] == 'tree':
-				trees_start = int(form_data['trees_start'] if form_data['trees_start'] else 0)
-				trees_end = int(form_data['trees_end'] if form_data['trees_end'] else 999999)
-				# make the file and return filename, path, size
-				fieldnames = [
-					'Country',
-					'Region',
-					'Farm',
-					'Field',
-					'Field UID',
-					'Block',
-					'Block UID',
-					'Variety',
-					'Tree Custom ID',
-					'UID'
-				]
-				id_list = Fields.get_trees(field_uid, trees_start, trees_end)
-			elif form_data['trait_level'] == 'branch':
-				fieldnames = [
-					'Country',
-					'Region',
-					'Farm',
-					'Field',
-					'Field UID',
-					'Block',
-					'Block UID',
-					'Tree Custom ID',
-					'Tree UID',
-					'Variety',
-					'UID'
-				]
-				if form_data['old_new_ids'] == 'old':
-					parameters = {
-						'country': form_data['country'],
-						'region': form_data['region'],
-						'farm': form_data['farm'],
-						'field_uid': field_uid,
-						'trees_start': int(form_data['trees_start']) if form_data['trees_start'] else 1,
-						'trees_end': int(form_data['trees_end']) if form_data['trees_end'] else 999999,
-						'start_time': int(
-							(
-								datetime.strptime(form_data['date_from'], '%Y-%m-%d')
-								- datetime(1970, 1, 1)
-							).total_seconds() * 1000) if form_data['date_from'] != '' else '',
-						'end_time': int(
-							(
-								datetime.strptime(form_data['date_to'], '%Y-%m-%d')
-								- datetime(1970, 1, 1)
-							).total_seconds() * 1000) if form_data['date_to'] != '' else '',
-						'branches_start': int(form_data['branches_start']) if form_data['branches_start'] != '' else 1,
-						'branches_end': int(form_data['branches_end']) if form_data['branches_end'] != ''else 999999
-					}
-					with get_driver().session() as neo4j_session:
-						result = neo4j_session.read_transaction(neo4j_query, Cypher.branches_get, parameters)
-					id_list = [record[0] for record in result]
-				else:
-					id_list = existing_ids
-			else:  # form_data['trait_level'] == 'block':
-				# make the file and return a dictionary with filename, file_path and file_size
-				fieldnames = [
-					'Country',
-					'Region',
-					'Farm',
-					'Field',
-					'Field UID',
-					'Block',
-					'UID'
-				]
-				id_list = Fields.get_blocks(field_uid)
-		# check we have found matching ID's, if not return None
-		if len(id_list) == 0:
-			return None
-		# if requesting replicates for samples then create these in the id_list
-		sample_replicates = int(form_data['sample_replicates']) if form_data['sample_replicates'] else 1
-		if sample_replicates > 1:
-			fieldnames.insert(13, 'Sample UID')
-			id_list_reps = []
-			for sample in id_list:
-				sample['Sample UID'] = sample['UID']
-				for i in range(sample_replicates):
-					sample['UID'] = str(sample['Sample UID']) + "." + str(int(i + 1))
-					id_list_reps.append(sample.copy())
-			id_list = id_list_reps
-		# then we get the traits list from the form
-		node_label = str(form_data['trait_level']).title() + 'Trait'
-		selection = [
-			item for sublist in [
-				form_data.getlist(i) for i in form_data if all(
-					['csrf_token' not in i, form_data['trait_level'] + '-' in i]
-				)
-			]
-			for item in sublist
-		]
-		# if there are no selected traits exit here returning None
-		if len(selection) == 0:
-			return None
-		# check that they are in the database
-		selected_traits = Lists(node_label).get_selected(selection, 'name')
+				# check we have found matching ID's, if not return None
+				if len(id_list) == 0:
+					return None
+				# if requesting replicates for samples then create these replicates in the id_list
+				if replicates > 1:
+					fieldnames.insert(13, 'Sample UID')
+					id_list_reps = []
+					for sample in id_list:
+						sample['Sample UID'] = sample['UID']
+						for i in range(replicates):
+							sample['UID'] = str(sample['Sample UID']) + "." + str(int(i + 1))
+							id_list_reps.append(sample.copy())
+					id_list = id_list_reps
 		# make the table file
 		fieldnames += ['Date', 'Time']
 		fieldnames += [trait['name'] for trait in selected_traits]

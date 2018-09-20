@@ -14,7 +14,7 @@ from flask import (
 	request
 )
 from app.models import (
-	Lists,
+#	Lists,
 	User,
 	# Download,
 	Samples,

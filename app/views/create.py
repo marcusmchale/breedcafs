@@ -11,7 +11,7 @@ from flask import (
 	jsonify
 )
 from app.models import (
-	Lists,
+#	Lists,
 	Fields
 	# User,
 	# Samples
@@ -43,7 +43,7 @@ class ListCountries(MethodView):
 			return redirect(url_for('login'))
 		else:
 			try:
-				countries = Lists('Country').create_list_tup('name', 'name')
+				countries = SelectionList.get_countries()
 				response = make_response(jsonify(countries))
 				response.content_type = 'application/json'
 				return response
@@ -59,7 +59,7 @@ class ListRegions(MethodView):
 			return redirect(url_for('login'))
 		else:
 			try:
-				regions = Lists('Country').get_connected('name', country, 'IS_IN')
+				regions = SelectionList.get_regions(country)
 				response = make_response(jsonify([(i.lower(), i) for i in regions]))
 				response.content_type = 'application/json'
 				return response

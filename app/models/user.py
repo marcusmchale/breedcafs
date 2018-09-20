@@ -13,6 +13,12 @@ from neo4j_driver import get_driver
 from time import time
 # from datetime import datetime
 
+from neo4j_driver import (
+	get_driver,
+	neo4j_query
+)
+
+
 
 class User:
 	def __init__(self, username):
@@ -33,23 +39,29 @@ class User:
 
 	def get_user_affiliations(self):
 		with get_driver().session() as neo4j_session:
-			confirmed = []
-			pending = []
-			for record in neo4j_session.read_transaction(self._get_user_affiliations):
-				if record['data_shared']:
-					fullname = record['p.fullname'] + " *"
-				else:
-					fullname = record['p.fullname']
-				if record['confirmed']:
-					confirmed.append((record['p.name'], fullname))
-				elif record['confirmed']:
-					if record['admin_email']:
-						fullname = fullname + ' <br>Contact: ' + record['admin_email']
-					pending.append((record['p.name'], fullname))
-			return {'confirmed': confirmed, 'pending': pending}
+			parameters = {
+				'username': self.username
+			}
+			result = neo4j_session.read_transaction(
+				neo4j_query,
+				Cypher.user_affiliations,
+				parameters)
+		confirmed = []
+		pending = []
+		for record in result:
+			if record['data_shared']:
+				fullname = record['p.fullname'] + " *"
+			else:
+				fullname = record['p.fullname']
+			if record['confirmed']:
+				confirmed.append((record['p.name'], fullname))
+			else:
+				if record['admin_email']:
+					fullname = fullname + ' <br>Contact: ' + record['admin_email']
+				pending.append((record['p.name'], fullname))
+		return {'confirmed': confirmed, 'pending': pending}
 
-	def _get_user_affiliations(self, tx):
-		return tx.run(Cypher.user_affiliations, username = self.username)
+
 
 	def add_affiliations(self, partners):
 		with get_driver().session() as neo4j_session:

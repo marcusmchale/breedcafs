@@ -503,9 +503,13 @@ else:
 	if confirm('Do you want to a wipe existing data, rebuild the constraints and reset the indexes?'):
 		print('Performing a full reset of database')
 		with driver.session() as session:
+			print('deleting all nodes and relationships')
 			session.write_transaction(delete_database)
+			print('clearing schema')
 			session.write_transaction(clear_schema)
+			print('creating constraints')
 			session.write_transaction(create_constraints, config.constraints)
+			print('creating indexes')
 			session.write_transaction(create_indexes, config.indexes)
 	else: print('Attempting to create the following while retaining existing data:\n'
 		'  * user:start \n'

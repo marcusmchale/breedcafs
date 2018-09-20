@@ -194,31 +194,33 @@ class Fields:
 
 	@staticmethod
 	def get_fields_tup(
-			country = None,
-			region = None,
-			farm = None
+			country=None,
+			region=None,
+			farm=None
 	):
 		with get_driver().session() as neo4j_session:
-			if farm:
-				parameters = {
-					'country': country,
-					'region': region,
-					'farm': farm
-				}
-				result = neo4j_session.read_transaction(neo4j_query, Cypher.get_fields_farm, parameters)
-			elif region:
-				parameters = {
-					'country': country,
-					'region': region
-				}
-				result = neo4j_session.read_transaction(neo4j_query, Cypher.get_fields_region, parameters)
-			elif country:
-				parameters = {
-					'country': country,
-				}
-				result = neo4j_session.read_transaction(neo4j_query, Cypher.get_fields_country, parameters)
-			else:
-				result = neo4j_session.read_transaction(neo4j_query, Cypher.get_fields)
+			# commented out and not using flexibility of country/region variables
+			# to stop displaying all the fields on create page without farm selected,
+			# if farm:
+			parameters = {
+				'country': country,
+				'region': region,
+				'farm': farm
+			}
+			result = neo4j_session.read_transaction(neo4j_query, Cypher.get_fields_farm, parameters)
+			# elif region:
+			#	parameters = {
+			#		'country': country,
+			#		'region': region
+			#	}
+			#	result = neo4j_session.read_transaction(neo4j_query, Cypher.get_fields_region, parameters)
+			#elif country:
+			#	parameters = {
+			#		'country': country,
+			#	}
+			#	result = neo4j_session.read_transaction(neo4j_query, Cypher.get_fields_country, parameters)
+			#else:
+			#	result = neo4j_session.read_transaction(neo4j_query, Cypher.get_fields)
 			return [(str(record[0]['uid']), record[0]['name']) for record in result]
 
 	# get lists of items - these have field_uid so don't need country

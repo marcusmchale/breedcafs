@@ -116,10 +116,14 @@ def generate_files():
 							'table': csv_file_details,
 							'details': trt_file_details
 						}
-					else:  # form_data['template_format'] == 'csv'
+					elif form_data['template_format'] == 'csv':
 						file_details_dict = Download(session['username']).get_table_csv(form_data, id_list)
 						if not file_details_dict:
 							return jsonify({'submitted': "No entries found that match your selection"})
+					else: #form_data['template_format'] == 'xlsx'
+						pass
+						#template_file =
+						#file_details_dict =
 					# create html block with urls
 					url_list_html = ''
 					for i in file_details_dict:

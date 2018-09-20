@@ -1,6 +1,10 @@
 from user import User
 from upload import Upload
-from lists import Lists
+from lists import (
+	TraitList,
+	ItemList,
+	SelectionList
+)
 from fields import Fields
 from chart import Chart
 from samples import Samples

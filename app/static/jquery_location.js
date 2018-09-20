@@ -14,7 +14,6 @@ update_countries = function(set_country = "") {
 				);
 			$('#country').val(set_country);
 			}
-			update_regions();
 		},
 		error: function(error) {
 			console.log(error);
@@ -26,6 +25,7 @@ update_regions = function(set_region = "") {
 	$("#region").empty();
 	var sel_country = $("#country").find(":selected").val();
 	if (sel_country === "") {
+	    $("#region").empty();
 		$("#region").append($("<option></option>").attr("value", "").text("Select Region"))
 	}
 	else {
@@ -43,7 +43,6 @@ update_regions = function(set_region = "") {
 				$("#region").prop( "disabled", false);
 				}
 				$('#region').val(set_region);
-				update_farms();
 			},
 			error: function(error) {
 				console.log(error);
@@ -75,7 +74,6 @@ update_farms = function(set_farm = "") {
 				$("#farm").prop( "disabled", false);
 				}
 				$('#farm').val(set_farm);
-				update_fields();
 			},
 			error: function (error) {
 				console.log(error);
@@ -108,7 +106,6 @@ update_fields = function(set_field = "") {
 				$("#field").prop( "disabled", false);
 				}
 				$('#field').val(set_field);
-				update_blocks();
 			},
 			error: function (error) {
 				console.log(error);
@@ -153,9 +150,9 @@ remove_flash = function() {
 }
 
 $( window ).load(update_countries)
-$("#country").change(update_regions).change(update_fields).change(remove_flash);
-$("#region").change(update_farms).change(update_fields).change(remove_flash);
-$("#farm").change(update_fields).change(remove_flash);
+$("#country").change(update_regions).change(update_farms).change(update_fields).change(update_blocks).change(remove_flash);
+$("#region").change(update_farms).change(update_fields).change(update_blocks).change(remove_flash);
+$("#farm").change(update_fields).change(update_blocks).change(remove_flash);
 $('#field').change(update_blocks).change(remove_flash);
 
 //Disable submit on keypress "Enter" for all inputs boxes
@@ -326,7 +323,7 @@ $("#submit_block").click( function(e) {
 					$("#submit_block").after(flash);
 					$("#text_block").val("");
 					update_blocks(response['submitted']['uid']);
-					load_chart;
+					load_chart();
 			}  else if (response.hasOwnProperty('found')) {
 					flash = flash = "<div id='block_flash' class='flash'> Found: " + response['found']['name'] + " </div>";
 					$("#submit_block").after(flash);

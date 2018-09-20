@@ -20,6 +20,10 @@ Set up neo4j:
 	Set initial password:
 		neo4j-admin set-initial-password SECURE-PASSWORD-HERE
 
+		- You may need to delete the auth folder if something is already created there
+
+		    rm /var/lib/neo4j/data/dbms/auth
+
 		Alternative for local install:
 			Visit neo4j in the browser at localhost:7474 and configure username password (default is neo4j:neo4j)
 
@@ -36,7 +40,7 @@ Set up neo4j:
 			dbms.directories.import=/var/www/breedcafs/instance/import
 
 	Add APOC plugin:
-		Download the latest version and place it in the neo4j plugins directory.
+		Download the latest version (jar file)and place it in the neo4j plugins directory.
 		APOC is currently used for date parsing during CSV import
 
 

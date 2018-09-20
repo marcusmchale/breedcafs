@@ -24,7 +24,12 @@ from wtforms.validators import (
 from flask_wtf import FlaskForm
 from flask_wtf.file import FileField, FileRequired
 # from app import app
-from app.models import Lists, Fields, User
+from app.models import (
+	TraitList,
+	SelectionList,
+	Fields,
+	User
+)
 from collections import defaultdict
 from safe import check
 
@@ -87,8 +92,7 @@ class RegistrationForm(FlaskForm):
 	@staticmethod
 	def update():
 		form = RegistrationForm()
-		partners_list = Lists('Partner').create_list_tup('name', 'fullname')
-		form.partner.choices = sorted(tuple(partners_list), key=lambda tup: tup[1])
+		form.partner.choices = SelectionList.get_partners()
 		return form
 
 
@@ -114,7 +118,7 @@ class AffiliationForm(FlaskForm):
 		affiliations = User(username).get_user_affiliations()
 		confirmed = set(affiliations['confirmed'])
 		pending = set(affiliations['pending'])
-		other = set(Lists('Partner').create_list_tup('name', 'fullname')) - confirmed - pending
+		other = set(SelectionList.get_partners()) - confirmed - pending
 		form.pending.choices = sorted(tuple(pending), key=lambda tup: tup[1])
 		form.other.choices = sorted(tuple(other), key=lambda tup: tup[1])
 		return form
@@ -263,14 +267,8 @@ class LocationForm(FlaskForm):
 	@staticmethod
 	def update(optional = False):
 		form = LocationForm()
-		countries = sorted(
-			set(Lists('Country').create_list_tup('name', 'name')),
-			key=lambda tup: tup[1]
-		)
-		regions = sorted(
-			set(Lists('Country').get_connected('name', form.country.data, 'IS_IN')),
-			key=lambda tup: tup[0]
-		)
+		countries = SelectionList.get_countries()
+		regions = SelectionList.get_regions(form.country.data)
 		farms = sorted(
 			set(Fields.get_farms(form.country.data, form.region.data)),
 			key=lambda tup: tup[0]
@@ -514,7 +512,7 @@ class RecordForm(FlaskForm):
 	template_format = SelectField(
 		'Template format',
 		[InputRequired()],
-		choices = [('', 'Select Format'), ('csv', 'Table'), ('fb', 'Field Book')]
+		choices = [('', 'Select Format'), ('xlsx', 'Table (xlsx)'), ('csv', 'Table (CSV)'), ('fb', 'Field Book')]
 	)
 	trees_start = IntegerField(
 		'Start TreeID',
@@ -628,7 +626,6 @@ class UploadForm(FlaskForm):
 	)
 	upload_submit = SubmitField('Upload')
 
-
 # download
 class DownloadForm(FlaskForm):
 	trait_level = SelectField(
@@ -676,10 +673,10 @@ class CreateTraits(FlaskForm):
 		# fill this dictionary
 		for level in levels:
 			# get a list of dictionaries of properties from each trait node at this level
-			traits = sorted(Lists(level.title() + 'Trait').get_nodes(), key = lambda dict: dict['name'])
+			traits = sorted(TraitList.get_traits(level), key = lambda dict: dict['name'])
 			# merge this into our nested defaultdict[level] with group as key and list of traits as value
 			for trait in traits:
-				self.levels_groups_traits[level][trait['group']].append((trait['name'], trait['details']))
+				self.levels_groups_traits[level][trait['group']].append((trait['name_lower'], trait['name']))
 			# and create empty attributes for each group
 			for group in self.levels_groups_traits[level]:
 				setattr(CreateTraits, group, SelectMultipleField(group,
