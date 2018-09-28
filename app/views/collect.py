@@ -14,7 +14,8 @@ from flask import (
 	request
 )
 from app.models import (
-#	Lists,
+	SelectionList,
+	MatchNode,
 	User,
 	# Download,
 	Samples,
@@ -101,7 +102,7 @@ class Tissues(MethodView):
 			return redirect(url_for('login'))
 		else:
 			try:
-				tissues = Lists('Tissue').create_list_tup('name', 'name')
+				tissues = SelectionList.get_tissues()
 				response = make_response(jsonify(tissues))
 				response.content_type = 'application/json'
 				return response
@@ -120,9 +121,9 @@ def add_tissue():
 			form = AddTissueForm()
 			text_tissue = request.form['text_tissue'].strip()
 			if form.validate_on_submit():
-				find_tissue = Lists('Tissue').find_node(text_tissue)
+				find_tissue = MatchNode.tissue(text_tissue)
 				if find_tissue:
-					return jsonify({"found": find_tissue[0]['name'].title()})
+					return jsonify({"found": find_tissue[1]})
 				else:
 					new_tissue = Samples().add_tissue(text_tissue)
 					return jsonify({"submitted": new_tissue[0]['name'].title()})
@@ -141,7 +142,7 @@ class StorageMethods(MethodView):
 			return redirect(url_for('login'))
 		else:
 			try:
-				storage_methods = Lists('Storage').create_list_tup('name', 'name')
+				storage_methods = SelectionList.get_storage_types()
 				response = make_response(jsonify(storage_methods))
 				response.content_type = 'application/json'
 				return response
@@ -160,9 +161,9 @@ def add_storage():
 			form = AddStorageForm()
 			text_storage = request.form['text_storage'].strip()
 			if form.validate_on_submit():
-				find_storage = Lists('Storage').find_node(text_storage)
+				find_storage = MatchNode.storage(text_storage)
 				if find_storage:
-					return jsonify({"found": find_storage[0]['name'].title()})
+					return jsonify({"found": find_storage[1]})
 				else:
 					new_storage = Samples().add_storage(text_storage)
 					return jsonify({"submitted": new_storage[0]['name'].title()})

@@ -267,28 +267,18 @@ class LocationForm(FlaskForm):
 	@staticmethod
 	def update(optional = False):
 		form = LocationForm()
+		country = form.country.data if form.country.data != '' else None
+		region = form.region.data if form.region.data != '' else None
+		farm = form.farm.data if form.farm.data != '' else None
+		field_uid = form.field.data if form.field.data != '' else None
 		countries = SelectionList.get_countries()
-		regions = SelectionList.get_regions(form.country.data)
-		farms = sorted(
-			set(Fields.get_farms(form.country.data, form.region.data)),
-			key=lambda tup: tup[0]
-		)
-		fields = sorted(
-			# in current version of WTForms the default value is coerced to u'None so have to handle it here like this
-			# means can't use None as a value though
-			# TODO fixed in v3 of WTForms - upgrade when released and remove the if statements below
-			# https://github.com/wtforms/wtforms/pull/288
-			set(Fields.get_fields_tup(
-				form.country.data if form.country.data != (u'None') else None,
-				form.region.data if form.region.data != (u'None') else None,
-				form.farm.data if form.farm.data != (u'None') else None
-			)),
-			key=lambda tup: tup[1]
-		)
-		blocks = sorted(set(Fields.get_blocks_tup(form.field.data)), key=lambda tup: tup[0])
+		regions = SelectionList.get_regions(country)
+		farms = SelectionList.get_farms(country, region)
+		fields = SelectionList.get_fields(country, region, farm)
+		blocks = SelectionList.get_blocks(country, region, farm, field_uid)
 		form.country.choices = [('', 'Select Country')] + countries
-		form.region.choices = [('', 'Select Region')] + [(i.lower(), i) for i in regions]
-		form.farm.choices = [('', 'Select Farm')] + [(i.lower(), i) for i in farms]
+		form.region.choices = [('', 'Select Region')] + regions
+		form.farm.choices = [('', 'Select Farm')] + farms
 		form.field.choices = [('', 'Select Field')] + fields
 		form.block.choices = [('', 'Select Block')] + blocks
 		if optional:
@@ -471,8 +461,8 @@ class SampleRegForm(FlaskForm):
 	@staticmethod
 	def update(optional = False):
 		form = SampleRegForm()
-		tissues = sorted(set(Lists('Tissue').create_list_tup('name', 'name')), key=lambda tup: tup[1])
-		storage_types = sorted(set(Lists('Storage').create_list_tup('name', 'name')), key=lambda tup: tup[1])
+		tissues = SelectionList.get_tissues()
+		storage_types = SelectionList.get_storage_types()
 		form.tissue.choices = [('', 'Select Tissue')] + tissues
 		form.storage.choices = [('', 'Select Storage')] + storage_types
 		if optional:
@@ -499,7 +489,7 @@ class RecordForm(FlaskForm):
 	trait_level = SelectField(
 		'Trait level',
 		[InputRequired()],
-		choices = [
+		choices=[
 			('', 'Select Level'),
 			('field', 'Field'),
 			('block', 'Block'),
@@ -512,58 +502,58 @@ class RecordForm(FlaskForm):
 	template_format = SelectField(
 		'Template format',
 		[InputRequired()],
-		choices = [('', 'Select Format'), ('xlsx', 'Table (xlsx)'), ('csv', 'Table (CSV)'), ('fb', 'Field Book')]
+		choices=[('', 'Select Format'), ('xlsx', 'Table (xlsx)'), ('csv', 'Table (CSV)'), ('fb', 'Field Book')]
 	)
 	trees_start = IntegerField(
 		'Start TreeID',
 		[
 			Optional(),
-			NumberRange(min = min, max = max, message='An integer (' + str(min) + ' to ' + str(max) + ')')
+			NumberRange(min=min, max=max, message='An integer (' + str(min) + ' to ' + str(max) + ')')
 		],
-		description = "Start TreeID",
+		description="Start TreeID",
 	)
 	trees_end = IntegerField(
 		'End TreeID',
 		[
 			Optional(),
-			NumberRange(min = min, max = max, message='An integer (' + str(min) + ' to ' + str(max) + ')')
+			NumberRange(min=min, max=max, message='An integer (' + str(min) + ' to ' + str(max) + ')')
 		],
-		description = "End TreeID",
+		description="End TreeID",
 	)
 	branches_start = IntegerField(
 		'Start BranchID',
 		[
 			Optional(),
-			NumberRange(min = min, max = max, message='An integer (' + str(min) + ' to ' + str(max) + ')')
+			NumberRange(min=min, max=max, message='An integer (' + str(min) + ' to ' + str(max) + ')')
 		],
-		description = "Start BranchID")
+		description="Start BranchID")
 	branches_end = IntegerField(
 		'End BranchID',
 		[
 			Optional(),
-			NumberRange(min = min, max = max, message='An integer (' + str(min) + ' to ' + str(max) + ')')
+			NumberRange(min=min, max=max, message='An integer (' + str(min) + ' to ' + str(max) + ')')
 		],
-		description = "End BranchID")
+		description="End BranchID")
 	leaves_start = IntegerField(
 		'Start LeafID',
 		[
 			Optional(),
-			NumberRange(min = min, max = max, message='An integer (' + str(min) + ' to ' + str(max) + ')')
+			NumberRange(min=min, max=max, message='An integer (' + str(min) + ' to ' + str(max) + ')')
 		],
-		description = "Start LeafID")
+		description="Start LeafID")
 	leaves_end = IntegerField(
 		'End LeafID',
 		[
 			Optional(),
-			NumberRange(min = min, max = max, message='An integer (' + str(min) + ' to ' + str(max) + ')')
+			NumberRange(min=min, max=max, message='An integer (' + str(min) + ' to ' + str(max) + ')')
 		],
-		description = "End LeafID"
+		description="End LeafID"
 	)
 	samples_start = IntegerField(
 		'Start SampleID',
 		[
 			Optional(),
-			NumberRange(min = min, max = max, message='An integer (' + str(min) + ' to ' + str(max) + ')')
+			NumberRange(min=min, max=max, message='An integer (' + str(min) + ' to ' + str(max) + ')')
 		],
 		description="Start SampleID",
 	)
@@ -571,42 +561,42 @@ class RecordForm(FlaskForm):
 		'End SampleID',
 		[
 			Optional(),
-			NumberRange(min = min, max = max, message='An integer (' + str(min) + ' to ' + str(max) + ')')
+			NumberRange(min=min, max=max, message='An integer (' + str(min) + ' to ' + str(max) + ')')
 		],
-		description= "End SampleID"
+		description="End SampleID"
 	)
 	date_from = DateField(
 		'Date start (YYYY-mm-dd): ',
 		[Optional()],
 		format='%Y-%m-%d',
-		description = 'Start date'
+		description='Start date'
 	)
 	date_to = DateField(
 		'Date end (YYYY-mm-dd): ',
 		[Optional()],
 		format='%Y-%m-%d',
-		description = 'End date'
+		description='End date'
 	)
-	replicates = IntegerField(
-		'Replicates',
+	per_tree_replicates = IntegerField(
+		'Replicates per tree',
 		[
 			Optional(),
-			NumberRange(min=1, max=100, message='Maximum of 100 replicates per submission')
+			NumberRange(min=1, max=1000, message='Maximum of 1000 replicates per tree per submission')
 		],
-		description = "Replicates (number of items per tree)"
+		description="Replicates (number of branches/leaves/samples per tree)"
 	)
-	sample_replicates = IntegerField(
-		'Sample Replicates',
+	per_sample_replicates = IntegerField(
+		'Measures per sample',
 		[
 			Optional(),
-			NumberRange(min=1, max=100, message='Maximum of 100 measures of each trait per submission')
+			NumberRange(min=1, max=10000, message='Maximum of 10000 measures per sample per submission')
 		],
-		description = "Replicates (measures per sample)"
+		description="Replicates (number of measures for each trait performed on each sample)"
 	)
-	old_new_ids = SelectField(
-		'Find existing or create new IDs',
+	create_new_items = SelectField(
+		'Find existing or create new items',
 		[InputRequired()],
-		choices = [('old', 'Find existing IDs'), ('new', 'Create new IDs')]
+		choices=[(False, 'Find existing items'), (True, 'Create new items')]
 	)
 	submit_record = SubmitField('Generate file/s')
 

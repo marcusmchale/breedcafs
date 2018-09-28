@@ -11,7 +11,7 @@ from flask import (
 	jsonify
 )
 from app.models import (
-#	Lists,
+	SelectionList,
 	Fields
 	# User,
 	# Samples
@@ -60,7 +60,7 @@ class ListRegions(MethodView):
 		else:
 			try:
 				regions = SelectionList.get_regions(country)
-				response = make_response(jsonify([(i.lower(), i) for i in regions]))
+				response = make_response(jsonify(regions))
 				response.content_type = 'application/json'
 				return response
 			except (ServiceUnavailable, AuthError):
@@ -75,8 +75,8 @@ class ListFarms(MethodView):
 			return redirect(url_for('login'))
 		else:
 			try:
-				farms = Fields.get_farms(country, region)
-				response = make_response(jsonify([(i.lower(),i) for i in farms]))
+				farms = SelectionList.get_farms(country, region)
+				response = make_response(jsonify(farms))
 				response.content_type = 'application/json'
 				return response
 			except (ServiceUnavailable, AuthError):
@@ -91,7 +91,7 @@ class ListFields(MethodView):
 			return redirect(url_for('login'))
 		else:
 			try:
-				fields = Fields.get_fields_tup(country, region, farm)
+				fields = SelectionList.get_fields(country, region, farm)
 				response = make_response(jsonify(fields))
 				response.content_type = 'application/json'
 				return response
@@ -107,7 +107,7 @@ class ListBlocks(MethodView):
 			return redirect(url_for('login'))
 		else:
 			try:
-				blocks = Fields.get_blocks_tup(field_uid)
+				blocks = SelectionList.get_blocks(field_uid=field_uid)
 				response = make_response(jsonify(blocks))
 				response.content_type = 'application/json'
 				return response

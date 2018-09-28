@@ -11,7 +11,11 @@
 			{{ render_field(affiliation_form.other)}}
 			{{ render_field(affiliation_form.submit_affiliations)}}
 		</form>
-	<p>Data you submit is accessible to all users with a confirmed affiliation to institutes marked with an asterix (*). These affiliations (established during registration) may not be removed. Confirmed affiliations cannot be removed, although you may be unconfirmed by the relevant partner administrator resulting in a loss of access to data from that partner.</p>
+	<p>Data you submit is accessible to all users with a confirmed affiliation to institutes marked with an asterix (*).
+		These affiliations (established during registration) may not be removed.
+		Confirmed affiliations may be removed by the relevant partner administrator
+		which will result in a loss of access to data from that partner.
+	</p>
 </div>
 <script src="{{ url_for('static', filename='jquery_1.8.3_min.js') }}"></script>
 <script src="{{ url_for('static', filename='jquery_user.js') }}"></script>

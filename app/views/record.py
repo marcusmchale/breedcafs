@@ -24,6 +24,7 @@ from app.forms import (
 	SampleRegForm,
 )
 from app.emails import send_email
+from datetime import datetime
 
 
 @app.route('/record', methods=['GET', 'POST'])
@@ -70,71 +71,98 @@ def generate_files():
 		try:
 			record_form = RecordForm()
 			if record_form.validate_on_submit():
-				# first ensure selection of trait level and load the appropriate forms
-				form_data = request.form
-				trait_level = request.form['trait_level']
-				traits_form = CreateTraits().update(trait_level)
+				level = request.form['trait_level']
+				create_new_items = request.form['create_new_items']  # boolean selection
+				request_email = True if request.form['email_checkbox'] else False
+				traits_form = CreateTraits().update(level)
 				# sample_reg_form = SampleRegForm().update(optional=True)
-				if trait_level == 'field':
-					location_form = LocationForm.update(optional = True)
+				if level == 'field':
+					location_form = LocationForm.update(optional=True)
 				else:
-					location_form = LocationForm.update(optional = False)
+					location_form = LocationForm.update(optional=False)
 				if all([location_form.validate_on_submit(), traits_form.validate_on_submit()]):
-					# first check traits were selected
-					trait_selection = [
+					# Parse the form data
+					template_format = request.form['template_format']
+					# reduce the traits to those selected from the relevant list
+					# drop out boxes checked from other levels and similarly named csrf tokens
+					traits = [
 						item for sublist in [
-							form_data.getlist(i) for i in form_data if
-							all(['csrf_token' not in i, form_data['trait_level'] + '-' in i])
+							request.form.getlist(i) for i in request.form if
+							all(['csrf_token' not in i, level + '-' in i])
 						]
 						for item in sublist
 					]
-					if len(trait_selection) == 0:
+					# if no traits are selected there is no point continuing
+					if len(traits) == 0:
 						return jsonify({'submitted': "Please select traits to include"})
-					field_uid = int(form_data['field']) if form_data['field'] else None
-					start = int(form_data['trees_start']) if form_data['trees_start'] else 1
-					end = int(form_data['trees_end']) if form_data['trees_end'] else 999999
-					replicates = int(form_data['replicates']) if form_data['replicates'] else 1
-					if trait_level in ['branch', 'leaf']:
-						if form_data['old_new_ids'] == 'new':  # create new IDs
-							if trait_level == 'branch':
-								id_list = Fields.add_branches(field_uid, start, end, replicates)
-							else:  # trait_level == 'leaf':
-								id_list = Fields.add_leaves(field_uid, start, end, replicates)
-						else:
-							id_list = None
-					else:
-						id_list = None
-					if form_data['template_format'] == 'fb':
-						csv_file_details = Download(session['username']).get_index_csv(form_data, id_list)
-						if not csv_file_details:
-							return jsonify({'submitted': "No entries found that match your selection"})
-						# then create the trait files
-						trt_file_details = Download(session['username']).create_trt(form_data)
-						if not trt_file_details:
-							return jsonify({'submitted': "Please select traits to include"})
-						file_details_dict = {
-							'table': csv_file_details,
-							'details': trt_file_details
-						}
-					elif form_data['template_format'] == 'csv':
-						file_details_dict = Download(session['username']).get_table_csv(form_data, id_list)
-						if not file_details_dict:
-							return jsonify({'submitted': "No entries found that match your selection"})
-					else: #form_data['template_format'] == 'xlsx'
-						pass
-						#template_file =
-						#file_details_dict =
-					# create html block with urls
-					url_list_html = ''
-					for i in file_details_dict:
-						item = str(
-							'<dt><a href="'
-							+ file_details_dict[i]['url']
-							+ '">'
-							+ file_details_dict[i]['filename']
-							+ '</a></dt>'
-						)
-						url_list_html += item
+					#  - no selection is empty string, convert to None
+					#  - convert integers stored as strings to integers
+					#  - convert date to UTC timestamp (ms)
+					country = request.form['country'] if request.form['country'] != '' else None
+					region = request.form['region'] if request.form['region'] != '' else None
+					farm = request.form['farm'] if request.form['farm'] != '' else None
+					field_uid = int(request.form['field']) if request.form['field'].isdigit() else None
+					block_uid = request.form['block'] if request.form['block'] != '' else None
+					per_tree_replicates = int(request.form['per_tree_replicates']) if request.form['replicates'].isdigit() else None
+					trees_start = int(request.form['trees_start']) if request.form['trees_start'].isdigit() else None
+					trees_end = int(request.form['trees_end']) if request.form['trees_end'].isdigit() else None
+					branches_start = int(request.form['branches_start']) if request.form['branches_start'].isdigit() else None
+					branches_end = int(request.form['branches_end']) if request.form['branches_end'].isdigit() else None
+					leaves_start = int(request.form['leaves_start']) if request.form['leaves_start'].isdigit() else None
+					leaves_end = int(request.form['leaves_end']) if request.form['leaves_end'].isdigit() else None
+					samples_start = int(request.form['samples_start']) if request.form['samples_start'].isdigit() else None
+					samples_end = int(request.form['samples_end']) if request.form['samples_end'].isdigit() else None
+					tissue = request.form['tissue'] if request.form['tissue'] != '' else None
+					storage = request.form['storage'] if request.form['storage'] != '' else None
+					per_sample_replicates = int(request.form['per_sample_replicates']) if request.form['sample_replicates'].isdigit() else None
+					try:
+						start_time = int(
+							(datetime.strptime(
+								request.form['date_from'], '%Y-%m-%d') - datetime(1970, 1, 1)
+							).total_seconds() * 1000
+						) if request.form['date_from'] != '' else None
+					except ValueError:
+						start_time = None
+					try:
+						end_time = int(
+							(datetime.strptime(
+								request.time['date_to'], '%Y-%m-%d') - datetime(1970, 1, 1)
+							).total_seconds() * 1000
+						) if request.form['date_to'] != '' else None
+					except ValueError:
+						end_time = None
+					# now generate the files
+					download_object = Download(session['username'], request_email)
+
+					download_object.template_files(
+						template_format,
+						create_new_items,
+						level,
+						traits,
+						country,
+						region,
+						farm,
+						field_uid,
+						block_uid,
+						per_tree_replicates,
+						trees_start,
+						trees_end,
+						branches_start,
+						branches_end,
+						leaves_start,
+						leaves_end,
+						samples_start,
+						samples_end,
+						tissue,
+						storage,
+						per_sample_replicates,
+						start_time,
+						end_time,
+					)
+
+
+
+
 					# if selected send an email copy of the file (or link to download if greater than ~5mb)
 					if request.form.get('email_checkbox'):
 						recipients = [User(session['username']).find('')['email']]

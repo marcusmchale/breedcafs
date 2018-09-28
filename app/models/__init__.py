@@ -5,6 +5,9 @@ from lists import (
 	ItemList,
 	SelectionList
 )
+from matches import (
+	MatchNode
+)
 from fields import Fields
 from chart import Chart
 from samples import Samples

@@ -1,9 +1,6 @@
 from app import app, os
 import grp
 from app.cypher import Cypher
-#from item_lists import ItemList
-#from lists import Lists
-#from item_lists import TraitList
 from samples import Samples
 from neo4j_driver import (
 	get_driver,
@@ -13,36 +10,404 @@ from flask import (
 	session,
 	url_for
 )
+from app.models import(
+	ItemList
+)
 import unicodecsv as csv
 from datetime import datetime
 from app.models import (
-	Fields
+	Fields,
+	TraitList
 )
-
+from xlsxwriter import Workbook
 
 # User class related (all uploads are tied to a user) yet more specifically regarding uploads
 class Download:
-	def __init__(self, username):
-		self.username = username
-
-	def make_csv_file(self, fieldnames, id_list, filename, with_time = True):
+	def __init__(self, username, email_requested=False):
+		self.username = username,
+		self.email_requested = email_requested
+		self.file_list = []
 		# create user download path if not found
-		download_path = os.path.join(app.instance_path, app.config['DOWNLOAD_FOLDER'], self.username)
-		if not os.path.isdir(download_path):
-			os.mkdir(download_path)
+		self.user_download_folder = os.path.join(app.instance_path, app.config['DOWNLOAD_FOLDER'], username)
+		if not os.path.isdir(self.user_download_folder):
+			os.mkdir(self.user_download_folder)
 			gid = grp.getgrnam(app.config['CELERYGRPNAME']).gr_gid
-			os.chown(download_path, -1, gid)
-			os.chmod(download_path, 0775)
+			os.chown(self.user_download_folder, -1, gid)
+			os.chmod(self.user_download_folder, 0775)
 		# prepare variables to write the file
-		time = datetime.utcnow().strftime('%Y%m%d-%H%M%S')
-		if with_time:
-			filename = time + '_' + filename
-		file_path = os.path.join(app.instance_path, app.config['DOWNLOAD_FOLDER'], session['username'], filename)
-		# handle case where user is making more than one file a minute (per second filenames)
+		self.time = datetime.utcnow().strftime('%Y%m%d-%H%M%S')
+
+	def template_files(
+			self,
+			template_format,
+			create_new_items,
+			level,
+			trait_selection,
+			country,
+			region,
+			farm,
+			field_uid,
+			block_uid,
+			per_tree_replicates,
+			trees_start,
+			trees_end,
+			branches_start,
+			branches_end,
+			leaves_start,
+			leaves_end,
+			samples_start,
+			samples_end,
+			tissue,
+			storage,
+			per_sample_replicates,
+			start_time,
+			end_time
+	):
+		if create_new_items:
+			if level == 'branch':
+				id_list = Fields.add_branches(field_uid, trees_start, trees_end, per_tree_replicates)
+			elif level == 'leaf':
+				id_list = Fields.add_leaves(field_uid, trees_start, trees_end, per_tree_replicates)
+			elif level == 'sample':
+				# TODO remove Collect page and merge here
+				id_list = None
+			else:
+				id_list = None
+		else:
+			id_list = self.get_id_list(
+				level,
+				country,
+				region,
+				farm,
+				field_uid,
+				block_uid,
+				trees_start,
+				trees_end,
+				branches_start,
+				branches_end,
+				leaves_start,
+				leaves_end,
+				samples_start,
+				samples_end,
+				tissue,
+				storage,
+				start_time,
+				end_time
+			)
+		fieldnames = self.get_fieldnames(level, per_sample_replicates)
+		#get trait details
+		traits = TraitList.get_traits(trait_selection)
+
+		if template_format == 'xlsx':
+			self.make_xlsx_data_template(
+				fieldnames,
+				id_list,
+				traits,
+				base_filename=level,
+				with_timestamp=True
+			)
+		elif template_format == 'csv':
+			self.make_csv_table_template(
+				fieldnames,
+				id_list,
+				traits,
+				base_filename=level,
+				with_timestamp=True
+			)
+		else: # template_format == 'fb':
+			self.make_fb_template(
+				fieldnames,
+				id_list,
+				traits,
+				base_filename=level,
+				with_timestamp=True
+			)
+
+			csv_file_details = Download(session['username']).get_index_csv(request.form, id_list)
+			# then create the trait files
+			trt_file_details = Download(session['username']).create_trt(form_data)
+
+			file_details_dict = {
+				'table': csv_file_details,
+				'details': trt_file_details
+			}
+
+		# make the table file
+		fieldnames += ['Date', 'Time']
+		fieldnames += [trait['name'] for trait in traits]
+
+		self.make_csv_file(fieldnames, id_list, 'table.csv')
+		# and a file that describes the trait details
+		trait_fieldnames = [
+			'name',
+			'format',
+			'minimum',
+			'maximum',
+			'details',
+			'category_list'
+		]
+		details_file = self.make_csv_file(trait_fieldnames, selected_traits, 'details.csv')
+		self.file_dict[''] {
+			'table': table_file,
+			'details': details_file
+		}
+
+
+		# if requesting replicates for samples then create these replicates in the id_list
+		# check we have found matching ID's, if not return None
+		if len(id_list) == 0:
+			return None
+		if per_sample_replicates > 1:
+			id_list_reps = []
+			for sample in id_list:
+				sample['Sample UID'] = sample['UID']
+				for i in range(per_sample_replicates):
+					sample['UID'] = str(sample['Sample UID']) + "." + str(int(i + 1))
+					id_list_reps.append(sample.copy())
+			id_list = id_list_reps
+
+	@staticmethod
+	def get_fieldnames(
+			level,
+			per_sample_replicates = None
+	):
+		fieldnames = [
+			'Country',
+			'Region',
+			'Farm',
+			'Field',
+			'UID'
+		]
+		if level in ['block','tree','branch','leaf','sample']:
+			fieldnames[-1:-1] = [
+				'Field UID',
+				'Block'
+			]
+		if level in ['tree', 'branch', 'leaf', 'sample']:
+			fieldnames[-1:-1] = [
+				'Block UID',
+				'Variety',
+				'Tree Custom ID'
+			]
+		if level in ['branch', 'leaf', 'sample']:
+			fieldnames[-1:-1] = [
+				'Tree UID'
+			]
+		if level in ['leaf','sample']:
+			fieldnames[-1:-1] = [
+				'Branch UID'
+			]
+		if level == ['sample']:
+			fieldnames[-1:-1] = [
+				'Leaf UID',
+				'Tissue',
+				'Storage',
+				'Date Sampled',
+				'UID'
+			]
+			if per_sample_replicates:
+				fieldnames.insert(-1, 'Sample UID')
+		return fieldnames
+
+	@staticmethod
+	def get_id_list(
+			level,
+			country,
+			region,
+			farm,
+			field_uid,
+			block_uid,
+			trees_start,
+			trees_end,
+			branches_start,
+			branches_end,
+			leaves_start,
+			leaves_end,
+			samples_start,
+			samples_end,
+			tissue,
+			storage,
+			start_time,
+			end_time
+	):
+		if level == 'field':
+			id_list = ItemList.get_fields(
+				country=country,
+				region=region,
+				farm=farm)
+
+		elif level == 'block':
+			id_list = ItemList.get_blocks(
+				country=country,
+				region=region,
+				farm=farm,
+				field_uid=field_uid
+			)
+		elif level == 'tree':
+			id_list = ItemList.get_trees(
+				country=country,
+				region=region,
+				farm=farm,
+				field_uid=field_uid,
+				block_uid=block_uid,
+				trees_start=trees_start,
+				trees_end=trees_end
+			)
+		elif level == 'branch':
+			id_list = ItemList.get_leaves(
+				country=country,
+				region=region,
+				farm=farm,
+				field_uid=field_uid,
+				block_uid=block_uid,
+				trees_start=trees_start,
+				trees_end=trees_end,
+				branches_start=branches_start,
+				branches_end=branches_end
+			)
+
+		elif level == 'leaf':
+			id_list = ItemList.get_leaves(
+				country=country,
+				region=region,
+				farm=farm,
+				field_uid=field_uid,
+				block_uid=block_uid,
+				trees_start=trees_start,
+				trees_end=trees_end,
+				branches_start=branches_start,
+				branches_end=branches_end,
+				leaves_start=leaves_start,
+				leaves_end=leaves_end
+			)
+		elif level == 'sample':
+			id_list = ItemList.get_samples(
+				country=country,
+				region=region,
+				farm=farm,
+				field_uid=field_uid,
+				block_uid=block_uid,
+				trees_start=trees_start,
+				trees_end=trees_end,
+				branches_start=branches_start,
+				branches_end=branches_end,
+				leaves_start=leaves_start,
+				leaves_end=leaves_end,
+				samples_start=samples_start,
+				samples_end=samples_end,
+				tissue=tissue,
+				storage=storage,
+				start_time=start_time,
+				end_time=end_time
+			)
+		return id_list
+
+	def get_file_path(
+			self,
+			file_extension,
+			base_filename = None,
+			with_timestamp = True
+	):
+		if base_filename and with_timestamp:
+			filename = base_filename + '_' + self.time
+		elif base_filename and not with_timestamp:
+			filename = base_filename
+		else:
+			filename = self.time
+		filename = filename + file_extension
+		file_path = os.path.join(self.user_download_folder, filename)
+		# prevent overwrite of existing file unless same path down to the second.
 		if os.path.isfile(file_path):
-			time = datetime.utcnow().strftime('%Y%m%d-%H%M%S')
-			filename = time + '_' + filename
-			file_path = os.path.join(app.instance_path, app.config['DOWNLOAD_FOLDER'], session['username'], filename)
+			time_s = datetime.utcnow().strftime('%Y%m%d-%H%M%S')
+			if base_filename:
+				filename = base_filename + '_' + time_s
+			else:
+				filename = time_s
+			filename = filename + file_extension
+			file_path = os.path.join(self.user_download_folder, filename)
+			# and just in case add an incrementing appendix if this time_s filename exists
+			filename_appendix = 1
+			while os.path.isfile(file_path):
+				if base_filename:
+					filename = base_filename + '_' + time_s + '_' + filename_appendix
+				else:
+					filename = time_s + '_' + filename_appendix
+				filename = filename + file_extension
+				file_path = os.path.join(self.user_download_folder, filename)
+		return file_path
+
+	def make_xlsx_data_template(
+			self,
+			fieldnames,
+			id_list,
+			traits,
+			base_filename = None,
+			with_timestamp = True
+	):
+		file_path = self.get_file_path(
+			'xlsx',
+			base_filename,
+			with_timestamp=with_timestamp
+		)
+		fieldnames += ['Date', 'Time']
+		fieldnames += [trait['name'] for trait in traits]
+		trait_fieldnames = [
+			'name',
+			'format',
+			'minimum',
+			'maximum',
+			'details',
+			'category_list'
+		]
+		wb = Workbook(file_path)
+		template_worksheet = wb.add_worksheet("Template")
+		row_number = 0
+		for header in fieldnames:
+			column_number = fieldnames.index(header)
+			template_worksheet.write(row_number, column_number, header)
+		for row in id_list:
+			row_number += 1
+			for key, value in row:
+				# if there is a list (or nested lists) stored in this item
+				# make sure it is printed as a list of strings
+				if isinstance(value, list):
+					value = str([str(i).encode() for i in value])
+				column_number = fieldnames.index(key)
+				template_worksheet.write(row_number, column_number, value)
+		trait_details_worksheet = wb.add_worksheet("Trait details")
+		row_number = 0
+		for header in trait_fieldnames:
+			column_number = fieldnames.index(header)
+			trait_details_worksheet.write(row_number, column_number, header)
+		for trait in traits:
+			row_number += 1
+			for key, value in trait:
+				# if there is a list (or nested lists) stored in this item
+				# make sure it is printed as a list of strings
+				if isinstance(value, list):
+					value = str([str(i).encode() for i in value])
+				column_number = trait_fieldnames.index(key)
+				trait_details_worksheet.write(row_number, column_number, value)
+		wb.close()
+		# add file to file_list
+		self.file_list.append({
+			"filename": os.path.basename(file_path),
+			"file_path": file_path,
+			"file_size": os.path.getsize(file_path),
+			"url": url_for(
+				'download_file',
+				username = self.username,
+				filename = os.path.basename(file_path),
+				_external = True
+			)
+		})
+
+	def make_csv_file(self, fieldnames, id_list, base_filename, with_timestamp=True, file_extension='csv'):
+		file_path = self.get_file_path(
+			file_extension,
+			base_filename=base_filename,
+			with_timestamp=with_timestamp
+		)
 		# make the file
 		with open(file_path, 'w') as csv_file:
 			writer = csv.DictWriter(
@@ -58,31 +423,101 @@ class Download:
 						row[item] = [str(i).encode() for i in row[item]]
 				# for key, value in row:
 				writer.writerow(row)
-			file_size = csv_file.tell()
+			# file_size = csv_file.tell()
 		# return file details
-		return {
-			"filename": filename,
+		self.file_list.append({
+			"filename": os.path.basename(file_path),
 			"file_path": file_path,
-			"file_size": file_size,
+			"file_size": os.path.getsize(file_path),
 			"url": url_for(
 				'download_file',
 				username = self.username,
-				filename = filename,
+				filename = os.path.basename(file_path),
 				_external = True
 			)
-		}
+		})
+
+	def make_csv_fb_template(
+			self,
+			fieldnames,
+			id_list,
+			traits,
+			base_filename=None,
+			with_timestamp=True
+	):
+		self.make_csv_file(
+			fieldnames,
+			id_list,
+			base_filename=base_filename,
+			with_timestamp=with_timestamp
+		)
+		trait_fieldnames = [
+			'name',
+			'format',
+			'defaultValue',
+			'minimum',
+			'maximum',
+			'details',
+			'categories',
+			'isVisible',
+			'realPosition'
+		]
+		for i, trait in enumerate(traits):
+			trait['realPosition'] = str(i + 1)
+			trait['isVisible'] = 'True'
+		self.make_csv_file(
+			trait_fieldnames,
+			traits,
+			base_filename=base_filename,
+			with_timestamp=with_timestamp,
+			file_extension='.trt'
+		)
+		# TODO may need to replace 'name' with 'trait' in header but doesn't seem to affect Field-Book
+
+
+	def make_csv_table_template(
+			self,
+			fieldnames,
+			id_list,
+			traits,
+			base_filename=None,
+			with_timestamp=True
+	):
+		fieldnames += ['Date', 'Time']
+		fieldnames += [trait['name'] for trait in traits]
+		self.make_csv_file(
+			fieldnames,
+			id_list,
+			base_filename=base_filename + '_data',
+			with_timestamp=with_timestamp
+		)
+		# and a file that describes the trait details
+		trait_fieldnames = [
+			'name',
+			'format',
+			'minimum',
+			'maximum',
+			'details',
+			'category_list'
+		]
+		self.make_csv_file(
+			trait_fieldnames,
+			traits,
+			base_filename=base_filename + '_details',
+			with_timestamp=with_timestamp
+		)
 
 	def get_csv(
 			self,
-			country, 
-			region, 
-			farm, 
+			country,
+			region,
+			farm,
 			field_uid,
 			block_uid,
-			level, 
-			traits, 
-			data_format, 
-			start_time, 
+			level,
+			traits,
+			data_format,
+			start_time,
 			end_time):
 		# First limit the get the confirmed affiliated institutes and all data nodes submitted by these
 		# TODO put this filter at the end of the query, might be less db-hits
@@ -917,556 +1352,3 @@ class Download:
 			start_time = start_time,
 			end_time = end_time
 		)]
-
-	def get_index_csv(
-			self,
-			form_data,
-			existing_ids = None
-	):
-		if form_data['trait_level'] == 'field':
-			parameters = {}
-			query = 'MATCH (c:Country '
-			if form_data['country'] != '':
-				query += '{name_lower: toLower($country)}'
-				parameters['country'] = form_data['country']
-			query += ')<-[:IS_IN]-(r:Region '
-			if form_data['region'] != '':
-				query += '{name_lower: toLower($region)}'
-				parameters['region'] = form_data['region']
-			query += ')<-[:IS_IN]-(f:Farm '
-			if form_data['farm'] != '':
-				query += '{name_lower: toLower($farm)}'
-				parameters['farm'] = form_data['farm']
-			query += (
-				' )<-[IS_IN]-(field:Field) '
-				' RETURN { '
-				'	UID: field.uid, '
-				'	Field: field.name, '
-				'	Farm: f.name, '
-				'	Region: r.name, '
-				'	Country: c.name '
-				' } '
-				' ORDER BY field.uid'
-			)
-			# make the file and return a dictionary with filename, file_path and file_size
-			with get_driver().session() as neo4j_session:
-				result = neo4j_session.read_transaction(
-					neo4j_query,
-					query,
-					parameters)
-				id_list = [record[0] for record in result]
-			if len(id_list) == 0:
-				return None
-			fieldnames = [
-				'Country',
-				'Region',
-				'Farm',
-				'Field',
-				'UID'
-			]
-			if 'farm' in parameters:
-				filename = form_data['farm'] + '_'
-			elif 'region' in parameters:
-				filename = form_data['region'] + '_'
-			elif 'country' in parameters:
-				filename = form_data['country'] + '_'
-			else:
-				filename = ''
-			csv_file_details = self.make_csv_file(
-				fieldnames,
-				id_list,
-				filename + 'Field_UIDs.csv'
-			)
-		else:  # form_data['trait_level'] in ['block', 'tree', 'branch', 'leaf', 'sample']:
-			field_uid = int(form_data['field'])
-			if form_data['trait_level'] == 'sample':
-				parameters = {
-					'country': form_data['country'],
-					'region': form_data['region'],
-					'farm': form_data['farm'],
-					'field_uid': int(field_uid),
-					'trees_start': int(form_data['trees_start']) if form_data['trees_start'] else '',
-					'trees_end': int(form_data['trees_end']) if form_data['trees_end'] else '',
-					'replicates': int(form_data['replicates']) if form_data['replicates'] else "",
-					'tissue': form_data['tissue'],
-					'storage': form_data['storage'],
-					'start_time': int(
-						(
-							datetime.strptime(form_data['date_from'], '%Y-%m-%d')
-							- datetime(1970, 1, 1)
-						).total_seconds() * 1000) if form_data['date_from'] != '' else '',
-					'end_time': int(
-						(
-							datetime.strptime(form_data['date_to'], '%Y-%m-%d')
-							- datetime(1970, 1, 1)
-						).total_seconds() * 1000) if form_data['date_to'] != '' else '',
-					'samples_start': int(form_data['samples_start']) if form_data['samples_start'] else "",
-					'samples_end': int(form_data['samples_end']) if form_data['samples_end'] else ""
-				}
-				# build the file and return filename etc.
-				fieldnames = [
-					'Country',
-					'Region',
-					'Farm',
-					'Field',
-					'Field UID',
-					'Block',
-					'Block UID',
-					'Tree UID',
-					'Tree Custom ID',
-					'Variety',
-					'Branch UID',
-					'Leaf UID',
-					'Tissue',
-					'Storage',
-					'Date Sampled',
-					'UID'
-				]
-				id_list = Samples().get_samples(parameters)
-				if len(id_list) == 0:
-					return None
-				sample_replicates = int(form_data['sample_replicates']) if form_data['sample_replicates'] else 1
-				if sample_replicates > 1:
-					fieldnames.insert(15, 'Sample UID')
-					id_list_reps = []
-					for sample in id_list:
-						sample['Sample UID'] = sample['UID']
-						for i in range(sample_replicates):
-							sample['UID'] = str(sample['Sample UID']) + "." + str(int(i + 1))
-							id_list_reps.append(sample.copy())
-					id_list = id_list_reps
-				csv_file_details = self.make_csv_file(
-					fieldnames,
-					id_list,
-					'Sample_UIDs.csv')
-			elif form_data['trait_level'] == 'leaf':
-				fieldnames = [
-					'Country',
-					'Region',
-					'Farm',
-					'Field',
-					'Field UID',
-					'Block',
-					'Block UID',
-					'Tree UID',
-					'Tree Custom ID',
-					'Variety',
-					'Branch UID',
-					'UID'
-				]
-				if form_data['old_new_ids'] == 'old':
-					parameters = {
-						'country': form_data['country'],
-						'region': form_data['region'],
-						'farm': form_data['farm'],
-						'field_uid': field_uid,
-						'trees_start': int(form_data['trees_start']) if form_data['trees_start'] else 1,
-						'trees_end': int(form_data['trees_end']) if form_data['trees_end'] else 999999,
-						'start_time': int(
-							(
-								datetime.strptime(form_data['date_from'], '%Y-%m-%d')
-								- datetime(1970, 1, 1)
-							).total_seconds() * 1000
-						) if form_data['date_from'] != '' else '',
-						'end_time': int(
-							(
-								datetime.strptime(form_data['date_to'], '%Y-%m-%d')
-								- datetime(1970, 1, 1)
-							).total_seconds() * 1000) if form_data['date_to'] != '' else '',
-						'leaves_start': int(form_data['leaves_start']) if form_data['leaves_start'] != '' else 1,
-						'leaves_end': int(form_data['leaves_end']) if form_data['leaves_end'] != ''else 999999
-					}
-					with get_driver().session() as neo4j_session:
-						result = neo4j_session.read_transaction(neo4j_query, Cypher.leaves_get, parameters)
-					id_list = [record[0] for record in result]
-					if len(id_list) == 0:
-						return None
-					csv_file_details = self.make_csv_file(
-						fieldnames,
-						id_list,
-						'Leaf_UIDs.csv'
-					)
-				else:
-					if len(existing_ids) == 0:
-						return None
-					first_leaf_id = existing_ids[0]['Leaf ID']
-					last_leaf_id = existing_ids[-1]['Leaf ID']
-					filename = 'Field_' + str(field_uid) + '_L' + str(first_leaf_id) + '_to_L' + str(
-						last_leaf_id) + '.csv'
-					csv_file_details = self.make_csv_file(
-						fieldnames,
-						existing_ids,
-						filename,
-						with_time = False
-					)
-			elif form_data['trait_level'] == 'branch':
-				fieldnames = [
-					'Country',
-					'Region',
-					'Farm',
-					'Field',
-					'Field UID',
-					'Block',
-					'Block UID',
-					'Tree UID',
-					'Variety',
-					'Tree Custom ID',
-					'UID'
-				]
-				if form_data['old_new_ids'] == 'old':
-					parameters = {
-						'country': form_data['country'],
-						'region': form_data['region'],
-						'farm': form_data['farm'],
-						'field_uid': field_uid,
-						'trees_start': int(form_data['trees_start']) if form_data['trees_start'] else 1,
-						'trees_end': int(form_data['trees_end']) if form_data['trees_end'] else 999999,
-						'start_time': int(
-							(
-								datetime.strptime(form_data['date_from'], '%Y-%m-%d')
-								- datetime(1970, 1, 1)
-							).total_seconds() * 1000
-						) if form_data['date_from'] != '' else '',
-						'end_time': int(
-							(
-								datetime.strptime(form_data['date_to'], '%Y-%m-%d')
-								- datetime(1970, 1, 1)
-							).total_seconds() * 1000
-						) if form_data['date_to'] != '' else '',
-						'branches_start': int(form_data['branches_start']) if form_data['branches_start'] != '' else 1,
-						'branches_end': int(form_data['branches_end']) if form_data['branches_end'] != ''else 999999
-					}
-					with get_driver().session() as neo4j_session:
-						result = neo4j_session.read_transaction(neo4j_query, Cypher.branches_get, parameters)
-					id_list = [record[0] for record in result]
-					if len(id_list) == 0:
-						return None
-					csv_file_details = self.make_csv_file(
-						fieldnames,
-						id_list,
-						'Branch_UIDs.csv'
-					)
-				else:
-					if len(existing_ids) == 0:
-						return None
-					first_branch_id = existing_ids[0]['Branch ID']
-					last_branch_id = existing_ids[-1]['Branch ID']
-					filename = 'field_' + str(field_uid) + '_R' + str(first_branch_id) + '_to_R' + str(
-						last_branch_id) + '.csv'
-					csv_file_details = self.make_csv_file(
-						fieldnames,
-						existing_ids,
-						filename,
-						with_time = False
-					)
-			elif form_data['trait_level'] == 'tree':
-				trees_start = int(form_data['trees_start'] if form_data['trees_start'] else 0)
-				trees_end = int(form_data['trees_end'] if form_data['trees_end'] else 999999)
-				# make the file and return filename, path, size
-				fieldnames = [
-					'Country',
-					'Region',
-					'Farm',
-					'Field',
-					'Field UID',
-					'Block',
-					'Block UID',
-					'Variety',
-					'Tree Custom ID',
-					'UID'
-				]
-				id_list = Fields.get_trees(field_uid, trees_start, trees_end)
-				if len(id_list) == 0:
-					return None
-				first_tree_id = id_list[0]['Tree ID']
-				last_tree_id = id_list[-1]['Tree ID']
-				csv_file_details = self.make_csv_file(
-					fieldnames,
-					id_list,
-					'Tree_UIDs_' + str(first_tree_id) + '-' + str(last_tree_id) + '.csv'
-				)
-			else:  # form_data['trait_level'] == 'block':
-				# make the file and return a dictionary with filename, file_path and file_size
-				fieldnames = [
-					'Country',
-					'Region',
-					'Farm',
-					'Field',
-					'Field UID',
-					'Block',
-					'UID'
-				]
-				id_list = Fields.get_blocks(field_uid)
-				if len(id_list) == 0:
-					return None
-				csv_file_details = self.make_csv_file(fieldnames, id_list, 'Block_UIDs.csv')
-		return csv_file_details
-
-	# creates the traits.trt file for import to Field-Book
-	# TODO may need to replace 'name' with 'trait' in header but doesn't seem to affect Field-Book
-	def create_trt(self, form_data):
-		node_label = str(form_data['trait_level']).title() + 'Trait'
-		selection = [
-			item for sublist in [
-				form_data.getlist(i) for i in form_data if all(
-					['csrf_token' not in i, form_data['trait_level'] + '-' in i]
-				)
-			]
-			for item in sublist
-		]
-		if len(selection) == 0:
-			return None
-		selected_traits = Lists(node_label).get_selected(selection, 'name')
-		for i, trait in enumerate(selected_traits):
-			trait['realPosition'] = str(i + 1)
-			trait['isVisible'] = 'True'
-		# create user download path if not found
-		download_path = os.path.join(app.instance_path, app.config['DOWNLOAD_FOLDER'], self.username)
-		if not os.path.isdir(download_path):
-			os.mkdir(download_path)
-			gid = grp.getgrnam(app.config['CELERYGRPNAME']).gr_gid
-			os.chown(download_path, -1, gid)
-			os.chmod(download_path, 0775)
-		# set variables for file creation
-		fieldnames = [
-			'name',
-			'format',
-			'defaultValue',
-			'minimum',
-			'maximum',
-			'details',
-			'categories',
-			'isVisible',
-			'realPosition'
-		]
-		# make the file
-		file_details = self.make_csv_file(fieldnames, selected_traits, form_data['trait_level'] + '.trt')
-		return file_details
-
-	def get_table_csv(self, form_data, existing_ids = None):
-		# create two files, one is the index + trait names + time details table, the other is a trait description file
-		# - specifying format and details of each trait value
-		# check the traits selected
-		level = form_data['trait_level']
-		# create list of selected traits
-		selection = [
-			item for sublist in [
-				form_data.getlist(i) for i in form_data if all(
-					['csrf_token' not in i, level + '-' in i]
-				)
-			]
-			for item in sublist
-		]
-		# if there are no selected traits exit here returning None
-		if len(selection) == 0:
-			return None
-		selected_traits = TraitList.get_traits(level, selection)
-		# get the index data (id_list) and fieldnames (to which the traits will be added)#
-		# define the list of items
-		if existing_ids:
-			id_list = existing_ids
-		else:
-			# To find the selected items we first parse the form_data
-			#  - no selection is empty string, convert to None
-			#  - convert integers stored as strings to integers
-			#  - convert date to UTC timestamp (ms)
-			country = form_data['country'] if form_data['country'] != '' else None
-			region = form_data['region'] if form_data['region'] != '' else None
-			farm = form_data['farm'] if form_data['farm'] != '' else None
-			field_uid = int(form_data['field']) if form_data['field'].isdigit() else None
-			block_uid = form_data['block'] if form_data['block'] != '' else None
-			trees_start = int(form_data['trees_start']) if form_data['trees_start'].isdigit() else None
-			trees_end = int(form_data['trees_end']) if form_data['trees_end'].isdigit() else None
-			branches_start = int(form_data['branches_start']) if form_data['branches_start'].isdigit() else None
-			branches_end = int(form_data['branches_end']) if form_data['branches_end'].isdigit() else None
-			leaves_start = int(form_data['leaves_start']) if form_data['leaves_start'].isdigit() else None
-			leaves_end = int(form_data['leaves_end']) if form_data['leaves_end'].isdigit() else None
-			samples_start = int(form_data['samples_start']) if form_data['samples_start'].isdigit() else None
-			samples_end = int(form_data['samples_end']) if form_data['samples_end'].isdigit() else None
-			tissue = form_data['tissue'] if form_data['tissue'] != '' else None
-			storage = form_data['storage'] if form_data['storage'] != '' else None
-			replicates = int(form_data['sample_replicates']) if form_data['sample_replicates'].isdigit() else None
-			try:
-				start_time = int(
-					(datetime.strptime(form_data['date_from'], '%Y-%m-%d') - datetime(1970, 1,
-																					  1)).total_seconds() * 1000
-				) if form_data['date_from'] != '' else None
-			except ValueError:
-				start_time = None
-			try:
-				end_time = int(
-					(datetime.strptime(form_data['date_to'], '%Y-%m-%d') - datetime(1970, 1, 1)).total_seconds() * 1000
-				) if form_data['date_to'] != '' else None
-			except ValueError:
-				end_time = None
-			# then retrieve the list of filtered items at the corresponding level
-			if level == 'field':
-				id_list = ItemList.get_fields(
-					country=country,
-					region=region,
-					farm=farm)
-				fieldnames = [
-					'Country',
-					'Region',
-					'Farm',
-					'Field',
-					'UID'
-				]
-			elif level == 'block':
-				id_list = ItemList.get_blocks(
-					country=country,
-					region=region,
-					farm=farm,
-					field_uid=field_uid
-				)
-				fieldnames = [
-					'Country',
-					'Region',
-					'Farm',
-					'Field',
-					'Field UID',
-					'Block',
-					'UID'
-				]
-			elif level == 'tree':
-				id_list = ItemList.get_trees(
-					country=country,
-					region=region,
-					farm=farm,
-					field_uid=field_uid,
-					block_uid=block_uid,
-					trees_start=trees_start,
-					trees_end=trees_end
-				)
-				fieldnames = [
-					'Country',
-					'Region',
-					'Farm',
-					'Field',
-					'Field UID',
-					'Block',
-					'Block UID',
-					'Variety',
-					'Tree Custom ID',
-					'UID'
-				]
-			elif level == 'branch':
-				id_list = ItemList.get_leaves(
-					country=country,
-					region=region,
-					farm=farm,
-					field_uid=field_uid,
-					block_uid=block_uid,
-					trees_start=trees_start,
-					trees_end=trees_end,
-					branches_start=branches_start,
-					branches_end=branches_end
-				)
-				fieldnames = [
-					'Country',
-					'Region',
-					'Farm',
-					'Field',
-					'Field UID',
-					'Block',
-					'Block UID',
-					'Tree Custom ID',
-					'Tree UID',
-					'Variety',
-					'UID'
-				]
-			elif level == 'leaf':
-				id_list = ItemList.get_leaves(
-					country=country,
-					region=region,
-					farm=farm,
-					field_uid=field_uid,
-					block_uid=block_uid,
-					trees_start=trees_start,
-					trees_end=trees_end,
-					branches_start=branches_start,
-					branches_end=branches_end,
-					leaves_start=leaves_start,
-					leaves_end=leaves_end
-				)
-				fieldnames = [
-					'Country',
-					'Region',
-					'Farm',
-					'Field',
-					'Field UID',
-					'Block',
-					'Block UID',
-					'Tree Custom ID',
-					'Tree UID',
-					'Branch UID',
-					'UID'
-				]
-
-			elif level == 'sample':
-				id_list = ItemList.get_samples(
-					country=country,
-					region=region,
-					farm=farm,
-					field_uid=field_uid,
-					block_uid=block_uid,
-					trees_start=trees_start,
-					trees_end=trees_end,
-					branches_start=branches_start,
-					branches_end=branches_end,
-					leaves_start=leaves_start,
-					leaves_end=leaves_end,
-					samples_start=samples_start,
-					samples_end=samples_end,
-					tissue=tissue,
-					storage=storage,
-					start_time=start_time,
-					end_time=end_time
-				)
-				fieldnames = [
-					'Country',
-					'Region',
-					'Farm',
-					'Field',
-					'Field UID',
-					'Block',
-					'Block UID',
-					'Tree UID',
-					'Tree Custom ID',
-					'Variety',
-					'Tissue',
-					'Storage',
-					'Date Sampled',
-					'UID'
-				]
-				# check we have found matching ID's, if not return None
-				if len(id_list) == 0:
-					return None
-				# if requesting replicates for samples then create these replicates in the id_list
-				if replicates > 1:
-					fieldnames.insert(13, 'Sample UID')
-					id_list_reps = []
-					for sample in id_list:
-						sample['Sample UID'] = sample['UID']
-						for i in range(replicates):
-							sample['UID'] = str(sample['Sample UID']) + "." + str(int(i + 1))
-							id_list_reps.append(sample.copy())
-					id_list = id_list_reps
-		# make the table file
-		fieldnames += ['Date', 'Time']
-		fieldnames += [trait['name'] for trait in selected_traits]
-		table_file = self.make_csv_file(fieldnames, id_list, 'table.csv')
-		# and a file that describes the trait details
-		trait_fieldnames = [
-			'name',
-			'format',
-			'minimum',
-			'maximum',
-			'details',
-			'category_list'
-		]
-		details_file = self.make_csv_file(trait_fieldnames, selected_traits, 'details.csv')
-		return {
-			'table': table_file,
-			'details': details_file
-		}

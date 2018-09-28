@@ -75,63 +75,27 @@ class SelectionList:
 			)
 		return [(record[0][0], record[0][1]) for record in result]
 
-class TraitList:
-	def __init__(self):
-		pass
-
-	@staticmethod
-	# also used to confirm list of traits from web form selections are real/found at the selected level
-	def get_traits(
-			level,
-			traits=None
-	):
-		parameters = {
-			'level': level,
-			'traits': traits
-		}
-		query = (
-			' MATCH (trait:Trait {level:$level}) '
-		)
-		if traits:
-			query += (
-				' WHERE trait.name_lower in $traits '
-			)
-		query += (
-			' RETURN trait '
-		)
-		with get_driver().session() as neo4j_session:
-			result = neo4j_session.read_transaction(
-				neo4j_query,
-				query,
-				parameters)
-		return [record[0] for record in result]
-
-
-class ItemList:
-	def __init__(self):
-		pass
-
 	@staticmethod
 	def get_farms(
 			country=None,
 			region=None
 	):
 		parameters = {}
-		query = 'MATCH (c:Country '
+		query = 'MATCH (:Country '
 		if country:
 			query += '{name_lower: toLower($country)}'
 			parameters['country'] = country
-		query += ')<-[:IS_IN]-(r:Region '
+		query += ')<-[:IS_IN]-(:Region '
 		if region:
 			query += '{name_lower: toLower($region)}'
 			parameters['region'] = region
 		query += (
-			')<-[:IS_IN]-(f:Farm)'
-			' RETURN {'
-			' Country: c.name, '
-			' Region : r.name, '
-			' Farm : f.name }'
-			' ORDER BY c.name, r.name, f.name'
+			')<-[:IS_IN]-(farm:Farm)'
+			' RETURN [ '
+			' 	farm.name_lower, '
+			'	farm.name '
+			' ] '
+			' ORDER BY farm.name'
 		)
 		with get_driver().session() as neo4j_session:
 			result = neo4j_session.read_transaction(
@@ -147,27 +111,145 @@ class ItemList:
 			farm=None
 	):
 		parameters = {}
-		query = 'MATCH (c:Country '
+		query = 'MATCH (:Country '
 		if country:
 			query += '{name_lower: toLower($country)}'
 			parameters['country'] = country
-		query += ')<-[:IS_IN]-(r:Region '
+		query += ')<-[:IS_IN]-(:Region '
 		if region:
 			query += '{name_lower: toLower($region)}'
 			parameters['region'] = region
-		query += ')<-[:IS_IN]-(f:Farm '
+		query += ')<-[:IS_IN]-(:Farm '
+		if farm:
+			query += '{name_lower: toLower($farm)}'
+			parameters['farm'] = farm
+		query += (
+			' )<-[:IS_IN]-(field:Field) '
+			' RETURN [ '
+			' 	toString(field.uid), '
+			'	field.name '
+			' ] '
+			' ORDER BY field.name '
+		)
+		with get_driver().session() as neo4j_session:
+			result = neo4j_session.read_transaction(
+				neo4j_query,
+				query,
+				parameters)
+		return [record[0] for record in result]
+
+	@staticmethod
+	def get_blocks(
+			country=None,
+			region=None,
+			farm=None,
+			field_uid=None
+	):
+		parameters = {}
+		query = 'MATCH (:Country '
+		if country:
+			query += '{name_lower: toLower($country)} '
+			parameters['country'] = country
+		query += ')<-[:IS_IN]-(:Region '
+		if region:
+			query += '{name_lower: toLower($region)} '
+			parameters['region'] = region
+		query += ')<-[:IS_IN]-(:Farm '
+		if farm:
+			query += '{name_lower: toLower($farm)} '
+			parameters['farm'] = farm
+		query += ')<-[:IS_IN]-(:Field '
+		if field_uid:
+			query += ' {uid: toInteger($field_uid)} '
+			parameters['field_uid'] = field_uid
+		query += (
+			' )<-[:IS_IN]-(:FieldBlocks) '
+			' <-[:IS_IN]-(block:Block)'
+			' RETURN [ '
+			' 	block.uid, '
+			'	block.name '
+			' ] '
+			' ORDER BY block.name '
+		)
+		with get_driver().session() as neo4j_session:
+			result = neo4j_session.read_transaction(
+				neo4j_query,
+				query,
+				parameters)
+		return [record[0] for record in result]
+
+	@staticmethod
+	def get_tissues():
+		parameters = {}
+		query = (
+			' MATCH (tissue:Tissue) '
+			' RETURN [ '
+			'	tissue.name_lower, '
+			'	tissue.name'
+			' ] '
+			' ORDER BY tissue.name'
+		)
+		with get_driver().session() as neo4j_session:
+			result = neo4j_session.read_transaction(
+				neo4j_query,
+				query,
+				parameters
+			)
+		return [(record[0][0], record[0][1]) for record in result]
+
+	@staticmethod
+	def get_storage_types():
+		parameters = {}
+		query = (
+			' MATCH (storage:Storage) '
+			' RETURN [ '
+			'	storage.name_lower, '
+			'	storage.name'
+			' ] '
+			' ORDER BY storage.name'
+		)
+		with get_driver().session() as neo4j_session:
+			result = neo4j_session.read_transaction(
+				neo4j_query,
+				query,
+				parameters
+			)
+		return [(record[0][0], record[0][1]) for record in result]
+
+
+class ItemList:
+	def __init__(self):
+		pass
+
+	@staticmethod
+	def get_fields(
+			country=None,
+			region=None,
+			farm=None
+	):
+		parameters = {}
+		query = 'MATCH (country:Country '
+		if country:
+			query += '{name_lower: toLower($country)}'
+			parameters['country'] = country
+		query += ')<-[:IS_IN]-(region:Region '
+		if region:
+			query += '{name_lower: toLower($region)}'
+			parameters['region'] = region
+		query += ')<-[:IS_IN]-(farm:Farm '
 		if farm:
 			query += '{name_lower: toLower($farm)}'
 			parameters['farm'] = farm
 		query += (
 			' )<-[IS_IN]-(field:Field) '
-			' RETURN {'
-			' UID : field.uid, '
-			' Field : field.name, '
-			' Farm : f.name, '
-			' Region : r.name, '
-			' Country : c.name }'
-			' ORDER BY field.uid'
+			' RETURN { '
+			'	Country : country.name, '
+			'	Region : region.name, '
+			'	Farm : farm.name, '
+			'	Field : field.name, '
+			'	UID : field.uid '
+			' } '
+			' ORDER BY field.uid '
 		)
 		with get_driver().session() as neo4j_session:
 			result = neo4j_session.read_transaction(
@@ -761,6 +843,38 @@ class ItemList:
 			' Region: r.name, '
 			' Country: c.name } '
 			' ORDER BY sample.uid '
+		)
+		with get_driver().session() as neo4j_session:
+			result = neo4j_session.read_transaction(
+				neo4j_query,
+				query,
+				parameters)
+		return [record[0] for record in result]
+
+
+class TraitList:
+	def __init__(self):
+		pass
+
+	@staticmethod
+	# also used to confirm list of traits from web form selections are real/found at the selected level
+	def get_traits(
+			level,
+			traits=None
+	):
+		parameters = {
+			'level': level,
+			'traits': traits
+		}
+		query = (
+			' MATCH (trait:Trait {level:$level}) '
+		)
+		if traits:
+			query += (
+				' WHERE trait.name_lower in $traits '
+			)
+		query += (
+			' RETURN trait '
 		)
 		with get_driver().session() as neo4j_session:
 			result = neo4j_session.read_transaction(
