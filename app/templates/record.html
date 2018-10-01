@@ -17,6 +17,7 @@
 			<dt>{{ location_form.region }}</dt>
 			<dt>{{ location_form.farm }}</dt>
 			<dt>{{ location_form.field }}</dt>
+			<dt>{{ location_form.block }}</dt>
 			<div id=tree_ids>
 				<br>
 				<a>Tree ID range:</a>
@@ -25,38 +26,43 @@
 				{{ record_form.trees_end(placeholder=record_form.trees_end.description) }} </dd>
 				<br>
 			</div>
-			<div id=sample_ids>
-						<br>
-						<a>Sample type:</a>
-						<dt>{{ sample_reg_form.tissue }}</dt>
-						<dt>{{ sample_reg_form.storage }}</dt>
-						<a>Date range:</a>
-						<dd>{{ record_form.date_from(placeholder = record_form.date_from.description) }}
-							{{ record_form.date_to(placeholder = record_form.date_to.description) }}</dd>
-						<a>Sample ID range:</a>
-						<p>ID is the number from the end of a UID, e.g. from 1_S2 the ID is 2.<br>The other parameters denote the field (1) and the level (S = Sample)</p>
-						<dd>{{ record_form.samples_start(placeholder = record_form.samples_start.description) }}
-							{{ record_form.samples_end(placeholder = record_form.samples_end.description) }}
-						</dd>
-						<a>Specify the number of measures per sample</a>
+			<div id=existing_ids>
+				<hr>
+				{{ record_form.create_new_items }}
+				<div id=new_ids>
+					{{
+						record_form.samples_pooled(
+							placeholder = record_form.samples_pooled.description
+						)
+					}}
+					<div id="per_tree">
+						<p>Specify the number of replicates (branches/leaves/samples) per tree</p>
 						<dt>{{
-								record_form.sample_replicates(
-									placeholder = record_form.sample_replicates.description
+								record_form.per_tree_replicates(
+									placeholder = record_form.per_tree_replicates.description
+								)
+							}}
+						</dt>
+                        <div id="per_sample">
+                            <p>Further specify the number of replicates if you would like to submit replicated measures per sample</p>
+                            <dt>{{
+								record_form.per_sample_replicates(
+									placeholder = record_form.per_sample_replicates.description
+								)
+							}}
+                            </dt>
+                        </div>
+					</div>
+					<div id="pooled">
+						<p>Specify the number of samples</p>
+						<dt>
+							{{
+								record_form.samples_count(
+									placeholder = record_form.samples_count.description
 								)
 							}}
 						</dt>
 					</div>
-			<div id=existing_ids>
-				<hr>
-				{{ record_form.old_new_ids }}
-				<div id=new_ids>
-						<p>Specify the number of replicates (branches/leaves) per tree</p>
-						<dt>{{
-								record_form.replicates(
-									placeholder = record_form.replicates.description
-								)
-							}}
-						</dt>
 				</div>
 				<div id=old_ids>
 					<div id=branch_ids>
@@ -75,6 +81,20 @@
 						{{ record_form.leaves_end(placeholder=record_form.leaves_end.description) }} </dd>
 						<br>
 					</div>
+                    <div id=sample_ids>
+						<br>
+						<a>Sample type:</a>
+						<dt>{{ sample_reg_form.tissue }}</dt>
+						<dt>{{ sample_reg_form.storage }}</dt>
+						<a>Date range:</a>
+						<dd>{{ record_form.date_from(placeholder = record_form.date_from.description) }}
+							{{ record_form.date_to(placeholder = record_form.date_to.description) }}</dd>
+						<a>Sample ID range:</a>
+						<p>ID is the number from the end of a UID, e.g. from 1_S2 the ID is 2.<br>The other parameters denote the field (1) and the level (S = Sample)</p>
+						<dd>{{ record_form.samples_start(placeholder = record_form.samples_start.description) }}
+							{{ record_form.samples_end(placeholder = record_form.samples_end.description) }}
+						</dd>
+                    </div>
 				</div>
 			</div>
 		<h3>File type</h3>

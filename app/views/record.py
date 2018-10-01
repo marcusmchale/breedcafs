@@ -69,10 +69,10 @@ def generate_files():
 		return redirect(url_for('login'))
 	else:
 		try:
-			record_form = RecordForm()
+			record_form = RecordForm.update()
 			if record_form.validate_on_submit():
 				level = request.form['trait_level']
-				create_new_items = request.form['create_new_items']  # boolean selection
+				create_new_items = True if request.form['create_new_items'] == 'new' else False
 				request_email = True if request.form['email_checkbox'] else False
 				traits_form = CreateTraits().update(level)
 				# sample_reg_form = SampleRegForm().update(optional=True)
@@ -97,13 +97,12 @@ def generate_files():
 						return jsonify({'submitted': "Please select traits to include"})
 					#  - no selection is empty string, convert to None
 					#  - convert integers stored as strings to integers
-					#  - convert date to UTC timestamp (ms)
 					country = request.form['country'] if request.form['country'] != '' else None
 					region = request.form['region'] if request.form['region'] != '' else None
 					farm = request.form['farm'] if request.form['farm'] != '' else None
 					field_uid = int(request.form['field']) if request.form['field'].isdigit() else None
 					block_uid = request.form['block'] if request.form['block'] != '' else None
-					per_tree_replicates = int(request.form['per_tree_replicates']) if request.form['replicates'].isdigit() else None
+					per_tree_replicates = int(request.form['per_tree_replicates']) if request.form['per_tree_replicates'].isdigit() else None
 					trees_start = int(request.form['trees_start']) if request.form['trees_start'].isdigit() else None
 					trees_end = int(request.form['trees_end']) if request.form['trees_end'].isdigit() else None
 					branches_start = int(request.form['branches_start']) if request.form['branches_start'].isdigit() else None
@@ -114,7 +113,9 @@ def generate_files():
 					samples_end = int(request.form['samples_end']) if request.form['samples_end'].isdigit() else None
 					tissue = request.form['tissue'] if request.form['tissue'] != '' else None
 					storage = request.form['storage'] if request.form['storage'] != '' else None
-					per_sample_replicates = int(request.form['per_sample_replicates']) if request.form['sample_replicates'].isdigit() else None
+					per_sample_replicates = int(request.form['per_sample_replicates']) if request.form['per_sample_replicates'].isdigit() else None
+					samples_pooled = True if request.form['samples_pooled'] == 'multiple' else False
+					samples_count = request.form['samples_count'] if request.form['samples_count'] else None
 					try:
 						start_time = int(
 							(datetime.strptime(
@@ -133,7 +134,6 @@ def generate_files():
 						end_time = None
 					# now generate the files
 					download_object = Download(session['username'], request_email)
-
 					download_object.template_files(
 						template_format,
 						create_new_items,
@@ -156,24 +156,34 @@ def generate_files():
 						tissue,
 						storage,
 						per_sample_replicates,
+						samples_pooled,
+						samples_count,
 						start_time,
-						end_time,
+						end_time
 					)
-
-
-
-
+					file_list = download_object.get_file_list()
+					if not file_list:
+						return jsonify(
+							{
+								'submitted': (
+										'No files generated'
+								)
+							}
+						)
+					file_list_html = ''
+					for i in file_list:
+						file_list_html = file_list_html + str("<ul><a href=" + i['url'] +">" + i['filename'] + "</a></ul>")
 					# if selected send an email copy of the file (or link to download if greater than ~5mb)
 					if request.form.get('email_checkbox'):
 						recipients = [User(session['username']).find('')['email']]
 						subject = "BreedCAFS files requested"
 						body = (
 								"You requested the attached file/s from the BreedCAFS database tools. "
-								+ str([file_details_dict[i]['url'] for i in file_details_dict])
+								+ file_list_html
 						)
 						html = render_template(
 							'emails/generate_files.html',
-							file_list = [file_details_dict[i]['url'] for i in file_details_dict]
+							file_list=[i['url'] for i in file_list]
 						)
 						send_email(
 							subject,
@@ -187,7 +197,7 @@ def generate_files():
 								'submitted': (
 										'Your files are ready for download '
 										'and a link has been sent to your email address:'
-										+ url_list_html
+										+ file_list_html
 								)
 							}
 						)
@@ -197,7 +207,7 @@ def generate_files():
 							{
 								'submitted': (
 									'Your files are ready for download: '
-									+ url_list_html
+									+ file_list_html
 								)
 							}
 						)

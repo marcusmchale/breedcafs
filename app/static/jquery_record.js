@@ -54,26 +54,45 @@ $('#trait_level').change(function () {
 	else if (this.value === 'sample') {
 		$('#field_traits,#block_traits,#tree_traits,#branch_traits,#leaf_traits').hide();
 		$('#sample_traits').show();
-		$('#existing_ids').hide();
+		$('#existing_ids').show();
+		$('#old_new_ids').val('old');
+		$('#new_ids').hide();
 		$('#field, #sample_ids, #tree_ids').show();
 		$('#branch_ids,#leaf_ids').hide();
 	}
 });
 
-$('#old_new_ids').val('old');
+$('#create_new_items').val('existing');
 $('#old_ids').show();
 
-$('#old_new_ids').change(function () {
+//$('#old_new_ids').change(function () {
+$('#create_new_items').change(function () {
    $(".flash").remove;
-   if (this.value === 'old') {
+   if (this.value === 'existing') {
         $('#new_ids').hide();
         $('#old_ids').show();
-    }
-    if (this.value === 'new') {
+   }
+   if (this.value === 'new') {
         $('#new_ids').show();
         $('#old_ids').hide();
         $('#email_checkbox').prop("checked", true);
    }
+});
+
+//switch for pooled samples
+$('#samples_pooled').val('single');
+$('#per_tree').show();
+$('#pooled').hide()
+$('#samples_pooled').change(function () {
+	$(".flash").remove;
+	if (this.value === 'single') {
+		$('#per_tree').show();
+		$('#pooled').hide()
+	}
+	else {
+		$('#per_tree').hide();
+		$('#pooled').show()
+	}
 });
 
 //remove flash message on change of data format select box

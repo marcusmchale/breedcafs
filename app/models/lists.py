@@ -874,7 +874,7 @@ class TraitList:
 				' WHERE trait.name_lower in $traits '
 			)
 		query += (
-			' RETURN trait '
+			' RETURN properties(trait) '
 		)
 		with get_driver().session() as neo4j_session:
 			result = neo4j_session.read_transaction(

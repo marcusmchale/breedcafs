@@ -565,6 +565,16 @@ class RecordForm(FlaskForm):
 		],
 		description="End SampleID"
 	)
+	samples_pooled = SelectField(
+		'Samples are pooled from multiple trees',
+		[InputRequired()],
+		choices=[('single', 'Single tree per sample'), ('multiple', 'Multiple trees per sample')]
+	)
+	samples_count = IntegerField(
+		'Sample count',
+		[NumberRange(min=1, max=10000, message='Register up to 10000 samples per field')],
+		description="Sample count"
+	)
 	date_from = DateField(
 		'Date start (YYYY-mm-dd): ',
 		[Optional()],
@@ -593,12 +603,27 @@ class RecordForm(FlaskForm):
 		],
 		description="Replicates (number of measures for each trait performed on each sample)"
 	)
+	date_collected = DateField(
+		'Date samples collected (YYYY-mm-dd): ',
+		[Optional()],
+		format='%Y-%m-%d',
+		description='Date samples collected'
+	)
 	create_new_items = SelectField(
 		'Find existing or create new items',
 		[InputRequired()],
-		choices=[(False, 'Find existing items'), (True, 'Create new items')]
+		choices=[('existing', 'Find existing items'), ('new', 'Create new items')]
 	)
 	submit_record = SubmitField('Generate file/s')
+
+	@staticmethod
+	def update():
+		form = RecordForm()
+		if form.samples_pooled == 'multiple':
+			form.samples_count.validators.insert(0, InputRequired())
+		else:
+			form.samples_count.validators.insert(0, Optional())
+		return form
 
 
 # upload

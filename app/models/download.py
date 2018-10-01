@@ -24,7 +24,7 @@ from xlsxwriter import Workbook
 # User class related (all uploads are tied to a user) yet more specifically regarding uploads
 class Download:
 	def __init__(self, username, email_requested=False):
-		self.username = username,
+		self.username = username
 		self.email_requested = email_requested
 		self.file_list = []
 		# create user download path if not found
@@ -37,12 +37,17 @@ class Download:
 		# prepare variables to write the file
 		self.time = datetime.utcnow().strftime('%Y%m%d-%H%M%S')
 
+	def get_file_list(
+			self
+	):
+		return self.file_list
+
 	def template_files(
 			self,
 			template_format,
 			create_new_items,
 			level,
-			trait_selection,
+			traits,
 			country,
 			region,
 			farm,
@@ -60,19 +65,52 @@ class Download:
 			tissue,
 			storage,
 			per_sample_replicates,
+			samples_pooled,
+			samples_count,
 			start_time,
 			end_time
 	):
 		if create_new_items:
 			if level == 'branch':
-				id_list = Fields.add_branches(field_uid, trees_start, trees_end, per_tree_replicates)
+				id_list = Fields.add_branches(
+					field_uid,
+					trees_start,
+					trees_end,
+					per_tree_replicates
+				)
 			elif level == 'leaf':
-				id_list = Fields.add_leaves(field_uid, trees_start, trees_end, per_tree_replicates)
-			elif level == 'sample':
-				# TODO remove Collect page and merge here
-				id_list = None
-			else:
-				id_list = None
+				id_list = Fields.add_leaves(
+					field_uid,
+					trees_start,
+					trees_end,
+					per_tree_replicates
+				)
+			else: # level == 'sample':
+				if samples_pooled:
+					id_list = Samples.add_samples_pooled(
+						field_uid,
+						samples_count
+					)
+				else:
+					# TODO remove Collect page and merge here
+					# check we have found matching ID's, if not return None
+					id_list = Samples.add_samples_per_tree(
+						field_uid,
+						trees_start,
+						trees_end,
+						per_tree_replicates
+					)
+				# if requesting replicates for samples then create these replicates in the id_list
+				if per_sample_replicates > 1:
+					if len(id_list) == 0:
+						return None
+					id_list_reps = []
+					for sample in id_list:
+						sample['Sample UID'] = sample['UID']
+						for i in range(per_sample_replicates):
+							sample['UID'] = str(sample['Sample UID']) + "." + str(int(i + 1))
+							id_list_reps.append(sample.copy())
+					id_list = id_list_reps
 		else:
 			id_list = self.get_id_list(
 				level,
@@ -95,9 +133,8 @@ class Download:
 				end_time
 			)
 		fieldnames = self.get_fieldnames(level, per_sample_replicates)
-		#get trait details
-		traits = TraitList.get_traits(trait_selection)
-
+		# get trait details
+		traits = TraitList.get_traits(level, traits)
 		if template_format == 'xlsx':
 			self.make_xlsx_data_template(
 				fieldnames,
@@ -122,49 +159,6 @@ class Download:
 				base_filename=level,
 				with_timestamp=True
 			)
-
-			csv_file_details = Download(session['username']).get_index_csv(request.form, id_list)
-			# then create the trait files
-			trt_file_details = Download(session['username']).create_trt(form_data)
-
-			file_details_dict = {
-				'table': csv_file_details,
-				'details': trt_file_details
-			}
-
-		# make the table file
-		fieldnames += ['Date', 'Time']
-		fieldnames += [trait['name'] for trait in traits]
-
-		self.make_csv_file(fieldnames, id_list, 'table.csv')
-		# and a file that describes the trait details
-		trait_fieldnames = [
-			'name',
-			'format',
-			'minimum',
-			'maximum',
-			'details',
-			'category_list'
-		]
-		details_file = self.make_csv_file(trait_fieldnames, selected_traits, 'details.csv')
-		self.file_dict[''] {
-			'table': table_file,
-			'details': details_file
-		}
-
-
-		# if requesting replicates for samples then create these replicates in the id_list
-		# check we have found matching ID's, if not return None
-		if len(id_list) == 0:
-			return None
-		if per_sample_replicates > 1:
-			id_list_reps = []
-			for sample in id_list:
-				sample['Sample UID'] = sample['UID']
-				for i in range(per_sample_replicates):
-					sample['UID'] = str(sample['Sample UID']) + "." + str(int(i + 1))
-					id_list_reps.append(sample.copy())
-			id_list = id_list_reps
 
 	@staticmethod
 	def get_fieldnames(
@@ -314,7 +308,7 @@ class Download:
 			filename = base_filename
 		else:
 			filename = self.time
-		filename = filename + file_extension
+		filename = filename + '.' + file_extension
 		file_path = os.path.join(self.user_download_folder, filename)
 		# prevent overwrite of existing file unless same path down to the second.
 		if os.path.isfile(file_path):
@@ -323,7 +317,7 @@ class Download:
 				filename = base_filename + '_' + time_s
 			else:
 				filename = time_s
-			filename = filename + file_extension
+			filename = filename + '.' + file_extension
 			file_path = os.path.join(self.user_download_folder, filename)
 			# and just in case add an incrementing appendix if this time_s filename exists
 			filename_appendix = 1
@@ -332,7 +326,7 @@ class Download:
 					filename = base_filename + '_' + time_s + '_' + filename_appendix
 				else:
 					filename = time_s + '_' + filename_appendix
-				filename = filename + file_extension
+				filename = filename + '.' + file_extension
 				file_path = os.path.join(self.user_download_folder, filename)
 		return file_path
 
@@ -367,7 +361,7 @@ class Download:
 			template_worksheet.write(row_number, column_number, header)
 		for row in id_list:
 			row_number += 1
-			for key, value in row:
+			for key, value in row.iteritems():
 				# if there is a list (or nested lists) stored in this item
 				# make sure it is printed as a list of strings
 				if isinstance(value, list):
@@ -377,17 +371,16 @@ class Download:
 		trait_details_worksheet = wb.add_worksheet("Trait details")
 		row_number = 0
 		for header in trait_fieldnames:
-			column_number = fieldnames.index(header)
+			column_number = trait_fieldnames.index(header)
 			trait_details_worksheet.write(row_number, column_number, header)
 		for trait in traits:
 			row_number += 1
-			for key, value in trait:
-				# if there is a list (or nested lists) stored in this item
-				# make sure it is printed as a list of strings
-				if isinstance(value, list):
-					value = str([str(i).encode() for i in value])
-				column_number = trait_fieldnames.index(key)
-				trait_details_worksheet.write(row_number, column_number, value)
+			for header in trait_fieldnames:
+				if header in trait:
+					if isinstance(trait[header], list):
+						trait[header] = str([str(i).encode() for i in trait[header]])
+					column_number = trait_fieldnames.index(header)
+					trait_details_worksheet.write(row_number, column_number, trait[header])
 		wb.close()
 		# add file to file_list
 		self.file_list.append({
@@ -396,9 +389,9 @@ class Download:
 			"file_size": os.path.getsize(file_path),
 			"url": url_for(
 				'download_file',
-				username = self.username,
-				filename = os.path.basename(file_path),
-				_external = True
+				username=self.username,
+				filename=os.path.basename(file_path),
+				_external=True
 			)
 		})
 
@@ -412,9 +405,9 @@ class Download:
 		with open(file_path, 'w') as csv_file:
 			writer = csv.DictWriter(
 				csv_file,
-				fieldnames = fieldnames,
-				quoting = csv.QUOTE_ALL,
-				extrasaction = 'ignore'
+				fieldnames=fieldnames,
+				quoting=csv.QUOTE_ALL,
+				extrasaction='ignore'
 			)
 			writer.writeheader()
 			for row in id_list:
@@ -431,13 +424,13 @@ class Download:
 			"file_size": os.path.getsize(file_path),
 			"url": url_for(
 				'download_file',
-				username = self.username,
-				filename = os.path.basename(file_path),
-				_external = True
+				username=self.username,
+				filename=os.path.basename(file_path),
+				_external=True
 			)
 		})
 
-	def make_csv_fb_template(
+	def make_fb_template(
 			self,
 			fieldnames,
 			id_list,
@@ -470,10 +463,9 @@ class Download:
 			traits,
 			base_filename=base_filename,
 			with_timestamp=with_timestamp,
-			file_extension='.trt'
+			file_extension='trt'
 		)
 		# TODO may need to replace 'name' with 'trait' in header but doesn't seem to affect Field-Book
-
 
 	def make_csv_table_template(
 			self,

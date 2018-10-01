@@ -33,76 +33,31 @@ class Samples:
 			return [record[0] for record in result]
 
 	@staticmethod
-	def add_samples(field_uid, start, end, replicates, tissue, storage, date, get_file):
+	def add_samples_per_tree(field_uid, start, end, per_tree_replicates):
 		with get_driver().session() as neo4j_session:
 			add_parameters = {
 				'field_uid': field_uid,
 				'start': start,
 				'end': end,
-				'replicates': replicates,
-				'tissue': tissue,
-				'storage': storage,
-				'date': date,
-				'time': (datetime.strptime(date, '%Y-%m-%d') - datetime(1970, 1, 1)).total_seconds() * 1000,
+				'replicates': per_tree_replicates,
 				'username': session['username']
 			}
-			result = neo4j_session.write_transaction(neo4j_query, Cypher.samples_add, add_parameters)
+			result = neo4j_session.write_transaction(neo4j_query, Cypher.samples_add_per_tree, add_parameters)
 			id_list = [record[0] for record in result]
-		if len(id_list) == 0:
-			return {
-				"error": "No sample codes generated. Please check the selected trees are registered"
+		return id_list
+
+	@staticmethod
+	def add_samples_pooled(field_uid, sample_count):
+		with get_driver().session() as neo4j_session:
+			add_parameters = {
+				'field_uid': field_uid,
+				'replicates': sample_count,
+				'username': session['username']
 			}
-		if get_file:
-			# create user download path if not found
-			download_path = os.path.join(app.instance_path, app.config['DOWNLOAD_FOLDER'], session['username'])
-			if not os.path.isdir(download_path):
-				os.mkdir(download_path)
-				gid = grp.getgrnam(app.config('celery_group_name')).gr_gid
-				os.chown(download_path, -1, gid)
-				os.chmod(download_path, 0775)
-			# prepare variables to write the file
-			fieldnames = [
-				'Country',
-				'Region',
-				'Farm',
-				'Field',
-				'Field UID',
-				'Block',
-				'Block UID',
-				'Tree UID',
-				'Tree Custom ID',
-				'Variety',
-				'Tissue',
-				'Storage',
-				'Date Sampled',
-				'Sample UID'
-			]
-			first_sample_id = id_list[0]['Sample ID']
-			last_sample_id = id_list[-1]['Sample ID']
-			filename = 'Field_' + str(field_uid) + '_S' + str(first_sample_id) + '_to_S' + str(last_sample_id) + '.csv'
-			file_path = os.path.join(app.instance_path, app.config['DOWNLOAD_FOLDER'], session['username'], filename)
-			# make the file
-			with open(file_path, 'w') as csv_file:
-				writer = csv.DictWriter(
-					csv_file,
-					fieldnames=fieldnames,
-					quoting=csv.QUOTE_ALL,
-					extrasaction='ignore'
-				)
-				writer.writeheader()
-				for row in id_list:
-					writer.writerow(row)
-				file_size = csv_file.tell()
-			# return file details
-			return {
-				"filename": filename,
-				"file_path": file_path,
-				"file_size": file_size,
-				"first_sample_id": first_sample_id,
-				"last_sample_id": last_sample_id
-			}
-		else:
-			return id_list
+			result = neo4j_session.write_transaction(neo4j_query, Cypher.samples_add_pooled, add_parameters)
+			id_list = [record[0] for record in result]
+		return id_list
+
 
 	@staticmethod
 	def get_samples(parameters):
