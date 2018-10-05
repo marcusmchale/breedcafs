@@ -50,26 +50,8 @@
 				As an example, "1_T2" is the UID for the second tree registered within the field with UID 1.
 			</p>
 	<h2>
-		Sample collection and/or registration with
-		<a href="{{ url_for('collect') }}"><img src = "{{ url_for('static', filename='collect.svg') }}"></a>
-	</h2>
-		<p>
-			Samples are the experimental unit against which the "sample" level trait data is recorded.
-			These will be a specific tissue from the tree that are stored in a particular way
-			depending on the analyses to be performed.
-		</p>
-		<p>
-			Once trees are registered, we can generate UIDs for samples from these trees.
-			First select the trees (filtering by field and tree ID).
-			Then enter the above parameters,
-			along with the number of samples of this type collected from each tree (replicates)
-			and the date of collection.
-			Click to register the samples in the database and generate UIDs.
-			A file will be provided describing these UIDs for you to uniquely label the samples.
-		</p>
-	<h2>
 		Generate templates to record data with
-		<a href="{{ url_for('record') }}"><img src = "{{ url_for('static', filename='record.svg') }}"></a>
+		<a href="{{ url_for('collect') }}"><img src = "{{ url_for('static', filename='collect.svg') }}"></a>
 	</h2>
 		<h3>Data formats</h3>
 			<p>

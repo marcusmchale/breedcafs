@@ -1,37 +1,115 @@
 {% extends "layout.html" %}	
 {% block body %}
 <div class="text_body">
-	<h2>Collect Samples</h2>
+	<h2>Record Data</h2>
 		{% from "_formhelpers_location_fields.html" import render_field %}
 	<form>
-		{{ location_form.csrf_token }}
-		<!-- Samples -->
-		<div id=sample_collection>
-			<h3>Location</h3>
-				<dt>{{ location_form.country }}</dt>
-				<dt>{{ location_form.region }}</dt>
-				<dt>{{ location_form.farm }}</dt>
-				<dt>{{ location_form.field }}</dt>
-			<h3>Trees</h3>
-			<p>ID is the number from the end of a UID, e.g. from 1_T2 the ID is 2.<br>The other parameters denote the field (1) and the level (T = Tree)</p>
-					<dd>{{ sample_reg_form.trees_start(placeholder=sample_reg_form.trees_start.description) }}
-					{{ sample_reg_form.trees_end(placeholder=sample_reg_form.trees_end.description) }} </dd>
-			<h3>Sampling details</h3>
-			<dt>{{ sample_reg_form.tissue }}
-				{{ add_tissue_form.text_tissue(placeholder = add_tissue_form.text_tissue.description) }}
-				{{ add_tissue_form.submit_tissue }}</dt>
-			<dt>{{ sample_reg_form.storage }}
-				{{ add_storage_form.text_storage(placeholder=add_storage_form.text_storage.description) }}
-				{{ add_storage_form.submit_storage }}</dt>
-			<dt>{{ sample_reg_form.replicates(placeholder = sample_reg_form.replicates.description) }}</dt>
-			<dt>{{ sample_reg_form.date_collected(placeholder = sample_reg_form.date_collected.description) }}</dt>
-			<br>
-			<dt>{{ render_field (sample_reg_form.submit_samples) }}{{ render_field (sample_reg_form.email_checkbox) }}</dt>
+		{{ record_form.csrf_token }}
+		<!--{{ location_form.csrf_token }}-->
+		<h3>Level</h3>
+				<dt>{{ record_form.trait_level }} </dt> <br>
+		<h3>Location</h3>
+			<dt>{{ location_form.country }}</dt>
+			<dt>{{ location_form.region }}</dt>
+			<dt>{{ location_form.farm }}</dt>
+			<dt>{{ location_form.field }}</dt>
+			<dt>{{ location_form.block }}</dt>
+			<div id=tree_ids>
+				<br>
+				<a>Tree ID range:</a>
+				<p>ID is the number from the end of a UID, e.g. from 1_T2 the ID is 2.<br>The other parameters denote the field (1) and the level (T = Tree)</p>
+				<dd>{{ record_form.trees_start(placeholder=record_form.trees_start.description) }}
+				{{ record_form.trees_end(placeholder=record_form.trees_end.description) }} </dd>
+				<br>
+			</div>
+			<div id=existing_ids>
+				<hr>
+				{{ record_form.create_new_items }}
+				<div id=new_ids>
+					{{
+						record_form.samples_pooled(
+							placeholder = record_form.samples_pooled.description
+						)
+					}}
+					<div id="per_tree">
+						<p>Specify the number of replicates (branches/leaves/samples) per tree</p>
+						<dt>{{
+								record_form.per_tree_replicates(
+									placeholder = record_form.per_tree_replicates.description
+								)
+							}}
+						</dt>
+                        <div id="per_sample">
+                            <p>Further specify the number of replicates if you would like to submit replicated measures per sample</p>
+                            <dt>{{
+								record_form.per_sample_replicates(
+									placeholder = record_form.per_sample_replicates.description
+								)
+							}}
+                            </dt>
+                        </div>
+					</div>
+					<div id="pooled">
+						<p>Specify the number of samples</p>
+						<dt>
+							{{
+								record_form.samples_count(
+									placeholder = record_form.samples_count.description
+								)
+							}}
+						</dt>
+					</div>
+				</div>
+				<div id=old_ids>
+					<div id=branch_ids>
+						<br>
+						<a>Branch ID range:</a>
+						<p>ID is the number from the end of a UID, e.g. from 1_R2 the ID is 2.<br>The other parameters denote the field (1) and the level (R = Branch)</p>
+						<dd>{{ record_form.branches_start(placeholder=record_form.branches_start.description) }}
+						{{ record_form.branches_end(placeholder=record_form.branches_end.description) }} </dd>
+						<br>
+					</div>
+					<div id=leaf_ids>
+						<br>
+						<a>Leaf ID range:</a>
+						<p>ID is the number from the end of a UID, e.g. from 1_L2 the ID is 2.<br>The other parameters denote the field (1) and the level (L = Leaf)</p>
+						<dd>{{ record_form.leaves_start(placeholder=record_form.leaves_start.description) }}
+						{{ record_form.leaves_end(placeholder=record_form.leaves_end.description) }} </dd>
+						<br>
+					</div>
+                    <div id=sample_ids>
+						<br>
+						<a>Sample type:</a>
+						<dt>{{ sample_reg_form.tissue }}</dt>
+						<dt>{{ sample_reg_form.storage }}</dt>
+						<a>Date range:</a>
+						<dd>{{ record_form.date_from(placeholder = record_form.date_from.description) }}
+							{{ record_form.date_to(placeholder = record_form.date_to.description) }}</dd>
+						<a>Sample ID range:</a>
+						<p>ID is the number from the end of a UID, e.g. from 1_S2 the ID is 2.<br>The other parameters denote the field (1) and the level (S = Sample)</p>
+						<dd>{{ record_form.samples_start(placeholder = record_form.samples_start.description) }}
+							{{ record_form.samples_end(placeholder = record_form.samples_end.description) }}
+						</dd>
+                    </div>
+				</div>
+			</div>
+        <div id = trait_selection>
+            <h3>Trait Selection</h3>
+			{% include 'traits_form.html' %}
+		</div>
+		<h3>File type</h3>
+			<dt>{{ record_form.template_format }} </dt>
+			<dt>
+				{{ record_form.submit_record }}
+				<input id="email_checkbox" name="email_checkbox" placeholder="" value="y" type="checkbox">
+				<a>Email a copy</a>
+			</dt>
 		</div>
 	</form>
 </div>
 <script src="{{ url_for('static', filename='jquery_1.8.3_min.js') }}"></script>
 <script src="{{ url_for('static', filename='jquery_location.js') }}"></script>
+<script src="{{ url_for('static', filename='jquery_collect.js') }}"></script>
 <script src="{{ url_for('static', filename='jquery-ui-1.12.1.custom/jquery-ui.js') }}"></script>
 <script src="{{ url_for('static', filename='jquery_samples.js') }}"></script>
 {% endblock %}

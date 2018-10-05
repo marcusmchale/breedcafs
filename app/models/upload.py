@@ -7,8 +7,11 @@ from user import User
 from config import ALLOWED_EXTENSIONS
 from neo4j_driver import get_driver
 import unicodecsv as csv
-from datetime import datetime
+import datetime
 from werkzeug.utils import secure_filename
+from openpyxl import load_workbook
+from zipfile import BadZipfile
+
 
 
 class DictReaderInsensitive(csv.DictReader):
@@ -108,7 +111,7 @@ class RowParseResult:
 		row_string = '<tr><td>' + str(self.row_num) + '</td>'
 		for field in fieldnames:
 			if field not in self.errors:
-				row_string += '<td>' + str(self.row_data[field].encode('utf8')) + '</td>'
+				row_string += '<td>' + self.row_data[field] + '</td>'
 			else:
 				row_string += '<td bgcolor = #FFFF00 title = "'
 				field_error_type = self.errors[field]['error_type']
@@ -299,12 +302,12 @@ class ParseResult:
 			for field in self.fieldnames:
 				if self.field_errors:
 					if field in self.field_errors:
-						header_string += '<th bgcolor = #FFFF00 title = "' + str(self.field_errors[field]) \
-							+ '"><p>' + str(field) + '</p></th>'
+						header_string += '<th bgcolor = #FFFF00 title = "' + self.field_errors[field] \
+							+ '"><p>' + field + '</p></th>'
 					else:
-						header_string += '<th><p>' + str(field) + '</p></th>'
+						header_string += '<th><p>' + field + '</p></th>'
 				else:
-					header_string += '<th><p>' + str(field) + '</p></th>'
+					header_string += '<th><p>' + field + '</p></th>'
 			header_string += '</tr>'
 			html_table = header_string
 			# construct each row and append to growing table
@@ -314,7 +317,6 @@ class ParseResult:
 				row_string = self.parse_result[item].html_row(self.fieldnames)
 				html_table += row_string
 			return '<table>' + html_table + '</table>'
-
 		else:
 			return None
 
@@ -340,7 +342,7 @@ class ItemSubmissionResult:
 	):
 		self.found = found
 		self.submitted_by = submitted_by
-		self.submitted_at = datetime.utcfromtimestamp(int(submitted_at) / 1000).strftime("%Y-%m-%d %H:%M:%S")
+		self.submitted_at = datetime.datetime.utcfromtimestamp(int(submitted_at) / 1000).strftime("%Y-%m-%d %H:%M:%S")
 		self.value = value
 		self.uploaded_value = uploaded_value
 		self.uid = uid
@@ -348,7 +350,7 @@ class ItemSubmissionResult:
 		self.timestamp = None
 		self.table_date = None
 		self.table_time = None
-		self.time = datetime.utcfromtimestamp(int(time) / 1000).strftime("%Y-%m-%d %H:%M:%S")
+		self.time = datetime.datetime.utcfromtimestamp(int(time) / 1000).strftime("%Y-%m-%d %H:%M:%S")
 
 	def fb_item(self, timestamp):
 		self.timestamp = timestamp
@@ -564,7 +566,7 @@ class Parsers:
 	def timestamp_fb_format(timestamp_string):
 		timestamp = str(timestamp_string).strip()
 		try:
-			datetime.strptime(timestamp[0:19], '%Y-%m-%d %H:%M:%S')
+			datetime.datetime.strptime(timestamp[0:19], '%Y-%m-%d %H:%M:%S')
 			if not all([
 				timestamp[-5] in ['+', '-'],
 				int(timestamp[-4:-2]) < 24,
@@ -582,9 +584,9 @@ class Parsers:
 	def date_format(date_string):
 		date_string = str(date_string).strip()
 		try:
-			time = datetime.strptime(date_string, '%Y-%m-%d')
+			time = datetime.datetime.strptime(date_string, '%Y-%m-%d')
 			# the below is just to make sure can render it again, strftime fails on dates pre-1990
-			datetime.strftime(time, '%Y')
+			datetime.datetime.strftime(time, '%Y')
 			return date_string
 		except ValueError:
 			return False
@@ -593,7 +595,7 @@ class Parsers:
 	def time_format(time_string):
 		time_string = str(time_string).strip()
 		try:
-			datetime.strptime(time_string, '%H:%M')
+			datetime.datetime.strptime(time_string, '%H:%M')
 			return time_string
 		except (ValueError, IndexError):
 			return False
@@ -627,8 +629,9 @@ class Parsers:
 
 class Upload:
 	def __init__(self, username, submission_type, raw_filename):
-		time = datetime.utcnow().strftime('_%Y%m%d-%H%M%S_')
+		time = datetime.datetime.utcnow().strftime('_%Y%m%d-%H%M%S_')
 		self.username = username
+		self.raw_filename = raw_filename
 		self.filename = secure_filename(time + '_' + raw_filename)
 		self.submission_type = submission_type
 		self.file_path = os.path.join(app.instance_path, app.config['UPLOAD_FOLDER'], username, self.filename)
@@ -636,10 +639,15 @@ class Upload:
 		self.parse_result = None
 		self.submission_result = None
 		self.fieldnames = None
+		self.file_extension = None
 
-	@staticmethod
-	def allowed_file(filename):
-		return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+	def allowed_file(self):
+		if '.' in self.raw_filename:
+			self.file_extension = self.raw_filename.rsplit('.', 1)[1].lower()
+			if self.file_extension in ALLOWED_EXTENSIONS:
+				return True
+		else:
+			return False
 
 	def file_save(self, file_data):
 		# create user upload path if not found
@@ -651,57 +659,106 @@ class Upload:
 			os.chmod(upload_path, 0775)
 		file_data.save(self.file_path)
 
-	def is_valid_csv(self):
-		with open(self.file_path) as uploaded_file:
-			# TODO implement CSV kit checks - in particular csvstat to check field length (avoid stray quotes)
-			# now get the dialect and check it conforms to expectations
-			dialect = csv.Sniffer().sniff(uploaded_file.read())
-			if not all((dialect.delimiter == ',', dialect.quotechar == '"')):
-				return False
-			else:
-				return True
+	def file_format_errors(self):
+		if self.file_extension == 'csv':
+			with open(self.file_path) as uploaded_file:
+				# TODO implement CSV kit checks - in particular csvstat to check field length (avoid stray quotes)
+				# now get the dialect and check it conforms to expectations
+				dialect = csv.Sniffer().sniff(uploaded_file.read())
+				if not all((dialect.delimiter == ',', dialect.quotechar == '"')):
+					return 'Please upload comma (,) separated file with quoted (") fields'
+		elif self.file_extension == 'xlsx':
+			wb = load_workbook(self.file_path, read_only=True)
+			if "Template" not in wb.sheetnames:
+				return 'This workbook does not contain a "Template" worksheet'
+		else:
+			return None
 
 	def check_headers(self):
-		with open(self.file_path) as uploaded_file:
-			file_dict = DictReaderInsensitive(uploaded_file)
-			self.fieldnames = file_dict.fieldnames
-			if len(self.fieldnames) > len(set(self.fieldnames)):
-				return "This file contains duplicated header fields. This is not supported"
-			fieldnames = set(self.fieldnames)
-			if self.submission_type == 'FB':
-				required = {'uid', 'trait', 'value', 'timestamp', 'person', 'location'}
-			else:  # submission_type == 'table'
-				required = {'uid', 'date', 'time'}
-			if not required.issubset(fieldnames):
-				missing_headers = required - fieldnames
-				return "This file is missing the following headers: " + str([i for i in missing_headers])
-			else:
-				return None
+		if self.file_extension == 'csv':
+			with open(self.file_path) as uploaded_file:
+				file_dict = DictReaderInsensitive(uploaded_file)
+				self.fieldnames = file_dict.fieldnames
+				if len(self.fieldnames) > len(set(self.fieldnames)):
+					return "This file contains duplicated header fields. This is not supported"
+				fieldnames = set(self.fieldnames)
+				if self.submission_type == 'FB':
+					required = {'uid', 'trait', 'value', 'timestamp', 'person', 'location'}
+				else:  # submission_type == 'table'
+					required = {'uid', 'date', 'time'}
+				if not required.issubset(fieldnames):
+					missing_fieldnames = required - fieldnames
+					return (
+							'This file is missing the following headers: '
+							+ ', '.join([i for i in missing_fieldnames])
+					)
+		elif self.file_extension == 'xlsx':
+			try:
+				wb = load_workbook(self.file_path, read_only=True)
+			except BadZipfile:
+				return 'This file does not appear to be a valid xlsx file'
+			if "Template" not in wb.sheetnames:
+				return 'This workbook does not contain the expected "Template" worksheet'
+			ws = wb['Template']
+			rows = ws.iter_rows(min_row=1, max_row=1)
+			first_row = next(rows)
+			self.fieldnames = [c.value.strip().lower() for c in first_row]
+			fieldnames_lower = {c.value.strip().lower() for c in first_row}
+			required = {'uid', 'date', 'time'}
+			if not required.issubset(fieldnames_lower):
+				missing_fieldnames = required - fieldnames_lower
+				return (
+						'The "Template" worksheet is missing the following fields: '
+						+ ', '.join([i for i in missing_fieldnames])
+				)
+		else:
+			return None
 
 	# clean up the csv by passing through dict reader and rewriting
+	# consider writing the xls to a csv here...
 	def trim_file(self):
 		file_path = self.file_path
-		self.trimmed_file_path = os.path.splitext(file_path)[0] + '_trimmed.csv'
-		trimmed_file_path = self.trimmed_file_path
-		with open(file_path, 'r') as uploaded_file, open(trimmed_file_path, "w") as trimmed_file:
-			# this dict reader lowers case and trims whitespace on all headers
-			file_dict = DictReaderInsensitive(
-				uploaded_file,
-				skipinitialspace=True
-			)
-			file_writer = csv.DictWriter(
-				trimmed_file,
-				fieldnames = file_dict.fieldnames,
-				quoting = csv.QUOTE_ALL
-			)
-			file_writer.writeheader()
-			for row in file_dict:
-				# remove rows without entries
-				if any(field.strip() for field in row):
-					for field in file_dict.fieldnames:
-						if row[field]:
-							row[field] = row[field].strip()
-					file_writer.writerow(row)
+		trimmed_file_path = os.path.splitext(file_path)[0] + '_trimmed.csv'
+		self.trimmed_file_path = trimmed_file_path
+		if self.file_extension == 'csv':
+			with open(file_path, 'r') as uploaded_file, open(trimmed_file_path, "w") as trimmed_file:
+				# this dict reader lowers case and trims whitespace on all headers
+				file_dict = DictReaderInsensitive(
+					uploaded_file,
+					skipinitialspace=True
+				)
+				file_writer = csv.DictWriter(
+					trimmed_file,
+					fieldnames=file_dict.fieldnames,
+					quoting=csv.QUOTE_ALL
+				)
+				file_writer.writeheader()
+				for row in file_dict:
+					# remove rows without entries
+					if any(field.strip() for field in row):
+						for field in file_dict.fieldnames:
+							if row[field]:
+								row[field] = row[field].strip()
+						file_writer.writerow(row)
+		elif self.file_extension == 'xlsx':
+			wb = load_workbook(self.file_path, read_only=True)
+			ws = wb['Template']
+			with open(trimmed_file_path, "wb") as trimmed_file:
+				file_writer = csv.writer(
+					trimmed_file,
+					quoting=csv.QUOTE_ALL
+				)
+				rows=ws.iter_rows()
+				first_row=next(rows)
+				file_writer.writerow(cell.value.lower() for cell in first_row)
+				for row in rows:
+					cell_values = [cell.value for cell in row]
+					for i, value in enumerate(cell_values):
+						if isinstance(value, datetime.datetime):
+							cell_values[i] = value.strftime("%Y-%m-%d")
+						elif isinstance(value, datetime.time):
+							cell_values[i] = value.strftime("%H:%M")
+					file_writer.writerow(cell_values)
 
 	def parse_rows(self):
 		trimmed_file_path = self.trimmed_file_path
@@ -711,7 +768,7 @@ class Upload:
 		with open(trimmed_file_path, 'r') as trimmed_file:
 			trimmed_dict = DictReaderInsensitive(trimmed_file)
 			for row_data in trimmed_dict:
-				#firstly, if a table check for trait data, if none then just skip
+				# firstly, if a table check for trait data, if none then just skip
 				if self.submission_type == 'table':
 					# firstly check if trait data in the row and ignore if empty
 					required = ['uid', 'date', 'time', 'person']
@@ -842,10 +899,10 @@ class Upload:
 				traits = [i for i in trimmed_dict.fieldnames if i not in not_traits]
 				check_result = [record[0] for record in tx.run(
 					Cypher.upload_table_check,
-					username = username,
-					filename = ("file:///" + username + '/' + trimmed_filename),
-					submission_type = submission_type,
-					traits = traits
+					username=username,
+					filename=("file:///" + username + '/' + trimmed_filename),
+					submission_type=submission_type,
+					traits=traits
 				)]
 				for row_data in trimmed_dict:
 					line_num = int(trimmed_dict.line_num)

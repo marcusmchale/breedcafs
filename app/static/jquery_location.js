@@ -179,7 +179,7 @@ $("#submit_country").click( function(e) {
 					update_countries(response['submitted'].toLowerCase());
 					load_chart();
 				}  else if (response.hasOwnProperty('found')) {
-					flash = flash = "<div id='country_flash' class='flash'> Found: " + response['found'] + " </div>";
+					flash = "<div id='country_flash' class='flash'> Found: " + response['found'] + " </div>";
 					$("#submit_country").after(flash);
 					update_countries(response['found'].toLowerCase());
 					$("#text_country").val("");
@@ -215,7 +215,7 @@ $("#submit_region").click( function(e) {
 					update_regions(response['submitted'].toLowerCase());
 					load_chart();
 				}  else if (response.hasOwnProperty('found')) {
-					flash = flash = "<div id='region_flash' class='flash'> Found: " + response['found'] + " </div>";
+					flash = "<div id='region_flash' class='flash'> Found: " + response['found'] + " </div>";
 					$("#submit_region").after(flash);
 					update_regions(response['found'].toLowerCase());
 					$("#text_region").val("");
@@ -251,7 +251,7 @@ $("#submit_farm").click( function(e) {
 					update_farms(response['submitted'].toLowerCase());
 					load_chart();
 				}  else if (response.hasOwnProperty('found')) {
-					flash = flash = "<div id='farm_flash' class='flash'> Found: " + response['found'] + " </div>";
+					flash = "<div id='farm_flash' class='flash'> Found: " + response['found'] + " </div>";
 					$("#submit_farm").after(flash);
 					update_farms(response['found'].toLowerCase());
 					$("#text_farm").val("");
@@ -288,7 +288,7 @@ $("#submit_field").click( function(e) {
 					update_fields(response['submitted']['uid']);
 					load_chart();
 				}  else if (response.hasOwnProperty('found')) {
-					flash = flash = "<div id='field_flash' class='flash'> Found: " + response['found']['name'] + " </div>";
+					flash = "<div id='field_flash' class='flash'> Found: " + response['found']['name'] + " </div>";
 					$("#submit_field").after(flash);
 					update_fields(response['found']['uid']);
 					$("#text_field").val("");
@@ -325,7 +325,7 @@ $("#submit_block").click( function(e) {
 					update_blocks(response['submitted']['uid']);
 					load_chart();
 			}  else if (response.hasOwnProperty('found')) {
-					flash = flash = "<div id='block_flash' class='flash'> Found: " + response['found']['name'] + " </div>";
+					flash = "<div id='block_flash' class='flash'> Found: " + response['found']['name'] + " </div>";
 					$("#submit_block").after(flash);
 					update_blocks(response['found']['uid']);
 					$("#text_block").val("");
@@ -385,11 +385,22 @@ $("#trees_end").val('')
 
 update_defaults = function() {
 	var sel_field = $("#field").find(":selected").val();
-	if (sel_field !== "") {
+	var sel_block = $("#block").find(":selected").val();
+	var treecount_level = undefined
+	if (sel_block !== "") {
+		treecount_level=sel_block
+	}
+	else if (sel_field !== "") {
+		treecount_level=sel_field
+	}
+	else{
+		treecount_level=null
+	}
+	if (treecount_level!== null) {
 		$("#trees_start, trees_end").prop("disabled", true);
 		var request = $.ajax({
 			type: 'GET',
-			url: "/location/treecount/" + sel_field + '/',
+			url: "/location/treecount/" + treecount_level + '/'
 		});
 		request.done(function(data){
 			if (data[0] === 0) {
@@ -401,6 +412,7 @@ update_defaults = function() {
 				//lazily return starting ID as 1
 				$("#trees_start").val(1)
 			}
+			console.log(data[0]);
 			//and be sure to allow the user to edit
 			$("#trees_start,#trees_end").prop("disabled", false);
 		});
@@ -409,6 +421,8 @@ update_defaults = function() {
 		//handling return to nothing entered on deselection of field
 		$("#trees_start,#trees_end").val('')
 	}
+	console.log(treecount_level);
 };
 
 $('#field').change(update_defaults);
+$('#block').change(update_defaults);

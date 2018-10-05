@@ -814,7 +814,7 @@ class Cypher:
 	treecount = (
 		' MATCH '
 		'	(c: Counter { '
-		'		uid: (toInteger($field_uid) + "_tree") '
+		'		uid: ($uid + "_tree") '
 		'	}) '
 		' RETURN '
 		'	c.count '

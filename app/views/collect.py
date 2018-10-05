@@ -14,23 +14,23 @@ from flask import (
 	request
 )
 from app.models import (
-	SelectionList,
 	MatchNode,
+	SelectionList,
 	User,
-	# Download,
-	Samples,
+	Download,
+	Samples
 )
 from app.forms import (
 	LocationForm,
+	RecordForm,
 	CreateTraits,
 	SampleRegForm,
 	AddTissueForm,
 	AddStorageForm,
 )
-from app.emails import (
-	# send_email,
-	send_static_attachment
-)
+from app.emails import send_email
+from datetime import datetime
+
 from flask.views import MethodView
 
 
@@ -41,27 +41,207 @@ def collect():
 		return redirect(url_for('login'))
 	else:
 		try:
+			record_form = RecordForm()
 			location_form = LocationForm.update()
-			sample_traits_form = CreateTraits().update('sample')
-			tree_traits_form = CreateTraits().update('tree')
-			block_traits_form = CreateTraits().update('block')
 			field_traits_form = CreateTraits().update('field')
-			sample_reg_form = SampleRegForm().update()
-			add_tissue_form = AddTissueForm()
-			add_storage_form = AddStorageForm()
+			block_traits_form = CreateTraits().update('block')
+			tree_traits_form = CreateTraits().update('tree')
+			branch_traits_form = CreateTraits().update('branch')
+			leaf_traits_form = CreateTraits().update('leaf')
+			sample_traits_form = CreateTraits().update('sample')
+			sample_reg_form = SampleRegForm.update()
 			return render_template(
 				'collect.html',
-				location_form = location_form,
-				level = 'all',
-				sample_traits_form = sample_traits_form,
-				tree_traits_form = tree_traits_form,
-				block_traits_form = block_traits_form,
-				field_traits_form = field_traits_form,
-				sample_reg_form = sample_reg_form,
-				add_tissue_form = add_tissue_form,
-				add_storage_form = add_storage_form,
-				title = 'Collect'
+				location_form=location_form,
+				record_form=record_form,
+				level='all',
+				field_traits_form=field_traits_form,
+				block_traits_form=block_traits_form,
+				tree_traits_form=tree_traits_form,
+				branch_traits_form=branch_traits_form,
+				leaf_traits_form=leaf_traits_form,
+				sample_traits_form=sample_traits_form,
+				sample_reg_form=sample_reg_form,
+				title='Record'
 			)
+		except (ServiceUnavailable, AuthError):
+			flash("Database unavailable")
+			return redirect(url_for('index'))
+
+
+@app.route('/collect/generate_files', methods=['GET', 'POST'])
+def generate_files():
+	if 'username' not in session:
+		flash('Please log in')
+		return redirect(url_for('login'))
+	else:
+		try:
+			record_form = RecordForm.update()
+			if record_form.validate_on_submit():
+				level = request.form['trait_level']
+				create_new_items = True if request.form.get('create_new_items') == 'new' else False
+				request_email = True if request.form.get('email_checkbox') else False
+				traits_form = CreateTraits().update(level)
+				# sample_reg_form = SampleRegForm().update(optional=True)
+				if level == 'field':
+					location_form = LocationForm.update(optional=True)
+				else:
+					location_form = LocationForm.update(optional=False)
+				if all([location_form.validate_on_submit(), traits_form.validate_on_submit()]):
+					# Parse the form data
+					template_format = request.form['template_format']
+					# reduce the traits to those selected from the relevant list
+					# drop out boxes checked from other levels and similarly named csrf tokens
+					traits = [
+						item for sublist in [
+							request.form.getlist(i) for i in request.form if
+							all(['csrf_token' not in i, level + '-' in i])
+						]
+						for item in sublist
+					]
+					# if no traits are selected there is no point continuing
+					if len(traits) == 0:
+						return jsonify({'submitted': "Please select traits to include"})
+					#  - no selection is empty string, convert to None
+					#  - convert integers stored as strings to integers
+					country = request.form['country'] if request.form['country'] != '' else None
+					region = request.form['region'] if request.form['region'] != '' else None
+					farm = request.form['farm'] if request.form['farm'] != '' else None
+					field_uid = int(request.form['field']) if request.form['field'].isdigit() else None
+					block_uid = request.form['block'] if request.form['block'] != '' else None
+					per_tree_replicates = int(
+						request.form['per_tree_replicates']
+					) if request.form['per_tree_replicates'].isdigit() else None
+					trees_start = int(
+						request.form['trees_start']
+					) if request.form['trees_start'].isdigit() else None
+					trees_end = int(
+						request.form['trees_end']
+					) if request.form['trees_end'].isdigit() else None
+					branches_start = int(
+						request.form['branches_start']
+					) if request.form['branches_start'].isdigit() else None
+					branches_end = int(
+						request.form['branches_end']
+					) if request.form['branches_end'].isdigit() else None
+					leaves_start = int(
+						request.form['leaves_start']
+					) if request.form['leaves_start'].isdigit() else None
+					leaves_end = int(
+						request.form['leaves_end']
+					) if request.form['leaves_end'].isdigit() else None
+					samples_start = int(
+						request.form['samples_start']
+					) if request.form['samples_start'].isdigit() else None
+					samples_end = int(
+						request.form['samples_end']
+					) if request.form['samples_end'].isdigit() else None
+					tissue = request.form['tissue'] if request.form['tissue'] != '' else None
+					storage = request.form['storage'] if request.form['storage'] != '' else None
+					per_sample_replicates = int(
+						request.form['per_sample_replicates']
+					) if request.form['per_sample_replicates'].isdigit() else None
+					samples_pooled = True if request.form['samples_pooled'] == 'multiple' else False
+					samples_count = request.form['samples_count'] if request.form['samples_count'] else None
+					try:
+						start_time = int((datetime.strptime(
+								request.form['date_from'], '%Y-%m-%d') - datetime(1970, 1, 1)
+							).total_seconds() * 1000
+						) if request.form['date_from'] != '' else None
+					except ValueError:
+						start_time = None
+					try:
+						end_time = int((datetime.strptime(
+							request.form['date_to'], '%Y-%m-%d') - datetime(1970, 1, 1)
+							).total_seconds() * 1000
+						) if request.form['date_to'] != '' else None
+					except ValueError:
+						end_time = None
+					# now generate the files
+					download_object = Download(session['username'], request_email)
+					download_object.template_files(
+						template_format,
+						create_new_items,
+						level,
+						traits,
+						country,
+						region,
+						farm,
+						field_uid,
+						block_uid,
+						per_tree_replicates,
+						trees_start,
+						trees_end,
+						branches_start,
+						branches_end,
+						leaves_start,
+						leaves_end,
+						samples_start,
+						samples_end,
+						tissue,
+						storage,
+						per_sample_replicates,
+						samples_pooled,
+						samples_count,
+						start_time,
+						end_time
+					)
+					file_list = download_object.get_file_list()
+					if not file_list:
+						return jsonify(
+							{
+								'submitted': (
+										'No files generated'
+								)
+							}
+						)
+					file_list_html = ''
+					for i in file_list:
+						file_list_html = file_list_html + str("<ul><a href=" + i['url'] + ">" + i['filename'] + "</a></ul>")
+					# if selected send an email copy of the file (or link to download if greater than ~5mb)
+					if request.form.get('email_checkbox'):
+						recipients = [User(session['username']).find('')['email']]
+						subject = "BreedCAFS files requested"
+						body = (
+								"You requested the attached file/s from the BreedCAFS database tools. "
+								+ file_list_html
+						)
+						html = render_template(
+							'emails/generate_files.html',
+							file_list=[i['url'] for i in file_list]
+						)
+						send_email(
+							subject,
+							app.config['ADMINS'][0],
+							recipients,
+							body,
+							html
+						)
+						return jsonify(
+							{
+								'submitted': (
+										'Your files are ready for download '
+										'and a link has been sent to your email address:'
+										+ file_list_html
+								)
+							}
+						)
+					# return as jsonify so that can be interpreted the same way as error message
+					else:
+						return jsonify(
+							{
+								'submitted': (
+									'Your files are ready for download: '
+									+ file_list_html
+								)
+							}
+						)
+				else:
+					errors = jsonify([record_form.errors, location_form.errors])
+					return errors
+			else:
+				errors = jsonify([record_form.errors])
+				return errors
 		except (ServiceUnavailable, AuthError):
 			flash("Database unavailable")
 			return redirect(url_for('index'))
@@ -169,109 +349,6 @@ def add_storage():
 					return jsonify({"submitted": new_storage[0]['name'].title()})
 			else:
 				return jsonify([form.errors])
-		except (ServiceUnavailable, AuthError):
-			flash("Database unavailable")
-			return redirect(url_for('index'))
-
-
-@app.route('/add_samples', methods=['GET', 'POST'])
-def add_samples():
-	if 'username' not in session:
-		flash('Please log in')
-		return redirect(url_for('login'))
-	else:
-		try:
-			location_form = LocationForm.update()
-			sample_form = SampleRegForm.update()
-			if all([location_form.validate_on_submit(), sample_form.validate_on_submit()]):
-				field_uid = int(request.form['field'])
-				start = int(request.form['trees_start']) if request.form['trees_start'] else 0
-				end = int(request.form['trees_end']) if request.form['trees_end'] else 999999
-				replicates = int(request.form['replicates'])
-				tissue = request.form['tissue']
-				storage = request.form['storage']
-				date = request.form['date_collected']
-				# register samples, make file describing index information and return filename etc.
-				file_details = Samples().add_samples(field_uid, start, end, replicates, tissue, storage, date, True)
-				# if result = none then no data was found
-				if 'error' in file_details:
-					return jsonify({'submitted': file_details['error']})
-				# create a download url
-				download_url = url_for(
-					'download_file',
-					username = session['username'],
-					filename = file_details['filename'],
-					_external = True
-				)
-				# if requested create email (and send as attachment if less than ~5mb)
-				if request.form.get('email_checkbox'):
-					recipients = [User(session['username']).find('')['email']]
-					subject = "BreedCAFS: Samples registered"
-					body = (
-							"You registered " + str(replicates) + " replicates of " + str(tissue)
-							+ " samples stored in " + str(storage) + " on " + str(date) + " for trees from "
-							+ str(start) + " to " + str(end) + " in Field #" + str(field_uid) + "."
-							+ " These samples are described in a file available for download at the following address: "
-							+ download_url
-					)
-					html = render_template(
-						'emails/add_samples.html',
-						field_uid = field_uid,
-						start = start,
-						end = end,
-						replicates = replicates,
-						tissue = tissue,
-						storage = storage,
-						date = date,
-						download_url = download_url
-					)
-					if file_details['file_size'] < 5000000:
-						send_static_attachment(
-							subject,
-							app.config['ADMINS'][0],
-							recipients,
-							body,
-							html,
-							file_details['filename'],
-							'text/csv',
-							file_details['file_path']
-						)
-						return jsonify({'submitted': (
-								'You successfully registered ' + str(tissue) + ' samples.<br> '
-								+ 'These are described in the following file: '
-								+ '<a href="' + download_url + '">' + file_details['filename'] + '</a>.<br>'
-								+ ' This file has also been sent to your email address ')}
-						)
-					else:
-						send_static_attachment(
-							subject,
-							app.config['ADMINS'][0],
-							recipients,
-							body,
-							html,
-							file_details['filename'],
-							'text/csv',
-							file_details['file_path']
-						)
-						return jsonify({'submitted': (
-								'You successfully registered ' + str(tissue) + ' samples.<br> '
-								+ 'These are described in the following file : '
-								+ '<a href="' + download_url + '">' + file_details['filename'] + '</a>.<br>'
-								+ ' This link has also been sent to your email address. ')})
-				else:
-					return jsonify(
-						{
-							'submitted': (
-									'You successfully registered ' + str(tissue) + ' samples.<br>'
-									+ 'These are described in the following file : '
-									+ '<a href="' + download_url + '">' + file_details['filename']
-									+ '</a>'
-							)
-						}
-					)
-			else:
-				errors = jsonify([location_form.errors, sample_form.errors])
-				return errors
 		except (ServiceUnavailable, AuthError):
 			flash("Database unavailable")
 			return redirect(url_for('index'))

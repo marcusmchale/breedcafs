@@ -24,23 +24,37 @@ svg {
 					background: #ffffea;
 					display: flex;
 					flex-wrap: wrap;
+					}
+.metanav			{
+					font-size: 0.8em;
+					padding: 0.3em;
+					display: flex;
+					flex-wrap:wrap;
 					justify-content: space-evenly;
-					align-items: flex-end;
+					margin-left: auto;
 					}
 .header				{
 					padding: 10px;
 					min-width:95%;
 					display: flex;
 					flex-wrap: wrap;
-					justify-content: space-evenly;
 					align-items: flex-end;
+					justify-content: space-evenly;
+					}
+.utils				{
+					display: flex;
+					flex-wrap: nowrap;
+					min-width:22%;
+					padding: 5px;
+					align-items: flex-end ;
+					margin-left: auto;
 					}
 .main				{
 					padding: 0.8em;
 					display: flex;
 					flex-wrap: wrap;
 					justify-content: space-evenly;
-					align-items: flex-start; 
+
 					padding: 2%;
 					}	
 .text_body			{
@@ -53,8 +67,6 @@ svg {
 .chart				{
 					padding: 0.8em; 
 					}
-.metanav			{ font-size: 0.8em; 
-					padding: 0.3em;}
 .flash				{
 					flex: 0 1 95%;
 					margin: 1%;
@@ -63,14 +75,6 @@ svg {
 					border: 1px solid #627138; }
 .error				{ background: #f0d6d6; 
 					padding: 0.5em; }
-.utils				{
-					display: flex;
-					flex-wrap: nowrap;
-					min-width:22%;
-					padding: 5px; 
-					margin: 10%;
-					}
-
 .root_node			{
 					stroke: none;
 					fill: none;

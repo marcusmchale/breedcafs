@@ -118,13 +118,13 @@ class ListBlocks(MethodView):
 
 class TreeCount(MethodView):
 	@staticmethod
-	def get(field_uid):
+	def get(uid):
 		if 'username' not in session:
 			flash('Please log in')
 			return redirect(url_for('login'))
 		else:
 			try:
-				tree_count = Fields.get_treecount(field_uid)
+				tree_count = Fields.get_treecount(uid)
 				response = make_response(jsonify(tree_count))
 				response.content_type = 'application/json'
 				return response

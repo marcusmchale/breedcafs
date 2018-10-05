@@ -31,17 +31,18 @@ def upload_submit():
 	else:
 		form = UploadForm()
 		if form.validate_on_submit():
-			if not Upload.allowed_file(form.file.data.filename):
-				return jsonify({'submitted': 'Please select a supported file type'})
 			username = session['username']
 			submission_type = form.submission_type.data
 			raw_filename = form.file.data.filename
-			file_data = form.file.data
 			upload_object = Upload(username, submission_type, raw_filename)
+			if not upload_object.allowed_file():
+				return jsonify({'submitted': 'Please select a supported file type'})
+			file_data = form.file.data
 			upload_object.file_save(file_data)
-			if not upload_object.is_valid_csv():
-				return jsonify({
-					'submitted': 'Please upload comma (,) separated file with quoted (") fields'
+			file_format_errors = upload_object.file_format_errors()
+			if file_format_errors:
+				return ({
+					'submitted': file_format_errors
 				})
 			header_report = upload_object.check_headers()
 			if header_report:
@@ -51,7 +52,7 @@ def upload_submit():
 			try:
 				# as an asynchronous function with celery
 				# result is stored in redis and accessible from the status/task_id endpoint
-				task = Upload.async_submit.apply_async(args = [username, upload_object])
+				task = Upload.async_submit.apply_async(args=[username, upload_object])
 			except (ServiceUnavailable, AuthError):
 				return jsonify({'submitted': 'The database is currently unavailable - please try again later'})
 			return jsonify({'submitted': (

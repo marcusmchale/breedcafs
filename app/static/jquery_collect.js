@@ -2,24 +2,28 @@
 //Set trait level undefined by default and only display traits when level selected
 $('#trait_level').val('0');
 traits = $('#field_traits,#block_traits,#tree_traits,#branch_traits,#leaf_traits,#sample_traits');
+$('#trait_selection').hide();
 traits.hide();
-id_forms = $('#field,#tree_ids,#branch_ids,#leaf_ids,#sample_ids');
+id_forms = $('#tree_ids,#branch_ids,#leaf_ids,#sample_ids');
 id_forms.hide();
 $('#existing_ids').hide();
 
 $('#trait_level').change(function () {
 	$(".flash").remove();
 	if (this.value === '') {
+		$('#trait_selection').hide();
 		traits.hide();
 		id_forms.hide();
 	}
 	else if (this.value === 'field') {
+		$('#trait_selection').show();
 		$('#block_traits, #tree_traits, #branch_traits, #leaf_traits, #sample_traits').hide();
 		$('#field_traits').show();
 		$('#existing_ids').hide();
 		$('#field, #tree_ids, #sample_ids').hide();
 	}
 	else if (this.value === 'block') {
+		$('#trait_selection').show();
 		$('#field_traits, #tree_traits, #branch_traits, #leaf_traits, #sample_traits').hide();
 		$('#block_traits').show();
 		$('#field').show();
@@ -27,6 +31,7 @@ $('#trait_level').change(function () {
 		$('#tree_ids, #sample_ids').hide();
 	}
 	else if (this.value === 'tree') {
+		$('#trait_selection').show();
 		$('#field_traits,#block_traits,#branch_traits,#leaf_traits,#sample_traits').hide();
 		$('#tree_traits').show();
 		$('#field, #tree_ids').show();
@@ -34,6 +39,7 @@ $('#trait_level').change(function () {
 		$('#branch_ids,#leaf_ids,#sample_ids').hide();
 	}
 	else if (this.value === 'branch') {
+		$('#trait_selection').show();
 		$('#field_traits,#block_traits,#tree_traits,#leaf_traits,#sample_traits').hide();
 		$('#branch_traits').show();
 		$('#existing_ids').show();
@@ -43,6 +49,7 @@ $('#trait_level').change(function () {
 		$('#leaf_ids, #sample_ids').hide();
 	}
 	else if (this.value === 'leaf') {
+		$('#trait_selection').show();
 		$('#field_traits,#block_traits,#tree_traits,#branch_traits,#sample_traits').hide();
 		$('#leaf_traits').show();
 		$('#existing_ids').show();
@@ -52,6 +59,7 @@ $('#trait_level').change(function () {
 		$('#branch_ids,#sample_ids').hide();
 	}
 	else if (this.value === 'sample') {
+		$('#trait_selection').show();
 		$('#field_traits,#block_traits,#tree_traits,#branch_traits,#leaf_traits').hide();
 		$('#sample_traits').show();
 		$('#existing_ids').show();
@@ -167,7 +175,7 @@ $("#submit_record").click( function(e) {
 	flash_wait = "<div id='files_flash' class='flash'>" + wait_message + "</div>";
 	$(this).parent().after(flash_wait);
 	var generate_files = $.ajax({
-	    url: "/record/generate_files",
+	    url: "/collect/generate_files",
 	    data: $("form").serialize(),
 		type: 'POST',
 		success: function(response) {

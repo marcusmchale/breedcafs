@@ -61,8 +61,6 @@ class User:
 				pending.append((record['p.name'], fullname))
 		return {'confirmed': confirmed, 'pending': pending}
 
-
-
 	def add_affiliations(self, partners):
 		with get_driver().session() as neo4j_session:
 			return [record['p.name'] for record in neo4j_session.write_transaction(self._add_affiliations, partners)]

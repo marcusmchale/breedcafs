@@ -60,7 +60,7 @@ app.add_url_rule('/location/blocks/<field_uid>/',
 	view_func=views.ListBlocks.as_view('blocks'),
 	methods=['GET'])
 
-app.add_url_rule('/location/treecount/<field_uid>/',
+app.add_url_rule('/location/treecount/<uid>/',
 	view_func=views.TreeCount.as_view('treecount'),
 	methods=['GET'])
 

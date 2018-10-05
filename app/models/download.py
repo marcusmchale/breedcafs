@@ -21,6 +21,7 @@ from app.models import (
 )
 from xlsxwriter import Workbook
 
+
 # User class related (all uploads are tied to a user) yet more specifically regarding uploads
 class Download:
 	def __init__(self, username, email_requested=False):
@@ -191,13 +192,12 @@ class Download:
 			fieldnames[-1:-1] = [
 				'Branch UID'
 			]
-		if level == ['sample']:
+		if level == 'sample':
 			fieldnames[-1:-1] = [
 				'Leaf UID',
 				'Tissue',
 				'Storage',
-				'Date Sampled',
-				'UID'
+				'Date Sampled'
 			]
 			if per_sample_replicates:
 				fieldnames.insert(-1, 'Sample UID')
@@ -343,7 +343,8 @@ class Download:
 			base_filename,
 			with_timestamp=with_timestamp
 		)
-		fieldnames += ['Date', 'Time']
+		len_fieldnames = len(fieldnames)
+		fieldnames += ['Date', 'Time', 'Person']
 		fieldnames += [trait['name'] for trait in traits]
 		trait_fieldnames = [
 			'name',
@@ -354,18 +355,29 @@ class Download:
 			'category_list'
 		]
 		wb = Workbook(file_path)
+		date_format = wb.add_format({'num_format': 'yyyy-mm-dd', 'left': 1})
+		time_format = wb.add_format({'num_format': 'hh:mm'})
+		right_border = wb.add_format({'right': 1})
+		uid_format = wb.add_format({'left':1})
+		header_format = wb.add_format({'border': 1})
 		template_worksheet = wb.add_worksheet("Template")
+		# column < row < cell formatting in priority
+		template_worksheet.set_column(len_fieldnames -1, len_fieldnames -1, None, cell_format=uid_format)
+		template_worksheet.set_column(len_fieldnames, len_fieldnames, None, cell_format=date_format)
+		template_worksheet.set_column(len_fieldnames +1, len_fieldnames+1, None, cell_format=time_format)
+		template_worksheet.set_column(len_fieldnames + 2, len_fieldnames + 2, None, cell_format=right_border)
+		template_worksheet.set_column(len(fieldnames)-1, len(fieldnames)-1, None, cell_format=right_border)
 		row_number = 0
 		for header in fieldnames:
 			column_number = fieldnames.index(header)
-			template_worksheet.write(row_number, column_number, header)
+			template_worksheet.write(row_number, column_number, header, header_format)
 		for row in id_list:
 			row_number += 1
 			for key, value in row.iteritems():
 				# if there is a list (or nested lists) stored in this item
 				# make sure it is printed as a list of strings
 				if isinstance(value, list):
-					value = str([str(i).encode() for i in value])
+					value = ", ".join([i for i in value])
 				column_number = fieldnames.index(key)
 				template_worksheet.write(row_number, column_number, value)
 		trait_details_worksheet = wb.add_worksheet("Trait details")
@@ -378,7 +390,7 @@ class Download:
 			for header in trait_fieldnames:
 				if header in trait:
 					if isinstance(trait[header], list):
-						trait[header] = str([str(i).encode() for i in trait[header]])
+						trait[header] = ", ".join([i for i in trait[header]])
 					column_number = trait_fieldnames.index(header)
 					trait_details_worksheet.write(row_number, column_number, trait[header])
 		wb.close()
@@ -413,7 +425,7 @@ class Download:
 			for row in id_list:
 				for item in row:
 					if isinstance(row[item], list):
-						row[item] = [str(i).encode() for i in row[item]]
+						row[item] = ", ".join([i for i in row[item]])
 				# for key, value in row:
 				writer.writerow(row)
 			# file_size = csv_file.tell()
@@ -475,7 +487,7 @@ class Download:
 			base_filename=None,
 			with_timestamp=True
 	):
-		fieldnames += ['Date', 'Time']
+		fieldnames += ['Date', 'Time', 'Person']
 		fieldnames += [trait['name'] for trait in traits]
 		self.make_csv_file(
 			fieldnames,
@@ -1308,7 +1320,7 @@ class Download:
 			for row in result:
 				for item in row:
 					if isinstance(row[item], list):
-						row[item] = [str(i).encode() for i in row[item]]
+						row[item] = ", ".join([i for i in row[item]])
 				writer.writerow(row)
 			file_size = csv_file.tell()
 		return {

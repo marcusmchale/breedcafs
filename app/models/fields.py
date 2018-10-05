@@ -253,9 +253,11 @@ class Fields:
 			return [record[0] for record in neo4j_session.read_transaction(neo4j_query, Cypher.trees_get, parameters)]
 
 	@staticmethod
-	def get_treecount(field_uid):
+	def get_treecount(uid):
 		with get_driver().session() as neo4j_session:
+			if uid.isdigit():
+				uid = int(uid)
 			parameters = {
-				'field_uid': field_uid
+				'uid': uid
 			}
 			return [record[0] for record in neo4j_session.read_transaction(neo4j_query, Cypher.treecount, parameters)]
