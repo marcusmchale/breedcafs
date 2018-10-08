@@ -147,29 +147,53 @@ class Fields:
 		return [record[0] for record in result]
 
 	@staticmethod
-	def add_branches(field_uid, start, end, replicates):
-		with get_driver().session() as neo4j_session:
-			add_parameters = {
-				'field_uid': field_uid,
-				'start': start,
-				'end': end,
-				'replicates': replicates,
-				'username': session['username']
-			}
-			result = neo4j_session.write_transaction(neo4j_query, Cypher.branches_add, add_parameters)
+	def add_branches(field_uid, start, end, replicates, block_uid=None):
+		if block_uid:
+			with get_driver().session() as neo4j_session:
+				add_parameters = {
+					'field_uid': field_uid,
+					'block_uid': block_uid,
+					'start': start,
+					'end': end,
+					'replicates': replicates,
+					'username': session['username']
+				}
+				result = neo4j_session.write_transaction(neo4j_query, Cypher.branches_add_block, add_parameters)
+		else:
+			with get_driver().session() as neo4j_session:
+				add_parameters = {
+					'field_uid': field_uid,
+					'start': start,
+					'end': end,
+					'replicates': replicates,
+					'username': session['username']
+				}
+				result = neo4j_session.write_transaction(neo4j_query, Cypher.branches_add, add_parameters)
 		return [record[0] for record in result]
 
 	@staticmethod
-	def add_leaves(field_uid, start, end, replicates):
-		with get_driver().session() as neo4j_session:
-			add_parameters = {
-				'field_uid': field_uid,
-				'start': start,
-				'end': end,
-				'replicates': replicates,
-				'username': session['username']
-			}
-			result = neo4j_session.write_transaction(neo4j_query, Cypher.leaves_add, add_parameters)
+	def add_leaves(field_uid, start, end, replicates, block_uid=None):
+		if block_uid:
+			with get_driver().session() as neo4j_session:
+				add_parameters = {
+					'field_uid': field_uid,
+					'block_uid': block_uid,
+					'start': start,
+					'end': end,
+					'replicates': replicates,
+					'username': session['username']
+				}
+				result = neo4j_session.write_transaction(neo4j_query, Cypher.leaves_add_block, add_parameters)
+		else:
+			with get_driver().session() as neo4j_session:
+				add_parameters = {
+					'field_uid': field_uid,
+					'start': start,
+					'end': end,
+					'replicates': replicates,
+					'username': session['username']
+				}
+				result = neo4j_session.write_transaction(neo4j_query, Cypher.leaves_add, add_parameters)
 		return [record[0] for record in result]
 
 	@staticmethod

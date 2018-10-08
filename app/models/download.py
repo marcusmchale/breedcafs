@@ -77,14 +77,16 @@ class Download:
 					field_uid,
 					trees_start,
 					trees_end,
-					per_tree_replicates
+					per_tree_replicates,
+					block_uid
 				)
 			elif level == 'leaf':
 				id_list = Fields.add_leaves(
 					field_uid,
 					trees_start,
 					trees_end,
-					per_tree_replicates
+					per_tree_replicates,
+					block_uid
 				)
 			else: # level == 'sample':
 				if samples_pooled:
@@ -99,7 +101,8 @@ class Download:
 						field_uid,
 						trees_start,
 						trees_end,
-						per_tree_replicates
+						per_tree_replicates,
+						block_uid
 					)
 				# if requesting replicates for samples then create these replicates in the id_list
 				if per_sample_replicates > 1:
@@ -164,7 +167,8 @@ class Download:
 	@staticmethod
 	def get_fieldnames(
 			level,
-			per_sample_replicates = None
+			per_sample_replicates=None,
+			pooled=None
 	):
 		fieldnames = [
 			'Country',
@@ -173,6 +177,10 @@ class Download:
 			'Field',
 			'UID'
 		]
+		if pooled:
+			fieldnames[-1:-1] = [
+				'Field UID'
+			]
 		if level in ['block','tree','branch','leaf','sample']:
 			fieldnames[-1:-1] = [
 				'Field UID',
@@ -195,8 +203,6 @@ class Download:
 		if level == 'sample':
 			fieldnames[-1:-1] = [
 				'Leaf UID',
-				'Tissue',
-				'Storage',
 				'Date Sampled'
 			]
 			if per_sample_replicates:
@@ -283,10 +289,6 @@ class Download:
 				block_uid=block_uid,
 				trees_start=trees_start,
 				trees_end=trees_end,
-				branches_start=branches_start,
-				branches_end=branches_end,
-				leaves_start=leaves_start,
-				leaves_end=leaves_end,
 				samples_start=samples_start,
 				samples_end=samples_end,
 				tissue=tissue,
@@ -343,9 +345,18 @@ class Download:
 			base_filename,
 			with_timestamp=with_timestamp
 		)
-		len_fieldnames = len(fieldnames)
-		fieldnames += ['Date', 'Time', 'Person']
-		fieldnames += [trait['name'] for trait in traits]
+		wb = Workbook(file_path)
+		context_worksheet = wb.add_worksheet("Context")
+		date_format = wb.add_format({'num_format': 'yyyy-mm-dd', 'left': 1})
+		time_format = wb.add_format({'num_format': 'hh:mm'})
+		right_border = wb.add_format({'right': 1})
+		header_format = wb.add_format({'bottom': 1})
+		row_number = 0
+		# write header for context worksheet
+		for i, j in enumerate(fieldnames):
+			context_worksheet.write(row_number, i, j, header_format)
+		template_fieldnames = ['UID', 'Date', 'Time', 'Person']
+		template_fieldnames += [trait['name'] for trait in traits]
 		trait_fieldnames = [
 			'name',
 			'format',
@@ -354,23 +365,18 @@ class Download:
 			'details',
 			'category_list'
 		]
-		wb = Workbook(file_path)
-		date_format = wb.add_format({'num_format': 'yyyy-mm-dd', 'left': 1})
-		time_format = wb.add_format({'num_format': 'hh:mm'})
-		right_border = wb.add_format({'right': 1})
-		uid_format = wb.add_format({'left':1})
-		header_format = wb.add_format({'border': 1})
 		template_worksheet = wb.add_worksheet("Template")
 		# column < row < cell formatting in priority
-		template_worksheet.set_column(len_fieldnames -1, len_fieldnames -1, None, cell_format=uid_format)
-		template_worksheet.set_column(len_fieldnames, len_fieldnames, None, cell_format=date_format)
-		template_worksheet.set_column(len_fieldnames +1, len_fieldnames+1, None, cell_format=time_format)
-		template_worksheet.set_column(len_fieldnames + 2, len_fieldnames + 2, None, cell_format=right_border)
-		template_worksheet.set_column(len(fieldnames)-1, len(fieldnames)-1, None, cell_format=right_border)
+		template_worksheet.set_column(0, 0, None, cell_format=right_border)
+		template_worksheet.set_column(1, 1, None, cell_format=date_format)
+		template_worksheet.set_column(2, 2, None, cell_format=time_format)
+		template_worksheet.set_column(3, 3, None, cell_format=right_border)
+		template_worksheet.set_column(len(template_fieldnames)-1, len(template_fieldnames)-1, None, cell_format=right_border)
 		row_number = 0
-		for header in fieldnames:
-			column_number = fieldnames.index(header)
-			template_worksheet.write(row_number, column_number, header, header_format)
+		# write header for template worksheet
+		for i, j in enumerate(template_fieldnames):
+			template_worksheet.write(row_number, i, j, header_format)
+		# write the id_list
 		for row in id_list:
 			row_number += 1
 			for key, value in row.iteritems():
@@ -379,20 +385,20 @@ class Download:
 				if isinstance(value, list):
 					value = ", ".join([i for i in value])
 				column_number = fieldnames.index(key)
-				template_worksheet.write(row_number, column_number, value)
+				context_worksheet.write(row_number, column_number, value)
+			template_worksheet.write(row_number, 0, row['UID'])
 		trait_details_worksheet = wb.add_worksheet("Trait details")
 		row_number = 0
 		for header in trait_fieldnames:
 			column_number = trait_fieldnames.index(header)
-			trait_details_worksheet.write(row_number, column_number, header)
+			trait_details_worksheet.write(row_number, column_number, header,  header_format)
 		for trait in traits:
 			row_number += 1
-			for header in trait_fieldnames:
-				if header in trait:
-					if isinstance(trait[header], list):
-						trait[header] = ", ".join([i for i in trait[header]])
-					column_number = trait_fieldnames.index(header)
-					trait_details_worksheet.write(row_number, column_number, trait[header])
+			for i, trait_header in enumerate(trait_fieldnames):
+				if trait_header in trait:
+					if isinstance(trait[trait_header], list):
+						trait[trait_header] = ", ".join([value for value in trait[trait_header]])
+					trait_details_worksheet.write(row_number, i, trait[trait_header])
 		wb.close()
 		# add file to file_list
 		self.file_list.append({

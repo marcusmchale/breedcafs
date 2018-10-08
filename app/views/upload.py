@@ -5,6 +5,7 @@ from flask import (
 from app.models import Upload
 from app.forms import UploadForm
 
+
 @app.route('/upload', methods=['GET', 'POST'])
 def upload():
 	if 'username' not in session:

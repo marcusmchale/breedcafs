@@ -4,6 +4,7 @@ $('#trait_level').val('0');
 traits = $('#field_traits,#block_traits,#tree_traits,#branch_traits,#leaf_traits,#sample_traits');
 $('#trait_selection').hide();
 traits.hide();
+$('#location').hide();
 id_forms = $('#tree_ids,#branch_ids,#leaf_ids,#sample_ids');
 id_forms.hide();
 $('#existing_ids').hide();
@@ -12,60 +13,67 @@ $('#trait_level').change(function () {
 	$(".flash").remove();
 	if (this.value === '') {
 		$('#trait_selection').hide();
+		$('#location').hide();
 		traits.hide();
 		id_forms.hide();
 	}
 	else if (this.value === 'field') {
+		$('#location').show();
 		$('#trait_selection').show();
 		$('#block_traits, #tree_traits, #branch_traits, #leaf_traits, #sample_traits').hide();
 		$('#field_traits').show();
 		$('#existing_ids').hide();
-		$('#field, #tree_ids, #sample_ids').hide();
+		$('#field, #block, #tree_ids, #sample_ids').hide();
 	}
 	else if (this.value === 'block') {
+		$('#location').show();
 		$('#trait_selection').show();
 		$('#field_traits, #tree_traits, #branch_traits, #leaf_traits, #sample_traits').hide();
 		$('#block_traits').show();
 		$('#field').show();
-		$('#existing_ids').hide();
+		$('#block, existing_ids').hide();
 		$('#tree_ids, #sample_ids').hide();
 	}
 	else if (this.value === 'tree') {
+		$('#location').show();
 		$('#trait_selection').show();
 		$('#field_traits,#block_traits,#branch_traits,#leaf_traits,#sample_traits').hide();
 		$('#tree_traits').show();
-		$('#field, #tree_ids').show();
+		$('#field, #block, #tree_ids').show();
 		$('#existing_ids').hide();
 		$('#branch_ids,#leaf_ids,#sample_ids').hide();
 	}
 	else if (this.value === 'branch') {
+		$('#location').show();
 		$('#trait_selection').show();
 		$('#field_traits,#block_traits,#tree_traits,#leaf_traits,#sample_traits').hide();
 		$('#branch_traits').show();
 		$('#existing_ids').show();
 		$('#old_new_ids').val('old');
 		$('#new_ids').hide();
-		$('#field, #tree_ids, #branch_ids').show();
+		$('#field, #block, #tree_ids, #branch_ids').show();
 		$('#leaf_ids, #sample_ids').hide();
 	}
 	else if (this.value === 'leaf') {
+		$('#location').show();
 		$('#trait_selection').show();
 		$('#field_traits,#block_traits,#tree_traits,#branch_traits,#sample_traits').hide();
 		$('#leaf_traits').show();
 		$('#existing_ids').show();
 		$('#old_new_ids').val('old');
 		$('#new_ids').hide();
-		$('#field,#leaf_ids,#tree_ids').show();
+		$('#field, #block, #leaf_ids,#tree_ids').show();
 		$('#branch_ids,#sample_ids').hide();
 	}
 	else if (this.value === 'sample') {
+		$('#location').show();
 		$('#trait_selection').show();
 		$('#field_traits,#block_traits,#tree_traits,#branch_traits,#leaf_traits').hide();
 		$('#sample_traits').show();
 		$('#existing_ids').show();
 		$('#old_new_ids').val('old');
 		$('#new_ids').hide();
-		$('#field, #sample_ids, #tree_ids').show();
+		$('#field, #block, #sample_ids, #tree_ids').show();
 		$('#branch_ids,#leaf_ids').hide();
 	}
 });
@@ -96,10 +104,12 @@ $('#samples_pooled').change(function () {
 	if (this.value === 'single') {
 		$('#per_tree').show();
 		$('#pooled').hide()
+		$('#block').show()
 	}
 	else {
 		$('#per_tree').hide();
 		$('#pooled').show()
+		$('#block').hide()
 	}
 });
 

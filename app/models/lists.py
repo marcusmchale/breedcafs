@@ -293,7 +293,7 @@ class ItemList:
 			' Farm: f.name, '
 			' Region: r.name, '
 			' Country: c.name }'
-			' ORDER BY block.uid'
+			' ORDER BY block.id'
 		)
 		with get_driver().session() as neo4j_session:
 			result = neo4j_session.read_transaction(
@@ -392,7 +392,7 @@ class ItemList:
 			' Farm: f.name, '
 			' Region: r.name, '
 			' Country: c.name } '
-			' ORDER BY tree.uid '
+			' ORDER BY tree.id '
 		)
 		with get_driver().session() as neo4j_session:
 			result = neo4j_session.read_transaction(
@@ -509,7 +509,7 @@ class ItemList:
 			' Farm: f.name, '
 			' Region: r.name, '
 			' Country: c.name } '
-			' ORDER BY branch.uid '
+			' ORDER BY branch.id '
 		)
 		with get_driver().session() as neo4j_session:
 			result = neo4j_session.read_transaction(
@@ -648,7 +648,7 @@ class ItemList:
 			' Farm: f.name, '
 			' Region: r.name, '
 			' Country: c.name } '
-			' ORDER BY leaf.uid '
+			' ORDER BY leaf.id '
 		)
 		with get_driver().session() as neo4j_session:
 			result = neo4j_session.read_transaction(
@@ -666,10 +666,6 @@ class ItemList:
 			block_uid=None,
 			trees_start=None,
 			trees_end=None,
-			branches_start=None,
-			branches_end=None,
-			leaves_start=None,
-			leaves_end=None,
 			samples_start=None,
 			samples_end=None,
 			tissue=None,
@@ -694,49 +690,50 @@ class ItemList:
 			parameters['farm'] = farm
 		query += ')<-[:IS_IN]-(field:Field '
 		if field_uid:
-			query += '{uid: $field_uid})'
+			query += '{uid: $field_uid}'
 			parameters['field_uid'] = field_uid
+		query += (
+			' )<-[:FROM_FIELD]-(:FieldSamples) '
+			' <-[:FROM_FIELD]-(sample:Sample) '
+		)
 		if block_uid:
 			query += (
-				' MATCH '
-				'	(field) '
-				'	<-[:IS_IN]-(fb: FieldBlocks) '
-				'	<-[:IS_IN]-(block:Block {uid: $block_uid}) '
-				'	<-[:IS_IN]-(bt: BlockTrees) '
-				'	<-[:IS_IN]-(tree: Tree) '
+				'	-[:FROM_TREE]->(: TreeSamples) '
+				'	-[:FROM_TREE]->(tree: Tree) '
+				'	-[:IS_IN]->(block: Block { '
+				'		uid: $block_uid) '
+				'	}) '
 			)
 			parameters['block_uid'] = block_uid
-		else:
+		elif any([trees_start, trees_end]):
 			query += (
-				' MATCH '
-				'	(field) '
-				'	<-[:IS_IN]-(ft: FieldTrees) '
-				'	<-[:IS_IN]-(tree: Tree) '
+				'	-[:FROM_TREE]->(: TreeSamples) '
+				'	-[:FROM_TREE]->(tree: Tree) '
 			)
 			optional_matches.append(
-				'	(tree)-[:IS_IN]->(bt:BlockTrees) '
+				'	(tree)-[:IS_IN]->(:BlockTrees) '
 				'	-[:IS_IN]->(block:Block) '
 			)
-		if trees_start:
-			filters.append(
-				' tree.id >= $trees_start '
+			if trees_start:
+				filters.append(
+					' tree.id >= $trees_start '
+				)
+				parameters['trees_start'] = trees_start
+			if trees_end:
+				filters.append(
+					' tree.id <= $trees_end '
+				)
+				parameters['trees_end'] = trees_end
+		else:
+			optional_matches.append(
+				'	(sample) '
+				'	-[:FROM_TREE]->(: TreeSamples) '
+				'	-[:FROM_TREE]->(tree: Tree) '
 			)
-			parameters['trees_start'] = trees_start
-		if trees_end:
-			filters.append(
-				' tree.id <= $trees_end '
+			optional_matches.append(
+				'	(tree)-[:IS_IN]->(:BlockTrees) '
+				'	-[:IS_IN]->(block:Block) '
 			)
-			parameters['trees_end'] = trees_end
-		query += (
-			' MATCH (tree) '
-			'	<-[:FROM_TREE]-(ts:TreeSamples) '
-			'	<-[:FROM_TREE]-(sample:Sample) '
-			'	-[:COLLECTED_AS]->(:FieldTissueStorage) '
-			'	-[:COLLECTED_AS]->(tissue_storage :TissueStorage) '
-			' MATCH '
-			'	(tissue:Tissue)<-[:OF_TISSUE]-(tissue_storage) '
-			'	-[:STORED_IN]->(storage:Storage) '
-		)
 		if samples_start:
 			filters.append(
 				' sample.id >= $samples_start '
@@ -767,48 +764,6 @@ class ItemList:
 				' sample.time <= $end_time '
 			)
 			parameters['end_time'] = end_time
-		if branches_start or branches_end:
-			query += (
-				' MATCH '
-				' (sample)-[:FROM_BRANCH]->(branch:Branch) '
-			)
-			if branches_start:
-				filters.append(
-					' branch.id >= $branches_start '
-				)
-				parameters['branches_start'] = branches_start
-			if branches_end:
-				filters.append(
-					' branch.id <= $branches_end '
-				)
-				parameters['branches_end'] = branches_end
-		else:
-			optional_matches.append(
-				' (sample)-[:FROM_BRANCH]->(branch:Branch) '
-			)
-		if leaves_start or leaves_end:
-			query += (
-				' MATCH '
-				' (sample)-[:FROM_LEAF]->(leaf:Leaf) '
-			)
-			optional_matches.append(
-				" (leaf)-[:FROM_BRANCH]->(branch:Branch) "
-			)
-			if branches_start:
-				filters.append(
-					' leaf.id >= $leaves_start '
-				)
-				parameters['leaves_start'] = leaves_start
-			if branches_end:
-				filters.append(
-					' leaf.id <= $leaves_end '
-				)
-				parameters['leaves_end'] = leaves_end
-		else:
-			optional_matches.append(
-				' (sample)-[:FROM_LEAF]->(leaf:Leaf) '
-				' -[:FROM_BRANCH]->(branch:Branch) '
-			)
 		if filters:
 			query += (
 				' WHERE '
@@ -830,20 +785,40 @@ class ItemList:
 				if count != 0:
 					query += ' , '
 		query += (
-			' RETURN {'
-			'	UID: sample.uid, '
-			'	`Leaf UID`: leaf.uid, '
-			'	`Branch UID`: branch.uid, '
-			'	`Tree UID`: tree.uid, '
-			'	`Block UID`: block.uid, '
-			'	Block: block.name, '
-			'	`Field UID` : field.uid, '
-			'	Field: field.name, '
-			'	Farm: f.name, '
-			'	Region: r.name, '
-			'	Country: c.name '
+			' WITH '
+			'	sample, '
+			'	tree, '
+			'	block, '
+			'	field, '
+			'	f,r,c '
+			' ORDER BY field, tree, sample '
+			' WITH '
+			'	sample.uid as UID, '
+			'	collect(tree.uid) as `Tree UID`, '
+			'	collect(distinct(tree.variety)) as Variety, '
+			'	collect(distinct(tree.custom_id)) as `Tree Custom ID`, '
+			'	collect(distinct(block.uid)) as `Block UID`, '
+			'	collect(distinct(block.name)) as Block, '
+			'	field.uid as `Field UID`, '
+			'	field.name as Field, '
+			'	f.name as Farm, '
+			'	r.name as Region, '
+			'	c.name as Country, '
+			'	[field.uid, sample.id] as id '
+			' RETURN { '
+			'	UID: UID, '
+			'	`Tree UID`: `Tree UID`, '
+			'	Variety: Variety, '
+			'	`Tree Custom ID`: `Tree Custom ID`, '
+			'	`Block UID`: `Block UID`, '
+			'	Block: Block, '
+			'	`Field UID` : `Field UID`, '
+			'	Field: Field, '
+			'	Farm: Farm, '
+			'	Region: Region, '
+			'	Country: Country '
 			' } '
-			' ORDER BY sample.id '
+			' ORDER BY id '
 		)
 		with get_driver().session() as neo4j_session:
 			result = neo4j_session.read_transaction(

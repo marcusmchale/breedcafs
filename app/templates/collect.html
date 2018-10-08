@@ -1,19 +1,22 @@
 {% extends "layout.html" %}	
 {% block body %}
 <div class="text_body">
-	<h2>Record Data</h2>
+	<h2>Collect</h2>
+        <p>Here you can generate templates for data collection and sample registration</p>
 		{% from "_formhelpers_location_fields.html" import render_field %}
 	<form>
 		{{ record_form.csrf_token }}
 		<!--{{ location_form.csrf_token }}-->
 		<h3>Level</h3>
 				<dt>{{ record_form.trait_level }} </dt> <br>
-		<h3>Location</h3>
+        <div id="location">
+            <h3>Location</h3>
 			<dt>{{ location_form.country }}</dt>
 			<dt>{{ location_form.region }}</dt>
 			<dt>{{ location_form.farm }}</dt>
 			<dt>{{ location_form.field }}</dt>
 			<dt>{{ location_form.block }}</dt>
+        </div>
 			<div id=tree_ids>
 				<br>
 				<a>Tree ID range:</a>
@@ -79,6 +82,10 @@
 					</div>
                     <div id=sample_ids>
 						<br>
+                        <p>Note: Samples registered as pooled (i.e. multiple trees per sample)
+                            for which the tree details have not yet been submitted,
+                            can be selected by removing the block and tree ID range specifications above.
+                        </p>
 						<a>Sample type:</a>
 						<dt>{{ sample_reg_form.tissue }}</dt>
 						<dt>{{ sample_reg_form.storage }}</dt>

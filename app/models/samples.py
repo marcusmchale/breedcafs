@@ -33,17 +33,30 @@ class Samples:
 			return [record[0] for record in result]
 
 	@staticmethod
-	def add_samples_per_tree(field_uid, start, end, per_tree_replicates):
-		with get_driver().session() as neo4j_session:
-			add_parameters = {
-				'field_uid': field_uid,
-				'start': start,
-				'end': end,
-				'replicates': per_tree_replicates,
-				'username': session['username']
-			}
-			result = neo4j_session.write_transaction(neo4j_query, Cypher.samples_add_per_tree, add_parameters)
-			id_list = [record[0] for record in result]
+	def add_samples_per_tree(field_uid, start, end, per_tree_replicates, block_uid=None):
+		if block_uid:
+			with get_driver().session() as neo4j_session:
+				add_parameters = {
+					'field_uid': field_uid,
+					'block_uid': block_uid,
+					'start': start,
+					'end': end,
+					'replicates': per_tree_replicates,
+					'username': session['username']
+				}
+				result = neo4j_session.write_transaction(neo4j_query, Cypher.samples_add_per_tree_block, add_parameters)
+				id_list = [record[0] for record in result]
+		else:
+			with get_driver().session() as neo4j_session:
+				add_parameters = {
+					'field_uid': field_uid,
+					'start': start,
+					'end': end,
+					'replicates': per_tree_replicates,
+					'username': session['username']
+				}
+				result = neo4j_session.write_transaction(neo4j_query, Cypher.samples_add_per_tree, add_parameters)
+				id_list = [record[0] for record in result]
 		return id_list
 
 	@staticmethod
@@ -51,13 +64,12 @@ class Samples:
 		with get_driver().session() as neo4j_session:
 			add_parameters = {
 				'field_uid': field_uid,
-				'replicates': sample_count,
+				'sample_count': int(sample_count) if sample_count.isdigit() else 1,
 				'username': session['username']
 			}
 			result = neo4j_session.write_transaction(neo4j_query, Cypher.samples_add_pooled, add_parameters)
 			id_list = [record[0] for record in result]
 		return id_list
-
 
 	@staticmethod
 	def get_samples(parameters):

@@ -86,7 +86,9 @@ def generate_files():
 				if level == 'field':
 					location_form = LocationForm.update(optional=True)
 				else:
-					location_form = LocationForm.update(optional=False)
+					if not create_new_items:
+						location_form = LocationForm.update(optional=True)
+					else: location_form = LocationForm.update(optional=False)
 				if all([location_form.validate_on_submit(), traits_form.validate_on_submit()]):
 					# Parse the form data
 					template_format = request.form['template_format']

@@ -21,7 +21,7 @@ update_countries = function(set_country = "") {
 	});
 }
 
-update_regions = function(set_region = "") {
+update_regions = function(set_region ="") {
 	$("#region").empty();
 	var sel_country = $("#country").find(":selected").val();
 	if (sel_country === "") {
@@ -385,22 +385,11 @@ $("#trees_end").val('')
 
 update_defaults = function() {
 	var sel_field = $("#field").find(":selected").val();
-	var sel_block = $("#block").find(":selected").val();
-	var treecount_level = undefined
-	if (sel_block !== "") {
-		treecount_level=sel_block
-	}
-	else if (sel_field !== "") {
-		treecount_level=sel_field
-	}
-	else{
-		treecount_level=null
-	}
-	if (treecount_level!== null) {
+	if (sel_field !== "") {
 		$("#trees_start, trees_end").prop("disabled", true);
 		var request = $.ajax({
 			type: 'GET',
-			url: "/location/treecount/" + treecount_level + '/'
+			url: "/location/treecount/" + sel_field + '/'
 		});
 		request.done(function(data){
 			if (data[0] === 0) {
@@ -412,7 +401,6 @@ update_defaults = function() {
 				//lazily return starting ID as 1
 				$("#trees_start").val(1)
 			}
-			console.log(data[0]);
 			//and be sure to allow the user to edit
 			$("#trees_start,#trees_end").prop("disabled", false);
 		});
@@ -421,8 +409,6 @@ update_defaults = function() {
 		//handling return to nothing entered on deselection of field
 		$("#trees_start,#trees_end").val('')
 	}
-	console.log(treecount_level);
 };
 
 $('#field').change(update_defaults);
-$('#block').change(update_defaults);

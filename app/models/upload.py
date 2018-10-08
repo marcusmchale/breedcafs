@@ -134,11 +134,7 @@ class RowParseResult:
 					elif 'assign to' in field_trait_name:
 						row_string += 'Expected a valid UID for the relevant trait. (e.g. 1_B1) '
 					if field_category_list:
-						for i, cat in enumerate(field_category_list):
-							if i == 0:
-								row_string += str(cat)
-							else:
-								row_string += ', ' + str(cat)
+						row_string += ", ".join([i for i in field_category_list])
 				row_string += '">' + str(self.row_data[field]) + '</td>'
 		return row_string
 
