@@ -681,7 +681,7 @@ class Upload:
 				if self.submission_type == 'FB':
 					required = {'uid', 'trait', 'value', 'timestamp', 'person', 'location'}
 				else:  # submission_type == 'table'
-					required = {'uid', 'date', 'time'}
+					required = {'uid', 'date', 'time', 'person'}
 				if not required.issubset(fieldnames):
 					missing_fieldnames = required - fieldnames
 					return (
@@ -700,7 +700,7 @@ class Upload:
 			first_row = next(rows)
 			self.fieldnames = [c.value.strip().lower() for c in first_row]
 			fieldnames_lower = {c.value.strip().lower() for c in first_row}
-			required = {'uid', 'date', 'time'}
+			required = {'uid', 'date', 'time', 'person'}
 			if not required.issubset(fieldnames_lower):
 				missing_fieldnames = required - fieldnames_lower
 				return (
