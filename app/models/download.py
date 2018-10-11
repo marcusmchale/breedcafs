@@ -1356,9 +1356,9 @@ class Download:
 				extrasaction = 'ignore')
 			writer.writeheader()
 			for row in result:
-				for item in row:
-					if isinstance(row[item], list):
-						row[item] = ", ".join([i for i in row[item]])
+				#for item in row:
+				#	if isinstance(row[item], list):
+				#		row[item] = ", ".join(row[item])
 				writer.writerow(row)
 			file_size = csv_file.tell()
 		return {
