@@ -1245,7 +1245,7 @@ class Download:
 					'	farm.name as Farm, '
 					'	field.name as Field, '
 					'	field.uid as `Field UID`, '
-					'	COLLECT([trait.name, data.value]) as Traits '
+					'	COLLECT([trait.name_lower, data.value]) as Traits '
 					' RETURN '
 					'	{ ' 
 					'		Country: Country, '
