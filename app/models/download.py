@@ -355,9 +355,10 @@ class Download:
 		# write header for context worksheet
 		for i, j in enumerate(fieldnames):
 			context_worksheet.write(row_number, i, j, header_format)
-		template_fieldnames = ['UID', 'Date', 'Time', 'Person']
-		template_fieldnames += [trait['name'] for trait in traits]
-		trait_fieldnames = [
+		core_template_fieldnames = ['UID', 'Date', 'Time', 'Person']
+		trait_fieldnames = [trait['name'] for trait in traits]
+		template_fieldnames = core_template_fieldnames + trait_fieldnames
+		trait_details_fieldnames = [
 			'name',
 			'format',
 			'minimum',
@@ -376,6 +377,36 @@ class Download:
 		# write header for template worksheet
 		for i, j in enumerate(template_fieldnames):
 			template_worksheet.write(row_number, i, j, header_format)
+		# set the formatting for the trait columns
+		numeric_format = wb.add_format({'num_format': '0.#'})
+		date_format = wb.add_format({'num_format': 'yyyy-mm-dd'})
+		text_format = wb.add_format({'num_format': '@'})
+		percent_format = wb.add_format({'num_format': 9})
+		location_format = wb.add_format({'num_format': '0.0000; 0.0000'})
+		trait_formats = {
+			"numeric": numeric_format,
+			"date": date_format,
+			"text": text_format,
+			"percent": percent_format,
+			"multicat": text_format,
+			"categorical": text_format,
+			"location": location_format,
+			"boolean":text_format
+		}
+
+		for i, trait in enumerate(traits):
+			column_number = len(core_template_fieldnames) + i
+			template_worksheet.set_column(
+				column_number,
+				column_number,
+				None,
+				cell_format=trait_formats[trait['format']]
+			)
+			if 'category_list' in trait:
+				template_worksheet.data_validation(1, column_number, len(id_list), column_number, {
+					'validate': 'list',
+					'source': trait['category_list']
+				})
 		# write the id_list
 		for row in id_list:
 			row_number += 1
@@ -387,14 +418,15 @@ class Download:
 				column_number = fieldnames.index(key)
 				context_worksheet.write(row_number, column_number, value)
 			template_worksheet.write(row_number, 0, row['UID'])
+		# create the details worksheet
 		trait_details_worksheet = wb.add_worksheet("Trait details")
 		row_number = 0
-		for header in trait_fieldnames:
-			column_number = trait_fieldnames.index(header)
+		for header in trait_details_fieldnames:
+			column_number = trait_details_fieldnames.index(header)
 			trait_details_worksheet.write(row_number, column_number, header,  header_format)
 		for trait in traits:
 			row_number += 1
-			for i, trait_header in enumerate(trait_fieldnames):
+			for i, trait_header in enumerate(trait_details_fieldnames):
 				if trait_header in trait:
 					if isinstance(trait[trait_header], list):
 						trait[trait_header] = ", ".join([value for value in trait[trait_header]])

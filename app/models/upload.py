@@ -590,11 +590,14 @@ class Parsers:
 	@staticmethod
 	def time_format(time_string):
 		time_string = str(time_string).strip()
-		try:
-			datetime.datetime.strptime(time_string, '%H:%M')
-			return time_string
-		except (ValueError, IndexError):
-			return False
+		if not time_string:
+			return True
+		else:
+			try:
+				datetime.datetime.strptime(time_string, '%H:%M')
+				return time_string
+			except (ValueError, IndexError):
+				return False
 
 	@staticmethod
 	def uid_format(uid):
@@ -789,7 +792,7 @@ class Upload:
 					]
 					not_traits = required + index_headers
 					traits = set(row_data.keys()).difference(set(not_traits))
-					if ([row_data[trait] for trait in traits if row_data[trait]]):
+					if [row_data[trait] for trait in traits if row_data[trait]]:
 						line_num = int(trimmed_dict.line_num)
 						# check timestamp formatting against regex
 						parse_result.parse_row(line_num, row_data)

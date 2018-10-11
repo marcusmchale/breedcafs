@@ -632,7 +632,7 @@ class UploadForm(FlaskForm):
 	submission_type = SelectField(
 		'Submission type:',
 		[InputRequired()],
-		choices=[('xlsx', 'Excel (xlsx)'),('table', 'Table (.csv)'), ('FB', 'Field Book (.csv)')]
+		choices=[('table', 'Table (xlsx, csv)'), ('FB', 'Field Book (.csv)')]
 	)
 	file = FileField(
 		'Select a file:',

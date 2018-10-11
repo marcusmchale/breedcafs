@@ -87,7 +87,7 @@ def taskstatus(task_id):
 					'in this file:</p>'
 				)
 				for i in errors_dict:
-					error_table += '<p> - ' + str(i) + '</p>\n'
+					error_table += '<p> - ' + i + '</p>\n'
 			else:
 				error_table = None
 			return jsonify({

@@ -2223,7 +2223,7 @@ class Cypher:
 		'			THEN '
 		'				replace(csvLine.time, " ", "") '
 		'			ELSE '
-		'				NULL '
+		'				"12:00" '
 		'			END '
 		'		, "ms", "yyyy-MM-dd HH:mm") as time '
 		# And identify the fields and traits assessed
