@@ -283,11 +283,11 @@ class ItemList:
 			query += '{uid: toLower($field_uid)}'
 			parameters['field_uid'] = field_uid
 		query += (
-			' )<-[IS_IN]-(:FieldBlocks) '
-			' <-[IS_IN]-(block:Block) '
+			' )<-[:IS_IN]-(:FieldBlocks) '
+			' <-[:IS_IN]-(block:Block) '
 			' RETURN {'
 			' UID: block.uid, '
-			' Block: block.name '
+			' Block: block.name, '
 			' `Field UID` : field.uid, '
 			' Field: field.name, '
 			' Farm: f.name, '
