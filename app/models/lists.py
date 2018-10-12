@@ -432,6 +432,7 @@ class ItemList:
 		if field_uid:
 			query += '{uid: $field_uid})'
 			parameters['field_uid'] = field_uid
+		query += ')'
 		if block_uid:
 			query += (
 				' MATCH '
@@ -551,6 +552,7 @@ class ItemList:
 		if field_uid:
 			query += '{uid: $field_uid})'
 			parameters['field_uid'] = field_uid
+		query += ')'
 		if block_uid:
 			query += (
 				' MATCH '
@@ -641,7 +643,7 @@ class ItemList:
 			' UID: leaf.uid, '
 			' `Branch UID`: branch.uid, '
 			' `Tree UID`: tree.uid, '
-			' `Block UID": block.uid, '
+			' `Block UID`: block.uid, '
 			' Block: block.name, '
 			' `Field UID` : field.uid, '
 			' Field: field.name, '

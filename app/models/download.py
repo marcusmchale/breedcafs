@@ -254,7 +254,7 @@ class Download:
 				trees_end=trees_end
 			)
 		elif level == 'branch':
-			id_list = ItemList.get_leaves(
+			id_list = ItemList.get_branches(
 				country=country,
 				region=region,
 				farm=farm,

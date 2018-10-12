@@ -1,6 +1,5 @@
 //TRAITS
 //Set trait level undefined by default and only display traits when level selected
-$('#trait_level').val('0');
 traits = $('#field_traits,#block_traits,#tree_traits,#branch_traits,#leaf_traits,#sample_traits');
 $('#trait_selection').hide();
 traits.hide();
@@ -9,13 +8,14 @@ id_forms = $('#tree_ids,#branch_ids,#leaf_ids,#sample_ids');
 id_forms.hide();
 $('#existing_ids').hide();
 
-$('#trait_level').change(function () {
-	$(".flash").remove();
-	if (this.value === '') {
+
+update_traits = function() {
+	if (this.value==='') {
 		$('#trait_selection').hide();
 		$('#location').hide();
 		traits.hide();
 		id_forms.hide();
+		$('#existing_ids').hide();
 	}
 	else if (this.value === 'field') {
 		$('#location').show();
@@ -53,6 +53,8 @@ $('#trait_level').change(function () {
 		$('#new_ids').hide();
 		$('#field, #block, #tree_ids, #branch_ids').show();
 		$('#leaf_ids, #sample_ids').hide();
+		update_existing_ids();
+
 	}
 	else if (this.value === 'leaf') {
 		$('#location').show();
@@ -64,6 +66,7 @@ $('#trait_level').change(function () {
 		$('#new_ids').hide();
 		$('#field, #block, #leaf_ids,#tree_ids').show();
 		$('#branch_ids,#sample_ids').hide();
+		update_existing_ids();
 	}
 	else if (this.value === 'sample') {
 		$('#location').show();
@@ -75,25 +78,35 @@ $('#trait_level').change(function () {
 		$('#new_ids').hide();
 		$('#field, #block, #sample_ids, #tree_ids').show();
 		$('#branch_ids,#leaf_ids').hide();
+		update_existing_ids();
 	}
-});
+};
 
-$('#create_new_items').val('existing');
-$('#old_ids').show();
+update_existing_ids = function() {
+	var selection=$('#create_new_items').val()
+	$(".flash").remove;
+	if (selection === 'existing') {
+	     $('#new_ids').hide();
+	     $('#old_ids').show();
+	}
+	else if (selection === 'new') {
+	     $('#new_ids').show();
+	     $('#old_ids').hide();
+	     $('#email_checkbox').prop("checked", true);
+	}
+	var trait_level=$('#trait_level').val();
+	if (trait_level === 'sample') {
+		$('#per_sample').show();
+	}
+	else {
+        $('#per_sample').hide();
+    }
+};
 
-//$('#old_new_ids').change(function () {
-$('#create_new_items').change(function () {
-   $(".flash").remove;
-   if (this.value === 'existing') {
-        $('#new_ids').hide();
-        $('#old_ids').show();
-   }
-   if (this.value === 'new') {
-        $('#new_ids').show();
-        $('#old_ids').hide();
-        $('#email_checkbox').prop("checked", true);
-   }
-});
+
+$('#trait_level').val('0').change(update_traits);
+$('#create_new_items').val('existing').change(update_existing_ids);
+
 
 //switch for pooled samples
 $('#samples_pooled').val('single');

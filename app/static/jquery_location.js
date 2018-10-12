@@ -21,7 +21,7 @@ update_countries = function(set_country = "") {
 	});
 }
 
-update_regions = function(set_region ="") {
+update_regions = function(set_region = "") {
 	$("#region").empty();
 	var sel_country = $("#country").find(":selected").val();
 	if (sel_country === "") {
