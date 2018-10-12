@@ -96,9 +96,11 @@ update_existing_ids = function() {
 	}
 	var trait_level=$('#trait_level').val();
 	if (trait_level === 'sample') {
+		$('#samples_pooled').show();
 		$('#per_sample').show();
 	}
 	else {
+		$('#samples_pooled').hide();
         $('#per_sample').hide();
     }
 };

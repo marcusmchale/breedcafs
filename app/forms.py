@@ -568,7 +568,7 @@ class RecordForm(FlaskForm):
 	samples_pooled = SelectField(
 		'Samples are pooled from multiple trees',
 		[InputRequired()],
-		choices=[('single', 'Single tree per sample'), ('multiple', 'Multiple trees per sample')]
+		choices=[('single', 'One per tree'), ('multiple', 'Pooled')]
 	)
 	samples_count = IntegerField(
 		'Sample count',
