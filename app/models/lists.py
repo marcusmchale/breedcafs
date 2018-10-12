@@ -280,7 +280,7 @@ class ItemList:
 			parameters['farm'] = farm
 		query += ')<-[:IS_IN]-(field:Field '
 		if field_uid:
-			query += '{uid: toLower($field_uid)}'
+			query += '{uid: toInteger($field_uid)}'
 			parameters['field_uid'] = field_uid
 		query += (
 			' )<-[:IS_IN]-(:FieldBlocks) '
