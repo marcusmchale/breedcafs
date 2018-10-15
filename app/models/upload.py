@@ -148,6 +148,7 @@ class ParseResult:
 		self.parse_result = None
 		self.unique_keys = None
 		self.duplicate_keys = None
+		self.contains_data = None
 
 	def add_field_error(self, field, error_type):
 		if not self.field_errors:
@@ -187,6 +188,8 @@ class ParseResult:
 			)
 		# check time formatting and for FB use trait in unique key.
 		if submission_type == "FB":
+			if row_data['trait']:
+				self.contains_data = True
 			parsed_timestamp = Parsers.timestamp_fb_format(row_data['timestamp'])
 			if not parsed_timestamp:
 				self.merge_error(
@@ -639,6 +642,7 @@ class Upload:
 		self.submission_result = None
 		self.fieldnames = None
 		self.file_extension = None
+		self.contains_data = None
 
 	def allowed_file(self):
 		if '.' in self.raw_filename:
@@ -747,8 +751,8 @@ class Upload:
 					trimmed_file,
 					quoting=csv.QUOTE_ALL
 				)
-				rows=ws.iter_rows()
-				first_row=next(rows)
+				rows = ws.iter_rows()
+				first_row = next(rows)
 				file_writer.writerow(cell.value.lower() for cell in first_row)
 				for row in rows:
 					cell_values = [cell.value for cell in row]
@@ -757,6 +761,8 @@ class Upload:
 							cell_values[i] = value.strftime("%Y-%m-%d")
 						elif isinstance(value, datetime.time):
 							cell_values[i] = value.strftime("%H:%M")
+						else:
+							cell_values[i] = value.strip() if value else None
 					file_writer.writerow(cell_values)
 
 	def parse_rows(self):
@@ -794,14 +800,11 @@ class Upload:
 					traits = set(row_data.keys()).difference(set(not_traits))
 					if [row_data[trait] for trait in traits if row_data[trait]]:
 						line_num = int(trimmed_dict.line_num)
-						# check timestamp formatting against regex
 						parse_result.parse_row(line_num, row_data)
-						# if many errors already then return immediately
 					else:
 						pass
 				if submission_type == "FB":
 					line_num = int(trimmed_dict.line_num)
-					# check timestamp formatting against regex
 					parse_result.parse_row(line_num, row_data)
 				# if many errors already then return immediately
 				if parse_result.long_enough():
@@ -1088,6 +1091,12 @@ class Upload:
 							)
 						else:
 							submitted_file_url = None
+						if not any([conflicts_file, resubmissions_file, submitted_file]):
+							response = 'No data submitted, please check that you uploaded a completed file'
+							return {
+								'status': 'SUCCESS',
+								'result': response
+							}
 						# send result of merger in an email
 						subject = "BreedCAFS upload summary"
 						recipients = [User(username).find('')['email']]

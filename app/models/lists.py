@@ -329,8 +329,9 @@ class ItemList:
 			parameters['farm'] = farm
 		query += ')<-[:IS_IN]-(field:Field '
 		if field_uid:
-			query += '{uid: $field_uid})'
+			query += '{uid: $field_uid}'
 			parameters['field_uid'] = field_uid
+		query += ')'
 		if block_uid:
 			query += (
 				' MATCH '
@@ -430,7 +431,7 @@ class ItemList:
 			parameters['farm'] = farm
 		query += ')<-[:IS_IN]-(field:Field '
 		if field_uid:
-			query += '{uid: $field_uid})'
+			query += '{uid: $field_uid}'
 			parameters['field_uid'] = field_uid
 		query += ')'
 		if block_uid:
@@ -550,7 +551,7 @@ class ItemList:
 			parameters['farm'] = farm
 		query += ')<-[:IS_IN]-(field:Field '
 		if field_uid:
-			query += '{uid: $field_uid})'
+			query += '{uid: $field_uid}'
 			parameters['field_uid'] = field_uid
 		query += ')'
 		if block_uid:

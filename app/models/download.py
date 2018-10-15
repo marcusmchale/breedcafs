@@ -393,7 +393,6 @@ class Download:
 			"location": location_format,
 			"boolean":text_format
 		}
-
 		for i, trait in enumerate(traits):
 			column_number = len(core_template_fieldnames) + i
 			template_worksheet.set_column(
@@ -424,6 +423,18 @@ class Download:
 		for header in trait_details_fieldnames:
 			column_number = trait_details_fieldnames.index(header)
 			trait_details_worksheet.write(row_number, column_number, header,  header_format)
+		# add notes about Date/Time/Person
+		date_time_person_details = [
+			("date", "Date these details were measured (YYYY-MM-DD)"),
+			("time", "Optional: time these details were measured (24hr, e.g. 13:00). Defaults to 12:00"),
+			("person", "Optional: person who recorded these details")
+		]
+		for i in date_time_person_details:
+			row_number +=1
+			trait_details_worksheet.write(row_number, 0, i[0])
+			trait_details_worksheet.write(row_number, 4, i[1])
+		# empty row to separate date/time/person from traits
+		row_number +=1
 		for trait in traits:
 			row_number += 1
 			for i, trait_header in enumerate(trait_details_fieldnames):
