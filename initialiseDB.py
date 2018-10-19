@@ -42,11 +42,21 @@ def clear_schema(tx):
 def delete_items_data(tx):
 	tx.run(
 		' MATCH '
-		'	(item:Item),' 
-		'	(data:Data), '
-		'	(counter:Counter) '
-		' DETACH DELETE item, data, counter '
+		'	(item:Item) ' 
+		' DETACH DELETE item '
 	)
+	tx.run(
+		' MATCH '
+		'	(data:Data) ' 
+		' DETACH DELETE data '
+	)
+	tx.run(
+		' MATCH '
+		'	(counter:Counter) ' 
+		' DETACH DELETE counter '
+	)
+
+
 
 def create_indexes(tx, indexes):
 	for item in indexes:
@@ -509,7 +519,14 @@ def create_start_email(tx):
 if not confirm('Are you sure you want to proceed? This is should probably only be run when setting up the database'):
 	sys.exit()
 else:
-	if confirm('Do you want to a wipe existing data, rebuild the constraints and reset the indexes?'):
+	if confirm(
+			'Would you like to remove data and items, leaving users, their account settings and partner affiliations'
+	):
+		with driver.session() as session:
+			print('Deleting all data and items')
+			session.write_transaction(delete_items_data)
+			session.write_transaction(create_field_counter)
+	elif confirm('Do you want to a delete everthing rebuild the constraints and reset the indexes?'):
 		print('Performing a full reset of database')
 		with driver.session() as session:
 			print('deleting all nodes and relationships')
@@ -520,25 +537,16 @@ else:
 			session.write_transaction(create_constraints, config.constraints)
 			print('creating indexes')
 			session.write_transaction(create_indexes, config.indexes)
-	elif confirm('Would you prefer to just remove data and items, leaving users, their account settings and partner affiliations'
-				 ' but deleting everything else? '):
-		with driver.session() as session:
-			print('Deleting all data and items')
-			session.write_transaction(delete_items_data)
-	else: print('Attempting to create the following while retaining existing data:\n'
-		'  * user:start \n'
-		'  * partners \n'
-		'  * traits')
-	with driver.session() as session:
-		session.write_transaction(create_partners, config.partners)
-		session.write_transaction(create_traits, 'traits/field_traits.csv', 'Field')
-		session.write_transaction(create_traits, 'traits/block_traits.csv', 'Block')
-		session.write_transaction(create_traits, 'traits/tree_traits.csv', 'Tree')
-		session.write_transaction(create_traits, 'traits/branch_traits.csv', 'Branch')
-		session.write_transaction(create_traits, 'traits/leaf_traits.csv', 'Leaf')
-		session.write_transaction(create_traits, 'traits/sample_traits.csv', 'Sample')
-		session.write_transaction(create_trials, config.trials)
-		session.write_transaction(create_variety_codes, config.variety_codes)
-		session.write_transaction(create_field_counter)
-		session.write_transaction(create_start_email)
-	print ('Complete')
+			session.write_transaction(create_partners, config.partners)
+			session.write_transaction(create_traits, 'traits/field_traits.csv', 'Field')
+			session.write_transaction(create_traits, 'traits/block_traits.csv', 'Block')
+			session.write_transaction(create_traits, 'traits/tree_traits.csv', 'Tree')
+			session.write_transaction(create_traits, 'traits/branch_traits.csv', 'Branch')
+			session.write_transaction(create_traits, 'traits/leaf_traits.csv', 'Leaf')
+			session.write_transaction(create_traits, 'traits/sample_traits.csv', 'Sample')
+			session.write_transaction(create_trials, config.trials)
+			session.write_transaction(create_variety_codes, config.variety_codes)
+			session.write_transaction(create_field_counter)
+			session.write_transaction(create_start_email)
+	else: print('Nothing done')
+	print ('Finished')
