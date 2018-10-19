@@ -44,9 +44,8 @@ def delete_items_data(tx):
 		' MATCH '
 		'	(item:Item),' 
 		'	(data:Data), '
-		'	(counter:Counter)'
-		' SET counter.count = 0 '
-		' DETACH DELETE item, data '
+		'	(counter:Counter) '
+		' DETACH DELETE item, data, counter '
 	)
 
 def create_indexes(tx, indexes):
