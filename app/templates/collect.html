@@ -5,10 +5,10 @@
         <p>Here you can generate templates for data collection and sample registration</p>
 		{% from "_formhelpers_location_fields.html" import render_field %}
 	<form>
-		{{ record_form.csrf_token }}
+		{{ collect_form.csrf_token }}
 		<!--{{ location_form.csrf_token }}-->
 		<h3>Level</h3>
-				<dt>{{ record_form.trait_level }} </dt> <br>
+				<dt>{{ collect_form.trait_level }} </dt> <br>
         <div id="location">
             <h3>Location</h3>
 			<dt>{{ location_form.country }}</dt>
@@ -21,32 +21,32 @@
 				<br>
 				<a>Tree ID range:</a>
 				<p>ID is the number from the end of a UID, e.g. from 1_T2 the ID is 2.<br>The other parameters denote the field (1) and the level (T = Tree)</p>
-				<dd>{{ record_form.trees_start(placeholder=record_form.trees_start.description) }}
-				{{ record_form.trees_end(placeholder=record_form.trees_end.description) }} </dd>
+				<dd>{{ collect_form.trees_start(placeholder=collect_form.trees_start.description) }}
+				{{ collect_form.trees_end(placeholder=collect_form.trees_end.description) }} </dd>
 				<br>
 			</div>
 			<div id=existing_ids>
 				<hr>
-				{{ record_form.create_new_items }}
+				{{ collect_form.create_new_items }}
 				<div id=new_ids>
 					{{
-						record_form.samples_pooled(
-							placeholder = record_form.samples_pooled.description
+						collect_form.samples_pooled(
+							placeholder = collect_form.samples_pooled.description
 						)
 					}}
 					<div id="per_tree">
 						<p>Specify the number of replicates (branches/leaves/samples) per tree</p>
 						<dt>{{
-								record_form.per_tree_replicates(
-									placeholder = record_form.per_tree_replicates.description
+								collect_form.per_tree_replicates(
+									placeholder = collect_form.per_tree_replicates.description
 								)
 							}}
 						</dt>
                         <div id="per_sample">
                             <p>Further specify the number of replicates if you would like to submit replicated measures per sample</p>
                             <dt>{{
-								record_form.per_sample_replicates(
-									placeholder = record_form.per_sample_replicates.description
+								collect_form.per_sample_replicates(
+									placeholder = collect_form.per_sample_replicates.description
 								)
 							}}
                             </dt>
@@ -56,8 +56,8 @@
 						<p>Specify the number of samples</p>
 						<dt>
 							{{
-								record_form.samples_count(
-									placeholder = record_form.samples_count.description
+								collect_form.samples_count(
+									placeholder = collect_form.samples_count.description
 								)
 							}}
 						</dt>
@@ -68,16 +68,16 @@
 						<br>
 						<a>Branch ID range:</a>
 						<p>ID is the number from the end of a UID, e.g. from 1_R2 the ID is 2.<br>The other parameters denote the field (1) and the level (R = Branch)</p>
-						<dd>{{ record_form.branches_start(placeholder=record_form.branches_start.description) }}
-						{{ record_form.branches_end(placeholder=record_form.branches_end.description) }} </dd>
+						<dd>{{ collect_form.branches_start(placeholder=collect_form.branches_start.description) }}
+						{{ collect_form.branches_end(placeholder=collect_form.branches_end.description) }} </dd>
 						<br>
 					</div>
 					<div id=leaf_ids>
 						<br>
 						<a>Leaf ID range:</a>
 						<p>ID is the number from the end of a UID, e.g. from 1_L2 the ID is 2.<br>The other parameters denote the field (1) and the level (L = Leaf)</p>
-						<dd>{{ record_form.leaves_start(placeholder=record_form.leaves_start.description) }}
-						{{ record_form.leaves_end(placeholder=record_form.leaves_end.description) }} </dd>
+						<dd>{{ collect_form.leaves_start(placeholder=collect_form.leaves_start.description) }}
+						{{ collect_form.leaves_end(placeholder=collect_form.leaves_end.description) }} </dd>
 						<br>
 					</div>
                     <div id=sample_ids>
@@ -90,12 +90,12 @@
 						<dt>{{ sample_reg_form.tissue }}</dt>
 						<dt>{{ sample_reg_form.storage }}</dt>
 						<a>Date range:</a>
-						<dd>{{ record_form.date_from(placeholder = record_form.date_from.description) }}
-							{{ record_form.date_to(placeholder = record_form.date_to.description) }}</dd>
+						<dd>{{ collect_form.date_from(placeholder = collect_form.date_from.description) }}
+							{{ collect_form.date_to(placeholder = collect_form.date_to.description) }}</dd>
 						<a>Sample ID range:</a>
 						<p>ID is the number from the end of a UID, e.g. from 1_S2 the ID is 2.<br>The other parameters denote the field (1) and the level (S = Sample)</p>
-						<dd>{{ record_form.samples_start(placeholder = record_form.samples_start.description) }}
-							{{ record_form.samples_end(placeholder = record_form.samples_end.description) }}
+						<dd>{{ collect_form.samples_start(placeholder = collect_form.samples_start.description) }}
+							{{ collect_form.samples_end(placeholder = collect_form.samples_end.description) }}
 						</dd>
                     </div>
 				</div>
@@ -105,9 +105,9 @@
 			{% include 'traits_form.html' %}
 		</div>
 		<h3>File type</h3>
-			<dt>{{ record_form.template_format }} </dt>
+			<dt>{{ collect_form.template_format }} </dt>
 			<dt>
-				{{ record_form.submit_record }}
+				{{ collect_form.submit_collect }}
 				<input id="email_checkbox" name="email_checkbox" placeholder="" value="y" type="checkbox">
 				<a>Email a copy</a>
 			</dt>

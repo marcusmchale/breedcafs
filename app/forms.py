@@ -483,7 +483,7 @@ class SampleRegForm(FlaskForm):
 
 
 # record
-class RecordForm(FlaskForm):
+class CollectForm(FlaskForm):
 	min = 1
 	max = 1000000
 	trait_level = SelectField(
@@ -614,12 +614,12 @@ class RecordForm(FlaskForm):
 		[InputRequired()],
 		choices=[('existing', 'Find existing items'), ('new', 'Create new items')]
 	)
-	submit_record = SubmitField('Generate file/s')
+	submit_collect = SubmitField('Generate file/s')
 
 	@staticmethod
 	def update():
-		form = RecordForm()
-		if form.samples_pooled == 'multiple':
+		form = CollectForm()
+		if form.samples_pooled:
 			form.samples_count.validators.insert(0, InputRequired())
 		else:
 			form.samples_count.validators.insert(0, Optional())

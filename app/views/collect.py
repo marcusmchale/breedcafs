@@ -22,7 +22,7 @@ from app.models import (
 )
 from app.forms import (
 	LocationForm,
-	RecordForm,
+	CollectForm,
 	CreateTraits,
 	SampleRegForm,
 	AddTissueForm,
@@ -41,7 +41,7 @@ def collect():
 		return redirect(url_for('login'))
 	else:
 		try:
-			record_form = RecordForm()
+			collect_form = CollectForm()
 			location_form = LocationForm.update()
 			field_traits_form = CreateTraits().update('field')
 			block_traits_form = CreateTraits().update('block')
@@ -53,7 +53,7 @@ def collect():
 			return render_template(
 				'collect.html',
 				location_form=location_form,
-				record_form=record_form,
+				collect_form=collect_form,
 				level='all',
 				field_traits_form=field_traits_form,
 				block_traits_form=block_traits_form,
@@ -62,7 +62,7 @@ def collect():
 				leaf_traits_form=leaf_traits_form,
 				sample_traits_form=sample_traits_form,
 				sample_reg_form=sample_reg_form,
-				title='Record'
+				title='Collect'
 			)
 		except (ServiceUnavailable, AuthError):
 			flash("Database unavailable")
@@ -76,8 +76,8 @@ def generate_files():
 		return redirect(url_for('login'))
 	else:
 		try:
-			record_form = RecordForm.update()
-			if record_form.validate_on_submit():
+			collect_form = CollectForm.update()
+			if collect_form.validate_on_submit():
 				level = request.form['trait_level']
 				create_new_items = True if request.form.get('create_new_items') == 'new' else False
 				request_email = True if request.form.get('email_checkbox') else False
@@ -142,7 +142,7 @@ def generate_files():
 					storage = request.form['storage'] if request.form['storage'] != '' else None
 					per_sample_replicates = int(
 						request.form['per_sample_replicates']
-					) if request.form['per_sample_replicates'].isdigit() else None
+					) if request.form['per_sample_replicates'].isdigit() else 1
 					samples_pooled = True if request.form['samples_pooled'] == 'multiple' else False
 					samples_count = request.form['samples_count'] if request.form['samples_count'] else None
 					try:
@@ -239,10 +239,10 @@ def generate_files():
 							}
 						)
 				else:
-					errors = jsonify([record_form.errors, location_form.errors])
+					errors = jsonify([collect_form.errors, location_form.errors])
 					return errors
 			else:
-				errors = jsonify([record_form.errors])
+				errors = jsonify([collect_form.errors])
 				return errors
 		except (ServiceUnavailable, AuthError):
 			flash("Database unavailable")

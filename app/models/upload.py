@@ -18,7 +18,7 @@ class DictReaderInsensitive(csv.DictReader):
 	# overwrites csv.fieldnames property so uses without surrounding whitespace and in lowercase
 	@property
 	def fieldnames(self):
-		return [field.strip().lower() for field in csv.DictReader.fieldnames.fget(self)]
+		return [field.strip().lower() for field in csv.DictReader.fieldnames.fget(self) if field]
 
 	def next(self):
 		return DictInsensitive(csv.DictReader.next(self))
@@ -27,7 +27,9 @@ class DictReaderInsensitive(csv.DictReader):
 class DictInsensitive(dict):
 	# This class overrides the __getitem__ method to automatically strip() and lower() the input key
 	def __getitem__(self, key):
-		return dict.__getitem__(self, key.strip().lower())
+		if key:
+			key = key.strip().lower()
+		return dict.__getitem__(self, key)
 
 
 class RowParseResult:
@@ -363,7 +365,10 @@ class ItemSubmissionResult:
 			return False
 		else:
 			if isinstance(self.value, list):
-				if set([i.lower() for i in self.uploaded_value.split(":")]) == set([y.lower() for y in self.value]):
+				if isinstance(self.uploaded_value, list):
+					if set(self.uploaded_value) == set(self.value):
+						return False
+				elif set([i.lower() for i in self.uploaded_value.split(":")]) == set([y.lower() for y in self.value]):
 					return False
 			return True
 
@@ -705,8 +710,8 @@ class Upload:
 			ws = wb['Template']
 			rows = ws.iter_rows(min_row=1, max_row=1)
 			first_row = next(rows)
-			self.fieldnames = [c.value.strip().lower() for c in first_row]
-			fieldnames_lower = {c.value.strip().lower() for c in first_row}
+			self.fieldnames = [c.value.strip().lower() for c in first_row if c.value]
+			fieldnames_lower = {c.value.strip().lower() for c in first_row if c.value}
 			required = {'uid', 'date', 'time', 'person'}
 			if not required.issubset(fieldnames_lower):
 				missing_fieldnames = required - fieldnames_lower
@@ -753,17 +758,28 @@ class Upload:
 				)
 				rows = ws.iter_rows()
 				first_row = next(rows)
-				file_writer.writerow(cell.value.lower() for cell in first_row)
+				file_writer.writerow(cell.value.lower() for cell in first_row if cell.value)
+				# handle deleted columns in the middle of the worksheet
+				empty_headers = []
+				for i, cell in enumerate(first_row):
+					if not cell.value:
+						empty_headers.append(i)
 				for row in rows:
 					cell_values = [cell.value for cell in row]
+					# remove columns with empty header
+					for i in sorted(empty_headers, reverse=True):
+						del cell_values[i]
+					# remove empty rows
 					for i, value in enumerate(cell_values):
 						if isinstance(value, datetime.datetime):
 							cell_values[i] = value.strftime("%Y-%m-%d")
 						elif isinstance(value, datetime.time):
 							cell_values[i] = value.strftime("%H:%M")
 						else:
-							cell_values[i] = value.strip() if value else None
-					file_writer.writerow(cell_values)
+							if isinstance(value, basestring):
+								cell_values[i] = value.strip()
+					if any(value for value in cell_values):
+						file_writer.writerow(cell_values)
 
 	def parse_rows(self):
 		trimmed_file_path = self.trimmed_file_path

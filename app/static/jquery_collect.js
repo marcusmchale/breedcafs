@@ -120,11 +120,13 @@ $('#samples_pooled').change(function () {
 		$('#per_tree').show();
 		$('#pooled').hide()
 		$('#block').show()
+		$('#tree_ids').show()
 	}
 	else {
 		$('#per_tree').hide();
 		$('#pooled').show()
 		$('#block').hide()
+		$('#tree_ids').hide()
 	}
 });
 
@@ -193,7 +195,7 @@ $('dl').each( function () {
 //$('#select_all_sample-general').parent().next().show();
 
 //submit collect button
-$("#submit_record").click( function(e) {
+$("#submit_collect").click( function(e) {
 	e.preventDefault();
 	remove_flash();
 	wait_message = "Please wait for files to be generated"

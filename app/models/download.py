@@ -593,7 +593,7 @@ class Download:
 			)
 		elif region != "":
 			frc = (
-				' <-[:IS_IN]->(farm:Farm) '
+				' -[:IS_IN]->(farm:Farm) '
 				' -[:IS_IN]->(region:Region {name_lower: toLower($region)}) '
 				' -[:IS_IN]->(country:Country {name_lower: toLower($country)}) '
 			)
@@ -624,58 +624,73 @@ class Download:
 				'Variety',
 				'Branch UID',
 				'Leaf UID',
-				'UID',
-				'Tissue',
-				'Storage',
-				'Date Sampled'
+				'UID'
+				#'Tissue',
+				#'Storage',
+				#'Date Sampled'
 			]
 			td = (
 				' MATCH '
 				'	(trait:SampleTrait) '
-				'	<-[FOR_TRAIT*2]-(sample_trait) '
-				'	<-[DATA_FOR]-(data)'
+				'	<-[FOR_TRAIT*2]-(sample_trait:ItemTrait) '
+				'	<-[DATA_FOR]-(data) '
 				' WHERE (trait.name_lower) IN $traits' 
 				' WITH user_name, partner_name, data, trait, sample_trait '
 				' MATCH '
 				'	(sample_trait) '
 				'	-[:FOR_ITEM]->(sample:Sample) '
-				'	-[:FROM_TREE*2]->(tree:Tree), '
-				'	(sample)'
-				'	-[:COLLECTED_AS*2]->(tist) '
-				'	-[:OF_TISSUE]->(tissue), '
-				'	(tist)-[:STORED_IN]->(storage), '
-				'	(tree) '
+				'	-[:FROM_FIELD]->(:FieldSamples) '
+				'	-[:FROM_FIELD]->(field: Field) '
 			)
 			# if block_uid is defined
 			if block_uid != "":
 				tdp = td + (
-					'-[:IS_IN]->(: BlockTrees) '
-					' -[:IS_IN]->(block: Block {uid: $block_uid}) '
-					' -[:IS_IN]->(: FieldBlocks) '
-					' -[:IS_IN]->(field: Field) '
+					' WHERE field.uid = $field_uid '
+					' MATCH (field) '
 				)
-				optional_block = ''
+				optional_block = (
+					' MATCH '
+					'	(sample)-[:FROM_TREE {current:True}]->(:TreeSamples) '
+					'	-[:FROM_TREE]->(tree:Tree) '
+					'	-[:IS_IN {current:True}]->(: BlockTrees) '
+					'	-[:IS_IN]->(block: Block {uid: $block_uid}) '
+					'	-[:IS_IN]->(: FieldBlocks) '
+					'	-[:IS_IN]->(field) '
+					' WITH user_name, partner_name, data, trait, sample_trait, '
+					'	sample, field, farm, region, country, '
+					'	collect(tree) as trees, '
+					'	collect(block) as blocks '
+				)
 			# if field_uid is defined
 			elif field_uid != "":
 				tdp = td + (
-					' -[:IS_IN]->(: FieldTrees) '
-					' -[:IS_IN]->(field: Field {uid: $field_uid}) '
+					' WHERE field.uid = $field_uid '
+					' MATCH (field) '
 				)
 				optional_block = (
 					' OPTIONAL MATCH (tree) '
-					' -[:IS_IN]->(: BlockTrees) '
+					' -[:IS_IN {current:True}]->(: BlockTrees) '
 					' -[:IS_IN]->(block: Block) '
+					' WITH user_name, partner_name, data, trait, sample_trait, '
+					'	sample, field, farm, region, country, '
+					'	collect(tree) as trees, '
+					'	collect(block) as blocks '
 				)
 			# else no field selected
 			else:
-				tdp = td + (
-					' -[:IS_IN]->(: FieldTrees) '
-					' -[:IS_IN]->(field:Field) '
-				)
+				tdp = td + ' MATCH (field) '
 				optional_block = (
-					' OPTIONAL MATCH (tree) '
-					' -[:IS_IN]->(: BlockTrees) '
-					' -[:IS_IN]->(block: Block) '
+					' OPTIONAL MATCH '
+					'	(sample)-[:FROM_TREE {current:True}]->(:TreeSamples) '
+					'	-[:FROM_TREE]->(tree:Tree) '
+					' OPTIONAL MATCH '
+					'	(tree) '
+					'	-[:IS_IN {current:True}]->(: BlockTrees) '
+					'	-[:IS_IN]->(block: Block) '
+					' WITH user_name, partner_name, data, trait, sample_trait, '
+					'	sample, field, farm, region, country, '
+					'	collect(tree) as trees, '
+					'	collect(block) as blocks '
 				)
 			optional_block += (
 				' OPTIONAL MATCH '
@@ -693,16 +708,16 @@ class Download:
 					' 	farm.name as Farm, '
 					' 	field.name as Field, '
 					'	field.uid as `Field UID`, '
-					' 	block.name as Block, '
-					' 	block.uid as `Block UID`, '
-					' 	tree.uid as `Tree UID`, '
-					' 	tree.custom_id as `Tree Custom ID`, '
-					' 	tree.variety as Variety, '
+					' 	extract(block in blocks | block.name) as Block, '
+					' 	extract(block in blocks | block.uid) as `Block UID`, '
+					' 	extract(tree in trees | tree.uid) as `Tree UID`, '
+					' 	extract(tree in trees | tree.custom_id) as `Tree Custom ID`, '
+					' 	extract(tree in trees | tree.variety) as Variety, '
 					' 	branch.uid as `Branch UID`, '
 					' 	leaf.uid as `Leaf UID`, '
 					' 	sample.uid as `Sample UID`, '
-					'	tissue.name as Tissue, '
-					'	storage.name as Storage, '
+					#'	tissue.name as Tissue, '
+					#'	storage.name as Storage, '
 					'	sample.date as `Date Sampled`, '
 					' 	sample.id as `Sample ID`, '
 					'	COLLECT([trait.name, data.value]) as Traits '
@@ -721,8 +736,8 @@ class Download:
 					'		`Branch UID`: `Branch UID`, '
 					'		`Leaf UID`: `Leaf UID`, '
 					'		UID : `Sample UID` ,'
-					'		Tissue: Tissue, '
-					'		Storage: Storage, '
+					#'		Tissue: Tissue, '
+					#'		Storage: Storage, '
 					'		`Date Sampled`: `Date Sampled`, '
 					'		`Sample ID` : `Sample ID`, '
 					'		Traits : Traits } '
@@ -739,17 +754,17 @@ class Download:
 					'	Farm: farm.name, '
 					'	Field: field.name, '
 					'	`Field UID`: field.uid, '
-					'	Block: block.name, '
-					'	`Block UID`: block.uid, '
-					'	`Tree UID`: tree.uid, '
-					'	`Tree Custom ID`: tree.custom_id,	'
-					'	Variety: tree.variety, '
+					' 	Block: extract(block in blocks | block.name), '
+					' 	`Block UID`: extract(block in blocks | block.uid), '
+					' 	`Tree UID`: extract(tree in trees | tree.uid), '
+					' 	`Tree Custom ID`: extract(tree in trees | tree.custom_id), '
+					' 	Variety: extract(tree in trees | tree.variety), '
 					'	`Sample UID`: sample.uid, '
 					'	`Branch UID`: branch.uid, '
 					'	`Leaf UID`: leaf.uid, '
 					'	UID : sample.uid, '
-					'	Tissue: tissue.name, '
-					'	Storage: storage.name, '
+					#'	Tissue: tissue.name, '
+					#'	Storage: storage.name, '
 					'	`Date Sampled`: sample.date, '
 					'	`Sample ID`: sample.id, '
 					'	Trait: trait.name, '
@@ -1323,12 +1338,12 @@ class Download:
 					if not i[0] in record:
 						# if the new value isn't a list just store it as a string
 						if not isinstance(i[1], list):
-							record.update({i[0]: str(i[1])})
+							record.update({i[0]: i[1]})
 						# if the new value is a list (multicat)
 						# make all the elements of the list into strings
 						# and make a string out of this list of strings
 						else:
-							record.update({i[0]: str([str(y) for y in i[1]])})
+							record.update({i[0]: ", ".join(i[1])})
 					# if the trait is already there
 					else:
 						# if the stored value for this trait is not a list
@@ -1339,9 +1354,9 @@ class Download:
 						# these always return a list (even if 1 element) so at least it is consistent
 						# in this case we can determine if it is a multicat by checking if the new value is a list
 						if not isinstance(i[1], list):
-							record[i[0]].append(str(i[1]))
+							record[i[0]].append(i[1])
 						else:
-							record[i[0]].append(str([str(y) for y in i[1]]))
+							record[i[0]].append(", ".join(i[1]))
 			trait_fieldnames = traits
 			# now create the csv file from result and fieldnames
 			fieldnames = index_fieldnames + trait_fieldnames
@@ -1367,9 +1382,9 @@ class Download:
 				extrasaction = 'ignore')
 			writer.writeheader()
 			for row in result:
-				#for item in row:
-				#	if isinstance(row[item], list):
-				#		row[item] = ", ".join(row[item])
+				for item in row:
+					if isinstance(row[item], list):
+						row[item] = str(', '.join([str(i).encode() for i in row[item] if i]))
 				writer.writerow(row)
 			file_size = csv_file.tell()
 		return {
