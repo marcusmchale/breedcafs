@@ -39,6 +39,16 @@ def clear_schema(tx):
 	tx.run('CALL apoc.schema.assert({}, {})')
 
 
+def delete_items_data(tx):
+	tx.run(
+		' MATCH '
+		'	(item:Item),' 
+		'	(data:Data), '
+		'	(counter:Counter)'
+		' SET counter.count = 0 '
+		' DETACH DELETE item, data '
+	)
+
 def create_indexes(tx, indexes):
 	for item in indexes:
 		tx.run(
@@ -477,7 +487,7 @@ def create_variety_codes(tx, variety_codes):
 		for record in result:
 			print "Merging variety codes"
 			if record[0]:
-				print "Existing variety, code added"
+				print "Existing variety, code set"
 			else:
 				print "New variety created"
 
@@ -511,6 +521,11 @@ else:
 			session.write_transaction(create_constraints, config.constraints)
 			print('creating indexes')
 			session.write_transaction(create_indexes, config.indexes)
+	elif confirm('Would you prefer to just remove data and items, leaving users, their account settings and partner affiliations'
+				 ' but deleting everything else? '):
+		with driver.session() as session:
+			print('Deleting all data and items')
+			session.write_transaction(delete_items_data)
 	else: print('Attempting to create the following while retaining existing data:\n'
 		'  * user:start \n'
 		'  * partners \n'
