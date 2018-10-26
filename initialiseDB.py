@@ -269,11 +269,11 @@ def create_trials(tx, trials):
 				'		name_lower: toLower($name) '
 				'	}) '
 				' -[: PERFORMED_IN]->(farm) ',
-				uid = trial['uid'],
-				name = trial['name'],
-				country = trial['country'],
-				region = trial['region'],
-				farm = trial['farm']
+				uid=trial['uid'],
+				name=trial['name'],
+				country=trial['country'],
+				region=trial['region'],
+				farm=trial['farm']
 			)
 		else:
 			if trial['region']:
@@ -298,10 +298,10 @@ def create_trials(tx, trials):
 					'		name: $name, '
 					'		name_lower: toLower($name) '
 					'	})-[: PERFORMED_IN]->(region) ',
-					uid = trial['uid'],
-					name = trial['name'],
-					country = trial['country'],
-					region = trial['region']
+					uid=trial['uid'],
+					name=trial['name'],
+					country=trial['country'],
+					region=trial['region']
 				)
 			else:
 				tx.run(
@@ -318,13 +318,13 @@ def create_trials(tx, trials):
 					'		name: $name, '
 					'		name_lower: toLower($name) '
 					'	})-[:PERFORMED_IN]->(country) ',
-					uid = trial['uid'],
-					name = trial['name'],
-					country = trial['country']
+					uid=trial['uid'],
+					name=trial['name'],
+					country=trial['country']
 				)
 		# add a relationship between the trial and the "variety name" trait
 		# make this relationship contain a category list
-		# use this later with coalesce to obtain trial specific category lists
+		# use this later with coalesce to obtain location dependent category lists
 		tx.run(
 			' MATCH '
 			'	(trial: Trial {uid:$uid}), '

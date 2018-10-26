@@ -1,0 +1,11 @@
+{% macro render_field(field) %}
+	{% if field.type in ['SelectField'] %}
+		{{ field(**kwargs)|safe }}
+    {% elif field.type in ['DateTimeField', 'DateField'] %}
+		{{ field(placeholder=field.description)|safe }}
+	{% elif field.type in ['SubmitField'] %}
+		{{ field(**kwargs)|safe }}
+	{% elif field.type in ['DecimalField'] %}
+		{{ field(placeholder=field.description.decode('utf8')) | safe }}
+	{% endif %}
+{% endmacro %}

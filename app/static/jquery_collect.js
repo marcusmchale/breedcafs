@@ -8,7 +8,6 @@ id_forms = $('#tree_ids,#branch_ids,#leaf_ids,#sample_ids');
 id_forms.hide();
 $('#existing_ids').hide();
 
-
 update_traits = function() {
 	if (this.value==='') {
 		$('#trait_selection').hide();
@@ -198,8 +197,8 @@ $('dl').each( function () {
 $("#submit_collect").click( function(e) {
 	e.preventDefault();
 	remove_flash();
-	wait_message = "Please wait for files to be generated"
-	flash_wait = "<div id='files_flash' class='flash'>" + wait_message + "</div>";
+	var wait_message = "Please wait for files to be generated"
+	var flash_wait = "<div id='files_flash' class='flash'>" + wait_message + "</div>";
 	$(this).parent().after(flash_wait);
 	var generate_files = $.ajax({
 	    url: "/collect/generate_files",
@@ -207,20 +206,20 @@ $("#submit_collect").click( function(e) {
 		type: 'POST',
 		success: function(response) {
 			if (response.hasOwnProperty('submitted')) {
-				flash_submitted = "<div id='files_flash' class='flash'>" + response.submitted + "</div>";
+				var flash_submitted = "<div id='files_flash' class='flash'>" + response.submitted + "</div>";
 				$("#files_flash").replaceWith(flash_submitted);
 			} else {
 				$("#files_flash").remove();
                 for (i in response) {
                     for (var key in response[i]){
                         if (response[i].hasOwnProperty(key)) {
-                            flash = "<div id='flash_" + key + "' class='flash'>" + response[i][key][0] + "</div>";
+                            var flash = "<div id='flash_" + key + "' class='flash'>" + response[i][key][0] + "</div>";
                             $('#' + key).after(flash);
                         }
                     }
                 }
 			}
-		},
+		}
     })
 })
 

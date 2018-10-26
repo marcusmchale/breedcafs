@@ -1,5 +1,4 @@
 # -*- coding: utf-8 -*-
-
 import os, logging
 from celery import Celery
 from redis import StrictRedis, exceptions

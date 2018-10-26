@@ -179,6 +179,25 @@ class SelectionList:
 		return [record[0] for record in result]
 
 	@staticmethod
+	def get_treatments():
+		parameters = {}
+		query = (
+			' MATCH (treatment:Treatment) '
+			' RETURN [ '
+			'	treatment.name_lower, '
+			'	treatment.name'
+			' ] '
+			' ORDER BY treatment.name '
+		)
+		with get_driver().session() as neo4j_session:
+			result = neo4j_session.read_transaction(
+				neo4j_query,
+				query,
+				parameters
+			)
+		return [(record[0][0], record[0][1]) for record in result]
+
+	@staticmethod
 	def get_tissues():
 		parameters = {}
 		query = (
@@ -386,6 +405,8 @@ class ItemList:
 		query += (
 			' RETURN {'
 			' UID: tree.uid, '
+			' `Tree Custom ID`: tree.custom_id, '
+			' `Variety`: tree.variety, '
 			' `Block UID`: block.uid, '
 			' Block: block.name, '
 			' `Field UID` : field.uid, '
@@ -828,6 +849,34 @@ class ItemList:
 				neo4j_query,
 				query,
 				parameters)
+		return [record[0] for record in result]
+
+
+class TreatmentList:
+	def __init__(self):
+		pass
+
+	@staticmethod
+	def get_treatment_details(
+			treatment
+	):
+		parameters = {}
+		query = (
+			' MATCH (treatment:Treatment { '
+			'	name_lower: $treatment'
+			' }) '
+			' RETURN '
+			'	properties(treatment) '
+			' ORDER BY treatment.name '
+		)
+		if treatment:
+			parameters['treatment']=treatment
+		with get_driver().session() as neo4j_session:
+			result = neo4j_session.read_transaction(
+				neo4j_query,
+				query,
+				parameters
+			)
 		return [record[0] for record in result]
 
 

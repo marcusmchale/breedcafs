@@ -1,6 +1,9 @@
+# -*- coding: utf-8 -*-
+
 from wtforms import (
 	StringField,
-	PasswordField, 
+	PasswordField,
+	DecimalField,
 	BooleanField, 
 	SelectField, 
 	SelectMultipleField, 
@@ -26,6 +29,7 @@ from flask_wtf.file import FileField, FileRequired
 # from app import app
 from app.models import (
 	TraitList,
+	TreatmentList,
 	SelectionList,
 	Fields,
 	User
@@ -482,7 +486,145 @@ class SampleRegForm(FlaskForm):
 		return form
 
 
-# record
+class AddTreatment(FlaskForm):
+	id = "add_treatment"
+	text_treatment = StringField(
+		'Treatment name',
+		[
+			InputRequired(),
+			Regexp('([^\x00-\x7F]|\w|\s)+$', message='Treatment name contains illegal characters'),
+			Length(min=1, max=50, message='Maximum 50 characters')
+		],
+		filters=[strip_filter],
+		description="Add new treatment"
+	)
+	submit_treatment = SubmitField('+')
+
+
+class AddTreatmentCategory(FlaskForm):
+	id = "add_treatment_category"
+	text_treatment_category = StringField(
+		'Add treatment category',
+		[
+			InputRequired(),
+			Regexp('([^\x00-\x7F]|\w|\s)+$', message='Treatment category name contains illegal characters'),
+			Length(min=1, max=50, message='Maximum 50 characters')
+		],
+		filters=[strip_filter],
+		description="Add new category to selected treatment"
+	)
+	submit_treatment = SubmitField('+')
+
+
+# Record
+class RecordForm(FlaskForm):
+	record_type = SelectField (
+		'Record level',
+		[InputRequired()],
+		description="Type of record",
+		choices=[
+			('', 'Select Record Type'),
+			('weather', 'Weather'),
+			('treatment', 'Treatment'),
+			('input', 'Input'),
+			('output', 'Output'),
+			('labour', 'Labour'),
+			('transaction', 'Transaction'),
+		]
+	)
+	#trees_start = IntegerField(
+	#	'Start TreeID',
+	#	[
+	#		Optional(),
+	#		NumberRange(min=min, max=max, message='An integer (' + str(min) + ' to ' + str(max) + ')')
+	#	],
+	#	description="Start TreeID",
+	#)
+	#trees_end = IntegerField(
+	#	'End TreeID',
+	#	[
+	#		Optional(),
+	#		NumberRange(min=min, max=max, message='An integer (' + str(min) + ' to ' + str(max) + ')')
+	#	],
+	#	description="End TreeID",
+	#)
+	#treatment_name = SelectField(
+	#	'Treatment name',
+	#	[InputRequired()]
+	#)
+	#treatment_categories = SelectField(
+	#	'Treatment categories',
+	#	[Optional()],
+	#	option_widget=widgets.CheckboxInput(),
+	#	widget=widgets.ListWidget(prefix_label=False)
+	#)
+	submit_record = SubmitField('Assign items to treatment group')
+
+	@staticmethod
+	def update():
+		form = RecordForm()
+		#treatments = SelectionList.get_treatments()
+		#form.treatment_name.choices = [('', 'Select Treatment')] + treatments
+		#treatment_name = form.treatment_name.data if form.treatment_name.data != '' else None
+		#treatment_details = TreatmentList.get_treatment_details('agroforestry')
+		#treatment_categories = treatment_details[0]['categories']
+		#form.treatment_categories.choices = [(i,i) for i in treatment_categories]
+		return form
+
+
+class WeatherForm(FlaskForm):
+	weather_start = DateField(
+		'Weather Start',
+		[InputRequired()],
+		description='Start of report period'
+
+	)
+	weather_end = DateField(
+		'Weather End',
+		[InputRequired()],
+		description='End of report period'
+	)
+	wind_speed_max = DecimalField(
+		'Peak wind speed',
+		[Optional()],
+		description='Peak wind speed in km/h'
+	)
+	wind_direction = SelectField(
+		'Dominant wind direction',
+		[Optional()],
+		description='Dominant cardinal wind direction',
+		choices=[
+			('n','N'),('ne','NE'),('e','E'),('se','SE'),('s','S'),('sw','SW'),('w','W'),('nw','NW')]
+	)
+	temperature_max = DecimalField(
+		'Maximum temperature',
+		[Optional()],
+		description='Maximum temperature (°C)'
+	)
+	temperature_min = DecimalField(
+		'Minimum temperature',
+		[Optional()],
+		description='Minimum temperature (°C)'
+	)
+	solar_radiation = DecimalField(
+		'Solar radiation',
+		[Optional()],
+		description='Solar radiation (W/m²)'
+	)
+	rainfall = DecimalField(
+		'Rainfall',
+		[Optional()],
+		description='Rainfall (mm)'
+	)
+	humidity = DecimalField(
+		'Relative humidity',
+		[Optional()],
+		description='Relative humidity (%)'
+	)
+	submit_weather = SubmitField('Submit weather record')
+
+
+# Collect
 class CollectForm(FlaskForm):
 	min = 1
 	max = 1000000
@@ -619,7 +761,7 @@ class CollectForm(FlaskForm):
 	@staticmethod
 	def update():
 		form = CollectForm()
-		if form.samples_pooled:
+		if form.samples_pooled == 'single':
 			form.samples_count.validators.insert(0, InputRequired())
 		else:
 			form.samples_count.validators.insert(0, Optional())
@@ -639,6 +781,7 @@ class UploadForm(FlaskForm):
 		[FileRequired()]
 	)
 	upload_submit = SubmitField('Upload')
+
 
 # download
 class DownloadForm(FlaskForm):

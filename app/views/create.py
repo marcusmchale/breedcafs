@@ -186,7 +186,7 @@ def add_country():
 			return redirect(url_for('index'))
 
 
-@app.route('/add_region', methods = ["POST"])
+@app.route('/add_region', methods=["POST"])
 def add_region():
 	if 'username' not in session:
 		flash('Please log in')
@@ -196,6 +196,7 @@ def add_region():
 			form = AddRegion()
 			country = request.form['country']
 			text_region = request.form['text_region'].strip()
+			import pdb;pdb.set_trace()
 			if form.validate_on_submit():
 				if country in ['', 'None']:
 					return jsonify([{"country": ["Please select a country to add a new region"]}])

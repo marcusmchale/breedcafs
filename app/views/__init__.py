@@ -16,5 +16,6 @@ from collect import (
 	Tissues,
 	StorageMethods
 )
+from record import record
 from chart import json_submissions
 # from flask.views import View

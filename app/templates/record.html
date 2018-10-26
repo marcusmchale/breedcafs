@@ -1,0 +1,64 @@
+{% extends "layout.html" %}
+{% block body %}
+<div class="text_body">
+	<h2>Record</h2>
+        {% from "_formhelpers_record.html" import render_field %}
+			<div>
+                <form>
+                    <h3>Select a type of record to submit</h3>
+                        <dd>{{  record_form.record_type }}</dd>
+                    <div id="field_selection">
+                        <h3>Select a field/s to associate with this record</h3>
+                        {{ location_form.csrf_token }}
+                        <dd>{{ render_field (location_form.country) }}</dd>
+                        <dd>{{ render_field (location_form.region) }}</dd>
+                        <dd>{{ render_field (location_form.farm) }}</dd>
+                        <dd>{{ render_field (location_form.field) }}</dd>
+                    </div>
+                    <div id = 'tree_selection'>
+                        <dd>{{ render_field (location_form.block) }}</dd>
+                        <br><br>
+                        <a>Tree ID range:</a>
+                            <p>ID is the number from the end of a UID, e.g. from 1_T2 the ID is 2.<br>The other parameters denote the field (1) and the level (T = Tree)</p>
+
+                    </div>
+                    <div id='weather'>
+                        <h3>Weather record</h3>
+                            {{ weather_form.csrf_token }}
+                            <p>This weather record will be assigned to all fields in the above selection
+                                (e.g. if you only select to the farm level,
+                                then all fields in that farm will have the record attributed
+                            </p>
+                            <p>Report period:<br>
+                                {{ render_field (weather_form.weather_start)}} -
+                                {{ render_field (weather_form.weather_end) }}
+                            </p>
+                            <p>Wind conditions:<br>
+                                {{ render_field (weather_form.wind_speed_max) }} km/h
+                                {{ render_field (weather_form.wind_direction) }} origin
+                            </p>
+                            <p>Temperature range:<br>
+                                {{ render_field (weather_form.temperature_min) }}
+                                {{ render_field (weather_form.temperature_max) }}
+                            </p>
+                            <p>Solar Radiation:
+                                {{ render_field (weather_form.solar_radiation) }}
+                            </p>
+                            <p>Rainfall:
+                                {{ render_field (weather_form.rainfall) }}
+                            </p>
+                            <p>Humidity:
+                                {{ render_field (weather_form.humidity) }}
+                            </p>
+                            {{ render_field (weather_form.submit_weather) }}
+                    </div>
+                    <div id='treatment'>
+                        <h3>Select a treatment and assign selected individuals to categories</h3>
+                    </div>
+                </form>
+			</div>
+<script src="{{ url_for('static', filename='jquery_1.8.3_min.js') }}"></script>
+<script src="{{ url_for('static', filename='jquery_location.js') }}"></script>
+<script src="{{ url_for('static', filename='jquery-ui-1.12.1.custom/jquery-ui.js') }}"></script>
+<script src="{{ url_for('static', filename='jquery_record.js') }}"></script>
+{% endblock %}
