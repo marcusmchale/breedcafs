@@ -337,8 +337,8 @@ class Download:
 			fieldnames,
 			id_list,
 			traits,
-			base_filename = None,
-			with_timestamp = True
+			base_filename=None,
+			with_timestamp=True
 	):
 		file_path = self.get_file_path(
 			'xlsx',
@@ -391,7 +391,7 @@ class Download:
 			"multicat": text_format,
 			"categorical": text_format,
 			"location": location_format,
-			"boolean":text_format
+			"boolean": text_format
 		}
 		for i, trait in enumerate(traits):
 			column_number = len(core_template_fieldnames) + i
@@ -412,10 +412,19 @@ class Download:
 			for key, value in row.iteritems():
 				# if there is a list (or nested lists) stored in this item
 				# make sure it is printed as a list of strings
-				if isinstance(value, list):
-					value = ", ".join([i for i in value])
-				column_number = fieldnames.index(key)
-				context_worksheet.write(row_number, column_number, value)
+				if key == 'Treatments':
+					for treatment in value:
+						if treatment['name'] not in fieldnames:
+							fieldnames.append(treatment['name'])
+							column_number = fieldnames.index(treatment['name'])
+							context_worksheet.write(0, column_number, treatment['name'], header_format)
+						column_number = fieldnames.index(treatment['name'])
+						context_worksheet.write(row_number, column_number, ", ".join(treatment['categories']))
+				else:
+					if isinstance(value, list):
+						value = ", ".join(value)
+					column_number = fieldnames.index(key)
+					context_worksheet.write(row_number, column_number, value)
 			template_worksheet.write(row_number, 0, row['UID'])
 		# create the details worksheet
 		trait_details_worksheet = wb.add_worksheet("Trait details")

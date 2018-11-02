@@ -261,14 +261,28 @@ class ItemList:
 			parameters['farm'] = farm
 		query += (
 			' )<-[IS_IN]-(field:Field) '
-			' RETURN { '
+			' OPTIONAL MATCH '
+			'	(field) '
+			'	<-[: FROM_FIELD]-(fit: FieldItemTreatment) '
+			'	-[: FOR_TREATMENT]->(treatment:Treatment), '
+			'	(fit)<-[: FOR_TREATMENT]-(tc:TreatmentCategory) ' 
+			' WITH '
+			'	country, region, farm, field, '
+			'	treatment, '
+			'	collect(tc.category) as categories '
+			' WITH { '
 			'	Country : country.name, '
 			'	Region : region.name, '
 			'	Farm : farm.name, '
 			'	Field : field.name, '
-			'	UID : field.uid '
-			' } '
-			' ORDER BY field.uid '
+			'	UID : field.uid, '
+			'	Treatments : collect({ '
+			'		name: treatment.name, '
+			'		categories: categories '
+			'	})'
+			' } as result '
+			' RETURN result '
+			' ORDER BY result["UID"] '
 		)
 		with get_driver().session() as neo4j_session:
 			result = neo4j_session.read_transaction(
@@ -285,15 +299,15 @@ class ItemList:
 			field_uid=None
 	):
 		parameters = {}
-		query = 'MATCH (c:Country '
+		query = 'MATCH (country:Country '
 		if country:
 			query += '{name_lower: toLower($country)}'
 			parameters['country'] = country
-		query += ')<-[:IS_IN]-(r:Region '
+		query += ')<-[:IS_IN]-(region:Region '
 		if region:
 			query += '{name_lower: toLower($region)}'
 			parameters['region'] = region
-		query += ')<-[:IS_IN]-(f:Farm '
+		query += ')<-[:IS_IN]-(farm:Farm '
 		if farm:
 			query += '{name_lower: toLower($farm)}'
 			parameters['farm'] = farm
@@ -304,15 +318,34 @@ class ItemList:
 		query += (
 			' )<-[:IS_IN]-(:FieldBlocks) '
 			' <-[:IS_IN]-(block:Block) '
-			' RETURN {'
-			' UID: block.uid, '
-			' Block: block.name, '
-			' `Field UID` : field.uid, '
-			' Field: field.name, '
-			' Farm: f.name, '
-			' Region: r.name, '
-			' Country: c.name }'
-			' ORDER BY block.id'
+			' OPTIONAL MATCH '
+			'	(field) '
+			'	<-[: FROM_FIELD]-(fit: FieldItemTreatment) '
+			'	-[: FOR_TREATMENT]->(treatment:Treatment), '
+			'	(fit)<-[: FOR_TREATMENT]-(tc:TreatmentCategory), '
+			'	(block) '
+			'	<-[:IS_IN]-(:BlockTrees) '
+			'	<-[:IS_IN]-(:Tree) '
+			'	-[:IN_TREATMENT_CATEGORY]->(tc) '
+			' WITH '
+			'	country, region, farm, field, block, '
+			'	treatment, '
+			'	collect (distinct tc.category) as categories '
+			' WITH { '
+			'	UID: block.uid, '
+			'	Block: block.name, '
+			'	`Field UID` : field.uid, '
+			'	Field: field.name, '
+			'	Farm: farm.name, '
+			'	Region: region.name, '
+			'	Country: country.name, '
+			'	Treatments: collect({ '
+			'		name: treatment.name, '
+			'		categories: categories '
+			'	}) '
+			' } as result, block.id as block_id  '
+			' RETURN result '
+			' ORDER BY block_id '
 		)
 		with get_driver().session() as neo4j_session:
 			result = neo4j_session.read_transaction(
@@ -333,7 +366,11 @@ class ItemList:
 	):
 		parameters = {}
 		filters = []
-		optional_matches = []
+		optional_matches = [(
+			' (tree)-[: IN_TREATMENT_CATEGORY]->(tc: TreatmentCategory) '
+			' -[: FOR_TREATMENT]->(: FieldItemTreatment)'
+			' -[: FOR_TREATMENT]->(treatment: Treatment)'
+		)]
 		query = 'MATCH (c:Country '
 		if country:
 			query += '{name_lower: toLower($country)}'
@@ -403,18 +440,28 @@ class ItemList:
 				if count != 0:
 					query += ' , '
 		query += (
-			' RETURN {'
-			' UID: tree.uid, '
-			' `Tree Custom ID`: tree.custom_id, '
-			' `Variety`: tree.variety, '
-			' `Block UID`: block.uid, '
-			' Block: block.name, '
-			' `Field UID` : field.uid, '
-			' Field: field.name, '
-			' Farm: f.name, '
-			' Region: r.name, '
-			' Country: c.name } '
-			' ORDER BY tree.id '
+			' WITH '
+			'	c, r, f, field, block, tree, '
+			'	treatment, '
+			'	collect (distinct tc.category) as categories '
+			' WITH { '
+			'	UID: tree.uid, '
+			'	`Tree Custom ID`: tree.custom_id, '
+			'	`Variety`: tree.variety, '
+			'	`Block UID`: block.uid, '
+			'	Block: block.name, '
+			'	`Field UID` : field.uid, '
+			'	Field: field.name, '
+			'	Farm: f.name, '
+			'	Region: r.name, '
+			'	Country: c.name, '
+			'	Treatments: collect({ '
+			'		name: treatment.name, '
+			'		categories: categories '
+			'	}) '
+			' } as result, tree.id as tree_id '
+			' RETURN result '
+			' ORDER BY tree_id'
 		)
 		with get_driver().session() as neo4j_session:
 			result = neo4j_session.read_transaction(
@@ -857,27 +904,26 @@ class TreatmentList:
 		pass
 
 	@staticmethod
-	def get_treatment_details(
-			treatment
+	def get_treatment_categories(
+			treatment_name
 	):
-		parameters = {}
+		parameters = {
+			'treatment_name':treatment_name
+		}
 		query = (
 			' MATCH (treatment:Treatment { '
-			'	name_lower: $treatment'
+			'	name_lower: toLower($treatment_name) '
 			' }) '
 			' RETURN '
-			'	properties(treatment) '
-			' ORDER BY treatment.name '
+			'	treatment.category_list '
 		)
-		if treatment:
-			parameters['treatment']=treatment
 		with get_driver().session() as neo4j_session:
 			result = neo4j_session.read_transaction(
 				neo4j_query,
 				query,
 				parameters
 			)
-		return [record[0] for record in result]
+		return [record[0] for record in result][0]
 
 
 class TraitList:

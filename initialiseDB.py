@@ -57,7 +57,6 @@ def delete_items_data(tx):
 	)
 
 
-
 def create_indexes(tx, indexes):
 	for item in indexes:
 		tx.run(
@@ -162,20 +161,83 @@ def create_partners(tx, partner_list):
 				)
 
 
+def create_conditions(tx, conditions_file, level):
+	with open(conditions_file, 'rb') as conditions_csv:
+		reader = csv.DictReader(conditions_csv, delimiter=',', quotechar='"')
+		for condition in reader:
+			condition_create = tx.run(
+				' MERGE '
+				'	(c:Condition:' + level + 'Condition { '
+				'		name_lower: toLower(trim($name)) '
+				'	}) '
+				'	ON CREATE SET '
+				'		c.level = toLower(trim($level)), '
+				'		c.group = toLower(trim($group)), '
+				'		c.name = trim($name), '
+				'		c.format = ttoLower(trim($format)), '
+				'		c.default_value = CASE '
+				'			WHEN size(trim($default_value)) = 0 '
+				'				THEN Null '
+				'			ELSE $default_value '
+				'			END, '
+				'		c.minimum = CASE '
+				'			WHEN size(trim($minimum)) = 0 '
+				'				THEN Null '
+				'			ELSE $minimum '
+				'			END, '
+				'		c.maximum = CASE '
+				'			WHEN size(trim($maximum)) = 0 '
+				'				THEN Null '
+				'			ELSE $maximum '
+				'			END, '
+				'		c.details = $details, '
+				'		c.categories = CASE '
+				'			WHEN size(trim($categories)) = 0 '
+				'				THEN Null '
+				'			ELSE $categories '
+				'			END, '
+				'		c.category_list  = CASE '
+				'			WHEN size(trim($categories)) = 0 '
+				'				THEN Null '
+				'			ELSE split($categories, "/") '
+				'			END, '
+				'		c.found = False '
+				'	ON MATCH SET '
+				'		c.found = True '
+				' RETURN c.found ',
+				group=condition['group'],
+				level=level,
+				name=condition['name'],
+				format=condition['format'],
+				default_value=condition['defaultValue'],
+				minimum=condition['minimum'],
+				maximum=condition['maximum'],
+				details=condition['details'],
+				categories=condition['categories']
+			)
+			for record in condition_create:
+				if record['c.found']:
+					print ('Found: ' + level + 'Trait ' + condition['name'])
+				elif not record['c.found']:
+					print ('Created: ' + level + 'Trait ' + condition['name'])
+				else:
+					print ('Error with merger of ' + level + 'Trait ' + condition['name'])
+
+
 def create_traits(tx, traits_file, level):
 	with open(traits_file, 'rb') as traits_csv:
-		reader = csv.DictReader(traits_csv, delimiter = ',', quotechar = '"')
+		reader = csv.DictReader(traits_csv, delimiter=',', quotechar='"')
 		for trait in reader:
 			trait_create = tx.run(
 				' MERGE '
 				# creating with both generic "trait" label, but also the specific level + trait attribute 
 				'	(t:Trait:' + level + 'Trait { '
-				'			name_lower: toLower(trim($trait))'
+				'			name_lower: toLower(trim($name))'
 				'	}) '
 				'	ON CREATE SET '
 				'		t.level = toLower(trim($level)), '
 				'		t.group = toLower(trim($group)), '
-				'		t.name = trim($trait), '
+				'		t.name = trim($name), '
 				'		t.format = toLower(trim($format)), '
 				'		t.default_value = CASE '
 				'			WHEN size(trim($default_value)) = 0 '
@@ -207,15 +269,15 @@ def create_traits(tx, traits_file, level):
 				'	ON MATCH SET '
 				'		t.found = True '
 				' RETURN t.found ',
-				group = trait['group'],
-				level = level,
-				trait = trait['name'],
-				format = trait['format'],
-				default_value = trait['defaultValue'],
-				minimum = trait['minimum'],
-				maximum = trait['maximum'],
-				details = trait['details'],
-				categories = trait['categories']
+				group=trait['group'],
+				level=level,
+				name=trait['name'],
+				format=trait['format'],
+				default_value=trait['defaultValue'],
+				minimum=trait['minimum'],
+				maximum=trait['maximum'],
+				details=trait['details'],
+				categories=trait['categories']
 			)
 			for record in trait_create:
 				if record['t.found']:
@@ -526,7 +588,7 @@ else:
 			print('Deleting all data and items')
 			session.write_transaction(delete_items_data)
 			session.write_transaction(create_field_counter)
-	elif confirm('Do you want to a delete everthing rebuild the constraints and reset the indexes?'):
+	elif confirm('Do you want to a delete everything rebuild the constraints and reset the indexes?'):
 		print('Performing a full reset of database')
 		with driver.session() as session:
 			print('deleting all nodes and relationships')
@@ -538,6 +600,7 @@ else:
 			print('creating indexes')
 			session.write_transaction(create_indexes, config.indexes)
 			session.write_transaction(create_partners, config.partners)
+			session.write_transaction(create_conditions, 'traits/field_conditions.csv', 'Field')
 			session.write_transaction(create_traits, 'traits/field_traits.csv', 'Field')
 			session.write_transaction(create_traits, 'traits/block_traits.csv', 'Block')
 			session.write_transaction(create_traits, 'traits/tree_traits.csv', 'Tree')

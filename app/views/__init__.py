@@ -11,6 +11,9 @@ from create import (
 	ListBlocks,
 	TreeCount
 )
+from record import (
+	ListTreatmentCategories
+)
 from collect import (
 	collect,
 	Tissues,

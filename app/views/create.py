@@ -196,7 +196,6 @@ def add_region():
 			form = AddRegion()
 			country = request.form['country']
 			text_region = request.form['text_region'].strip()
-			import pdb;pdb.set_trace()
 			if form.validate_on_submit():
 				if country in ['', 'None']:
 					return jsonify([{"country": ["Please select a country to add a new region"]}])

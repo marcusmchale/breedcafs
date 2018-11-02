@@ -71,3 +71,6 @@ app.add_url_rule('/sample_reg/storage_methods/',
 	view_func=views.StorageMethods.as_view('storage_methods'),
 	methods=['GET'])
 
+app.add_url_rule('/record/treatment_categories/<treatment_name>/',
+	view_func=views.ListTreatmentCategories.as_view('treatment_categories'),
+	methods=['GET'])
