@@ -619,24 +619,24 @@ def create_conditions(tx, conditions_file):
 			)
 			for record in condition_create:
 				if record['c.found']:
-					print ('Found: ' + level + 'Condition ' + condition['name'])
+					print ('Found Condition ' + condition['name'])
 				elif not record['c.found']:
-					print ('Created: ' + level + 'Condition ' + condition['name'])
+					print ('Created Condition: ' + condition['name'])
 				else:
-					print ('Error with merger of ' + level + 'Condition ' + condition['name'])
+					print ('Error with merger of Condition: ' + condition['name'])
 
 
-def create_treatments(tx, treatments_file, level):
+def create_treatments(tx, treatments_file):
 	with open(treatments_file, 'rb') as treatments_csv:
 		reader = csv.DictReader(treatments_csv, delimiter=',', quotechar='"')
 		for treatment in reader:
 			treatment_create = tx.run(
 				' MERGE '
-				'	(t:Treatment:' + level + 'Treatment { '
+				'	(t:Treatment { '
 				'		name_lower: toLower(trim($name)) '
 				'	}) '
 				'	ON CREATE SET '
-				'		t.level = toLower(trim($level)), '
+				'		t.levels = extract(x in split($levels, "/") | toLower(trim(x))), '
 				'		t.group = toLower(trim($group)), '
 				'		t.name = trim($name), '
 				'		t.details = $details, '
@@ -650,18 +650,18 @@ def create_treatments(tx, treatments_file, level):
 				'		t.found = True '
 				' RETURN t.found ',
 				group=treatment['group'],
-				level=level,
+				levels=treatment['levels'],
 				name=treatment['name'],
 				details=treatment['details'],
 				categories=treatment['categories']
 			)
 			for record in treatment_create:
 				if record['t.found']:
-					print ('Found: ' + level + 'Treatment ' + treatment['name'])
+					print ('Found Treatment: ' + treatment['name'])
 				elif not record['t.found']:
-					print ('Created: ' + level + 'Treatment ' + treatment['name'])
+					print ('Created Treatment: ' + treatment['name'])
 				else:
-					print ('Error with merger of ' + level + 'Treatment ' + treatment['name'])
+					print ('Error with merger of Treatment: ' + treatment['name'])
 
 
 

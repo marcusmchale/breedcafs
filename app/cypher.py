@@ -2818,7 +2818,7 @@ class Cypher:
 	)
 	existing_field_tree_treatment = (
 		' MATCH '
-		'	(treatment: TreeTreatment { '
+		'	(treatment: Treatment { '
 		'		name_lower: toLower($treatment_name) '
 		'	}) '
 		'	<-[: FOR_TREATMENT]-(: FieldItemTreatment) '
@@ -2843,7 +2843,7 @@ class Cypher:
 	)
 	existing_block_tree_treatment = (
 		' MATCH '
-		'	(treatment: TreeTreatment { '
+		'	(treatment: Treatment { '
 		'		name_lower: toLower($treatment_name) '
 		'	}) '
 		'	<-[: FOR_TREATMENT]-(: FieldItemTreatment) '
@@ -2962,7 +2962,7 @@ class Cypher:
 		'	WHERE tree.id >= $trees_start '
 		'	AND tree.id <= $trees_end '
 		' MATCH '
-		'	(treatment: TreeTreatment {name_lower: $treatment_name}) '
+		'	(treatment: Treatment {name_lower: $treatment_name}) '
 		' MERGE '
 		'	(field) '
 		'	<-[: FROM_FIELD]-(fit: FieldItemTreatment) '
@@ -3006,7 +3006,7 @@ class Cypher:
 		'	WHERE tree.id >= $trees_start '
 		'	AND tree.id <= $trees_end '
 		' MATCH '
-		'	(treatment: TreeTreatment {name_lower: $treatment_name}) '
+		'	(treatment: Treatment {name_lower: $treatment_name}) '
 		' MERGE '
 		'	(field) '
 		'	<-[: FROM_FIELD]-(fit: FieldItemTreatment) '
