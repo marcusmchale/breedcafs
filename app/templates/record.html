@@ -8,35 +8,21 @@
                     <h3>Select a type of record to submit</h3>
                     <dl>
                         <dd>{{  record_form.record_type }}</dd>
-                        <div id="field_selection">
+                        <div id="location">
                             <h3>Select item/s to associate with this record</h3>
                             {{ location_form.csrf_token }}
                             <dd>{{ render_field (location_form.country) }}</dd>
                             <dd>{{ render_field (location_form.region) }}</dd>
                             <dd>{{ render_field (location_form.farm) }}</dd>
                             <dd>{{ render_field (location_form.field) }}</dd>
-                        </div>
-                        <div id = 'tree_selection'>
-                            <br><br>
-                            <p>Optionally filter by block:</p>
                             <dd>{{ render_field (location_form.block) }}</dd>
-                            <br><br>
-                            <a>Tree ID range:</a>
-                                <p>
-                                    ID is the number from the end of a UID, e.g. from 1_T2 the ID is 2.
-                                    <br>
-                                    The other parameters denote the field (1) and the level (T = Tree)
-                                </p>
+                        </div>
+                        <div id = 'tree_selection' title="ID is the integer from the end of a UID, e.g. from 1_T2 the ID is 2">
                             <dd>{{ render_field (treatment_form.trees_start) }}</dd>
                             <dd>{{ render_field (treatment_form.trees_end) }}</dd>
-
                         </div>
                         <div id='weather'>
-                            <h3>Weather record</h3>
-                                <!--<p>This weather record will be assigned to all fields in the above selection
-                                    (e.g. if you only select to the farm level,
-                                    then all fields in that farm will have the record attributed
-                                </p>-->
+                            <h3>Weather conditions</h3>
                                 <p>Report period:<br>
                                     {{ render_field (weather_form.weather_start)}} -
                                     {{ render_field (weather_form.weather_end) }}
@@ -59,6 +45,34 @@
                                     {{ render_field (weather_form.humidity) }}
                                 </p>
                                 {{ render_field (weather_form.submit_weather) }}
+                        </div>
+                         <div id='controlled_environment'>
+                            <h3>Controlled environment conditions</h3>
+                             <p>Select a field or optionally a block above to record conditions</p>
+                                <p>Report period:<br>
+                                    {{ render_field (controlled_environment_form.controlled_environment_start)}} -
+                                    {{ render_field (controlled_environment_form.controlled_environment_end)}}
+                                </p>
+                                <p>Diurnal cycle:<br>
+                                    {{ render_field (controlled_environment_form.day_length)}} /
+                                    {{ render_field (controlled_environment_form.night_length)}}
+
+                                </p>
+                                <p>Temperature:<br>
+                                    {{ render_field (controlled_environment_form.temperature_day)}} /
+                                    {{ render_field (controlled_environment_form.temperature_night)}}
+
+                                </p>
+                                <p>Humidity:
+                                    {{ render_field (controlled_environment_form.humidity)}}
+                                </p>
+                                <p>Photosynthetically active radiation:
+                                    {{ render_field (controlled_environment_form.par)}}
+                                </p>
+                                <p>Carbon dioxide:
+                                    {{ render_field (controlled_environment_form.carbon_dioxide)}}
+                                </p>
+                                {{ render_field (controlled_environment_form.submit_controlled_environment) }}
                         </div>
                         <div id='treatment'>
                             <h3>Select a treatment and assign selected individuals to categories</h3>

@@ -24,9 +24,9 @@ from app.forms import (
 	LocationForm,
 	CollectForm,
 	CreateTraits,
-	SampleRegForm,
-	AddTissueForm,
-	AddStorageForm,
+	SampleRegForm
+	#AddTissueForm,
+	#AddStorageForm,
 )
 from app.emails import send_email
 from datetime import datetime
@@ -82,14 +82,18 @@ def generate_files():
 				create_new_items = True if request.form.get('create_new_items') == 'new' else False
 				request_email = True if request.form.get('email_checkbox') else False
 				traits_form = CreateTraits().update(level)
-				# sample_reg_form = SampleRegForm().update(optional=True)
+				sample_reg_form = SampleRegForm().update(optional=True)
 				if level == 'field':
 					location_form = LocationForm.update(optional=True)
 				else:
 					if not create_new_items:
 						location_form = LocationForm.update(optional=True)
 					else: location_form = LocationForm.update(optional=False)
-				if all([location_form.validate_on_submit(), traits_form.validate_on_submit()]):
+				if all([
+					location_form.validate_on_submit(),
+					traits_form.validate_on_submit(),
+					sample_reg_form.validate_on_submit()
+				]):
 					# Parse the form data
 					template_format = request.form['template_format']
 					# reduce the traits to those selected from the relevant list
@@ -139,7 +143,7 @@ def generate_files():
 						request.form['samples_end']
 					) if request.form['samples_end'].isdigit() else None
 					tissue = request.form['tissue'] if request.form['tissue'] != '' else None
-					storage = request.form['storage'] if request.form['storage'] != '' else None
+					harvest_condition = request.form['harvest_condition'] if request.form['harvest_condition'] != '' else None
 					per_sample_replicates = int(
 						request.form['per_sample_replicates']
 					) if request.form['per_sample_replicates'].isdigit() else 1
@@ -181,7 +185,7 @@ def generate_files():
 						samples_start,
 						samples_end,
 						tissue,
-						storage,
+						harvest_condition,
 						per_sample_replicates,
 						samples_pooled,
 						samples_count,
@@ -193,7 +197,7 @@ def generate_files():
 						return jsonify(
 							{
 								'submitted': (
-										'No files generated'
+										'No items found that match your selection'
 								)
 							}
 						)
@@ -249,108 +253,109 @@ def generate_files():
 			return redirect(url_for('index'))
 
 
-# Samples
-@app.route('/sample_reg', methods=['GET', 'POST'])
-def sample_reg():
-	if 'username' not in session:
-		flash('Please log in')
-		return redirect(url_for('login'))
-	else:
-		try:
-			location_form = LocationForm.update()
-			add_tissue_form = AddTissueForm()
-			add_storage_form = AddStorageForm()
-			sample_reg_form = SampleRegForm.update()
-			# custom_sample_form = CustomSampleForm()
-			return render_template(
-				'sample_reg.html',
-				location_form=location_form,
-				add_tissue_form=add_tissue_form,
-				add_storage_form=add_storage_form,
-				sample_reg_form=sample_reg_form,
-				# custom_sample_form=custom_sample_form,
-				title='Sample registration'
-			)
-		except (ServiceUnavailable, AuthError):
-			flash("Database unavailable")
-			return redirect(url_for('index'))
+## Samples
+#@app.route('/sample_reg', methods=['GET', 'POST'])
+#def sample_reg():
+#	if 'username' not in session:
+#		flash('Please log in')
+#		return redirect(url_for('login'))
+#	else:
+#		try:
+#			location_form = LocationForm.update()
+#			add_tissue_form = AddTissueForm()
+#			add_storage_form = AddStorageForm()
+#			sample_reg_form = SampleRegForm.update()
+#			# custom_sample_form = CustomSampleForm()
+#			return render_template(
+#				'sample_reg.html',
+#				location_form=location_form,
+#				add_tissue_form=add_tissue_form,
+#				add_storage_form=add_storage_form,
+#				sample_reg_form=sample_reg_form,
+#				# custom_sample_form=custom_sample_form,
+#				title='Sample registration'
+#			)
+#		except (ServiceUnavailable, AuthError):
+#			flash("Database unavailable")
+#			return redirect(url_for('index'))
+#
 
-
-class Tissues(MethodView):
-	@staticmethod
-	def get():
-		if 'username' not in session:
-			flash('Please log in')
-			return redirect(url_for('login'))
-		else:
-			try:
-				tissues = SelectionList.get_tissues()
-				response = make_response(jsonify(tissues))
-				response.content_type = 'application/json'
-				return response
-			except (ServiceUnavailable, AuthError):
-				flash("Database unavailable")
-				return redirect(url_for('index'))
-
-
-@app.route('/add_tissue', methods=["POST"])
-def add_tissue():
-	if 'username' not in session:
-		flash('Please log in')
-		return redirect(url_for('login'))
-	else:
-		try:
-			form = AddTissueForm()
-			text_tissue = request.form['text_tissue'].strip()
-			if form.validate_on_submit():
-				find_tissue = MatchNode.tissue(text_tissue)
-				if find_tissue:
-					return jsonify({"found": find_tissue[1]})
-				else:
-					new_tissue = Samples().add_tissue(text_tissue)
-					return jsonify({"submitted": new_tissue[0]['name'].title()})
-			else:
-				return jsonify([form.errors])
-		except (ServiceUnavailable, AuthError):
-			flash("Database unavailable")
-			return redirect(url_for('index'))
-
-
-class StorageMethods(MethodView):
-	@staticmethod
-	def get():
-		if 'username' not in session:
-			flash('Please log in')
-			return redirect(url_for('login'))
-		else:
-			try:
-				storage_methods = SelectionList.get_storage_types()
-				response = make_response(jsonify(storage_methods))
-				response.content_type = 'application/json'
-				return response
-			except (ServiceUnavailable, AuthError):
-				flash("Database unavailable")
-				return redirect(url_for('index'))
-
-
-@app.route('/add_storage', methods=["POST"])
-def add_storage():
-	if 'username' not in session:
-		flash('Please log in')
-		return redirect(url_for('login'))
-	else:
-		try:
-			form = AddStorageForm()
-			text_storage = request.form['text_storage'].strip()
-			if form.validate_on_submit():
-				find_storage = MatchNode.storage(text_storage)
-				if find_storage:
-					return jsonify({"found": find_storage[1]})
-				else:
-					new_storage = Samples().add_storage(text_storage)
-					return jsonify({"submitted": new_storage[0]['name'].title()})
-			else:
-				return jsonify([form.errors])
-		except (ServiceUnavailable, AuthError):
-			flash("Database unavailable")
-			return redirect(url_for('index'))
+#class Tissues(MethodView):
+#	@staticmethod
+#	def get():
+#		if 'username' not in session:
+#			flash('Please log in')
+#			return redirect(url_for('login'))
+#		else:
+#			try:
+#				tissues = SelectionList.get_tissues()
+#				response = make_response(jsonify(tissues))
+#				response.content_type = 'application/json'
+#				return response
+#			except (ServiceUnavailable, AuthError):
+#				flash("Database unavailable")
+#				return redirect(url_for('index'))
+#
+#
+#@app.route('/add_tissue', methods=["POST"])
+#def add_tissue():
+#	if 'username' not in session:
+#		flash('Please log in')
+#		return redirect(url_for('login'))
+#	else:
+#		try:
+#			form = AddTissueForm()
+#			text_tissue = request.form['text_tissue'].strip()
+#			if form.validate_on_submit():
+#				find_tissue = MatchNode.tissue(text_tissue)
+#				if find_tissue:
+#					return jsonify({"found": find_tissue[1]})
+#				else:
+#					new_tissue = Samples().add_tissue(text_tissue)
+#					return jsonify({"submitted": new_tissue[0]['name'].title()})
+#			else:
+#				return jsonify([form.errors])
+#		except (ServiceUnavailable, AuthError):
+#			flash("Database unavailable")
+#			return redirect(url_for('index'))
+#
+#
+#class StorageMethods(MethodView):
+#	@staticmethod
+#	def get():
+#		if 'username' not in session:
+#			flash('Please log in')
+#			return redirect(url_for('login'))
+#		else:
+#			try:
+#				storage_methods = SelectionList.get_storage_types()
+#				response = make_response(jsonify(storage_methods))
+#				response.content_type = 'application/json'
+#				return response
+#			except (ServiceUnavailable, AuthError):
+#				flash("Database unavailable")
+#				return redirect(url_for('index'))
+#
+#
+#@app.route('/add_storage', methods=["POST"])
+#def add_storage():
+#	if 'username' not in session:
+#		flash('Please log in')
+#		return redirect(url_for('login'))
+#	else:
+#		try:
+#			form = AddStorageForm()
+#			text_storage = request.form['text_storage'].strip()
+#			if form.validate_on_submit():
+#				find_storage = MatchNode.storage(text_storage)
+#				if find_storage:
+#					return jsonify({"found": find_storage[1]})
+#				else:
+#					new_storage = Samples().add_storage(text_storage)
+#					return jsonify({"submitted": new_storage[0]['name'].title()})
+#			else:
+#				return jsonify([form.errors])
+#		except (ServiceUnavailable, AuthError):
+#			flash("Database unavailable")
+#			return redirect(url_for('index'))
+#

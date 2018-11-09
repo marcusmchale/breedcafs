@@ -19,6 +19,7 @@ from app.forms import (
 	LocationForm,
 	RecordForm,
 	WeatherForm,
+	ControlledEnvironmentForm,
 	TreatmentForm
 )
 
@@ -42,6 +43,7 @@ def record():
 			record_form = RecordForm()
 			location_form = LocationForm.update()
 			weather_form = WeatherForm()
+			controlled_environment_form = ControlledEnvironmentForm()
 			treatment_form = TreatmentForm.update()
 			return render_template(
 				'record.html',
@@ -49,7 +51,8 @@ def record():
 				record_form=record_form,
 				location_form=location_form,
 				weather_form=weather_form,
-				treatment_form=treatment_form
+				treatment_form=treatment_form,
+				controlled_environment_form=controlled_environment_form
 			)
 		except (ServiceUnavailable, AuthError):
 			flash("Database unavailable")
@@ -173,6 +176,89 @@ def weather():
 				return result
 			else:
 				errors = jsonify([record_form.errors, weather_form.errors, location_form.errors])
+				return errors
+		except (ServiceUnavailable, AuthError):
+			flash("Database unavailable")
+			return redirect(url_for('index'))
+
+
+@app.route('/record/controlled_environment', methods=['POST'])
+def controlled_environment():
+	if 'username' not in session:
+		flash('Please log in')
+		return redirect(url_for('login'))
+	else:
+		try:
+			record_form = RecordForm()
+			location_form = LocationForm.update()
+			controlled_environment_form = ControlledEnvironmentForm()
+			# need to allow other levels of optional, at farm level for example
+			if all([
+				record_form.validate_on_submit(),
+				controlled_environment_form.validate_on_submit(),
+				location_form.validate_on_submit(),
+			]):
+				field_uid = int(request.form['field']) if request.form['field'].isdigit() else None
+				block_uid = request.form['block'] if request.form['block'] != '' else None
+				start_time = (
+					int((datetime.strptime(request.form['controlled_environment_start'], '%Y-%m-%d')
+						- datetime(1970, 1, 1)).total_seconds() * 1000)
+					if request.form['controlled_environment_start'] != '' else None
+				)
+				# end time is the last millisecond of the end date.
+				end_time = (
+					int((datetime.strptime(request.form['controlled_environment_end'], '%Y-%m-%d')
+						- datetime(1969, 12, 31)).total_seconds() * 1000) - 1
+					if request.form['controlled_environment_end'] != '' else None
+				)
+				day_length = (
+					float(request.form['day_length'])
+					if request.form['day_length'].replace('.', '', 1).isdigit() else None
+				)
+				night_length = (
+					float(request.form['night_length'])
+					if request.form['night_length'].replace('.', '', 1).isdigit() else None
+				)
+				temperature_day = (
+					float(request.form['temperature_day'])
+					if request.form['temperature_night'].replace('.', '', 1).isdigit() else None
+				)
+				temperature_night = (
+					float(request.form['temperature_night'])
+					if request.form['temperature_night'].replace('.', '', 1).isdigit() else None
+				)
+				humidity = (
+					float(request.form['humidity'])
+					if request.form['humidity'].replace('.', '', 1).isdigit() else None
+				)
+				par = (
+					float(request.form['par'])
+					if request.form['par'].replace('.', '', 1).isdigit() else None
+				)
+				carbon_dioxide = (
+					float(request.form['carbon_dioxide'])
+					if request.form['carbon_dioxide'].replace('.', '', 1).isdigit() else None
+				)
+				if start_time >= end_time:
+					return jsonify({
+						'submitted': 'Please make sure the start date is before the end date'
+					})
+				result = Record(session['username']).controlled_environment(
+					field_uid,
+					block_uid,
+					start_time,
+					end_time,
+					day_length,
+					night_length,
+					temperature_day,
+					temperature_night,
+					humidity,
+					par,
+					carbon_dioxide
+				)
+				return result
+			else:
+				errors = jsonify([record_form.errors, controlled_environment_form.errors, location_form.errors])
 				return errors
 		except (ServiceUnavailable, AuthError):
 			flash("Database unavailable")

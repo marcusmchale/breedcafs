@@ -401,32 +401,32 @@ class AddTreesForm(FlaskForm):
 
 
 # Samples
-class AddTissueForm(FlaskForm):
-	id = "add_tissue_form"
-	text_tissue = StringField(
-		'Tissue type text',
-		[
-			InputRequired(),
-			Regexp("([^\x00-\x7F]|\w|\s)+$", message='Tissue name contains illegal characters'),
-			Length(min=1, max=100, message='Maximum 100 characters')
-		],
-		filters=[strip_filter],
-		description = "Add new tissue")
-	submit_tissue = SubmitField('+')
+#class AddTissueForm(FlaskForm):
+#	id = "add_tissue_form"
+#	text_tissue = StringField(
+#		'Tissue type text',
+#		[
+#			InputRequired(),
+#			Regexp("([^\x00-\x7F]|\w|\s)+$", message='Tissue name contains illegal characters'),
+#			Length(min=1, max=100, message='Maximum 100 characters')
+#		],
+#		filters=[strip_filter],
+#		description = "Add new tissue")
+#	submit_tissue = SubmitField('+')
 
 
-class AddStorageForm(FlaskForm):
-	id = "add_storage_form"
-	text_storage = StringField(
-		'Storage type text',
-		[
-			InputRequired(),
-			Regexp("([^\x00-\x7F]|\w|\s|[+-])+$", message='Storage name contains illegal characters'),
-			Length(min=1, max=100, message='Maximum 100 characters')
-		],
-		filters=[strip_filter],
-		description = "Add new storage method")
-	submit_storage = SubmitField('+')
+#class AddStorageForm(FlaskForm):
+#	id = "add_storage_form"
+#	text_storage = StringField(
+#		'Storage type text',
+#		[
+#			InputRequired(),
+#			Regexp("([^\x00-\x7F]|\w|\s|[+-])+$", message='Storage name contains illegal characters'),
+#			Length(min=1, max=100, message='Maximum 100 characters')
+#		],
+#		filters=[strip_filter],
+#		description = "Add new storage method")
+#	submit_storage = SubmitField('+')
 
 
 class SampleRegForm(FlaskForm):
@@ -453,10 +453,10 @@ class SampleRegForm(FlaskForm):
 		],
 		description= "Replicates (per tree)"
 	)
-	tissue = SelectField('Tissue: ')
-	storage = SelectField('Storage: ')
+	tissue = SelectField('Tissue', description='Tissue')
+	harvest_condition = SelectField('Harvest condition', description='Harvest condition')
 	date_collected = DateField(
-		'Date collected (YYYY-mm-dd): ',
+		'Date harvested (YYYY-mm-dd): ',
 		format='%Y-%m-%d',
 		description= 'Date collected (YYYY-mm-dd)'
 	)
@@ -466,22 +466,22 @@ class SampleRegForm(FlaskForm):
 	def update(optional = False):
 		form = SampleRegForm()
 		tissues = SelectionList.get_tissues()
-		storage_types = SelectionList.get_storage_types()
+		harvest_conditions = SelectionList.get_harvest_conditions()
 		form.tissue.choices = [('', 'Select Tissue')] + tissues
-		form.storage.choices = [('', 'Select Storage')] + storage_types
+		form.harvest_condition.choices = [('', 'Select Harvest condition')] + harvest_conditions
 		if optional:
 			form.trees_start.validators.insert(0, Optional())
 			form.trees_end.validators.insert(0, Optional())
 			form.replicates.validators.insert(0, Optional())
 			form.tissue.validators.insert(0, Optional())
-			form.storage.validators.insert(0, Optional())
+			form.harvest_condition.validators.insert(0, Optional())
 			form.date_collected.validators.insert(0, Optional())
 		else:
 			form.trees_start.validators.insert(0, Optional())
 			form.trees_end.validators.insert(0, Optional())
 			form.replicates.validators.append(InputRequired())
 			form.tissue.validators.append(InputRequired())
-			form.storage.validators.append(InputRequired())
+			form.harvest_condition.validators.append(InputRequired())
 			form.date_collected.validators.append(InputRequired())
 		return form
 
@@ -526,6 +526,7 @@ class RecordForm(FlaskForm):
 			('', 'Select Record Type'),
 			('treatment', 'Treatment'),
 			('weather', 'Weather'),
+			('controlled_environment', 'Controlled Environment'),
 			('input', 'Input'),
 			('output', 'Output'),
 			('labour', 'Labour'),
@@ -639,6 +640,56 @@ class WeatherForm(FlaskForm):
 	submit_weather = SubmitField('Submit weather record')
 
 
+class ControlledEnvironmentForm(FlaskForm):
+	controlled_environment_start = DateField(
+		'Controlled Environment Start',
+		[InputRequired()],
+		description='Start of report period'
+
+	)
+	controlled_environment_end = DateField(
+		'Controlled Environment End',
+		[InputRequired()],
+		description='End of report period'
+	)
+	day_length = DecimalField(
+		'Day length',
+		[Optional()],
+		description='Duration of light (hours)'
+	)
+	night_length = DecimalField(
+		'Night length',
+		[Optional()],
+		description='Duration of dark (hours)'
+	)
+	temperature_day = DecimalField(
+		'Day temperature',
+		[Optional()],
+		description='Temperature in light (°C)'
+	)
+	temperature_night = DecimalField(
+		'Night temperature',
+		[Optional()],
+		description='Temperature in dark (°C)'
+	)
+	humidity = DecimalField(
+		'Relative humidity',
+		[Optional()],
+		description='Humidity (%)'
+	)
+	carbon_dioxide = DecimalField(
+		'Carbon dioxide levels',
+		[Optional()],
+		description='Atmospheric CO₂ (ppm)'
+	)
+	par = DecimalField(
+		'PAR',
+		[Optional()],
+		description='PAR (W/m²)'
+	)
+	submit_controlled_environment = SubmitField('Submit environment record')
+
+
 # Collect
 class CollectForm(FlaskForm):
 	min = 1
@@ -725,7 +776,7 @@ class CollectForm(FlaskForm):
 	samples_pooled = SelectField(
 		'Samples are pooled from multiple trees',
 		[InputRequired()],
-		choices=[('single', 'One per tree'), ('multiple', 'Pooled')]
+		choices=[('single', 'One tree per sample'), ('multiple', 'Multiple trees per sample')]
 	)
 	samples_count = IntegerField(
 		'Sample count',
@@ -750,7 +801,7 @@ class CollectForm(FlaskForm):
 			Optional(),
 			NumberRange(min=1, max=1000, message='Maximum of 1000 replicates per tree per submission')
 		],
-		description="Replicates (number of branches/leaves/samples per tree)"
+		description="Items per tree"
 	)
 	per_sample_replicates = IntegerField(
 		'Measures per sample',
@@ -758,7 +809,7 @@ class CollectForm(FlaskForm):
 			Optional(),
 			NumberRange(min=1, max=10000, message='Maximum of 10000 measures per sample per submission')
 		],
-		description="Replicates (number of measures for each trait performed on each sample)"
+		description="Replicates per sample"
 	)
 	date_collected = DateField(
 		'Date samples collected (YYYY-mm-dd): ',

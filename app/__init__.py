@@ -63,13 +63,13 @@ app.add_url_rule('/location/treecount/<uid>/',
 	view_func=views.TreeCount.as_view('treecount'),
 	methods=['GET'])
 
-app.add_url_rule('/sample_reg/tissues/', 
-	view_func=views.Tissues.as_view('tissues'),
-	methods=['GET'])
+#app.add_url_rule('/sample_reg/tissues/',
+#	view_func=views.Tissues.as_view('tissues'),
+#	methods=['GET'])
 
-app.add_url_rule('/sample_reg/storage_methods/', 
-	view_func=views.StorageMethods.as_view('storage_methods'),
-	methods=['GET'])
+#app.add_url_rule('/sample_reg/storage_methods/',
+#	view_func=views.StorageMethods.as_view('storage_methods'),
+#	methods=['GET'])
 
 app.add_url_rule('/record/treatment_categories/<treatment_name>/',
 	view_func=views.ListTreatmentCategories.as_view('treatment_categories'),

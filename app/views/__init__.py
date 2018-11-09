@@ -15,9 +15,9 @@ from record import (
 	ListTreatmentCategories
 )
 from collect import (
-	collect,
-	Tissues,
-	StorageMethods
+	collect
+	#Tissues,
+	#StorageMethods
 )
 from record import record
 from chart import json_submissions

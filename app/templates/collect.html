@@ -3,104 +3,79 @@
 <div class="text_body">
 	<h2>Collect</h2>
         <p>Here you can generate templates for data collection and sample registration</p>
+        <p>Select the appropriate filters to identify the items of interest</p>
 		{% from "_formhelpers_location_fields.html" import render_field %}
 	<form>
 		{{ collect_form.csrf_token }}
 		<!--{{ location_form.csrf_token }}-->
-		<h3>Level</h3>
-				<dt>{{ collect_form.trait_level }} </dt> <br>
-        <div id="location">
-            <h3>Location</h3>
-			<dt>{{ location_form.country }}</dt>
-			<dt>{{ location_form.region }}</dt>
-			<dt>{{ location_form.farm }}</dt>
-			<dt>{{ location_form.field }}</dt>
-			<dt>{{ location_form.block }}</dt>
+		<div id="level_choice">
+		    <h3>Level</h3>
+			{{ collect_form.trait_level }}
+		</div>
+        <div id="location" title="Select a location">
+            <h3>Fields, Blocks and/or Trees selection</h3>
+                <dt>{{ location_form.country }}</dt>
+                <dt>{{ location_form.region }}</dt>
+                <dt>{{ location_form.farm }}</dt>
+                <dt>{{ location_form.field }}</dt>
+    			<dt>{{ location_form.block }}</dt>
         </div>
-			<div id=tree_ids>
-				<br>
-				<a>Tree ID range:</a>
-				<p>ID is the number from the end of a UID, e.g. from 1_T2 the ID is 2.<br>The other parameters denote the field (1) and the level (T = Tree)</p>
-				<dd>{{ collect_form.trees_start(placeholder=collect_form.trees_start.description) }}
-				{{ collect_form.trees_end(placeholder=collect_form.trees_end.description) }} </dd>
-				<br>
-			</div>
-			<div id=existing_ids>
-				<hr>
-				{{ collect_form.create_new_items }}
-				<div id=new_ids>
-					{{
-						collect_form.samples_pooled(
-							placeholder = collect_form.samples_pooled.description
-						)
-					}}
-					<div id="per_tree">
-						<p>Specify the number of replicates (branches/leaves/samples) per tree</p>
-						<dt>{{
-								collect_form.per_tree_replicates(
-									placeholder = collect_form.per_tree_replicates.description
-								)
-							}}
-						</dt>
-                        <div id="per_sample">
-                            <p>Further specify the number of replicates if you would like to submit replicated measures per sample</p>
-                            <dt>{{
-								collect_form.per_sample_replicates(
-									placeholder = collect_form.per_sample_replicates.description
-								)
-							}}
-                            </dt>
-                        </div>
-					</div>
-					<div id="pooled">
-						<p>Specify the number of samples</p>
-						<dt>
-							{{
-								collect_form.samples_count(
-									placeholder = collect_form.samples_count.description
-								)
-							}}
-						</dt>
-					</div>
-				</div>
-				<div id=old_ids>
-					<div id=branch_ids>
-						<br>
-						<a>Branch ID range:</a>
-						<p>ID is the number from the end of a UID, e.g. from 1_R2 the ID is 2.<br>The other parameters denote the field (1) and the level (R = Branch)</p>
-						<dd>{{ collect_form.branches_start(placeholder=collect_form.branches_start.description) }}
-						{{ collect_form.branches_end(placeholder=collect_form.branches_end.description) }} </dd>
-						<br>
-					</div>
-					<div id=leaf_ids>
-						<br>
-						<a>Leaf ID range:</a>
-						<p>ID is the number from the end of a UID, e.g. from 1_L2 the ID is 2.<br>The other parameters denote the field (1) and the level (L = Leaf)</p>
-						<dd>{{ collect_form.leaves_start(placeholder=collect_form.leaves_start.description) }}
-						{{ collect_form.leaves_end(placeholder=collect_form.leaves_end.description) }} </dd>
-						<br>
-					</div>
-                    <div id=sample_ids>
-						<br>
-                        <p>Note: Samples registered as pooled (i.e. multiple trees per sample)
-                            for which the tree details have not yet been submitted,
-                            can be selected by removing the block and tree ID range specifications above.
-                        </p>
-						<a>Sample type:</a>
-						<dt>{{ sample_reg_form.tissue }}</dt>
-						<dt>{{ sample_reg_form.storage }}</dt>
-						<a>Date range:</a>
-						<dd>{{ collect_form.date_from(placeholder = collect_form.date_from.description) }}
-							{{ collect_form.date_to(placeholder = collect_form.date_to.description) }}</dd>
-						<a>Sample ID range:</a>
-						<p>ID is the number from the end of a UID, e.g. from 1_S2 the ID is 2.<br>The other parameters denote the field (1) and the level (S = Sample)</p>
-						<dd>{{ collect_form.samples_start(placeholder = collect_form.samples_start.description) }}
-							{{ collect_form.samples_end(placeholder = collect_form.samples_end.description) }}
-						</dd>
-                    </div>
-				</div>
-			</div>
-        <div id = trait_selection>
+		<div id=trees>
+            <div id="tree_ids" title="ID is the integer from the end of a UID, e.g. from 1_T2 the ID is 2">
+                    <dt>
+                        {{ collect_form.trees_start(placeholder=collect_form.trees_start.description) }}
+                        {{ collect_form.trees_end(placeholder=collect_form.trees_end.description) }}
+                    </dt>
+            </div>
+		</div>
+        <div id="branches_leaves_samples">
+            <h3>Branches, Leaves or Samples creation and/or selection</h3>
+            <p>Items will be created for (or selected from) trees corresponding to the above selection</p>
+            <dt>{{ collect_form.create_new_items }}</dt>
+            <div id="branches">
+                <div id=branch_ids class="existing" title="ID is the integer from the end of a UID, e.g. from 1_R2 the ID is 2">
+                    <dl>
+                        <dt>
+                            {{ collect_form.branches_start(placeholder=collect_form.branches_start.description) }}
+                            {{ collect_form.branches_end(placeholder=collect_form.branches_end.description) }}
+                        </dt>
+                    </dl>
+                </div>
+            </div>
+            <div id="leaves">
+                <div id="leaf_ids" class="existing" title="ID is the integer from the end of a UID, e.g. from 1_L2 the ID is 2">
+                    <dl>
+                        <dt>
+                            {{ collect_form.leaves_start(placeholder=collect_form.leaves_start.description) }}
+                            {{ collect_form.leaves_end(placeholder=collect_form.leaves_end.description) }}
+                        </dt>
+                    </dl>
+                </div>
+            </div>
+            <div id="samples">
+                <div id="sample_type">
+					    <dt>{{ sample_reg_form.tissue }}</dt>
+                        <dt>{{ sample_reg_form.harvest_condition }}</dt>
+                </div>
+                <div id="sample_ids" class="existing">
+                       <dt>
+                           {{ collect_form.date_from(placeholder = collect_form.date_from.description) }}
+                           {{ collect_form.date_to(placeholder = collect_form.date_to.description) }}
+                       </dt>
+                       <dt>
+                           {{ collect_form.samples_start(placeholder = collect_form.samples_start.description) }}
+                           {{ collect_form.samples_end(placeholder = collect_form.samples_end.description) }}
+                       </dt>
+                </div>
+            </div>
+            <div id="replicates" class="new">
+                <dt class="samples">{{collect_form.samples_pooled(placeholder = collect_form.samples_pooled.description)}}</dt>
+                <dt class="single">{{collect_form.per_tree_replicates(placeholder = collect_form.per_tree_replicates.description)}}</dt>
+                <dt class="samples pooled">{{collect_form.samples_count(placeholder = collect_form.samples_count.description)}}</dt>
+                <dt class="samples" title="Optionally create multiple rows per sample in template">{{collect_form.per_sample_replicates(placeholder = collect_form.per_sample_replicates.description)}}</dt>
+            </div>
+        </div>
+        <div id=trait_selection>
             <h3>Trait Selection</h3>
 			{% include 'traits_form.html' %}
 		</div>

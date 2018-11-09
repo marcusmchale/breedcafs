@@ -13,7 +13,6 @@ from openpyxl import load_workbook
 from zipfile import BadZipfile
 
 
-
 class DictReaderInsensitive(csv.DictReader):
 	# overwrites csv.fieldnames property so uses without surrounding whitespace and in lowercase
 	@property
@@ -134,7 +133,10 @@ class RowParseResult:
 					elif 'time' in field_trait_name:
 						row_string += 'Expected time format as HH:MM e.g. 13:01'
 					elif 'assign to' in field_trait_name:
-						row_string += 'Expected a valid UID for the relevant trait. (e.g. 1_B1) '
+						row_string += (
+							'Expected a valid UID (or a comma separated list thereof) '
+							'for the relevant trait. (e.g. "1_B1" or "1_T1, 1_T2") '
+						)
 					if field_category_list:
 						row_string += ", ".join([i for i in field_category_list])
 				row_string += '">' + str(self.row_data[field]) + '</td>'
@@ -349,16 +351,16 @@ class ItemSubmissionResult:
 		self.uid = uid
 		self.trait = trait
 		self.timestamp = None
-		self.table_date = None
-		self.table_time = None
+		self.text_date = None
+		self.text_time = None
 		self.time = datetime.datetime.utcfromtimestamp(int(time) / 1000).strftime("%Y-%m-%d %H:%M:%S")
 
 	def fb_item(self, timestamp):
 		self.timestamp = timestamp
 
-	def table_item(self, table_date, table_time):
-		self.table_date = table_date
-		self.table_time = table_time
+	def table_item(self, text_date, text_time):
+		self.text_date = text_date
+		self.text_time = text_time
 
 	def conflict(self):
 		if self.value == self.uploaded_value:
@@ -386,8 +388,8 @@ class ItemSubmissionResult:
 		if submission_type == "FB":
 			item_dict['timestamp'] = self.timestamp
 		else:  # submission type == 'table'
-			item_dict['table_date'] = self.table_date
-			item_dict['table_time'] = self.table_time
+			item_dict['text_date'] = self.text_date
+			item_dict['text_time'] = self.text_time
 		return item_dict
 
 
@@ -423,7 +425,7 @@ class SubmissionResult:
 		if submission_type == "FB":
 			submission_item.fb_item(record['timestamp'])
 		else:  # submission type == 'table'
-			submission_item.table_item(record['table_date'], record['table_time'])
+			submission_item.table_item(record['text_date'], record['text_time'])
 		if not record['found']:
 			self.submitted.append(submission_item)
 		elif submission_item.conflict():
@@ -1027,10 +1029,10 @@ class Upload:
 			query = Cypher.upload_table
 			result = [record[0] for record in tx.run(
 				query,
-				username = username,
-				filename = ("file:///" + username + '/' + trimmed_filename),
-				submission_type = submission_type,
-				traits = traits
+				username=username,
+				filename=("file:///" + username + '/' + trimmed_filename),
+				submission_type=submission_type,
+				traits=traits
 			)]
 		# create a submission result
 		for record in result:
@@ -1066,6 +1068,7 @@ class Upload:
 						'status': 'ERRORS',
 						'result': db_check_result
 					}
+
 				else:
 					# submit data
 					submission_result = neo4j_session.write_transaction(

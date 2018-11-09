@@ -1,23 +1,32 @@
 $("#weather_start").datepicker({ dateFormat: 'yy-mm-dd'});
 $("#weather_end").datepicker({ dateFormat: 'yy-mm-dd'});
-$('#record_type').val('')
+$("#controlled_environment_start").datepicker({ dateFormat: 'yy-mm-dd'});
+$("#controlled_environment_end").datepicker({ dateFormat: 'yy-mm-dd'});
 
-
-record_forms = $('#weather,#treatment,#input,#output,#labour,#transaction');
+record_forms = $('#weather,#controlled_environment,#treatment,#input,#output,#labour,#transaction');
 $('#tree_selection').hide();
-$('#field_selection').hide();
+$('#location').hide();
 record_forms.hide()
 
 show_record_form = function() {
     var record_form_type = this.value;
     record_forms.hide();
+    $('#location').hide();
+    $('#tree_selection').hide();
     if (record_form_type === 'weather') {
         $('#tree_selection').hide();
-        $('#field_selection').show();
+        $('#location').show();
+        $('#block').hide()
+    }
+    if (record_form_type === 'controlled_environment') {
+        $('#tree_selection').hide();
+        $('#location').show();
+        $('#block').show()
     }
     if (record_form_type === 'treatment') {
         $('#tree_selection').show();
-        $('#field_selection').show();
+        $('#location').show();
+        $('#block').hide()
     }
     $('#'+record_form_type).show();
 };
@@ -26,8 +35,7 @@ remove_flash = function() {
 	$(".flash").remove();
 }
 
-$('#record_type').change(show_record_form).change(remove_flash);0
-
+$('#record_type').val('').change(show_record_form).change(remove_flash);
 
 $('#submit_weather').click( function (e) {
     e.preventDefault();
@@ -41,14 +49,12 @@ $('#submit_weather').click( function (e) {
         data: data,
         type: 'POST',
         success: function(response) {
-            console.log(response);
             if (response.hasOwnProperty('submitted')) {
-                console.log(response);
                 var flash_submitted = "<div id='weather_flash' class='flash'>" + response.submitted + "</div>";
                 $("#weather_flash").replaceWith(flash_submitted);
             } else {
                 $("#weather_flash").remove();
-                    for (i in response) {
+                    for (var i in response) {
                         for (var key in response[i]){
                             var flash = "<div id='flash_" + key + "' class='flash'>" + response[i][key][0] + "</div>";
                             $('#' + key).after(flash);
@@ -61,6 +67,40 @@ $('#submit_weather').click( function (e) {
 		}
     })
 });
+
+
+$('#submit_controlled_environment').click( function (e) {
+    e.preventDefault();
+    remove_flash();
+    var wait_message = "Please wait for controlled environment data to complete submission";
+    var flash_wait = "<div id='controlled_environment_flash', class='flash'>" + wait_message + "</div>";
+    $(this).parent().after(flash_wait);
+    var data = $("form").serialize();
+    var submit_controlled_environment_record = $.ajax({
+        url: "/record/controlled_environment",
+        data: data,
+        type: 'POST',
+        success: function(response) {
+            console.log(response);
+            if (response.hasOwnProperty('submitted')) {
+                var flash_submitted = "<div id='controlled_environment_flash' class='flash'>" + response.submitted + "</div>";
+                $("#controlled_environment_flash").replaceWith(flash_submitted);
+            } else {
+                $("#controlled_environment_flash").remove();
+                    for (var i in response) {
+                        for (var key in response[i]){
+                            var flash = "<div id='flash_" + key + "' class='flash'>" + response[i][key][0] + "</div>";
+                            $('#' + key).after(flash);
+                        }
+                    }
+            }
+        },
+        error: function(error) {
+			console.log(error);
+		}
+    })
+});
+
 
 update_treatment_categories = function() {
     var treatment_name =  $("#treatment_name").find(":selected").val();

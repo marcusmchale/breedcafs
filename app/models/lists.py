@@ -201,12 +201,8 @@ class SelectionList:
 	def get_tissues():
 		parameters = {}
 		query = (
-			' MATCH (tissue:Tissue) '
-			' RETURN [ '
-			'	tissue.name_lower, '
-			'	tissue.name'
-			' ] '
-			' ORDER BY tissue.name'
+			' MATCH (trait:SampleTrait {name_lower: "tissue type"}) '
+			' RETURN trait.category_list '
 		)
 		with get_driver().session() as neo4j_session:
 			result = neo4j_session.read_transaction(
@@ -214,18 +210,15 @@ class SelectionList:
 				query,
 				parameters
 			)
-		return [(record[0][0], record[0][1]) for record in result]
+		tissue_list = [record[0] for record in result][0]
+		return [(tissue.lower(), tissue) for tissue in tissue_list]
 
 	@staticmethod
-	def get_storage_types():
+	def get_harvest_conditions():
 		parameters = {}
 		query = (
-			' MATCH (storage:Storage) '
-			' RETURN [ '
-			'	storage.name_lower, '
-			'	storage.name'
-			' ] '
-			' ORDER BY storage.name'
+			' MATCH (trait:SampleTrait {name_lower: "harvest condition"}) '
+			' RETURN trait.category_list '
 		)
 		with get_driver().session() as neo4j_session:
 			result = neo4j_session.read_transaction(
@@ -233,7 +226,8 @@ class SelectionList:
 				query,
 				parameters
 			)
-		return [(record[0][0], record[0][1]) for record in result]
+		condition_list = [record[0] for record in result][0]
+		return [(condition.lower(), condition) for condition in condition_list]
 
 
 class ItemList:
@@ -343,9 +337,9 @@ class ItemList:
 			'		name: treatment.name, '
 			'		categories: categories '
 			'	}) '
-			' } as result, block.id as block_id  '
+			' } as result, field.uid as field_uid, block.id as block_id  '
 			' RETURN result '
-			' ORDER BY block_id '
+			' ORDER BY field_uid, block_id '
 		)
 		with get_driver().session() as neo4j_session:
 			result = neo4j_session.read_transaction(
@@ -433,12 +427,7 @@ class ItemList:
 			query += (
 				' OPTIONAL MATCH '
 			)
-			count = len(optional_matches)
-			for optional_match in optional_matches:
-				query += optional_match
-				count -= 1
-				if count != 0:
-					query += ' , '
+			query += ' OPTIONAL MATCH '.join(optional_matches)
 		query += (
 			' WITH '
 			'	c, r, f, field, block, tree, '
@@ -459,9 +448,9 @@ class ItemList:
 			'		name: treatment.name, '
 			'		categories: categories '
 			'	}) '
-			' } as result, tree.id as tree_id '
+			' } as result, field.uid as field_uid, tree.id as tree_id '
 			' RETURN result '
-			' ORDER BY tree_id'
+			' ORDER BY field_uid, tree_id '
 		)
 		with get_driver().session() as neo4j_session:
 			result = neo4j_session.read_transaction(
@@ -484,7 +473,11 @@ class ItemList:
 	):
 		parameters = {}
 		filters = []
-		optional_matches = []
+		optional_matches = [(
+			' (tree)-[: IN_TREATMENT_CATEGORY]->(tc: TreatmentCategory) '
+			' -[: FOR_TREATMENT]->(: FieldItemTreatment) '
+			' -[: FOR_TREATMENT]->(treatment: Treatment) '
+		)]
 		query = 'MATCH (c:Country '
 		if country:
 			query += '{name_lower: toLower($country)}'
@@ -562,24 +555,29 @@ class ItemList:
 			query += (
 				' OPTIONAL MATCH '
 			)
-			count = len(optional_matches)
-			for optional_match in optional_matches:
-				query += optional_match
-				count -= 1
-				if count != 0:
-					query += ' , '
+			query += ' OPTIONAL MATCH '.join(optional_matches)
 		query += (
-			' RETURN {'
-			' UID: branch.uid, '
-			' `Tree UID`: tree.uid, '
-			' `Block UID`: block.uid, '
-			' Block: block.name, '
-			' `Field UID` : field.uid, '
-			' Field: field.name, '
-			' Farm: f.name, '
-			' Region: r.name, '
-			' Country: c.name } '
-			' ORDER BY branch.id '
+			' WITH '
+			'	c, r, f, field, block, tree, branch, '
+			'	treatment, '
+			'	collect (distinct tc.category) as categories '
+			' WITH { '
+			' 	UID: branch.uid, '
+			'	`Tree UID`: tree.uid, '
+			'	`Block UID`: block.uid, '
+			'	Block: block.name, '
+			'	`Field UID` : field.uid, '
+			'	Field: field.name, '
+			'	Farm: f.name, '
+			'	Region: r.name, '
+			'	Country: c.name, '
+			'	Treatments: collect({ '
+			'		name: treatment.name, '
+			'		categories: categories '
+			'	}) '
+			'} as result, field.uid as field_uid, branch.id as branch_id '
+			' RETURN result '
+			' ORDER BY field_uid, branch_id '
 		)
 		with get_driver().session() as neo4j_session:
 			result = neo4j_session.read_transaction(
@@ -604,7 +602,11 @@ class ItemList:
 	):
 		parameters = {}
 		filters = []
-		optional_matches = []
+		optional_matches = [(
+			' (tree)-[: IN_TREATMENT_CATEGORY]->(tc: TreatmentCategory) '
+			' -[: FOR_TREATMENT]->(: FieldItemTreatment)'
+			' -[: FOR_TREATMENT]->(treatment: Treatment)'
+		)]
 		query = 'MATCH (c:Country '
 		if country:
 			query += '{name_lower: toLower($country)}'
@@ -701,25 +703,30 @@ class ItemList:
 			query += (
 				' OPTIONAL MATCH '
 			)
-			count = len(optional_matches)
-			for optional_match in optional_matches:
-				query += optional_match
-				count -= 1
-				if count != 0:
-					query += ' , '
+			query += ' OPTIONAL MATCH '.join(optional_matches)
 		query += (
-			' RETURN {'
-			' UID: leaf.uid, '
-			' `Branch UID`: branch.uid, '
-			' `Tree UID`: tree.uid, '
-			' `Block UID`: block.uid, '
-			' Block: block.name, '
-			' `Field UID` : field.uid, '
-			' Field: field.name, '
-			' Farm: f.name, '
-			' Region: r.name, '
-			' Country: c.name } '
-			' ORDER BY leaf.id '
+			' WITH '
+			'	c, r, f, field, block, tree, branch, leaf, '
+			'	treatment, '
+			'	collect (distinct tc.category) as categories '
+			' WITH { '
+			'	UID: leaf.uid, '
+			'	`Branch UID`: branch.uid, '
+			'	`Tree UID`: tree.uid, '
+			'	`Block UID`: block.uid, '
+			'	Block: block.name, '
+			'	`Field UID` : field.uid, '
+			'	Field: field.name, '
+			'	Farm: f.name, '
+			'	Region: r.name, '
+			'	Country: c.name, '
+			'	Treatments: collect({ '
+			'		name: treatment.name, '
+			'		categories: categories '
+			'	}) '
+			'} as result, field.uid as field_uid, leaf.id as leaf_id '
+			' RETURN result '
+			' ORDER BY field_uid, leaf_id '
 		)
 		with get_driver().session() as neo4j_session:
 			result = neo4j_session.read_transaction(
@@ -740,7 +747,7 @@ class ItemList:
 			samples_start=None,
 			samples_end=None,
 			tissue=None,
-			storage=None,
+			harvest_condition=None,
 			start_time=None,
 			end_time=None
 	):
@@ -817,79 +824,71 @@ class ItemList:
 			parameters['samples_end'] = samples_end
 		if tissue:
 			filters.append(
-				' tissue = $tissue '
+				' sample.tissue = $tissue '
 			)
 			parameters['tissue'] = tissue
-		if storage:
+		if harvest_condition:
 			filters.append(
-				' storage = $storage '
+				' sample.harvest_condition = $harvest_condition '
 			)
-			parameters['storage'] = storage
+			parameters['harvest_condition'] = harvest_condition
 		if start_time:
 			filters.append(
-				' sample.time >= $start_time '
+				' sample.harvest_time >= $start_time '
 			)
 			parameters['start_time'] = start_time
 		if end_time:
 			filters.append(
-				' sample.time <= $end_time '
+				' sample.harvest_time <= $end_time '
 			)
 			parameters['end_time'] = end_time
 		if filters:
 			query += (
 				' WHERE '
 			)
-			filter_count = len(filters)
-			for f in filters:
-				query += f
-				filter_count -= 1
-				if filter_count != 0:
-					query += ' AND '
+			query += ' AND '.join(filters)
+		optional_matches.append(
+				' (tree)-[: IN_TREATMENT_CATEGORY]->(tc: TreatmentCategory) '
+				' -[: FOR_TREATMENT]->(: FieldItemTreatment) '
+				' -[: FOR_TREATMENT]->(treatment: Treatment) '
+			)
 		if optional_matches:
 			query += (
 				' OPTIONAL MATCH '
 			)
-			count = len(optional_matches)
-			for optional_match in optional_matches:
-				query += optional_match
-				count -= 1
-				if count != 0:
-					query += ' , '
+			query += ' OPTIONAL MATCH '.join(optional_matches)
 		query += (
 			' WITH '
 			'	sample, '
 			'	tree, '
 			'	block, '
 			'	field, '
-			'	f,r,c '
-			' ORDER BY field, tree, sample '
-			' WITH '
-			'	sample.uid as UID, '
-			'	collect(tree.uid) as `Tree UID`, '
-			'	collect(distinct(tree.variety)) as Variety, '
-			'	collect(distinct(tree.custom_id)) as `Tree Custom ID`, '
-			'	collect(distinct(block.uid)) as `Block UID`, '
-			'	collect(distinct(block.name)) as Block, '
-			'	field.uid as `Field UID`, '
-			'	field.name as Field, '
-			'	f.name as Farm, '
-			'	r.name as Region, '
-			'	c.name as Country, '
-			'	[field.uid, sample.id] as id '
-			' RETURN { '
-			'	UID: UID, '
-			'	`Tree UID`: `Tree UID`, '
-			'	Variety: Variety, '
-			'	`Tree Custom ID`: `Tree Custom ID`, '
-			'	`Block UID`: `Block UID`, '
-			'	Block: Block, '
-			'	`Field UID` : `Field UID`, '
-			'	Field: Field, '
-			'	Farm: Farm, '
-			'	Region: Region, '
-			'	Country: Country '
-			' } '
-			' ORDER BY id '
+			'	f,r,c, '
+			'	treatment, '
+			'	collect(distinct tc.category) as categories '
+			' ORDER BY field.uid, tree.id '
+			' WITH { '
+			'	UID: sample.uid, '
+			'	`Tree UID`: collect(distinct tree.uid), '
+			'	Variety: collect(distinct(tree.variety)), '
+			'	`Tree Custom ID`: collect(distinct(tree.custom_id)), '
+			'	`Block UID`: collect(distinct(block.uid)), '
+			'	Block: collect(distinct(block.name)), '
+			'	`Field UID` : field.uid, '
+			'	Field: field.name, '
+			'	Farm: f.name, '
+			'	Region: r.name, '
+			'	Country: c.name, '
+			'	Treatments: collect({ '
+			'		name: treatment.name, '
+			'		categories: categories '
+			'	}), '
+			'	`Harvest condition`: sample.harvest_condition, '
+			'	`Harvest time`: apoc.date.format(sample.harvest_time), '
+			'	Tissue: sample.tissue '
+			' } as result, field.uid as field_uid, sample.id as sample_id'
+			' RETURN result '
+			' ORDER BY field_uid, sample_id '
 		)
 		with get_driver().session() as neo4j_session:
 			result = neo4j_session.read_transaction(

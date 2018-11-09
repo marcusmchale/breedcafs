@@ -174,7 +174,7 @@ def create_conditions(tx, conditions_file, level):
 				'		c.level = toLower(trim($level)), '
 				'		c.group = toLower(trim($group)), '
 				'		c.name = trim($name), '
-				'		c.format = ttoLower(trim($format)), '
+				'		c.format = toLower(trim($format)), '
 				'		c.default_value = CASE '
 				'			WHEN size(trim($default_value)) = 0 '
 				'				THEN Null '
@@ -563,6 +563,108 @@ def create_variety_codes(tx, variety_codes):
 				print "New variety created"
 
 
+def create_conditions(tx, conditions_file):
+	with open(conditions_file, 'rb') as conditions_csv:
+		reader = csv.DictReader(conditions_csv, delimiter=',', quotechar='"')
+		for condition in reader:
+			condition_create = tx.run(
+				' MERGE '
+				'	(c:Condition: { '
+				'		name_lower: toLower(trim($name)) '
+				'	}) '
+				'	ON CREATE SET '
+				'		c.levels = extract(x in split($levels, "/") | toLower(trim(x))), '
+				'		c.group = toLower(trim($group)), '
+				'		c.name = trim($name), '
+				'		c.format = toLower(trim($format)), '
+				'		c.default_value = CASE '
+				'			WHEN size(trim($default_value)) = 0 '
+				'				THEN Null '
+				'			ELSE $default_value '
+				'			END, '
+				'		c.minimum = CASE '
+				'			WHEN size(trim($minimum)) = 0 '
+				'				THEN Null '
+				'			ELSE $minimum '
+				'			END, '
+				'		c.maximum = CASE '
+				'			WHEN size(trim($maximum)) = 0 '
+				'				THEN Null '
+				'			ELSE $maximum '
+				'			END, '
+				'		c.details = $details, '
+				'		c.categories = CASE '
+				'			WHEN size(trim($categories)) = 0 '
+				'				THEN Null '
+				'			ELSE $categories '
+				'			END, '
+				'		c.category_list  = CASE '
+				'			WHEN size(trim($categories)) = 0 '
+				'				THEN Null '
+				'			ELSE split($categories, "/") '
+				'			END, '
+				'		c.found = False '
+				'	ON MATCH SET '
+				'		c.found = True '
+				' RETURN c.found ',
+				group=condition['group'],
+				levels=condition['levels'],
+				name=condition['name'],
+				format=condition['format'],
+				default_value=condition['defaultValue'],
+				minimum=condition['minimum'],
+				maximum=condition['maximum'],
+				details=condition['details'],
+				categories=condition['categories']
+			)
+			for record in condition_create:
+				if record['c.found']:
+					print ('Found: ' + level + 'Condition ' + condition['name'])
+				elif not record['c.found']:
+					print ('Created: ' + level + 'Condition ' + condition['name'])
+				else:
+					print ('Error with merger of ' + level + 'Condition ' + condition['name'])
+
+
+def create_treatments(tx, treatments_file, level):
+	with open(treatments_file, 'rb') as treatments_csv:
+		reader = csv.DictReader(treatments_csv, delimiter=',', quotechar='"')
+		for treatment in reader:
+			treatment_create = tx.run(
+				' MERGE '
+				'	(t:Treatment:' + level + 'Treatment { '
+				'		name_lower: toLower(trim($name)) '
+				'	}) '
+				'	ON CREATE SET '
+				'		t.level = toLower(trim($level)), '
+				'		t.group = toLower(trim($group)), '
+				'		t.name = trim($name), '
+				'		t.details = $details, '
+				'		t.category_list  = CASE '
+				'			WHEN size(trim($categories)) = 0 '
+				'				THEN Null '
+				'			ELSE split($categories, "/") '
+				'			END, '
+				'		t.found = False '
+				'	ON MATCH SET '
+				'		t.found = True '
+				' RETURN t.found ',
+				group=treatment['group'],
+				level=level,
+				name=treatment['name'],
+				details=treatment['details'],
+				categories=treatment['categories']
+			)
+			for record in treatment_create:
+				if record['t.found']:
+					print ('Found: ' + level + 'Treatment ' + treatment['name'])
+				elif not record['t.found']:
+					print ('Created: ' + level + 'Treatment ' + treatment['name'])
+				else:
+					print ('Error with merger of ' + level + 'Treatment ' + treatment['name'])
+
+
+
 def create_field_counter(tx):
 	tx.run(' CREATE (:Counter {name: "field", count: 0})')
 
@@ -600,13 +702,14 @@ else:
 			print('creating indexes')
 			session.write_transaction(create_indexes, config.indexes)
 			session.write_transaction(create_partners, config.partners)
-			session.write_transaction(create_conditions, 'traits/field_conditions.csv', 'Field')
 			session.write_transaction(create_traits, 'traits/field_traits.csv', 'Field')
 			session.write_transaction(create_traits, 'traits/block_traits.csv', 'Block')
 			session.write_transaction(create_traits, 'traits/tree_traits.csv', 'Tree')
 			session.write_transaction(create_traits, 'traits/branch_traits.csv', 'Branch')
 			session.write_transaction(create_traits, 'traits/leaf_traits.csv', 'Leaf')
 			session.write_transaction(create_traits, 'traits/sample_traits.csv', 'Sample')
+			session.write_transaction(create_conditions, 'traits/conditions.csv')
+			session.write_transaction(create_treatments, 'traits/treatments.csv')
 			session.write_transaction(create_trials, config.trials)
 			session.write_transaction(create_variety_codes, config.variety_codes)
 			session.write_transaction(create_field_counter)

@@ -64,7 +64,7 @@ class Download:
 			samples_start,
 			samples_end,
 			tissue,
-			storage,
+			harvest_condition,
 			per_sample_replicates,
 			samples_pooled,
 			samples_count,
@@ -132,10 +132,12 @@ class Download:
 				samples_start,
 				samples_end,
 				tissue,
-				storage,
+				harvest_condition,
 				start_time,
 				end_time
 			)
+		if not id_list:
+			return
 		fieldnames = self.get_fieldnames(level, per_sample_replicates)
 		# get trait details
 		traits = TraitList.get_traits(level, traits)
@@ -203,7 +205,9 @@ class Download:
 		if level == 'sample':
 			fieldnames[-1:-1] = [
 				'Leaf UID',
-				'Date Sampled'
+				'Harvest time',
+				'Harvest condition',
+				'Tissue'
 			]
 			if per_sample_replicates:
 				fieldnames.insert(-1, 'Sample UID')
@@ -226,7 +230,7 @@ class Download:
 			samples_start,
 			samples_end,
 			tissue,
-			storage,
+			harvest_condition,
 			start_time,
 			end_time
 	):
@@ -292,7 +296,7 @@ class Download:
 				samples_start=samples_start,
 				samples_end=samples_end,
 				tissue=tissue,
-				storage=storage,
+				harvest_condition=harvest_condition,
 				start_time=start_time,
 				end_time=end_time
 			)
@@ -659,7 +663,7 @@ class Download:
 				)
 				optional_block = (
 					' MATCH '
-					'	(sample)-[:FROM_TREE {current:True}]->(:TreeSamples) '
+					'	(sample)-[:FROM_TREE]->(:TreeSamples) '
 					'	-[:FROM_TREE]->(tree:Tree) '
 					'	-[:IS_IN {current:True}]->(: BlockTrees) '
 					'	-[:IS_IN]->(block: Block {uid: $block_uid}) '
@@ -690,7 +694,7 @@ class Download:
 				tdp = td + ' MATCH (field) '
 				optional_block = (
 					' OPTIONAL MATCH '
-					'	(sample)-[:FROM_TREE {current:True}]->(:TreeSamples) '
+					'	(sample)-[:FROM_TREE]->(:TreeSamples) '
 					'	-[:FROM_TREE]->(tree:Tree) '
 					' OPTIONAL MATCH '
 					'	(tree) '
@@ -703,9 +707,9 @@ class Download:
 				)
 			optional_block += (
 				' OPTIONAL MATCH '
-				'	(sample)-[:FROM_BRANCH {current: True}]->(branch:Branch) '
+				'	(sample)-[:FROM_BRANCH]->(branch:Branch) '
 				' OPTIONAL MATCH '
-				'	(sample)-[:FROM_LEAF {current:True}]->(leaf:Leaf) '
+				'	(sample)-[:FROM_LEAF]->(leaf:Leaf) '
 			)
 			# generate the return statement
 			if data_format == 'table':
@@ -849,7 +853,7 @@ class Download:
 				)
 			optional_block += (
 				' OPTIONAL MATCH '
-				'	(leaf)-[:FROM_BRANCH {current: True}]->(branch:Branch) '
+				'	(leaf)-[:FROM_BRANCH]->(branch:Branch) '
 			)
 			# and generate the return statement
 			if data_format == 'table':

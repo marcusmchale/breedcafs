@@ -18,7 +18,7 @@ class Record:
 	def find_condition_conflicts(
 			start,
 			end,
-			field_uid,
+			uid,
 			conditions_dict
 	):
 		# make a list of the conditions that are actually set
@@ -29,15 +29,22 @@ class Record:
 				parameters = {
 					'start': start,
 					'end': end,
-					'field_uid': field_uid,
+					'uid': uid,
 					'condition': condition,
 					'value': conditions_dict[condition]
 				}
-				result = neo4j_session.read_transaction(
-					neo4j_query,
-					Cypher.existing_field_condition,
-					parameters
-				)
+				if isinstance(uid, int):
+					result = neo4j_session.read_transaction(
+						neo4j_query,
+						Cypher.existing_field_condition,
+						parameters
+					)
+				else:
+					result = neo4j_session.read_transaction(
+						neo4j_query,
+						Cypher.existing_block_condition,
+						parameters
+					)
 				result_list = [record for record in result]
 				if result_list:
 					found_values[condition] = result_list
@@ -130,7 +137,6 @@ class Record:
 				Cypher.match_condition_submission_node,
 				{'username': username}
 			)]:
-				print('submissions node not found, merging')
 				neo4j_session.write_transaction(
 					neo4j_query,
 					Cypher.merge_condition_submission_node,
@@ -181,6 +187,102 @@ class Record:
 				html_table = self.condition_result_table(all_submitted)
 				return jsonify({'submitted': (
 					' Weather record submitted or updated: '
+					+ html_table
+					)
+				})
+
+	def controlled_environment(
+			self,
+			field_uid,
+			block_uid,
+			start,
+			end,
+			day_length,
+			night_length,
+			temperature_day,
+			temperature_night,
+			humidity,
+			par,
+			carbon_dioxide
+
+	):
+		username = self.username
+		with get_driver().session() as neo4j_session:
+			# Make sure we have the condition submission node for this user
+			if not [i for i in neo4j_session.read_transaction(
+				neo4j_query,
+				Cypher.match_condition_submission_node,
+				{'username': username}
+			)]:
+				neo4j_session.write_transaction(
+					neo4j_query,
+					Cypher.merge_condition_submission_node,
+					{'username': username}
+				)
+			# Store weather as FieldCondition - similar to trait but Start/End for data point rather than time-point.
+			# Has value, start_time, end_time, person (user from form submission)
+			# Conflicts:
+				# If period overlapping for condition do not allow update
+			conditions_dict = {
+				'day length': day_length,
+				'night length': night_length,
+				'day temperature': temperature_day,
+				'night temperature': temperature_night,
+				'humidity': humidity,
+				'par': par,
+				'carbon dioxide': carbon_dioxide,
+			}
+			# make sure to check that start is less than end!!
+			# first check to see if a value is already set in the selected period
+			if block_uid:
+				found_conflicts = self.find_condition_conflicts(start, end, block_uid, conditions_dict)
+			else:
+				found_conflicts = self.find_condition_conflicts(start, end, field_uid, conditions_dict)
+			if found_conflicts:
+				html_table = self.condition_result_table(found_conflicts)
+				return jsonify({
+					'submitted': (
+						' Record not submitted. <br><br> '
+						' Conflicting values for some of the input data are found in this period: '
+						+ html_table
+					)
+				})
+			else:
+				all_submitted = {}
+				for condition in [i for i, j in conditions_dict.iteritems() if j]:
+					if block_uid:
+						parameters = {
+							'username': username,
+							'start': start,
+							'end': end,
+							'block_uid': block_uid,
+							'condition': condition,
+							'value': conditions_dict[condition]
+						}
+						result = neo4j_session.write_transaction(
+							neo4j_query,
+							Cypher.merge_block_condition,
+							parameters
+						)
+						all_submitted[condition] = [record for record in result]
+					else:
+						parameters = {
+							'username': username,
+							'start': start,
+							'end': end,
+							'field_uid': field_uid,
+							'condition': condition,
+							'value': conditions_dict[condition]
+						}
+						result = neo4j_session.write_transaction(
+							neo4j_query,
+							Cypher.merge_field_condition,
+							parameters
+						)
+						all_submitted[condition] = [record for record in result]
+				html_table = self.condition_result_table(all_submitted)
+				return jsonify({'submitted': (
+					' Controlled environment record submitted or updated: '
 					+ html_table
 					)
 				})

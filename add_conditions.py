@@ -13,17 +13,17 @@ auth = (os.environ['NEO4J_USERNAME'], os.environ['NEO4J_PASSWORD'])
 driver = GraphDatabase.driver(uri, auth=auth)
 
 
-def create_conditions(tx, conditions_file, level):
+def create_conditions(tx, conditions_file):
 	with open(conditions_file, 'rb') as conditions_csv:
 		reader = csv.DictReader(conditions_csv, delimiter=',', quotechar='"')
 		for condition in reader:
 			condition_create = tx.run(
 				' MERGE '
-				'	(c:Condition:' + level + 'Condition { '
+				'	(c:Condition { '
 				'		name_lower: toLower(trim($name)) '
 				'	}) '
 				'	ON CREATE SET '
-				'		c.level = toLower(trim($level)), '
+				'		c.levels = extract(x in split($levels, "/") | toLower(trim(x))), '
 				'		c.group = toLower(trim($group)), '
 				'		c.name = trim($name), '
 				'		c.format = toLower(trim($format)), '
@@ -58,7 +58,7 @@ def create_conditions(tx, conditions_file, level):
 				'		c.found = True '
 				' RETURN c.found ',
 				group=condition['group'],
-				level=level,
+				levels=condition['levels'],
 				name=condition['name'],
 				format=condition['format'],
 				default_value=condition['defaultValue'],
@@ -69,12 +69,12 @@ def create_conditions(tx, conditions_file, level):
 			)
 			for record in condition_create:
 				if record['c.found']:
-					print ('Found: ' + level + 'Trait ' + condition['name'])
+					print ('Found condition: ' + condition['name'])
 				elif not record['c.found']:
-					print ('Created: ' + level + 'Trait ' + condition['name'])
+					print ('Created condition: ' + condition['name'])
 				else:
-					print ('Error with merger of ' + level + 'Trait ' + condition['name'])
+					print ('Error with merger of condition:' + condition['name'])
 
 
 with driver.session() as session:
-	session.write_transaction(create_conditions, 'traits/field_conditions.csv', 'Field')
+	session.write_transaction(create_conditions, 'traits/conditions.csv')
