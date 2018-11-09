@@ -167,7 +167,7 @@ def create_conditions(tx, conditions_file, level):
 		for condition in reader:
 			condition_create = tx.run(
 				' MERGE '
-				'	(c:Condition:' + level + 'Condition { '
+				'	(c:Condition { '
 				'		name_lower: toLower(trim($name)) '
 				'	}) '
 				'	ON CREATE SET '
@@ -206,7 +206,7 @@ def create_conditions(tx, conditions_file, level):
 				'		c.found = True '
 				' RETURN c.found ',
 				group=condition['group'],
-				level=level,
+				levels=condition['levels'],
 				name=condition['name'],
 				format=condition['format'],
 				default_value=condition['defaultValue'],
@@ -217,11 +217,11 @@ def create_conditions(tx, conditions_file, level):
 			)
 			for record in condition_create:
 				if record['c.found']:
-					print ('Found: ' + level + 'Trait ' + condition['name'])
+					print ('Found condition: ' + condition['name'])
 				elif not record['c.found']:
-					print ('Created: ' + level + 'Trait ' + condition['name'])
+					print ('Created condition: ' + condition['name'])
 				else:
-					print ('Error with merger of ' + level + 'Trait ' + condition['name'])
+					print ('Error with merger of condition: ' + condition['name'])
 
 
 def create_traits(tx, traits_file, level):
