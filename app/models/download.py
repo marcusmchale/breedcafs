@@ -350,7 +350,9 @@ class Download:
 			with_timestamp=with_timestamp
 		)
 		wb = Workbook(file_path)
-		context_worksheet = wb.add_worksheet("Context")
+		template_worksheet = wb.add_worksheet("Template")
+		context_worksheet = wb.add_worksheet("Item Context")
+		trait_details_worksheet = wb.add_worksheet("Trait details")
 		date_format = wb.add_format({'num_format': 'yyyy-mm-dd', 'left': 1})
 		time_format = wb.add_format({'num_format': 'hh:mm'})
 		right_border = wb.add_format({'right': 1})
@@ -370,7 +372,6 @@ class Download:
 			'details',
 			'category_list'
 		]
-		template_worksheet = wb.add_worksheet("Template")
 		# column < row < cell formatting in priority
 		template_worksheet.set_column(0, 0, None, cell_format=right_border)
 		template_worksheet.set_column(1, 1, None, cell_format=date_format)
@@ -431,16 +432,15 @@ class Download:
 					context_worksheet.write(row_number, column_number, value)
 			template_worksheet.write(row_number, 0, row['UID'])
 		# create the details worksheet
-		trait_details_worksheet = wb.add_worksheet("Trait details")
 		row_number = 0
 		for header in trait_details_fieldnames:
 			column_number = trait_details_fieldnames.index(header)
 			trait_details_worksheet.write(row_number, column_number, header,  header_format)
 		# add notes about Date/Time/Person
 		date_time_person_details = [
-			("date", "Date these details were measured (YYYY-MM-DD)"),
-			("time", "Optional: time these details were measured (24hr, e.g. 13:00). Defaults to 12:00"),
-			("person", "Optional: person who recorded these details")
+			("date", "Required: Date these values were determined (YYYY-MM-DD, e.g. 2017-06-01)"),
+			("time", "Optional: Time these values were determined (24hr, e.g. 13:00. Defaults to 12:00"),
+			("person", "Optional: Person responsible for determining these values")
 		]
 		for i in date_time_person_details:
 			row_number +=1

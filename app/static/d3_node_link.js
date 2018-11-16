@@ -13,11 +13,10 @@ var simulation = d3.forceSimulation()
 	.force("charge", d3.forceManyBody().strength(-30).distanceMin(10).distanceMax(300))
 	.force("collision", d3.forceCollide().radius(function(d) {
 	    return d.radius
-	}).strength(1000))
+	}).strength(1000));
 
 
 var load_graph = function(data) {
-	console.log("LOADs");
 	// load graph (nodes,links) json from /graph endpoint
 	d3.json(data, function(error, graph) {
 		if (error) console.warn(error);
@@ -25,19 +24,21 @@ var load_graph = function(data) {
 			$("svg").replaceWith("<div class='flash'>" + graph.status + "</div>")
 		}
 		else {
+			simulation.tick();
 			update(graph.links, graph.nodes);
 		}
 	})
-}
-
+};
 
 var update = function(links, nodes){
-	console.log("UPDATE");
+	svg.selectAll(".link").remove();
+	svg.selectAll(".node").remove();
+
 	link = svg.selectAll(".link")
 	.data(links)
 	.enter()
 	.append("line")
-	.attr("class","link")
+	.attr("class","link");
 
 	link.append("title")
 		.text(function (d) {return d.type;});
@@ -54,7 +55,7 @@ var update = function(links, nodes){
 
 	node.append("circle")
 		.attr("r",radius)
-		.attr("class", function (d) { return "node " + d.label; })
+		.attr("class", function (d) { return "node " + d.label; });
 
 	node.append("title")
 		.text(function (d) {return d.label});
@@ -70,8 +71,9 @@ var update = function(links, nodes){
 		.on("tick", ticked);
 
 	simulation.force("link")
-		.links(links)
-}
+		.links(links);
+
+};
 
 var ticked = function() {
 	node
@@ -86,15 +88,11 @@ var ticked = function() {
 	    .attr("x1", function(d) { return Math.max(radius, Math.min(width-radius, d.source.x)); })
 	    .attr("y1", function(d) { return Math.max(radius, Math.min(height-radius, d.source.y)); })
 	    .attr("x2", function(d) { return Math.max(radius, Math.min(width-radius, d.target.x)); })
-	    .attr("y2", function(d) { return Math.max(radius, Math.min(height-radius, d.target.y)); })
-		//.attr("x1", function(d) { return d.source.x; })
-		//.attr("y1", function(d) { return d.source.y; })
-		//.attr("x2", function(d) { return d.target.x; })
-		//.attr("y2", function(d) { return d.target.y; });
-}
+	    .attr("y2", function(d) { return Math.max(radius, Math.min(height-radius, d.target.y)); });
+};
 
 var dragstarted = function(d) {
-	if (!d3.event.active) simulation.alphaTarget(0.3).restart()
+	if (!d3.event.active) simulation.alphaTarget(0.3).restart();
 	d.fx = d.x;
 	d.fy = d.y;
 }
@@ -102,6 +100,6 @@ var dragstarted = function(d) {
 var dragged = function(d) {
 	d.fx = d3.event.x;
 	d.fy = d3.event.y;
-}
+};
 
 load_graph('/json_submissions');

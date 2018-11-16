@@ -42,7 +42,7 @@ def upload_submit():
 			upload_object.file_save(file_data)
 			file_format_errors = upload_object.file_format_errors()
 			if file_format_errors:
-				return ({
+				return jsonify({
 					'submitted': file_format_errors
 				})
 			header_report = upload_object.check_headers()
