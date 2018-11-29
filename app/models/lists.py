@@ -179,15 +179,21 @@ class SelectionList:
 		return [record[0] for record in result]
 
 	@staticmethod
-	def get_treatments():
-		parameters = {}
+	def get_condition_groups(level):
+		parameters = {
+			"level": level
+		}
 		query = (
-			' MATCH (treatment:Treatment) '
-			' RETURN [ '
-			'	treatment.name_lower, '
-			'	treatment.name'
-			' ] '
-			' ORDER BY treatment.name '
+			' MATCH '
+			'	(condition_group: ConditionGroup)'
+			'		<-[:IN_GROUP]-(: Condition) '
+			'		-[:AT_LEVEL]->(:Level {name_lower: $level}) '
+			' WITH DISTINCT (condition_group) '
+			' RETURN { '
+			'	name: condition_group.name, '
+			'	name_lower: condition_group.name_lower '
+			' } '
+			' ORDER BY condition_group.name_lower '
 		)
 		with get_driver().session() as neo4j_session:
 			result = neo4j_session.read_transaction(
@@ -195,7 +201,7 @@ class SelectionList:
 				query,
 				parameters
 			)
-		return [(record[0][0], record[0][1]) for record in result]
+		return [(record[0]['name_lower'], record[0]['name']) for record in result]
 
 	@staticmethod
 	def get_tissues():
@@ -898,23 +904,27 @@ class ItemList:
 		return [record[0] for record in result]
 
 
-class TreatmentList:
+class ConditionsList:
 	def __init__(self):
 		pass
 
 	@staticmethod
-	def get_treatment_categories(
-			treatment_name
-	):
+	def get_conditions_details(level, group):
 		parameters = {
-			'treatment_name':treatment_name
+			"level": level,
+			"group": group
 		}
 		query = (
-			' MATCH (treatment:Treatment { '
-			'	name_lower: toLower($treatment_name) '
-			' }) '
-			' RETURN '
-			'	treatment.category_list '
+			' MATCH '
+			'	(:ConditionGroup { '
+			'		name_lower: toLower($group) '
+			'	}) '
+			'	<-[:IN_GROUP]-(condition: Condition) '
+			'	-[:AT_LEVEL]-(:Level {'
+			'		name_lower: toLower($level)'
+			'	}) '
+			' RETURN properties(condition) '
+			' ORDER BY condition.name_lower '
 		)
 		with get_driver().session() as neo4j_session:
 			result = neo4j_session.read_transaction(
@@ -922,7 +932,7 @@ class TreatmentList:
 				query,
 				parameters
 			)
-		return [record[0] for record in result][0]
+		return [record[0] for record in result]
 
 
 class TraitList:

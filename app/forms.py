@@ -17,6 +17,7 @@ from wtforms import (
 )
 from wtforms.validators import (
 	InputRequired,
+	DataRequired,
 	Optional,
 	Email,
 	# EqualTo,
@@ -29,7 +30,7 @@ from flask_wtf.file import FileField, FileRequired
 # from app import app
 from app.models import (
 	TraitList,
-	TreatmentList,
+	ConditionsList,
 	SelectionList,
 	Fields,
 	User
@@ -486,210 +487,6 @@ class SampleRegForm(FlaskForm):
 		return form
 
 
-class AddTreatment(FlaskForm):
-	id = "add_treatment"
-	text_treatment = StringField(
-		'Treatment name',
-		[
-			InputRequired(),
-			Regexp('([^\x00-\x7F]|\w|\s)+$', message='Treatment name contains illegal characters'),
-			Length(min=1, max=50, message='Maximum 50 characters')
-		],
-		filters=[strip_filter],
-		description="Add new treatment"
-	)
-	submit_treatment = SubmitField('+')
-
-
-class AddTreatmentCategory(FlaskForm):
-	id = "add_treatment_category"
-	text_treatment_category = StringField(
-		'Add treatment category',
-		[
-			InputRequired(),
-			Regexp('([^\x00-\x7F]|\w|\s)+$', message='Treatment category name contains illegal characters'),
-			Length(min=1, max=50, message='Maximum 50 characters')
-		],
-		filters=[strip_filter],
-		description="Add new category to selected treatment"
-	)
-	submit_treatment = SubmitField('+')
-
-
-# Record
-class RecordForm(FlaskForm):
-	record_type = SelectField (
-		'Record level',
-		[InputRequired()],
-		description="Type of record",
-		choices=[
-			('', 'Select Record Type'),
-			('treatment', 'Treatment'),
-			('weather', 'Weather'),
-			('controlled_environment', 'Controlled Environment'),
-			('input', 'Input'),
-			('output', 'Output'),
-			('labour', 'Labour'),
-			('transaction', 'Transaction'),
-		]
-	)
-
-
-# Treatment
-class TreatmentForm(FlaskForm):
-	min = 1
-	max = 1000000
-	trees_start = IntegerField(
-		'Start TreeID',
-		[
-			Optional(),
-			NumberRange(min=min, max=max, message='An integer (' + str(min) + ' to ' + str(max) + ')')
-		],
-		description="Start TreeID",
-	)
-	trees_end = IntegerField(
-		'End TreeID',
-		[
-			Optional(),
-			NumberRange(min=min, max=max, message='An integer (' + str(min) + ' to ' + str(max) + ')')
-		],
-		description="End TreeID",
-	)
-	treatment_name = SelectField(
-		'Treatment name',
-		[InputRequired()]
-	)
-	treatment_category = SelectField(
-		'Treatment category',
-		[InputRequired()]
-	)
-	submit_treatment = SubmitField('Assign items to treatment group')
-
-	@staticmethod
-	def update():
-		form = TreatmentForm()
-		treatments = SelectionList.get_treatments()
-		form.treatment_name.choices = [('', 'Select Treatment')] + treatments
-		treatment_name = form.treatment_name.data if form.treatment_name.data not in ['', 'None'] else None
-		if treatment_name:
-			treatment_categories = TreatmentList.get_treatment_categories(treatment_name)
-			form.treatment_category.choices = [(i,i) for i in treatment_categories]
-		else:
-			form.treatment_category.choices = []
-		return form
-
-
-class WeatherForm(FlaskForm):
-	weather_start = DateField(
-		'Weather Start',
-		[InputRequired()],
-		description='Start of report period'
-
-	)
-	weather_end = DateField(
-		'Weather End',
-		[InputRequired()],
-		description='End of report period'
-	)
-	wind_speed_max = DecimalField(
-		'Peak wind speed',
-		[Optional()],
-		description='Peak wind speed in km/h'
-	)
-	wind_direction = SelectField(
-		'Dominant wind direction',
-		[Optional()],
-		description='Dominant cardinal wind direction',
-		choices=[
-			('', ''),
-			('N', 'N'),
-			('NE', 'NE'),
-			('E', 'E'),
-			('SE', 'SE'),
-			('S', 'S'),
-			('SW', 'SW'),
-			('W', 'W'),
-			('NW', 'NW')
-		]
-	)
-	temperature_max = DecimalField(
-		'Maximum temperature',
-		[Optional()],
-		description='Maximum temperature (°C)'
-	)
-	temperature_min = DecimalField(
-		'Minimum temperature',
-		[Optional()],
-		description='Minimum temperature (°C)'
-	)
-	solar_radiation = DecimalField(
-		'Solar radiation',
-		[Optional()],
-		description='Solar radiation (W/m²)'
-	)
-	rainfall = DecimalField(
-		'Rainfall',
-		[Optional()],
-		description='Rainfall (mm)'
-	)
-	humidity = DecimalField(
-		'Relative humidity',
-		[Optional()],
-		description='Relative humidity (%)'
-	)
-	submit_weather = SubmitField('Submit weather record')
-
-
-class ControlledEnvironmentForm(FlaskForm):
-	controlled_environment_start = DateField(
-		'Controlled Environment Start',
-		[InputRequired()],
-		description='Start of report period'
-
-	)
-	controlled_environment_end = DateField(
-		'Controlled Environment End',
-		[InputRequired()],
-		description='End of report period'
-	)
-	day_length = DecimalField(
-		'Day length',
-		[Optional()],
-		description='Duration of light (hours)'
-	)
-	night_length = DecimalField(
-		'Night length',
-		[Optional()],
-		description='Duration of dark (hours)'
-	)
-	temperature_day = DecimalField(
-		'Day temperature',
-		[Optional()],
-		description='Temperature in light (°C)'
-	)
-	temperature_night = DecimalField(
-		'Night temperature',
-		[Optional()],
-		description='Temperature in dark (°C)'
-	)
-	humidity = DecimalField(
-		'Relative humidity',
-		[Optional()],
-		description='Humidity (%)'
-	)
-	carbon_dioxide = DecimalField(
-		'Carbon dioxide levels',
-		[Optional()],
-		description='Atmospheric CO₂ (ppm)'
-	)
-	par = DecimalField(
-		'PAR',
-		[Optional()],
-		description='PAR (W/m²)'
-	)
-	submit_controlled_environment = SubmitField('Submit environment record')
-
-
 # Collect
 class CollectForm(FlaskForm):
 	min = 1
@@ -919,4 +716,129 @@ class CreateTraits(FlaskForm):
 			#the recursive part here is just to add the prefix to the item to compare against the fieldnames
 			if field.name[len(prefix):] in self.levels_groups_traits[level]:
 				field.choices = self.levels_groups_traits[level][field.name[len(prefix):]]
+		return form
+
+
+# Record form (conditions)
+class RecordForm(FlaskForm):
+	level = SelectField(
+		'Level',
+		[InputRequired()],
+		description="Level for record",
+		choices=[
+			('', 'Select Level'),
+			('field', 'Field'),
+			('block', 'Block'),
+			('tree', 'Tree')
+		]
+		# default='field'
+	)
+	record_start = DateField(
+		'Record start',
+		[InputRequired()],
+		description='Start of condition'
+	)
+	record_end = DateField(
+		'Record end',
+		[Optional()],
+		description=(
+			'End of condition (optional)'
+		)
+		# In allowing for open ended conditions, must handle retrieval/conflict comparisons carefully
+	)
+	trees_start = IntegerField(
+		'Start TreeID',
+		[
+			Optional(),
+			NumberRange(min=min, max=max, message='An integer (' + str(min) + ' to ' + str(max) + ')')
+		],
+		description="Start TreeID",
+	)
+	trees_end = IntegerField(
+		'End TreeID',
+		[
+			Optional(),
+			NumberRange(min=min, max=max, message='An integer (' + str(min) + ' to ' + str(max) + ')')
+		],
+		description="End TreeID",
+	)
+	condition_group = SelectField(
+		'Condition group',
+		[InputRequired()],
+		description="Condition group to select fields for form/template",
+		choices=[("", "Select group")]
+	)
+	select_conditions = SelectMultipleField(
+		[InputRequired()],
+		option_widget=widgets.CheckboxInput(),
+		widget=widgets.ListWidget(prefix_label=False),
+		choices=[]
+	)
+	submit_records = SubmitField('Submit records')
+	generate_template = SubmitField('Generate template')
+
+	@staticmethod
+	def update():
+		form = RecordForm()
+		level = form.level.data if form.level.data not in ['', 'None'] else None
+		form.condition_group.choices += SelectionList.get_condition_groups(level)
+		selected_condition_group = form.condition_group.data if form.condition_group.data not in ['', 'None'] else None
+		if selected_condition_group:
+			conditions_details = ConditionsList.get_conditions_details(level, selected_condition_group)
+			conditions_list = [(condition['name_lower'], condition['name']) for condition in conditions_details]
+			form.select_conditions.choices = conditions_list
+
+			class ConditionFormDetailed(RecordForm):
+				@classmethod
+				def append_field(cls, name, field):
+					setattr(cls, name, field)
+					return cls
+
+			for condition in conditions_details:
+				if condition['name_lower'] in form.data['select_conditions']:
+					if condition['format'] == "numeric":
+						if all([condition['minimum'], condition['maximum']]):
+							validator_message = (
+								'Must be between ' +
+								condition['minimum'] +
+								' and ' +
+								condition['maximum']
+							)
+						elif condition['minimum']:
+							validator_message = (
+									'Must be greater than ' +
+									condition['minimum']
+							)
+						elif condition['maximum']:
+							validator_message = (
+									'Must be less than ' +
+									condition['maximum']
+							)
+						else:
+							validator_message = "Number range error"
+						ConditionFormDetailed.append_field(
+							condition['name_lower'],
+							DecimalField(
+								[
+									InputRequired(),
+									NumberRange(
+										min=condition['minimum'],
+										max=condition['maximum'],
+										message=validator_message
+									)
+								],
+								description=condition['details']
+							)
+						)
+					elif condition['format'] == "categorical":
+						categories_list = [(category.lower(), category) for category in condition['category_list']]
+						ConditionFormDetailed.append_field(
+							condition['name_lower'],
+							SelectField(
+								[InputRequired()],
+								choices=categories_list,
+								description=condition['details']
+							)
+						)
+			form = ConditionFormDetailed()
 		return form

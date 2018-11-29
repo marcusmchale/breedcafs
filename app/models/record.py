@@ -56,13 +56,13 @@ class Record:
 			if parameters['block_uid']:
 				result = neo4j_session.read_transaction(
 					neo4j_query,
-					Cypher.existing_block_tree_treatment,
+					Cypher.existing_block_tree_condition,
 					parameters
 				)
 			else:
 				result = neo4j_session.read_transaction(
 					neo4j_query,
-					Cypher.existing_field_tree_treatment,
+					Cypher.existing_field_tree_condition,
 					parameters
 				)
 			result_list = [record for record in result]
@@ -134,15 +134,15 @@ class Record:
 			# Make sure we have the condition submission node for this user
 			if not [i for i in neo4j_session.read_transaction(
 				neo4j_query,
-				Cypher.match_condition_submission_node,
+				Cypher.match_record_submission_node,
 				{'username': username}
 			)]:
 				neo4j_session.write_transaction(
 					neo4j_query,
-					Cypher.merge_condition_submission_node,
+					Cypher.merge_record_submission_node,
 					{'username': username}
 				)
-			# Store weather as FieldCondition - similar to trait but Start/End for data point rather than time-point.
+			# Store weather as FieldCondition record - similar to trait but Start/End for record rather than time-point.
 			# Has value, start_time, end_time, person (user from form submission)
 			# Conflicts:
 				# If period overlapping for condition do not allow update
@@ -163,7 +163,7 @@ class Record:
 				return jsonify({
 					'submitted': (
 						' Record not submitted. <br><br> '
-						' Conflicting values for some of the input data are found in this period: '
+						' Conflicting values for some of the input records are found in this period: '
 						+ html_table
 					)
 				})
@@ -211,15 +211,15 @@ class Record:
 			# Make sure we have the condition submission node for this user
 			if not [i for i in neo4j_session.read_transaction(
 				neo4j_query,
-				Cypher.match_condition_submission_node,
+				Cypher.match_record_submission_node,
 				{'username': username}
 			)]:
 				neo4j_session.write_transaction(
 					neo4j_query,
-					Cypher.merge_condition_submission_node,
+					Cypher.merge_record_submission_node,
 					{'username': username}
 				)
-			# Store weather as FieldCondition - similar to trait but Start/End for data point rather than time-point.
+			# Store weather as FieldCondition record- similar to trait but Start/End for record rather than time-point.
 			# Has value, start_time, end_time, person (user from form submission)
 			# Conflicts:
 				# If period overlapping for condition do not allow update
@@ -243,7 +243,7 @@ class Record:
 				return jsonify({
 					'submitted': (
 						' Record not submitted. <br><br> '
-						' Conflicting values for some of the input data are found in this period: '
+						' Conflicting values for some of the input records are found in this period: '
 						+ html_table
 					)
 				})
@@ -301,13 +301,13 @@ class Record:
 			# Make sure we have the treatment submission node for this user
 			if not [i for i in neo4j_session.read_transaction(
 				neo4j_query,
-				Cypher.match_treatment_submission_node,
+				Cypher.match_record_submission_node,
 				{'username': username}
 			)]:
 				print('treatment node not found, merging')
 				neo4j_session.write_transaction(
 					neo4j_query,
-					Cypher.merge_treatment_submission_node,
+					Cypher.merge_record_submission_node,
 					{'username': username}
 				)
 			parameters = {
@@ -325,7 +325,7 @@ class Record:
 				return jsonify({
 					'submitted': (
 						' Record not submitted. <br><br> '
-						' Conflicting values for some of the input data are found in this period: '
+						' Conflicting values for some of the input records are found in this period: '
 						+ html_table
 					)
 				})

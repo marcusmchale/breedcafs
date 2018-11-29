@@ -5,9 +5,9 @@
         {% from "_formhelpers_record.html" import render_field %}
 			<div>
                 <form>
-                    <h3>Select a type of record to submit</h3>
                     <dl>
-                        <dd>{{  record_form.record_type }}</dd>
+                        <h3>Level</h3>
+                        <dd>{{  record_form.level }}</dd>
                         <div id="location">
                             <h3>Select item/s to associate with this record</h3>
                             {{ location_form.csrf_token }}
@@ -15,77 +15,39 @@
                             <dd>{{ render_field (location_form.region) }}</dd>
                             <dd>{{ render_field (location_form.farm) }}</dd>
                             <dd>{{ render_field (location_form.field) }}</dd>
+                        </div>
+                        <div id="block_div">
                             <dd>{{ render_field (location_form.block) }}</dd>
                         </div>
-                        <div id = 'tree_selection' title="ID is the integer from the end of a UID, e.g. from 1_T2 the ID is 2">
-                            <dd>{{ render_field (treatment_form.trees_start) }}</dd>
-                            <dd>{{ render_field (treatment_form.trees_end) }}</dd>
+                        <div id = 'tree_selection_div' title="ID is the integer from the end of a UID, e.g. from 1_T2 the ID is 2">
+                            <dd>{{ render_field (record_form.trees_start) }}</dd>
+                            <dd>{{ render_field (record_form.trees_end) }}</dd>
                         </div>
-                        <div id='weather'>
-                            <h3>Weather conditions</h3>
-                                <p>Report period:<br>
-                                    {{ render_field (weather_form.weather_start)}} -
-                                    {{ render_field (weather_form.weather_end) }}
-                                </p>
-                                <p>Wind conditions:<br>
-                                    {{ render_field (weather_form.wind_speed_max) }} km/h
-                                    {{ render_field (weather_form.wind_direction) }} origin
-                                </p>
-                                <p>Temperature range:<br>
-                                    {{ render_field (weather_form.temperature_min) }}
-                                    {{ render_field (weather_form.temperature_max) }}
-                                </p>
-                                <p>Peak Solar Radiation:
-                                    {{ render_field (weather_form.solar_radiation) }}
-                                </p>
-                                <p>Total Rainfall:
-                                    {{ render_field (weather_form.rainfall) }}
-                                </p>
-                                <p>Average Humidity:
-                                    {{ render_field (weather_form.humidity) }}
-                                </p>
-                                {{ render_field (weather_form.submit_weather) }}
-                        </div>
-                         <div id='controlled_environment'>
-                            <h3>Controlled environment conditions</h3>
-                             <p>Select a field or optionally a block above to record conditions</p>
-                                <p>Report period:<br>
-                                    {{ render_field (controlled_environment_form.controlled_environment_start)}} -
-                                    {{ render_field (controlled_environment_form.controlled_environment_end)}}
-                                </p>
-                                <p>Diurnal cycle:<br>
-                                    {{ render_field (controlled_environment_form.day_length)}} /
-                                    {{ render_field (controlled_environment_form.night_length)}}
-
-                                </p>
-                                <p>Temperature:<br>
-                                    {{ render_field (controlled_environment_form.temperature_day)}} /
-                                    {{ render_field (controlled_environment_form.temperature_night)}}
-
-                                </p>
-                                <p>Humidity:
-                                    {{ render_field (controlled_environment_form.humidity)}}
-                                </p>
-                                <p>Photosynthetically active radiation:
-                                    {{ render_field (controlled_environment_form.par)}}
-                                </p>
-                                <p>Carbon dioxide:
-                                    {{ render_field (controlled_environment_form.carbon_dioxide)}}
-                                </p>
-                                {{ render_field (controlled_environment_form.submit_controlled_environment) }}
-                        </div>
-                        <div id='treatment'>
-                            <h3>Select a treatment and assign selected individuals to categories</h3>
-                                {{  render_field (treatment_form.treatment_name) }}
-                                {{  render_field (treatment_form.treatment_category) }}
-                                {{  render_field (treatment_form.submit_treatment) }}
+                        <div id='condition_selection'>
+                            <h3>Select conditions to record</h3>
+                                <dd>{{  render_field (record_form.condition_group) }}</dd>
+                                <div id="condition_checkbox_div"></div>
+                            <br><br>
+                            {{  render_field (record_form.generate_template) }}
+                            <div id="web_form_div">
+                            <h3>Web Form</h3>
+                                <dt>Record period</dt>
+                                <dd>
+                                    {{ render_field (record_form.record_start) }}
+                                    {{ render_field (record_form.record_end) }}
+                                </dd>
+                                <div id="dynamic_form_div"></div>
+                                {{  render_field (record_form.submit_records) }}
+                            </div>
                         </div>
                     </dl>
                 </form>
 			</div>
 </div>
+
 <script src="{{ url_for('static', filename='jquery_1.8.3_min.js') }}"></script>
 <script src="{{ url_for('static', filename='jquery_location.js') }}"></script>
 <script src="{{ url_for('static', filename='jquery-ui-1.12.1.custom/jquery-ui.js') }}"></script>
 <script src="{{ url_for('static', filename='jquery_record.js') }}"></script>
+
 {% endblock %}

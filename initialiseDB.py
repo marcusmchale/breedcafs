@@ -160,6 +160,7 @@ def create_partners(tx, partner_list):
 					+ ' and/or BASED_IN relationship'
 				)
 
+
 def create_traits(tx, traits_file, level):
 	with open(traits_file, 'rb') as traits_csv:
 		reader = csv.DictReader(traits_csv, delimiter=',', quotechar='"')
@@ -509,8 +510,6 @@ def create_conditions(tx, conditions_file):
 				'		name_lower: toLower(trim($name)) '
 				'	}) '
 				'	ON CREATE SET '
-				'		c.levels = extract(x in split($levels, "/") | toLower(trim(x))), '
-				'		c.group = toLower(trim($group)), '
 				'		c.name = trim($name), '
 				'		c.format = toLower(trim($format)), '
 				'		c.default_value = CASE '
@@ -542,8 +541,28 @@ def create_conditions(tx, conditions_file):
 				'		c.found = False '
 				'	ON MATCH SET '
 				'		c.found = True '
+				' FOREACH (group in extract(x in split($groups, "/") | trim(x)) | '
+				'	MERGE '
+				'		(condition_group: ConditionGroup {'
+				'			name_lower:toLower(group)'
+				'		}) '
+				'		ON CREATE SET '
+				'			condition_group.name = group '
+				' 	MERGE '
+				'		(c)-[:IN_GROUP]->(condition_group) '
+				' ) '
+				' FOREACH (level in extract(x in split($levels, "/") | trim(x)) | '
+				'	MERGE '
+				'		(item_level: Level { '
+				'			name_lower: toLower(level) '
+				'		}) '
+				'		ON CREATE SET '
+				'			item_level.name = level '
+				'	MERGE '
+				'		(c)-[:AT_LEVEL]->(item_level) '
+				' ) '
 				' RETURN c.found ',
-				group=condition['group'],
+				groups=condition['groups'],
 				levels=condition['levels'],
 				name=condition['name'],
 				format=condition['format'],
@@ -560,45 +579,6 @@ def create_conditions(tx, conditions_file):
 					print ('Created Condition: ' + condition['name'])
 				else:
 					print ('Error with merger of Condition: ' + condition['name'])
-
-
-def create_treatments(tx, treatments_file):
-	with open(treatments_file, 'rb') as treatments_csv:
-		reader = csv.DictReader(treatments_csv, delimiter=',', quotechar='"')
-		for treatment in reader:
-			treatment_create = tx.run(
-				' MERGE '
-				'	(t:Treatment { '
-				'		name_lower: toLower(trim($name)) '
-				'	}) '
-				'	ON CREATE SET '
-				'		t.levels = extract(x in split($levels, "/") | toLower(trim(x))), '
-				'		t.group = toLower(trim($group)), '
-				'		t.name = trim($name), '
-				'		t.details = $details, '
-				'		t.category_list  = CASE '
-				'			WHEN size(trim($categories)) = 0 '
-				'				THEN Null '
-				'			ELSE split($categories, "/") '
-				'			END, '
-				'		t.found = False '
-				'	ON MATCH SET '
-				'		t.found = True '
-				' RETURN t.found ',
-				group=treatment['group'],
-				levels=treatment['levels'],
-				name=treatment['name'],
-				details=treatment['details'],
-				categories=treatment['categories']
-			)
-			for record in treatment_create:
-				if record['t.found']:
-					print ('Found Treatment: ' + treatment['name'])
-				elif not record['t.found']:
-					print ('Created Treatment: ' + treatment['name'])
-				else:
-					print ('Error with merger of Treatment: ' + treatment['name'])
-
 
 
 def create_field_counter(tx):
@@ -645,7 +625,6 @@ else:
 			session.write_transaction(create_traits, 'traits/leaf_traits.csv', 'Leaf')
 			session.write_transaction(create_traits, 'traits/sample_traits.csv', 'Sample')
 			session.write_transaction(create_conditions, 'traits/conditions.csv')
-			session.write_transaction(create_treatments, 'traits/treatments.csv')
 			session.write_transaction(create_trials, config.trials)
 			session.write_transaction(create_variety_codes, config.variety_codes)
 			session.write_transaction(create_field_counter)
