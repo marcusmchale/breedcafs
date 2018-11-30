@@ -76,6 +76,7 @@ group_update = function() {
                             '<dt>' + response[i]['name'] + '</dt>' +
                             '<dd><input type="text" ' +
                             'id="'+ response[i]['name_lower'] + '" ' +
+                            'name="'+ response[i]['name_lower'] + '" ' +
                             'placeholder="' + response[i]['details'] + '" ' +
                             'title="' + response[i]['details'] + '" ' +
                             '</dd>'
@@ -86,7 +87,7 @@ group_update = function() {
                         for (let j = 0; j < category_list.length; j++) {
                             const category = category_list[j];
                             category_options += (
-                                '<option value = "' + category.toLowerCase + '">' +
+                                '<option value = "' + category.toLowerCase() + '">' +
                                 category + '</option>'
                             )
                         }
@@ -94,6 +95,7 @@ group_update = function() {
                             '<dt>' + response[i]['name'] + '</dt>' +
                             '<dd><select ' +
                             'id="'+ response[i]['name_lower'] + '" ' +
+                            'name="'+ response[i]['name_lower'] + '" ' +
                             'title="' + response[i]['details'] + '"> ' +
                             category_options + '</select></dd>'
                         );
@@ -182,8 +184,17 @@ $('#submit_records').click( function (e) {
         type: 'POST',
         success: function(response) {
             if (response.hasOwnProperty('submitted')) {
-                const flash_submitted = "<div id='records_flash' class='flash'>" + response.submitted + "</div>";
-                $("#records_flash").replaceWith(flash_submitted);
+                if (response.hasOwnProperty('class')) {
+                    console.log('test');
+                    if (response.class === 'conflicts') {
+                        console.log('test2');
+                        const flash_submitted = "<div id='records_flash' class='flash' style='background:#f0b7e1'>" + response.submitted + "</div>";
+                        $("#records_flash").replaceWith(flash_submitted);
+                    }
+                } else {
+                    const flash_submitted = "<div id='records_flash' class='flash'>" + response.submitted + "</div>";
+                    $("#records_flash").replaceWith(flash_submitted);
+                }
             } else {
                 $("#records_flash").remove();
                     for (const i in response) {
@@ -191,7 +202,7 @@ $('#submit_records').click( function (e) {
                             for (const key in response[i]) {
                                 if (response[i].hasOwnProperty(key)) {
                                     const flash = "<div id='flash_" + key + "' class='flash'>" + response[i][key][0] + "</div>";
-                                    $('#' + key).after(flash);
+                                    $('[id="' + key + '"').after(flash);
                                 }
                             }
                         }
@@ -203,193 +214,3 @@ $('#submit_records').click( function (e) {
 		}
     })
 });
-
-
-//$('#submit_controlled_environment').click( function (e) {
-//    e.preventDefault();
-//    remove_flash();
-//    const wait_message = "Please wait for controlled environment data to complete submission";
-//    const flash_wait = "<div id='controlled_environment_flash' class='flash'>" + wait_message + "</div>";
-//    $(this).parent().after(flash_wait);
-//    const data = $("form").serialize();
-//    $.ajax({
-//        url: "/record/controlled_environment",
-//        data: data,
-//        type: 'POST',
-//        success: function(response) {
-//            console.log(response);
-//            if (response.hasOwnProperty('submitted')) {
-//                const flash_submitted = "<div id='controlled_environment_flash' class='flash'>" + response.submitted + "</div>";
-//                $("#controlled_environment_flash").replaceWith(flash_submitted);
-//            } else {
-//                $("#controlled_environment_flash").remove();
-//                    for (const i in response) {
-//                        if (response.hasOwnProperty(i)) {
-//                            for (const key in response[i]) {
-//                                if (response[i].hasOwnProperty(key)) {
-//                                    const flash = "<div id='flash_" + key + "' class='flash'>" + response[i][key][0] + "</div>";
-//                                    $('#' + key).after(flash);
-//                                }
-//                            }
-//                        }
-//                    }
-//            }
-//        },
-//        error: function(error) {
-//			console.log(error);
-//		}
-//    })
-//});
-
-
-//const category_select = $("#treatment_category");
-//const value_select = $("#treatment_value");
-//category_select.hide();
-//value_select.hide();
-//
-//update_conditions_form = function() {
-//    const condition_type = $("#condition_type").find(":selected").val();
-//    const treatment_div = $("#treatment")
-//    if (treatment_type !== "") {
-//        $.ajax({
-//            type: 'GET',
-//            url:'/record/treatment_details/' + treatment_type + '/',
-//            success: function(response) {
-//                const treatment_checkbox_div = $("#treatment_checkbox_div");
-//                const treatment_form = $("#treatment_form");
-//                treatment_checkbox_div.empty();
-//                treatment_checkbox_div.append(
-//                    "<br><input id=select_all_treatments type=checkbox>" +
-//                    "<label>Select all</label>" +
-//                    "<ul></ul>"
-//                );
-//                treatment_form.empty()
-//                for (const i in response) {
-//                    if (response.hasOwnProperty(i)) {
-//                        const treatment = response[i];
-//                        $('#treatment_checkbox_div ul').append(
-//                            "<li>" +
-//                            "<input id=checkbox_" + i + " " +
-//                            "type=checkbox value='" + treatment['name_lower'] + "' " +
-//                            ">" +
-//                            "<label for='checkbox_" + treatment['name_lower'] + "'>" +
-//                            treatment['name'] +
-//                            "</label>" +
-//                            "</li>"
-//                        )
-//                        $('#treatment_form').append(
-//
-//                        )
-//                    }
-//                }
-//                $('#select_all_treatments').change(function() {
-//                   if(this.checked) {
-//                       treatment_checkbox_div.find(":checkbox").each(function() {
-//                           this.checked=true;
-//                       });
-//                   } else {
-//                       treatment_checkbox_div.find(":checkbox").each(function() {
-//                           this.checked=false;
-//                       });
-//                   }
-//                });
-//
-//            }
-//        })
-//        //const treatment_name =  $("#treatment_name").find(":selected").val();
-//        //category_select.empty();
-//        //value_select.attr("value", "");
-//        //if (treatment_name !== "") {
-//        //    $.ajax({
-//        //        type: 'GET',
-//        //        url: '/record/treatment_details/' + treatment_name + '/',
-//        //        success: function(response){
-//        //            const format = response['format'];
-//        //            if (format === 'categorical') {
-//        //                value_select.hide();
-//        //                category_select.show();
-//        //                const categories = response['category_list'];
-//        //                category_select.append($("<option></option>").attr("value", "").text("Select Category"));
-//        //                for (let i = 0; i< categories.length; i++) {
-//        //                    category_select.append($("<option></option>").attr("value", categories[i]).text(categories[i]));
-//        //                }
-//        //            } else if (['numeric','percent'].includes(format)) {
-//        //                category_select.hide();
-//        //                value_select.show();
-//        //                value_select.attr("placeholder", response['details']);
-//        //                value_select.attr("title", response['details']);
-//        //            }
-//        //        },
-//        //        error: function(response) {
-//        //        }
-//        //    })
-//        //}
-//    }
-//};
-
-//$('#select_all_treatments').change(function() {
-   //if(this.checked) {
-   //    $('#treatment_checkboxes').find(":checkbox").each(function() {
-   //        this.checked=true;
-   //    });
-   //} else {
-   //    $('#treatment_checkboxes').find(":checkbox").each(function() {
-   //        this.checked=false;
-   //    });
-   //}
-//});
-
-//$('[id="select_all_' + trait_id + '"]').change(function () {
-//		$(this).parent().find('label').css('text-decoration', 'none');
-//		if (this.checked) {
-//			$(this).parent().next().find("input").prop("checked", true);
-//		}
-//		else {
-//			$(this).parent().next().find("input").prop("checked", false);
-//		}
-//	});
-//
-
-//$("#treatment_type").change(update_treatment_form);
-
-
-//$('#submit_treatment').click( function (e) {
-//    e.preventDefault();
-//    remove_flash();
-//    const wait_message = "Please wait for treatment assignment to complete";
-//    const flash_wait = "<div id='treatment_flash' class='flash'>" + wait_message + "</div>";
-//    const treatment_flash = $("#treatment_flash");
-//    $(this).parent().after(flash_wait);
-//    const data = $("form").serialize();
-//    $.ajax({
-//        url: "/record/treatment",
-//        data: data,
-//        type: 'POST',
-//        success: function(response) {
-//            console.log(response);
-//            if (response.hasOwnProperty('submitted')) {
-//                console.log(response);
-//                const flash_submitted = "<div id='treatment_flash' class='flash'>" + response.submitted + "</div>";
-//                treatment_flash.replaceWith(flash_submitted);
-//            } else {
-//                treatment_flash.remove();
-//                for (const i in response) {
-//                    if (response.hasOwnProperty(i)) {
-//                        for (const key in response[i]) {
-//                            if (response[i].hasOwnProperty(key)) {
-//                                const flash = "<div id='flash_" + key + "' class='flash'>" + response[i][key][0] + "</div>";
-//                                $('#' + key).after(flash);
-//                            }
-//                        }
-//                    }
-//                }
-//            }
-//        },
-//        error: function(error) {
-//			console.log(error);
-//		}
-//    })
-//});
-
-
-//$('#record_type').val('').change(show_record_form).change(remove_flash);

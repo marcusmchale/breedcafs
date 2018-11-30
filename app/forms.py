@@ -17,7 +17,6 @@ from wtforms import (
 )
 from wtforms.validators import (
 	InputRequired,
-	DataRequired,
 	Optional,
 	Email,
 	# EqualTo,
@@ -749,8 +748,7 @@ class RecordForm(FlaskForm):
 	trees_start = IntegerField(
 		'Start TreeID',
 		[
-			Optional(),
-			NumberRange(min=min, max=max, message='An integer (' + str(min) + ' to ' + str(max) + ')')
+			Optional()
 		],
 		description="Start TreeID",
 	)
@@ -758,7 +756,6 @@ class RecordForm(FlaskForm):
 		'End TreeID',
 		[
 			Optional(),
-			NumberRange(min=min, max=max, message='An integer (' + str(min) + ' to ' + str(max) + ')')
 		],
 		description="End TreeID",
 	)
@@ -770,6 +767,7 @@ class RecordForm(FlaskForm):
 	)
 	select_conditions = SelectMultipleField(
 		[InputRequired()],
+		coerce=unicode,
 		option_widget=widgets.CheckboxInput(),
 		widget=widgets.ListWidget(prefix_label=False),
 		choices=[]
@@ -785,8 +783,6 @@ class RecordForm(FlaskForm):
 		selected_condition_group = form.condition_group.data if form.condition_group.data not in ['', 'None'] else None
 		if selected_condition_group:
 			conditions_details = ConditionsList.get_conditions_details(level, selected_condition_group)
-			conditions_list = [(condition['name_lower'], condition['name']) for condition in conditions_details]
-			form.select_conditions.choices = conditions_list
 
 			class ConditionFormDetailed(RecordForm):
 				@classmethod
@@ -796,23 +792,25 @@ class RecordForm(FlaskForm):
 
 			for condition in conditions_details:
 				if condition['name_lower'] in form.data['select_conditions']:
-					if condition['format'] == "numeric":
-						if all([condition['minimum'], condition['maximum']]):
+					if condition['format'] in ["numeric","percent"]:
+						min_value = condition['minimum'] if 'minimum' in condition else None
+						max_value = condition['maximum'] if 'maximum' in condition else None
+						if all([min_value, max_value]):
 							validator_message = (
 								'Must be between ' +
-								condition['minimum'] +
+								min_value +
 								' and ' +
-								condition['maximum']
+								max_value
 							)
-						elif condition['minimum']:
+						elif min_value:
 							validator_message = (
 									'Must be greater than ' +
-									condition['minimum']
+									min_value
 							)
-						elif condition['maximum']:
+						elif max_value:
 							validator_message = (
 									'Must be less than ' +
-									condition['maximum']
+									max_value
 							)
 						else:
 							validator_message = "Number range error"
@@ -822,8 +820,8 @@ class RecordForm(FlaskForm):
 								[
 									InputRequired(),
 									NumberRange(
-										min=condition['minimum'],
-										max=condition['maximum'],
+										min=min_value,
+										max=max_value,
 										message=validator_message
 									)
 								],
@@ -841,4 +839,6 @@ class RecordForm(FlaskForm):
 							)
 						)
 			form = ConditionFormDetailed()
+			conditions_list = [(condition['name_lower'], condition['name']) for condition in conditions_details]
+			form.select_conditions.choices = conditions_list
 		return form

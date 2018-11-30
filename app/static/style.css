@@ -73,6 +73,14 @@ svg {
 					background: #E1F0B7; 
 					padding: 0.5em; 
 					border: 1px solid #627138; }
+
+.flash_red			{
+					flex: 0 1 95%;
+					margin: 1%;
+					background: #f0b7e1;
+					padding: 0.5em;
+					border: 1px solid #627138; }
+
 .error				{ background: #f0d6d6; 
 					padding: 0.5em; }
 .root_node			{

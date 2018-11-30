@@ -31,7 +31,7 @@ from app.models import (
 
 from flask.views import MethodView
 
-from datetime import datetime
+from datetime import datetime, timedelta
 
 
 class ListConditionGroups(MethodView):
@@ -73,8 +73,8 @@ def record():
 		return redirect(url_for('login'))
 	else:
 		try:
-			record_form = RecordForm.update()
-			location_form = LocationForm.update()
+			record_form = RecordForm().update()
+			location_form = LocationForm.update(optional=True)
 			return render_template(
 				'record.html',
 				title='Record',
@@ -93,15 +93,16 @@ def submit_records():
 		return redirect(url_for('login'))
 	else:
 		record_form = RecordForm.update()
-		location_form = LocationForm.update()
+		location_form = LocationForm.update(optional=True)
 		try:
 			if all([
 				record_form.validate_on_submit(),
 				location_form.validate_on_submit()
 			]):
-				print('start of submit endpoint just after validation')
-				import pdb;
-				pdb.set_trace()
+				level = request.form['level'] if request.form['level'] != '' else None
+				country = request.form['country'] if request.form['country'] != '' else None
+				region = request.form['region'] if request.form['region'] != '' else None
+				farm = request.form['farm'] if request.form['farm'] != '' else None
 				field_uid = int(request.form['field']) if request.form['field'].isdigit() else None
 				block_uid = request.form['block'] if request.form['block'] != '' else None
 				trees_start = int(
@@ -110,22 +111,44 @@ def submit_records():
 				trees_end = int(
 					request.form['trees_end']
 					) if request.form['trees_end'].isdigit() else None
-
-
-				treatment_name = request.form['treatment_name']
-				treatment_category = request.form['treatment_category']
-
-
-				result = Record(session['username']).submit_records(
-					field_uid,
-					block_uid,
-					trees_start,
-					trees_end,
-
-
-					treatment_name,
-					treatment_category
+				start_time = int(
+					(datetime.strptime(request.form['record_start'], '%Y-%m-%d') - datetime(1970, 1, 1)).total_seconds()
+					* 1000
 				)
+				# end time is the last millisecond of the end date
+				end_time = int(
+					(
+						datetime.strptime(request.form['record_end'], '%Y-%m-%d') +
+						timedelta(days=1) -
+						datetime(1970, 1, 1)
+					).total_seconds() * 1000
+				) - 1 if request.form['record_end'] != '' else None
+				if all([end_time, start_time >= end_time]):
+					return jsonify({
+						'submitted': 'Please make sure the start date is before the end date'
+					})
+				if 'select_conditions' in request.form:
+					selected_conditions = request.form.getlist('select_conditions')
+				else:
+					selected_conditions = None
+				conditions_dict = {}
+				for condition in selected_conditions:
+					conditions_dict[condition] = request.form[condition]
+				record_data = {
+					'level': level,
+					'country': country,
+					'region': region,
+					'farm': farm,
+					'field_uid': field_uid,
+					'block_uid': block_uid,
+					'trees_start': trees_start,
+					'trees_end': trees_end,
+					'start_time': start_time,
+					'end_time': end_time,
+					'selected_conditions': selected_conditions,
+					'conditions_dict': conditions_dict
+				}
+				result = Record(session['username']).submit_records(record_data)
 				return result
 			else:
 				errors = jsonify([record_form.errors, location_form.errors])
