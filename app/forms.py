@@ -734,14 +734,14 @@ class RecordForm(FlaskForm):
 	)
 	record_start = DateField(
 		'Record start',
-		[InputRequired()],
-		description='Start of condition'
+		[Optional()],
+		description='Start of period'
 	)
 	record_end = DateField(
 		'Record end',
 		[Optional()],
 		description=(
-			'End of condition (optional)'
+			'End of period'
 		)
 		# In allowing for open ended conditions, must handle retrieval/conflict comparisons carefully
 	)

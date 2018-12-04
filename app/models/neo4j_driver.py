@@ -27,17 +27,18 @@ def get_driver():
 			os.environ['NEO4J_USERNAME'],
 			os.environ['NEO4J_PASSWORD']
 		),
-		connection_timeout = 5,
-		connection_acquisition_timeout = 5,
-		max_retry_time = 5
+		connection_timeout=5,
+		connection_acquisition_timeout=5,
+		max_retry_time=5
 	)
 	watch("neo4j.bolt", logging.INFO, open(app.config['NEO4J_DRIVER_LOG'], 'w+'))
 	return DriverHolder.driver
 
 
-def neo4j_query(tx, query, parameters = None):
+def neo4j_query(tx, query, parameters=None):
 	try:
 		result = tx.run(query, parameters)
-		return result
+		# must not return live result object or may break retry
+		return [record for record in result]
 	except Exception as e:
 		logging.error("Error with neo4j_query:" + str(e))

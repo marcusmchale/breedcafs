@@ -1,20 +1,22 @@
 //update the drop down boxes
 
 update_countries = function(set_country="") {
+	const country_select = $("#country");
+	country_select.empty();
+	country_select.append($("<option></option>").attr("value", "").text("Select Country"));
 	$.ajax({
 		type: 'GET',
 		url: "/location/countries/",
 		success: function(response) {
-			const countries = [["","Select Country"]].concat(response).sort();
-			const country_select = $("#country");
-            country_select.empty();
+			const countries = response.sort();
 			for (let i = 0; i < countries.length; i++) {
 				country_select.append(
 					$("<option></option>").attr(
 						"value", countries[i][0]).text(countries[i][1])
 				);
-			country_select.val(set_country);
 			}
+			country_select.val(set_country);
+			update_regions();
 		},
 		error: function(error) {
 			console.log(error);
@@ -24,122 +26,120 @@ update_countries = function(set_country="") {
 
 update_regions = function(set_region = "") {
 	const sel_country = $("#country").find(":selected").val();
-	const region_select=$("#region");
+	const region_select = $("#region");
 	region_select.empty();
-	if (sel_country === "") {
-	    region_select.empty();
-		region_select.append($("<option></option>").attr("value", "").text("Select Region"))
-	}
-	else {
+	region_select.append($("<option></option>").attr("value", "").text("Select Region"));
+	if (sel_country !== "") {
 		region_select.prop( "disabled", true);
 		$.ajax({
 			type: 'GET',
 			url: "/location/" + sel_country +'/',
 			success: function(response) {
-				const regions = [["","Select Region"]].concat(response).sort();
+				const regions = response.sort();
 				for (let i = 0; i < regions.length; i++) {
 					region_select.append(
 						$("<option></option>").attr(
 							"value", regions[i][0]).text(regions[i][1])
 					);
-				region_select.prop( "disabled", false);
 				}
+				region_select.prop( "disabled", false);
 				region_select.val(set_region);
+				update_farms();
 			},
 			error: function(error) {
 				console.log(error);
 			}
 		});
+	} else {
+		update_farms();
 	}
 };
 
 update_farms = function(set_farm = "") {
-	const sel_country= $("#country").find(":selected").val();
-	const sel_region= $("#region").find(":selected").val();
+	const sel_country=$("#country").find(":selected").val();
+	const sel_region=$("#region").find(":selected").val();
 	const farm_select=$("#farm");
-	if (sel_region === "") {
-		farm_select.empty();
-		farm_select.append($("<option></option>").attr("value", "").text("Select Farm"))
-	}
-	else {
+	farm_select.empty();
+	farm_select.append($("<option></option>").attr("value", "").text("Select Farm"));
+	if (sel_region !== "") {
 		farm_select.prop( "disabled", true);
 		$.ajax({
 			type: 'GET',
 			url: "/location/" + sel_country +'/' + sel_region + '/',
 			success: function(response){
-				const farms = [["","Select Farm"]].concat(response).sort();
-				farm_select.empty();
+				const farms = response.sort();
 				for (let i = 0; i < farms.length; i++) {
 					farm_select.append(
 						$("<option></option>").attr(
 							"value", farms[i][0]).text(farms[i][1])
 					);
-				farm_select.prop( "disabled", false);
 				}
+				farm_select.prop( "disabled", false);
 				farm_select.val(set_farm);
+				update_fields();
 			},
 			error: function (error) {
 				console.log(error);
 			}
 		});
+	} else {
+		update_fields();
 	}
+
 };
 
 update_fields = function(set_field = "") {
 	const sel_country = $("#country").find(":selected").val();
 	const sel_region = $("#region").find(":selected").val();
 	const sel_farm = $("#farm").find(":selected").val();
-	const field_select=$("#field");
-	if (sel_farm === "") {
-		field_select.empty();
-		field_select.append($("<option></option>").attr("value", "").text("Select Field"))
-	}
-	else {
+	const field_select = $("#field");
+	field_select.empty();
+	field_select.append($("<option></option>").attr("value", "").text("Select Field"));
+	if (sel_farm !== "") {
 		field_select.prop( "disabled", true);
 		$.ajax({
 			type: 'GET',
 			url: "/location/" + sel_country + '/' + sel_region + '/' + sel_farm + '/',
 			success: function(response){
-				const fields = [["","Select Field"]].concat(response).sort();
-				field_select.empty();
+				const fields = response.sort();
 				for (let i = 0; i < fields.length; i++) {
 					field_select.append(
 						$("<option></option>").attr(
 							"value", fields[i][0]).text(fields[i][1])
 					);
-				field_select.prop( "disabled", false);
 				}
+				field_select.prop( "disabled", false);
 				field_select.val(set_field);
+				update_blocks();
 			},
 			error: function (error) {
 				console.log(error);
 			}
 		});
+	} else {
+		update_blocks();
 	}
 };
 
 update_blocks = function(set_block = "") {
 	const sel_field = $("#field").find(":selected").val();
 	const block_select = $("#block");
-	if (sel_field === "")  {
-		block_select.empty();
-		block_select.append($("<option></option>").attr("value", "").text("Select Block"))
-	}
-	else {
+	block_select.empty();
+	block_select.append($("<option></option>").attr("value", "").text("Select Block"));
+	if (sel_field !== "")  {
 		block_select.prop( "disabled", true);
 		$.ajax({
 			type: 'GET',
 			url: "/location/blocks/" + sel_field + '/',
 			success: function(response){
-				const blocks = [["","Select Block"]].concat(response).sort();
-				block_select.empty();
+				const blocks = response.sort();
 				for (let i = 0; i < blocks.length; i++) {
 					block_select.append(
 						$("<option></option>").attr(
 							"value", blocks[i][0]).text(blocks[i][1])
 					);
-				block_select.prop( "disabled", false);
 				}
+				block_select.prop( "disabled", false);
 				block_select.val(set_block);
 			},
 			error: function (error) {

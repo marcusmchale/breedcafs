@@ -4,6 +4,8 @@ const tree_div = $('#tree_selection_div');
 const group_select = $('#condition_group');
 const condition_checkbox_div = $('#condition_checkbox_div');
 const dynamic_form_div = $('#dynamic_form_div');
+const location_div = $('#location');
+const condition_div = $('#condition_selection');
 
 $("#record_start").datepicker({ dateFormat: 'yy-mm-dd'});
 $("#record_end").datepicker({ dateFormat: 'yy-mm-dd'});
@@ -21,17 +23,24 @@ level_update = function() {
     group_select.append(
         '<option value="">Select group</option>'
     );
-    if (["field", ""].includes(level)) {
-        block_div.hide();
-        tree_div.hide();
-    }
-    else if (level === "block") {
-        block_div.show()
-        tree_div.hide();
-    }
-    else if (level === 'tree') {
-        block_div.show()
-        tree_div.show();
+    if (level === "") {
+        location_div.hide();
+        condition_div.hide();
+    } else {
+        location_div.show();
+        condition_div.show();
+        if (level === "field") {
+            block_div.hide();
+            tree_div.hide();
+        }
+        else if (level === "block") {
+            block_div.show();
+            tree_div.hide();
+        }
+        else if (level === 'tree') {
+            block_div.show()
+            tree_div.show();
+        }
     }
     if (level) {
         $.ajax({
@@ -184,13 +193,9 @@ $('#submit_records').click( function (e) {
         type: 'POST',
         success: function(response) {
             if (response.hasOwnProperty('submitted')) {
-                if (response.hasOwnProperty('class')) {
-                    console.log('test');
-                    if (response.class === 'conflicts') {
-                        console.log('test2');
-                        const flash_submitted = "<div id='records_flash' class='flash' style='background:#f0b7e1'>" + response.submitted + "</div>";
-                        $("#records_flash").replaceWith(flash_submitted);
-                    }
+                if (response.hasOwnProperty('class') && response.class === 'conflicts') {
+                    const flash_submitted = "<div id='records_flash' class='flash' style='background:#f0b7e1'>" + response.submitted + "</div>";
+                    $("#records_flash").replaceWith(flash_submitted);
                 } else {
                     const flash_submitted = "<div id='records_flash' class='flash'>" + response.submitted + "</div>";
                     $("#records_flash").replaceWith(flash_submitted);
@@ -210,7 +215,10 @@ $('#submit_records').click( function (e) {
             }
         },
         error: function(error) {
-			console.log(error);
+            const error_message = error.status === 500 ? 'An error has occurred. Please try again':
+                'An unknown error as occurred, please contact an administrator';
+            const flash_error = "<div id='records_flash' class='flash'>" + error_message + "</div>";
+            $("#records_flash").replaceWith(flash_error);
 		}
     })
 });

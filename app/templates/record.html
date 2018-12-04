@@ -9,7 +9,7 @@
                         <h3>Level</h3>
                         <dd>{{  record_form.level }}</dd>
                         <div id="location">
-                            <h3>Select item/s to associate with this record</h3>
+                            <h3>Filter for item/s to associate with this record</h3>
                             {{ location_form.csrf_token }}
                             <dd>{{ render_field (location_form.country) }}</dd>
                             <dd>{{ render_field (location_form.region) }}</dd>

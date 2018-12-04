@@ -32,7 +32,7 @@ celery.conf.update(
 redis_store = StrictRedis(host= 'localhost', port = 6379, db=0)
 redis_exceptions = exceptions
 
-from neo4j.v1 import GraphDatabase, ServiceUnavailable, AuthError
+from neo4j.v1 import GraphDatabase, ServiceUnavailable, AuthError, TransactionError
 from neo4j.util import watch
 
 
