@@ -170,23 +170,11 @@ class Record:
 			statement += (
 				' <-[:IS_IN]-(item:Tree) '
 			)
-			if record_data['trees_start']:
-				parameters['trees_start'] = record_data['trees_start']
+			if record_data['trees_list']:
+				parameters['trees_list'] = record_data['trees_list']
 				statement += (
-					' WHERE item.id >= $trees_start '
-				)
-			if record_data['trees_end']:
-				parameters['trees_end'] = record_data['trees_end']
-				if record_data['trees_start']:
-					statement += (
-						' AND'
-					)
-				else:
-					statement += (
-						' WHERE '
-					)
-				statement += (
-					' item.id <= $trees_end '
+					' WHERE '
+					' item.id in $trees_list '
 				)
 		# matched the item, now the condition and value for this in the selected period
 		statement += (
@@ -366,7 +354,7 @@ class Record:
 		)
 		if record_data['level'] == 'field':
 			statement += (
-				' , item_uid, r.start, r.end '
+				' , UID, r.start, r.end '
 			)
 		else:
 			statement += (
@@ -465,22 +453,12 @@ class Record:
 			statement += (
 				' <-[:IS_IN]-(item:Tree) '
 			)
-		# if providing start and/or end for tree.id
-		if record_data['level'] == 'tree':
-			if record_data['trees_start']:
-				parameters['trees_start'] = record_data['trees_start']
-				statement += (
-					' WHERE item.id >= $trees_start '
-				)
-			if record_data['trees_end']:
-				parameters['trees_end'] = record_data['trees_end']
-				if record_data['trees_start']:
-					statement += ' AND '
-				else:
-					statement += ' WHERE '
-				statement += (
-					' item.id <= $trees_end '
-				)
+		if record_data['trees_list']:
+			parameters['trees_list'] = record_data['trees_list']
+			statement += (
+				' WHERE '
+				' item.id in $trees_list '
+			)
 		statement += (
 			' UNWIND $conditions_list as condition_name '
 			'	MATCH (condition:Condition'
@@ -580,7 +558,7 @@ class Record:
 			)
 		else:
 			statement += (
-				' , field_uid, item_id,r. start, r.end '
+				' , field_uid, item_id, r. start, r.end '
 			)
 		return {
 			'statement': statement,

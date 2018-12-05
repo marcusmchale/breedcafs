@@ -429,61 +429,60 @@ class AddTreesForm(FlaskForm):
 #	submit_storage = SubmitField('+')
 
 
-class SampleRegForm(FlaskForm):
-	id = "sample_reg_form"
-	email_checkbox = BooleanField('Email checkbox')
-	trees_start = IntegerField(
-		'Start TreeID',
-		[
-			NumberRange(min=1, max=1000000, message='Maximum tree ID is 1000000')
-		],
-		description= "Start TreeID"
-	)
-	trees_end = IntegerField(
-		'End TreeID',
-		[
-			NumberRange(min=1, max=1000000, message='Maximum tree ID is 1000000')
-		],
-		description= "End TreeID"
-	)
-	replicates = IntegerField(
-		'Replicates',
-		[
-			NumberRange(min=1, max=100, message='Maximum of 100 replicates per submission')
-		],
-		description= "Replicates (per tree)"
-	)
-	tissue = SelectField('Tissue', description='Tissue')
-	harvest_condition = SelectField('Harvest condition', description='Harvest condition')
-	date_collected = DateField(
-		'Date harvested (YYYY-mm-dd): ',
-		format='%Y-%m-%d',
-		description= 'Date collected (YYYY-mm-dd)'
-	)
-	submit_samples = SubmitField('Register samples')
-
-	@staticmethod
-	def update(optional = False):
-		form = SampleRegForm()
-		tissues = SelectionList.get_tissues()
-		harvest_conditions = SelectionList.get_harvest_conditions()
-		form.tissue.choices = [('', 'Select Tissue')] + tissues
-		form.harvest_condition.choices = [('', 'Select Harvest condition')] + harvest_conditions
-		if optional:
-			form.trees_start.validators.insert(0, Optional())
-			form.trees_end.validators.insert(0, Optional())
-			form.replicates.validators.insert(0, Optional())
-			form.tissue.validators.insert(0, Optional())
-			form.harvest_condition.validators.insert(0, Optional())
-			form.date_collected.validators.insert(0, Optional())
-		else:
-			form.trees_start.validators.insert(0, Optional())
-			form.trees_end.validators.insert(0, Optional())
-			form.replicates.validators.append(InputRequired())
-			form.tissue.validators.append(InputRequired())
-			form.harvest_condition.validators.append(InputRequired())
-			form.date_collected.validators.append(InputRequired())
-		return form
+#class SampleRegForm(FlaskForm):
+#	id = "sample_reg_form"
+#	email_checkbox = BooleanField('Email checkbox')
+#	trees_start = IntegerField(
+#		'Start TreeID',
+#		[
+#			NumberRange(min=1, max=1000000, message='Maximum tree ID is 1000000')
+#		],
+#		description= "Start TreeID"
+#	)
+#	trees_end = IntegerField(
+#		'End TreeID',
+#		[
+#			NumberRange(min=1, max=1000000, message='Maximum tree ID is 1000000')
+#		],
+#		description= "End TreeID"
+#	)
+#	replicates = IntegerField(
+#		'Replicates',
+#		[
+#			NumberRange(min=1, max=100, message='Maximum of 100 replicates per submission')
+#		],
+#		description= "Replicates (per tree)"
+#	)
+#
+#	date_collected = DateField(
+#		'Date harvested (YYYY-mm-dd): ',
+#		format='%Y-%m-%d',
+#		description= 'Date collected (YYYY-mm-dd)'
+#	)
+#	submit_samples = SubmitField('Register samples')
+#
+#	@staticmethod
+#	def update(optional = False):
+#		form = SampleRegForm()
+#		tissues = SelectionList.get_tissues()
+#		harvest_conditions = SelectionList.get_harvest_conditions()
+#		form.tissue.choices = [('', 'Select Tissue')] + tissues
+#		form.harvest_condition.choices = [('', 'Select Harvest condition')] + harvest_conditions
+#		if optional:
+#			form.trees_start.validators.insert(0, Optional())
+#			form.trees_end.validators.insert(0, Optional())
+#			form.replicates.validators.insert(0, Optional())
+#			form.tissue.validators.insert(0, Optional())
+#			form.harvest_condition.validators.insert(0, Optional())
+#			form.date_collected.validators.insert(0, Optional())
+#		else:
+#			form.trees_start.validators.insert(0, Optional())
+#			form.trees_end.validators.insert(0, Optional())
+#			form.replicates.validators.append(InputRequired())
+#			form.tissue.validators.append(InputRequired())
+#			form.harvest_condition.validators.append(InputRequired())
+#			form.date_collected.validators.append(InputRequired())
+#		return form
 
 
 # Collect
@@ -508,66 +507,37 @@ class CollectForm(FlaskForm):
 		[InputRequired()],
 		choices=[('', 'Select Format'), ('xlsx', 'Table (xlsx)'), ('csv', 'Table (CSV)'), ('fb', 'Field Book')]
 	)
-	trees_start = IntegerField(
-		'Start TreeID',
+	trees_list = StringField(
+		'Tree list',
 		[
 			Optional(),
-			NumberRange(min=min, max=max, message='An integer (' + str(min) + ' to ' + str(max) + ')')
+			Regexp("^[0-9,-]*$", message='List should be comma separated with hyphens for ranges')
 		],
-		description="Start TreeID",
+		description="List of tree IDs, e.g. '1, 2-5' "
 	)
-	trees_end = IntegerField(
-		'End TreeID',
+	branches_list = StringField(
+		'Branch list',
 		[
 			Optional(),
-			NumberRange(min=min, max=max, message='An integer (' + str(min) + ' to ' + str(max) + ')')
+			Regexp("^[0-9,-]*$", message='List should be comma separated with hyphens for ranges')
 		],
-		description="End TreeID",
+		description="List of branch IDs, e.g. '1, 2-5' "
 	)
-	branches_start = IntegerField(
-		'Start BranchID',
+	leaves_list = StringField(
+		'Tree list',
 		[
 			Optional(),
-			NumberRange(min=min, max=max, message='An integer (' + str(min) + ' to ' + str(max) + ')')
+			Regexp("^[0-9,-]*$", message='List should be comma separated with hyphens for ranges')
 		],
-		description="Start BranchID")
-	branches_end = IntegerField(
-		'End BranchID',
-		[
-			Optional(),
-			NumberRange(min=min, max=max, message='An integer (' + str(min) + ' to ' + str(max) + ')')
-		],
-		description="End BranchID")
-	leaves_start = IntegerField(
-		'Start LeafID',
-		[
-			Optional(),
-			NumberRange(min=min, max=max, message='An integer (' + str(min) + ' to ' + str(max) + ')')
-		],
-		description="Start LeafID")
-	leaves_end = IntegerField(
-		'End LeafID',
-		[
-			Optional(),
-			NumberRange(min=min, max=max, message='An integer (' + str(min) + ' to ' + str(max) + ')')
-		],
-		description="End LeafID"
+		description="List of leaf IDs, e.g. '1, 2-5' "
 	)
-	samples_start = IntegerField(
-		'Start SampleID',
+	samples_list = StringField(
+		'Tree list',
 		[
 			Optional(),
-			NumberRange(min=min, max=max, message='An integer (' + str(min) + ' to ' + str(max) + ')')
+			Regexp("^[0-9,-]*$", message='List should be comma separated with hyphens for ranges')
 		],
-		description="Start SampleID",
-	)
-	samples_end = IntegerField(
-		'End SampleID',
-		[
-			Optional(),
-			NumberRange(min=min, max=max, message='An integer (' + str(min) + ' to ' + str(max) + ')')
-		],
-		description="End SampleID"
+		description="List of tree IDs, e.g. '1, 2-5' "
 	)
 	samples_pooled = SelectField(
 		'Samples are pooled from multiple trees',
@@ -618,11 +588,28 @@ class CollectForm(FlaskForm):
 		[InputRequired()],
 		choices=[('existing', 'Find existing items'), ('new', 'Create new items')]
 	)
+	tissue = SelectField(
+		'Tissue',
+		[
+			Optional(),
+		],
+		description='Tissue'
+	)
+	harvest_condition = SelectField(
+		'Harvest condition',
+		[
+			Optional(),
+		],
+		description='Harvest condition'
+	)
 	submit_collect = SubmitField('Generate file/s')
-
 	@staticmethod
 	def update():
 		form = CollectForm()
+		tissues = SelectionList.get_tissues()
+		harvest_conditions = SelectionList.get_harvest_conditions()
+		form.tissue.choices = [('', 'Select Tissue')] + tissues
+		form.harvest_condition.choices = [('', 'Select Harvest condition')] + harvest_conditions
 		if form.samples_pooled == 'single':
 			form.samples_count.validators.insert(0, InputRequired())
 		else:
@@ -745,19 +732,13 @@ class RecordForm(FlaskForm):
 		)
 		# In allowing for open ended conditions, must handle retrieval/conflict comparisons carefully
 	)
-	trees_start = IntegerField(
-		'Start TreeID',
-		[
-			Optional()
-		],
-		description="Start TreeID",
-	)
-	trees_end = IntegerField(
-		'End TreeID',
+	trees_list = StringField(
+		'Tree list',
 		[
 			Optional(),
+			Regexp("^[0-9,-]*$", message='List should be comma separated with hyphens for ranges')
 		],
-		description="End TreeID",
+		description="List of tree IDs, e.g. '1, 2-5' "
 	)
 	condition_group = SelectField(
 		'Condition group',

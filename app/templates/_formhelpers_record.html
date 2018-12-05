@@ -7,7 +7,7 @@
 		{{ field(**kwargs)|safe }}
 	{% elif field.type in ['DecimalField'] %}
 		{{ field(placeholder=field.description.decode('utf8')) | safe }}
-    {% elif field.type in ['IntegerField'] %}
+    {% elif field.type in ['IntegerField', 'StringField'] %}
 		<dd>{{ field(placeholder=field.description)|safe }}
 	{% endif %}
 {% endmacro %}

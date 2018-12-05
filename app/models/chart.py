@@ -7,6 +7,8 @@ from app.cypher import Cypher
 from neo4j_driver import get_driver, neo4j_query
 from datetime import datetime
 from flask import jsonify
+from parsers import Parsers
+from itertools import chain
 
 
 class Chart:
@@ -63,7 +65,6 @@ class Chart:
 		except (ServiceUnavailable, AuthError):
 			return jsonify({"status": "Database unavailable"})
 
-
 	# get lists of submitted nodes (relationships and directly linked nodes) in json format
 	@staticmethod
 	def get_fields_treecount():
@@ -76,3 +77,131 @@ class Chart:
 			'children': [record[0] for record in records]
 		}
 		return jsonify(nested)
+
+	@staticmethod
+	def get_item_count(
+			level,
+			country=None,
+			region=None,
+			farm=None,
+			field_uid=None,
+			block_uid=None,
+			trees_list=None
+
+	):
+		if trees_list:
+			try:
+				trees_list = Parsers.parse_range_list(trees_list)
+				if len(trees_list) >= 10000:
+					return "Please select a list of less than 10000 tree IDs"
+			except ValueError:
+				return 'Invalid range of tree IDs'
+		parameters = {}
+		statement = (
+			' MATCH '
+		)
+		if country:
+			parameters['country'] = country
+			statement += (
+				' (:Country '
+				'	{ '
+				'		name_lower: $country '
+				'	}'
+				' )<-[:IS_IN]-(:Region '
+			)
+			if region:
+				parameters['region'] = region
+				statement += (
+					' { '
+					'	name_lower: $region '
+					' } '
+				)
+			statement += (
+				' )<-[:IS_IN]-(:Farm '
+			)
+			if farm:
+				parameters['farm'] = farm
+				statement += (
+					' { '
+					'	name_lower: $farm '
+					' } '
+				)
+			statement += (
+				' )<-[:IS_IN]-(field:Field '
+			)
+			if field_uid:
+				parameters['field_uid'] = field_uid
+				statement += (
+					' { '
+					'	uid: toInteger($field_uid) '
+					' } '
+				)
+			statement += (
+				' ) '
+			)
+		else:
+			statement += (
+				' (field:Field) '
+			)
+		if level == 'field':
+			statement += (
+				' RETURN count(field) '
+			)
+		elif any([level == 'block', block_uid]):
+			statement += (
+				' <-[:IS_IN]-(:FieldBlocks) '
+				' <-[:IS_IN]-(block:Block '
+			)
+			if block_uid:
+				parameters['block_uid'] = block_uid
+				statement += (
+					' { '
+					'	uid: $block_uid '
+					' } '
+				)
+			statement += (
+				' ) '
+			)
+			if level == 'block':
+				statement += (
+					' RETURN count(block) '
+				)
+		if level == 'tree':
+			statement += (
+				' <-[:IS_IN]-'
+			)
+			if block_uid:
+				statement += (
+					' (:BlockTrees) '
+					' <-[:IS_IN]-'
+				)
+			else:
+				statement += (
+					' (:FieldTrees) '
+					' <-[:IS_IN]-'
+				)
+			statement += (
+				' (tree:Tree) '
+			)
+			if trees_list:
+				parameters['trees_list'] = trees_list
+				statement += (
+					' WHERE '
+					' tree.id in $trees_list '
+				)
+			statement += (
+				' RETURN count(tree) '
+			)
+		with get_driver().session() as neo4j_session:
+			result = neo4j_session.read_transaction(
+				neo4j_query,
+				statement,
+				parameters
+			)[0][0]
+			return result
+
+
+
+
+
+

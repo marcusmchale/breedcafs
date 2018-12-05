@@ -23,8 +23,7 @@
 		<div id=trees>
             <div id="tree_ids" title="ID is the integer from the end of a UID, e.g. from 1_T2 the ID is 2">
                     <dt>
-                        {{ collect_form.trees_start(placeholder=collect_form.trees_start.description) }}
-                        {{ collect_form.trees_end(placeholder=collect_form.trees_end.description) }}
+                        {{ collect_form.trees_list(placeholder=collect_form.trees_list.description) }}
                     </dt>
             </div>
 		</div>
@@ -36,8 +35,7 @@
                 <div id=branch_ids class="existing" title="ID is the integer from the end of a UID, e.g. from 1_R2 the ID is 2">
                     <dl>
                         <dt>
-                            {{ collect_form.branches_start(placeholder=collect_form.branches_start.description) }}
-                            {{ collect_form.branches_end(placeholder=collect_form.branches_end.description) }}
+                            {{ collect_form.branches_list(placeholder=collect_form.branches_list.description) }}
                         </dt>
                     </dl>
                 </div>
@@ -46,16 +44,15 @@
                 <div id="leaf_ids" class="existing" title="ID is the integer from the end of a UID, e.g. from 1_L2 the ID is 2">
                     <dl>
                         <dt>
-                            {{ collect_form.leaves_start(placeholder=collect_form.leaves_start.description) }}
-                            {{ collect_form.leaves_end(placeholder=collect_form.leaves_end.description) }}
+                            {{ collect_form.leaves_list(placeholder=collect_form.leaves_list.description) }}
                         </dt>
                     </dl>
                 </div>
             </div>
             <div id="samples">
                 <div id="sample_type">
-					    <dt>{{ sample_reg_form.tissue }}</dt>
-                        <dt>{{ sample_reg_form.harvest_condition }}</dt>
+					    <dt>{{ collect_form.tissue }}</dt>
+                        <dt>{{ collect_form.harvest_condition }}</dt>
                 </div>
                 <div id="sample_ids" class="existing">
                        <dt>
@@ -63,8 +60,7 @@
                            {{ collect_form.date_to(placeholder = collect_form.date_to.description) }}
                        </dt>
                        <dt>
-                           {{ collect_form.samples_start(placeholder = collect_form.samples_start.description) }}
-                           {{ collect_form.samples_end(placeholder = collect_form.samples_end.description) }}
+                           {{ collect_form.samples_list(placeholder = collect_form.samples_list.description) }}
                        </dt>
                 </div>
             </div>
@@ -72,6 +68,7 @@
                 <dt class="samples">{{collect_form.samples_pooled(placeholder = collect_form.samples_pooled.description)}}</dt>
                 <dt class="single">{{collect_form.per_tree_replicates(placeholder = collect_form.per_tree_replicates.description)}}</dt>
                 <dt class="samples pooled">{{collect_form.samples_count(placeholder = collect_form.samples_count.description)}}</dt>
+                <div id="item_count_div"></div>
                 <dt class="samples" title="Optionally create multiple rows per sample in template">{{collect_form.per_sample_replicates(placeholder = collect_form.per_sample_replicates.description)}}</dt>
             </div>
         </div>

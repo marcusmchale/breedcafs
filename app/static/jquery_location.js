@@ -150,9 +150,61 @@ update_blocks = function(set_block = "") {
 };
 
 
-remove_flash = function() {
-	$(".flash").remove();
+update_item_count = function() {
+	const sel_level = $("#level").find(":selected").val();
+	if (sel_level && sel_level !== "") {
+		const item_count_text = $('#item_count_div a:eq(0)');
+		const item_type_text = $('#item_count_div a:eq(1)');
+        const sel_country = $("#country").find(":selected").val();
+        const sel_region = $("#region").find(":selected").val();
+        const sel_farm = $("#farm").find(":selected").val();
+        const sel_field = $("#field").find(":selected").val();
+        const sel_block = $("#block").find(":selected").val();
+        const trees_list = $("#trees_list").val();
+        $.ajax({
+            type: "GET",
+            url: (
+                "/item_count"
+                + "?level=" + sel_level
+                + "&country=" + sel_country
+                + "&region=" + sel_region
+                + "&farm=" + sel_farm
+                + "&field_uid=" + sel_field
+                + "&block_uid=" + sel_block
+				+ "&trees_list=" + trees_list
+            ),
+            success: function (response) {
+            	if (isNaN(response['item_count'])) {
+            		item_count_text.replaceWith(
+                        "<a>" + response['item_count'] + "</a>"
+                    );
+            		 item_type_text.replaceWith(
+                        "<a></a>"
+                    );
+                } else {
+                    item_count_text.replaceWith(
+                        "<a>" + response['item_count'] + "</a>"
+                    );
+                    const item_type_text_entry = (response['item_count'] === 1)
+                        ? sel_level.toString() : sel_level.toString() + 's';
+                    item_type_text.replaceWith(
+                        "<a>" + item_type_text_entry + "</a>"
+                    );
+                }
+            },
+            error: function (error) {
+            	console.log(error);
+            	item_count_text.replaceWith(
+            		"<a>" + error.statusText + "</a>"
+				);
+            	item_type_text.replaceWith(
+					"<a></a>"
+				);
+            }
+        });
+    }
 };
+
 
 //Submit locations
 $("#submit_country").click( function(e) {
@@ -382,46 +434,41 @@ $("#submit_trees").click( function(e) {
 	});
 });
 
-update_defaults = function() {
-	const sel_field = $("#field").find(":selected").val();
-	if (sel_field !== "") {
-		$("#trees_start, #trees_end").prop("disabled", true);
-		$.ajax({
-			type: 'GET',
-			url: "/location/treecount/" + sel_field + '/',
-			success: function(response) {
-				if (response[0] === 0) {
-					$("#trees_end").val('');
-					$("#trees_start").val('');
-				}
-				else if (response[0] >= 0) {
-					$("#trees_end").val(response[0]);
-					//lazily return starting ID as 1
-					$("#trees_start").val(1);
-				}
-				//and be sure to allow the user to edit
-				$("#trees_start,#trees_end").prop("disabled", false);
-			},
-			error: function (error) {
-				console.log(error);
-			}
-		});
-	} else {
-		//on deselection of field return empty values to input boxes
-		$("#trees_start,#trees_end").val('')
-	}
+//  update_defaults = function() {
+//  	const sel_field = $("#field").find(":selected").val();
+//  	if (sel_field !== "") {
+//  		$("#trees_start, #trees_end").prop("disabled", true);
+//  		$.ajax({
+//  			type: 'GET',
+//  			url: "/location/treecount/" + sel_field + '/',
+//  			success: function(response) {
+//  				if (response[0] === 0) {
+//  					$("#trees_end").val('');
+//  					$("#trees_start").val('');
+//  				}
+//  				else if (response[0] >= 0) {
+//  					$("#trees_end").val(response[0]);
+//  					//lazily return starting ID as 1
+//  					$("#trees_start").val(1);
+//  				}
+//  				//and be sure to allow the user to edit
+//  				$("#trees_start,#trees_end").prop("disabled", false);
+//  			},
+//  			error: function (error) {
+//  				console.log(error);
+//  			}
+//  		});
+//  	} else {
+//  		//on deselection of field return empty values to input boxes
+//  		$("#trees_start,#trees_end").val('')
+//  	}
+//  };
+//
+
+remove_flash = function() {
+	$(".flash").remove();
 };
 
-
-$( window ).load(update_countries);
-$("#country").change(update_regions).change(update_farms).change(update_fields).change(update_blocks).change(remove_flash);
-$("#region").change(update_farms).change(update_fields).change(update_blocks).change(remove_flash);
-$("#farm").change(update_fields).change(update_blocks).change(remove_flash);
-$('#field').change(update_blocks).change(update_defaults).change(remove_flash);
-
-//autocomplete the start and end tree
-//This is for the collect and record forms
-$("#trees_end").val('');
 
 //Disable submit on keypress "Enter" for all inputs boxes
 $("input").keypress( function(e) {
@@ -430,3 +477,29 @@ $("input").keypress( function(e) {
 		$(".flash").remove();
 	}
 });
+
+
+$('#level, #country, #region, #farm, #field, #block').change(update_item_count);
+
+
+$('#trees_list').keypress(function(e){
+	if (e.keyCode === 13 || e.keyCode === 10) {
+		update_item_count();
+	}
+});
+
+
+
+
+
+$( window ).load(update_countries).load(update_item_count);
+$("#country").change(update_regions).change(update_farms).change(update_fields).change(update_blocks).change(remove_flash);
+$("#region").change(update_farms).change(update_fields).change(update_blocks).change(remove_flash);
+$("#farm").change(update_fields).change(update_blocks).change(remove_flash);
+$('#field').change(update_blocks).change(remove_flash); //.change(update_defaults)
+
+
+//autocomplete the start and end tree
+//This is for the collect and record forms
+$("#trees_end").val('');
+

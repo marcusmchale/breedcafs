@@ -1,6 +1,7 @@
 const level_select = $('#level');
 const block_div = $('#block_div');
 const tree_div = $('#tree_selection_div');
+const item_count_div = $('#item_count_div');
 const group_select = $('#condition_group');
 const condition_checkbox_div = $('#condition_checkbox_div');
 const dynamic_form_div = $('#dynamic_form_div');
@@ -25,10 +26,14 @@ level_update = function() {
     );
     if (level === "") {
         location_div.hide();
+        block_div.hide();
+        tree_div.hide();
+        item_count_div.hide();
         condition_div.hide();
     } else {
         location_div.show();
         condition_div.show();
+        item_count_div.show();
         if (level === "field") {
             block_div.hide();
             tree_div.hide();
@@ -61,6 +66,7 @@ level_update = function() {
         });
     }
     group_update();
+    remove_flash();
 };
 
 group_update = function() {

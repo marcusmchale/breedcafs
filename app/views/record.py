@@ -23,7 +23,8 @@ from app.forms import (
 from app.models import (
 	SelectionList,
 	Record,
-	ConditionsList
+	ConditionsList,
+	Parsers
 )
 
 from flask.views import MethodView
@@ -102,12 +103,12 @@ def submit_records():
 				farm = request.form['farm'] if request.form['farm'] != '' else None
 				field_uid = int(request.form['field']) if request.form['field'].isdigit() else None
 				block_uid = request.form['block'] if request.form['block'] != '' else None
-				trees_start = int(
-					request.form['trees_start']
-					) if request.form['trees_start'].isdigit() else None
-				trees_end = int(
-					request.form['trees_end']
-					) if request.form['trees_end'].isdigit() else None
+				trees_list = request.form['trees_list'] if request.form['trees_list'] != '' else None
+				if trees_list:
+					try:
+						trees_list = Parsers.parse_range_list(trees_list)
+					except ValueError:
+						return 'Invalid range'
 				start_time = int(
 					(datetime.strptime(request.form['record_start'], '%Y-%m-%d') - datetime(1970, 1, 1)).total_seconds()
 					* 1000
@@ -138,8 +139,7 @@ def submit_records():
 					'farm': farm,
 					'field_uid': field_uid,
 					'block_uid': block_uid,
-					'trees_start': trees_start,
-					'trees_end': trees_end,
+					'trees_list': trees_list,
 					'start_time': start_time,
 					'end_time': end_time,
 					'selected_conditions': selected_conditions,
