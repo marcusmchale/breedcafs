@@ -266,7 +266,7 @@ class ItemList:
 			'	<-[: FROM_FIELD]-(fit: FieldItemTreatment) '
 			'	-[: FOR_TREATMENT]->(treatment:Treatment), '
 			'	(fit)<-[: FOR_TREATMENT]-(tc:TreatmentCategory) ' 
-			' WITH '
+			' WITH '      
 			'	country, region, farm, field, '
 			'	treatment, '
 			'	collect(tc.category) as categories '
@@ -361,8 +361,7 @@ class ItemList:
 			farm=None,
 			field_uid=None,
 			block_uid=None,
-			trees_start=None,
-			trees_end=None
+			tree_id_list=None
 	):
 		parameters = {}
 		filters = []
@@ -409,16 +408,11 @@ class ItemList:
 				'	(tree)-[:IS_IN]->(bt:BlockTrees) '
 				'	-[:IS_IN]->(block:Block) '
 			)
-		if trees_start:
+		if tree_id_list:
 			filters.append(
-				' tree.id >= $trees_start '
+				' tree.id in $tree_id_list '
 			)
-			parameters['trees_start'] = trees_start
-		if trees_end:
-			filters.append(
-				' tree.id <= $trees_end '
-			)
-			parameters['trees_end'] = trees_end
+			parameters['tree_id_list'] = tree_id_list
 		if filters:
 			query += (
 				' WHERE '
@@ -472,10 +466,8 @@ class ItemList:
 			farm=None,
 			field_uid=None,
 			block_uid=None,
-			trees_start=None,
-			trees_end=None,
-			branches_start=None,
-			branches_end=None
+			tree_id_list=None,
+			branch_id_list=None
 	):
 		parameters = {}
 		filters = []
@@ -522,31 +514,21 @@ class ItemList:
 				'	(tree)-[:IS_IN]->(bt:BlockTrees) '
 				'	-[:IS_IN]->(block:Block) '
 			)
-		if trees_start:
+		if tree_id_list:
 			filters.append(
-				' tree.id >= $trees_start '
+				' tree.id IN $tree_id_list '
 			)
-			parameters['trees_start'] = trees_start
-		if trees_end:
-			filters.append(
-				' tree.id <= $trees_end '
-			)
-			parameters['trees_end'] = trees_end
+			parameters['trees_start'] = tree_id_list
 		query += (
 			' MATCH (tree) '
 			'	<-[:FROM_TREE]-(tb:TreeBranches) '
 			'	<-[:FROM_TREE]-(branch:Branch) '
 		)
-		if branches_start:
+		if branch_id_list:
 			filters.append(
-				' branch.id >= $branches_start '
+				' branch.id IN $branch_id_list '
 			)
-			parameters['branches_start'] = branches_start
-		if branches_end:
-			filters.append(
-				' branch.id <= $branches_end '
-			)
-			parameters['branches_end'] = branches_end
+			parameters['branch_id_list'] = branch_id_list
 		if filters:
 			query += (
 				' WHERE '
@@ -599,12 +581,8 @@ class ItemList:
 			farm=None,
 			field_uid=None,
 			block_uid=None,
-			trees_start=None,
-			trees_end=None,
-			branches_start=None,
-			branches_end=None,
-			leaves_start=None,
-			leaves_end=None
+			tree_id_list=None,
+			leaf_id_list=None
 	):
 		parameters = {}
 		filters = []
@@ -651,50 +629,24 @@ class ItemList:
 				'	(tree)-[:IS_IN]->(bt:BlockTrees) '
 				'	-[:IS_IN]->(block:Block) '
 			)
-		if trees_start:
+		if tree_id_list:
 			filters.append(
-				' tree.id >= $trees_start '
+				' tree.id IN $tree_id_list '
 			)
-			parameters['trees_start'] = trees_start
-		if trees_end:
-			filters.append(
-				' tree.id <= $trees_end '
-			)
-			parameters['trees_end'] = trees_end
+			parameters['tree_id_list'] = tree_id_list
 		query += (
 			' MATCH (tree) '
 			'	<-[:FROM_TREE]-(tl:TreeLeaves) '
 			'	<-[:FROM_TREE]-(leaf:Leaf) '
 		)
-		if leaves_start:
+		if leaf_id_list:
 			filters.append(
-				' leaf.id >= $leaves_start '
+				' leaf.id IN $leaf_id_list '
 			)
-			parameters['leaves_start'] = leaves_start
-		if leaves_end:
-			filters.append(
-				' leaf.id <= $leaves_end '
-			)
-			parameters['leaves_end'] = leaves_end
-		if branches_start or branches_end:
-			query += (
-				' MATCH '
-				' (leaf)-[:FROM_BRANCH]->(branch:Branch) '
-			)
-			if branches_start:
-				filters.append(
-					' branch.id >= $branches_start '
-				)
-				parameters['branches_start'] = branches_start
-			if branches_end:
-				filters.append(
-					' branch.id <= $branches_end '
-				)
-				parameters['branches_end'] = branches_end
-		else:
-			optional_matches.append(
-				' (leaf)-[:FROM_BRANCH]->(branch:Branch) '
-			)
+			parameters['leaf_id_list'] = leaf_id_list
+		optional_matches.append(
+			' (leaf)-[:FROM_BRANCH]->(branch:Branch) '
+		)
 		if filters:
 			query += (
 				' WHERE '
@@ -748,10 +700,8 @@ class ItemList:
 			farm=None,
 			field_uid=None,
 			block_uid=None,
-			trees_start=None,
-			trees_end=None,
-			samples_start=None,
-			samples_end=None,
+			tree_id_list=None,
+			sample_id_list=None,
 			tissue=None,
 			harvest_condition=None,
 			start_time=None,
@@ -789,7 +739,7 @@ class ItemList:
 				'	}) '
 			)
 			parameters['block_uid'] = block_uid
-		elif any([trees_start, trees_end]):
+		elif tree_id_list:
 			query += (
 				'	-[:FROM_TREE]->(: TreeSamples) '
 				'	-[:FROM_TREE]->(tree: Tree) '
@@ -798,16 +748,10 @@ class ItemList:
 				'	(tree)-[:IS_IN]->(:BlockTrees) '
 				'	-[:IS_IN]->(block:Block) '
 			)
-			if trees_start:
-				filters.append(
-					' tree.id >= $trees_start '
-				)
-				parameters['trees_start'] = trees_start
-			if trees_end:
-				filters.append(
-					' tree.id <= $trees_end '
-				)
-				parameters['trees_end'] = trees_end
+			filters.append(
+				' tree.id IN $tree_id_list '
+			)
+			parameters['tree_id_list'] = tree_id_list
 		else:
 			optional_matches.append(
 				'	(sample) '
@@ -818,16 +762,11 @@ class ItemList:
 				'	(tree)-[:IS_IN]->(:BlockTrees) '
 				'	-[:IS_IN]->(block:Block) '
 			)
-		if samples_start:
+		if sample_id_list:
 			filters.append(
-				' sample.id >= $samples_start '
+				' sample.id IN $sample_id_list '
 			)
-			parameters['samples_start'] = samples_start
-		if samples_end:
-			filters.append(
-				' sample.id <= $samples_end '
-			)
-			parameters['samples_end'] = samples_end
+			parameters['sample_id_list'] = sample_id_list
 		if tissue:
 			filters.append(
 				' sample.tissue = $tissue '

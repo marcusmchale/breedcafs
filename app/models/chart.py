@@ -79,6 +79,23 @@ class Chart:
 		return jsonify(nested)
 
 	@staticmethod
+	def get_tree_count(uid):
+		parameters = {
+			'uid': uid
+		}
+		statement = (
+			' MATCH '
+			'	(c: Counter { '
+			'		uid: ($uid + "_tree") '
+			'	}) '
+			' RETURN '
+			'	c.count '
+		)
+		with get_driver().session() as neo4j_session:
+			result = neo4j_session.read_transaction(neo4j_query, statement, parameters)
+			return [record[0] for record in result]
+
+	@staticmethod
 	def get_item_count(
 			level,
 			country=None,
@@ -86,14 +103,14 @@ class Chart:
 			farm=None,
 			field_uid=None,
 			block_uid=None,
-			trees_list=None
+			tree_id_list=None
 
 	):
-		if trees_list:
+		if tree_id_list:
 			try:
-				trees_list = Parsers.parse_range_list(trees_list)
-				if len(trees_list) >= 10000:
-					return "Please select a list of less than 10000 tree IDs"
+				tree_id_list = Parsers.parse_range_list(tree_id_list)
+				if len(tree_id_list) >= 10000:
+					return "Please select a range of less than 10000 tree IDs"
 			except ValueError:
 				return 'Invalid range of tree IDs'
 		parameters = {}
@@ -183,11 +200,11 @@ class Chart:
 			statement += (
 				' (tree:Tree) '
 			)
-			if trees_list:
-				parameters['trees_list'] = trees_list
+			if tree_id_list:
+				parameters['tree_id_list'] = tree_id_list
 				statement += (
 					' WHERE '
-					' tree.id in $trees_list '
+					' tree.id in $tree_id_list '
 				)
 			statement += (
 				' RETURN count(tree) '

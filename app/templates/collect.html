@@ -23,7 +23,7 @@
 		<div id=trees>
             <div id="tree_ids" title="ID is the integer from the end of a UID, e.g. from 1_T2 the ID is 2">
                     <dt>
-                        {{ collect_form.trees_list(placeholder=collect_form.trees_list.description) }}
+                        {{ collect_form.tree_id_list(placeholder=collect_form.tree_id_list.description) }}
                     </dt>
             </div>
 		</div>
@@ -35,7 +35,7 @@
                 <div id=branch_ids class="existing" title="ID is the integer from the end of a UID, e.g. from 1_R2 the ID is 2">
                     <dl>
                         <dt>
-                            {{ collect_form.branches_list(placeholder=collect_form.branches_list.description) }}
+                            {{ collect_form.branch_id_list(placeholder=collect_form.branch_id_list.description) }}
                         </dt>
                     </dl>
                 </div>
@@ -44,7 +44,7 @@
                 <div id="leaf_ids" class="existing" title="ID is the integer from the end of a UID, e.g. from 1_L2 the ID is 2">
                     <dl>
                         <dt>
-                            {{ collect_form.leaves_list(placeholder=collect_form.leaves_list.description) }}
+                            {{ collect_form.leaf_id_list(placeholder=collect_form.leaf_id_list.description) }}
                         </dt>
                     </dl>
                 </div>
@@ -60,7 +60,7 @@
                            {{ collect_form.date_to(placeholder = collect_form.date_to.description) }}
                        </dt>
                        <dt>
-                           {{ collect_form.samples_list(placeholder = collect_form.samples_list.description) }}
+                           {{ collect_form.sample_id_list(placeholder = collect_form.sample_id_list.description) }}
                        </dt>
                 </div>
             </div>

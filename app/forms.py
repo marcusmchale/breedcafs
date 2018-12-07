@@ -31,7 +31,7 @@ from app.models import (
 	TraitList,
 	ConditionsList,
 	SelectionList,
-	Fields,
+	Parsers,
 	User
 )
 from collections import defaultdict
@@ -44,6 +44,13 @@ def safe_password_check(form, field):
 		pass
 	else:
 		raise ValidationError('Please choose a more complex password')
+
+
+def range_list_check(form, field):
+	try:
+		Parsers.parse_range_list(field.data)
+	except ValueError:
+		raise ValidationError('Invalid range list')
 
 
 # custom filters
@@ -400,91 +407,6 @@ class AddTreesForm(FlaskForm):
 	submit_trees = SubmitField('Register new trees')
 
 
-# Samples
-#class AddTissueForm(FlaskForm):
-#	id = "add_tissue_form"
-#	text_tissue = StringField(
-#		'Tissue type text',
-#		[
-#			InputRequired(),
-#			Regexp("([^\x00-\x7F]|\w|\s)+$", message='Tissue name contains illegal characters'),
-#			Length(min=1, max=100, message='Maximum 100 characters')
-#		],
-#		filters=[strip_filter],
-#		description = "Add new tissue")
-#	submit_tissue = SubmitField('+')
-
-
-#class AddStorageForm(FlaskForm):
-#	id = "add_storage_form"
-#	text_storage = StringField(
-#		'Storage type text',
-#		[
-#			InputRequired(),
-#			Regexp("([^\x00-\x7F]|\w|\s|[+-])+$", message='Storage name contains illegal characters'),
-#			Length(min=1, max=100, message='Maximum 100 characters')
-#		],
-#		filters=[strip_filter],
-#		description = "Add new storage method")
-#	submit_storage = SubmitField('+')
-
-
-#class SampleRegForm(FlaskForm):
-#	id = "sample_reg_form"
-#	email_checkbox = BooleanField('Email checkbox')
-#	trees_start = IntegerField(
-#		'Start TreeID',
-#		[
-#			NumberRange(min=1, max=1000000, message='Maximum tree ID is 1000000')
-#		],
-#		description= "Start TreeID"
-#	)
-#	trees_end = IntegerField(
-#		'End TreeID',
-#		[
-#			NumberRange(min=1, max=1000000, message='Maximum tree ID is 1000000')
-#		],
-#		description= "End TreeID"
-#	)
-#	replicates = IntegerField(
-#		'Replicates',
-#		[
-#			NumberRange(min=1, max=100, message='Maximum of 100 replicates per submission')
-#		],
-#		description= "Replicates (per tree)"
-#	)
-#
-#	date_collected = DateField(
-#		'Date harvested (YYYY-mm-dd): ',
-#		format='%Y-%m-%d',
-#		description= 'Date collected (YYYY-mm-dd)'
-#	)
-#	submit_samples = SubmitField('Register samples')
-#
-#	@staticmethod
-#	def update(optional = False):
-#		form = SampleRegForm()
-#		tissues = SelectionList.get_tissues()
-#		harvest_conditions = SelectionList.get_harvest_conditions()
-#		form.tissue.choices = [('', 'Select Tissue')] + tissues
-#		form.harvest_condition.choices = [('', 'Select Harvest condition')] + harvest_conditions
-#		if optional:
-#			form.trees_start.validators.insert(0, Optional())
-#			form.trees_end.validators.insert(0, Optional())
-#			form.replicates.validators.insert(0, Optional())
-#			form.tissue.validators.insert(0, Optional())
-#			form.harvest_condition.validators.insert(0, Optional())
-#			form.date_collected.validators.insert(0, Optional())
-#		else:
-#			form.trees_start.validators.insert(0, Optional())
-#			form.trees_end.validators.insert(0, Optional())
-#			form.replicates.validators.append(InputRequired())
-#			form.tissue.validators.append(InputRequired())
-#			form.harvest_condition.validators.append(InputRequired())
-#			form.date_collected.validators.append(InputRequired())
-#		return form
-
-
 # Collect
 class CollectForm(FlaskForm):
 	min = 1
@@ -507,37 +429,41 @@ class CollectForm(FlaskForm):
 		[InputRequired()],
 		choices=[('', 'Select Format'), ('xlsx', 'Table (xlsx)'), ('csv', 'Table (CSV)'), ('fb', 'Field Book')]
 	)
-	trees_list = StringField(
+	tree_id_list = StringField(
 		'Tree list',
 		[
 			Optional(),
-			Regexp("^[0-9,-]*$", message='List should be comma separated with hyphens for ranges')
+			Regexp("^[0-9,-]*$", message='List should be comma separated with hyphens for ranges'),
+			range_list_check
 		],
 		description="List of tree IDs, e.g. '1, 2-5' "
 	)
-	branches_list = StringField(
+	branch_id_list = StringField(
 		'Branch list',
 		[
 			Optional(),
-			Regexp("^[0-9,-]*$", message='List should be comma separated with hyphens for ranges')
+			Regexp("^[0-9,-]*$", message='List should be comma separated with hyphens for ranges'),
+			range_list_check
 		],
 		description="List of branch IDs, e.g. '1, 2-5' "
 	)
-	leaves_list = StringField(
+	leaf_id_list = StringField(
 		'Tree list',
 		[
 			Optional(),
-			Regexp("^[0-9,-]*$", message='List should be comma separated with hyphens for ranges')
+			Regexp("^[0-9,-]*$", message='List should be comma separated with hyphens for ranges'),
+			range_list_check
 		],
 		description="List of leaf IDs, e.g. '1, 2-5' "
 	)
-	samples_list = StringField(
+	sample_id_list = StringField(
 		'Tree list',
 		[
 			Optional(),
-			Regexp("^[0-9,-]*$", message='List should be comma separated with hyphens for ranges')
+			Regexp("^[0-9,-]*$", message='List should be comma separated with hyphens for ranges'),
+			range_list_check
 		],
-		description="List of tree IDs, e.g. '1, 2-5' "
+		description="List of sample IDs, e.g. '1, 2-5' "
 	)
 	samples_pooled = SelectField(
 		'Samples are pooled from multiple trees',
@@ -603,6 +529,7 @@ class CollectForm(FlaskForm):
 		description='Harvest condition'
 	)
 	submit_collect = SubmitField('Generate file/s')
+
 	@staticmethod
 	def update():
 		form = CollectForm()
@@ -732,11 +659,12 @@ class RecordForm(FlaskForm):
 		)
 		# In allowing for open ended conditions, must handle retrieval/conflict comparisons carefully
 	)
-	trees_list = StringField(
+	tree_id_list = StringField(
 		'Tree list',
 		[
 			Optional(),
-			Regexp("^[0-9,-]*$", message='List should be comma separated with hyphens for ranges')
+			Regexp("^[0-9,-]*$", message='List should be comma separated with hyphens for ranges'),
+			range_list_check
 		],
 		description="List of tree IDs, e.g. '1, 2-5' "
 	)

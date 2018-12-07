@@ -160,7 +160,7 @@ update_item_count = function() {
         const sel_farm = $("#farm").find(":selected").val();
         const sel_field = $("#field").find(":selected").val();
         const sel_block = $("#block").find(":selected").val();
-        const trees_list = $("#trees_list").val();
+        const tree_id_list = $("#tree_id_list").val();
         $.ajax({
             type: "GET",
             url: (
@@ -171,7 +171,7 @@ update_item_count = function() {
                 + "&farm=" + sel_farm
                 + "&field_uid=" + sel_field
                 + "&block_uid=" + sel_block
-				+ "&trees_list=" + trees_list
+				+ "&tree_id_list=" + tree_id_list
             ),
             success: function (response) {
             	if (isNaN(response['item_count'])) {
@@ -193,7 +193,6 @@ update_item_count = function() {
                 }
             },
             error: function (error) {
-            	console.log(error);
             	item_count_text.replaceWith(
             		"<a>" + error.statusText + "</a>"
 				);
@@ -482,15 +481,11 @@ $("input").keypress( function(e) {
 $('#level, #country, #region, #farm, #field, #block').change(update_item_count);
 
 
-$('#trees_list').keypress(function(e){
+$('#tree_id_list').keypress(function(e){
 	if (e.keyCode === 13 || e.keyCode === 10) {
 		update_item_count();
 	}
 });
-
-
-
-
 
 $( window ).load(update_countries).load(update_item_count);
 $("#country").change(update_regions).change(update_farms).change(update_fields).change(update_blocks).change(remove_flash);
@@ -499,7 +494,4 @@ $("#farm").change(update_fields).change(update_blocks).change(remove_flash);
 $('#field').change(update_blocks).change(remove_flash); //.change(update_defaults)
 
 
-//autocomplete the start and end tree
-//This is for the collect and record forms
-$("#trees_end").val('');
 

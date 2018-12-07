@@ -18,15 +18,13 @@ from app.models import (
 	SelectionList,
 	User,
 	Download,
-	Samples
+	Samples,
+	Parsers
 )
 from app.forms import (
 	LocationForm,
 	CollectForm,
-	CreateTraits,
-	SampleRegForm
-	#AddTissueForm,
-	#AddStorageForm,
+	CreateTraits
 )
 from app.emails import send_email
 from datetime import datetime
@@ -41,7 +39,7 @@ def collect():
 		return redirect(url_for('login'))
 	else:
 		try:
-			collect_form = CollectForm()
+			collect_form = CollectForm().update()
 			location_form = LocationForm.update()
 			field_traits_form = CreateTraits().update('field')
 			block_traits_form = CreateTraits().update('block')
@@ -49,7 +47,6 @@ def collect():
 			branch_traits_form = CreateTraits().update('branch')
 			leaf_traits_form = CreateTraits().update('leaf')
 			sample_traits_form = CreateTraits().update('sample')
-			sample_reg_form = SampleRegForm.update()
 			return render_template(
 				'collect.html',
 				location_form=location_form,
@@ -61,7 +58,6 @@ def collect():
 				branch_traits_form=branch_traits_form,
 				leaf_traits_form=leaf_traits_form,
 				sample_traits_form=sample_traits_form,
-				sample_reg_form=sample_reg_form,
 				title='Collect'
 			)
 		except (ServiceUnavailable, AuthError):
@@ -82,7 +78,6 @@ def generate_files():
 				create_new_items = True if request.form.get('create_new_items') == 'new' else False
 				request_email = True if request.form.get('email_checkbox') else False
 				traits_form = CreateTraits().update(level)
-				sample_reg_form = SampleRegForm().update(optional=True)
 				if level == 'field':
 					location_form = LocationForm.update(optional=True)
 				else:
@@ -92,7 +87,6 @@ def generate_files():
 				if all([
 					location_form.validate_on_submit(),
 					traits_form.validate_on_submit(),
-					sample_reg_form.validate_on_submit()
 				]):
 					# Parse the form data
 					template_format = request.form['template_format']
@@ -118,30 +112,14 @@ def generate_files():
 					per_tree_replicates = int(
 						request.form['per_tree_replicates']
 					) if request.form['per_tree_replicates'].isdigit() else None
-					trees_start = int(
-						request.form['trees_start']
-					) if request.form['trees_start'].isdigit() else None
-					trees_end = int(
-						request.form['trees_end']
-					) if request.form['trees_end'].isdigit() else None
-					branches_start = int(
-						request.form['branches_start']
-					) if request.form['branches_start'].isdigit() else None
-					branches_end = int(
-						request.form['branches_end']
-					) if request.form['branches_end'].isdigit() else None
-					leaves_start = int(
-						request.form['leaves_start']
-					) if request.form['leaves_start'].isdigit() else None
-					leaves_end = int(
-						request.form['leaves_end']
-					) if request.form['leaves_end'].isdigit() else None
-					samples_start = int(
-						request.form['samples_start']
-					) if request.form['samples_start'].isdigit() else None
-					samples_end = int(
-						request.form['samples_end']
-					) if request.form['samples_end'].isdigit() else None
+					tree_id_list = (Parsers.parse_range_list(request.form['tree_id_list'])
+						if request.form['tree_id_list'] else None)
+					branch_id_list = (Parsers.parse_range_list(request.form['branch_id_list'])
+						if request.form['branch_id_list'] else None)
+					leaf_id_list = (Parsers.parse_range_list(request.form['leaf_id_list'])
+						if request.form['leaf_id_list'] else None)
+					sample_id_list = (Parsers.parse_range_list(request.form['sample_id_list'])
+						if request.form['sample_id_list'] else None)
 					tissue = request.form['tissue'] if request.form['tissue'] != '' else None
 					harvest_condition = request.form['harvest_condition'] if request.form['harvest_condition'] != '' else None
 					per_sample_replicates = int(
@@ -176,14 +154,10 @@ def generate_files():
 						field_uid,
 						block_uid,
 						per_tree_replicates,
-						trees_start,
-						trees_end,
-						branches_start,
-						branches_end,
-						leaves_start,
-						leaves_end,
-						samples_start,
-						samples_end,
+						tree_id_list,
+						branch_id_list,
+						leaf_id_list,
+						sample_id_list,
 						tissue,
 						harvest_condition,
 						per_sample_replicates,
@@ -243,10 +217,14 @@ def generate_files():
 							}
 						)
 				else:
-					errors = jsonify([collect_form.errors, location_form.errors])
+					errors = jsonify({
+						'errors': [collect_form.errors, location_form.errors]
+						})
 					return errors
 			else:
-				errors = jsonify([collect_form.errors])
+				errors = jsonify({
+					'errors': [collect_form.errors]
+				})
 				return errors
 		except (ServiceUnavailable, AuthError):
 			flash("Database unavailable")

@@ -216,24 +216,26 @@ $('dl').each( function () {
 $("#submit_collect").click( function(e) {
 	e.preventDefault();
 	remove_flash();
-	var wait_message = "Please wait for files to be generated"
-	var flash_wait = "<div id='files_flash' class='flash'>" + wait_message + "</div>";
+	const wait_message = "Please wait for files to be generated"
+	const flash_wait = "<div id='files_flash' class='flash'>" + wait_message + "</div>";
 	$(this).parent().after(flash_wait);
-	var generate_files = $.ajax({
+	$.ajax({
 	    url: "/collect/generate_files",
 	    data: $("form").serialize(),
 		type: 'POST',
 		success: function(response) {
 			if (response.hasOwnProperty('submitted')) {
-				var flash_submitted = "<div id='files_flash' class='flash'>" + response.submitted + "</div>";
+				const flash_submitted = "<div id='files_flash' class='flash'>" + response.submitted + "</div>";
 				$("#files_flash").replaceWith(flash_submitted);
 			} else {
-				$("#files_flash").remove();
-                for (i in response) {
-                    for (var key in response[i]){
-                        if (response[i].hasOwnProperty(key)) {
-                            var flash = "<div id='flash_" + key + "' class='flash'>" + response[i][key][0] + "</div>";
-                            $('#' + key).after(flash);
+				if (response.hasOwnProperty('errors')) {
+                    const errors= response['errors'];
+                    for (let i = 0; i < errors.length; i++) {
+                        for (const key in errors[i]) {
+                            if (errors[i].hasOwnProperty(key)) {
+                                const flash = "<div id='flash_" + key + "' class='flash'>" + errors[i][key][0] + "</div>";
+                                $('[id="' + key + '"').after(flash);
+                            }
                         }
                     }
                 }

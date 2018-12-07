@@ -55,14 +55,10 @@ class Download:
 			field_uid,
 			block_uid,
 			per_tree_replicates,
-			trees_start,
-			trees_end,
-			branches_start,
-			branches_end,
-			leaves_start,
-			leaves_end,
-			samples_start,
-			samples_end,
+			tree_id_list,
+			branch_id_list,
+			leaf_id_list,
+			sample_id_list,
 			tissue,
 			harvest_condition,
 			per_sample_replicates,
@@ -75,16 +71,14 @@ class Download:
 			if level == 'branch':
 				id_list = Fields.add_branches(
 					field_uid,
-					trees_start,
-					trees_end,
 					per_tree_replicates,
-					block_uid
+					tree_id_list=tree_id_list,
+					block_uid=block_uid
 				)
 			elif level == 'leaf':
 				id_list = Fields.add_leaves(
 					field_uid,
-					trees_start,
-					trees_end,
+					tree_id_list,
 					per_tree_replicates,
 					block_uid
 				)
@@ -95,12 +89,10 @@ class Download:
 						samples_count
 					)
 				else:
-					# TODO remove Collect page and merge here
 					# check we have found matching ID's, if not return None
 					id_list = Samples.add_samples_per_tree(
 						field_uid,
-						trees_start,
-						trees_end,
+						tree_id_list,
 						per_tree_replicates,
 						block_uid
 					)
@@ -123,14 +115,10 @@ class Download:
 				farm,
 				field_uid,
 				block_uid,
-				trees_start,
-				trees_end,
-				branches_start,
-				branches_end,
-				leaves_start,
-				leaves_end,
-				samples_start,
-				samples_end,
+				tree_id_list,
+				branch_id_list,
+				leaf_id_list,
+				sample_id_list,
 				tissue,
 				harvest_condition,
 				start_time,
@@ -221,14 +209,10 @@ class Download:
 			farm,
 			field_uid,
 			block_uid,
-			trees_start,
-			trees_end,
-			branches_start,
-			branches_end,
-			leaves_start,
-			leaves_end,
-			samples_start,
-			samples_end,
+			tree_id_list,
+			branch_id_list,
+			leaf_id_list,
+			sample_id_list,
 			tissue,
 			harvest_condition,
 			start_time,
@@ -254,8 +238,7 @@ class Download:
 				farm=farm,
 				field_uid=field_uid,
 				block_uid=block_uid,
-				trees_start=trees_start,
-				trees_end=trees_end
+				tree_id_list=tree_id_list
 			)
 		elif level == 'branch':
 			id_list = ItemList.get_branches(
@@ -264,12 +247,9 @@ class Download:
 				farm=farm,
 				field_uid=field_uid,
 				block_uid=block_uid,
-				trees_start=trees_start,
-				trees_end=trees_end,
-				branches_start=branches_start,
-				branches_end=branches_end
+				tree_id_list=tree_id_list,
+				branch_id_list=branch_id_list
 			)
-
 		elif level == 'leaf':
 			id_list = ItemList.get_leaves(
 				country=country,
@@ -277,12 +257,8 @@ class Download:
 				farm=farm,
 				field_uid=field_uid,
 				block_uid=block_uid,
-				trees_start=trees_start,
-				trees_end=trees_end,
-				branches_start=branches_start,
-				branches_end=branches_end,
-				leaves_start=leaves_start,
-				leaves_end=leaves_end
+				tree_id_list=tree_id_list,
+				leaf_id_list=leaf_id_list
 			)
 		elif level == 'sample':
 			id_list = ItemList.get_samples(
@@ -291,10 +267,8 @@ class Download:
 				farm=farm,
 				field_uid=field_uid,
 				block_uid=block_uid,
-				trees_start=trees_start,
-				trees_end=trees_end,
-				samples_start=samples_start,
-				samples_end=samples_end,
+				tree_id_list=tree_id_list,
+				sample_id_list=sample_id_list,
 				tissue=tissue,
 				harvest_condition=harvest_condition,
 				start_time=start_time,

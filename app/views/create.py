@@ -12,9 +12,7 @@ from flask import (
 )
 from app.models import (
 	SelectionList,
-	Fields
-	# User,
-	# Samples
+	Chart
 )
 from app.forms import (
 	LocationForm,
@@ -124,7 +122,7 @@ class TreeCount(MethodView):
 			return redirect(url_for('login'))
 		else:
 			try:
-				tree_count = Fields.get_treecount(uid)
+				tree_count = Chart.get_tree_count(uid)
 				response = make_response(jsonify(tree_count))
 				response.content_type = 'application/json'
 				return response

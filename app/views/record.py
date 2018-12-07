@@ -103,12 +103,9 @@ def submit_records():
 				farm = request.form['farm'] if request.form['farm'] != '' else None
 				field_uid = int(request.form['field']) if request.form['field'].isdigit() else None
 				block_uid = request.form['block'] if request.form['block'] != '' else None
-				trees_list = request.form['trees_list'] if request.form['trees_list'] != '' else None
-				if trees_list:
-					try:
-						trees_list = Parsers.parse_range_list(trees_list)
-					except ValueError:
-						return 'Invalid range'
+				tree_id_list = (
+					Parsers.parse_range_list(request.form['tree_id_list']) if request.form['tree_id_list'] != '' else None
+				)
 				start_time = int(
 					(datetime.strptime(request.form['record_start'], '%Y-%m-%d') - datetime(1970, 1, 1)).total_seconds()
 					* 1000
@@ -139,7 +136,7 @@ def submit_records():
 					'farm': farm,
 					'field_uid': field_uid,
 					'block_uid': block_uid,
-					'trees_list': trees_list,
+					'tree_id_list': tree_id_list,
 					'start_time': start_time,
 					'end_time': end_time,
 					'selected_conditions': selected_conditions,
@@ -148,7 +145,9 @@ def submit_records():
 				result = Record(session['username']).submit_records(record_data)
 				return result
 			else:
-				errors = jsonify([record_form.errors, location_form.errors])
+				errors = jsonify({
+					'errors': [record_form.errors, location_form.errors]
+				})
 				return errors
 		except (ServiceUnavailable, AuthError):
 			flash("Database unavailable")

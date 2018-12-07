@@ -62,6 +62,8 @@ class Record:
 				try:
 					tx.commit()
 					if merged:
+
+
 						html_table = self.result_table(merged)
 						return jsonify({'submitted': (
 							' Records submitted or found (highlighted): '
@@ -170,11 +172,11 @@ class Record:
 			statement += (
 				' <-[:IS_IN]-(item:Tree) '
 			)
-			if record_data['trees_list']:
-				parameters['trees_list'] = record_data['trees_list']
+			if record_data['tree_id_list']:
+				parameters['tree_id_list'] = record_data['tree_id_list']
 				statement += (
 					' WHERE '
-					' item.id in $trees_list '
+					' item.id in $tree_id_list '
 				)
 		# matched the item, now the condition and value for this in the selected period
 		statement += (
@@ -232,7 +234,7 @@ class Record:
 				'	s.time as submitted_at, '
 				'	u.name as user '
 			)
-			if record_data['level'] in ["tree","block"]:
+			if record_data['level'] in ["tree", "block"]:
 				statement += (
 					' , field.uid as field_uid, '
 					' item.id as item_id '
@@ -453,11 +455,11 @@ class Record:
 			statement += (
 				' <-[:IS_IN]-(item:Tree) '
 			)
-		if record_data['trees_list']:
-			parameters['trees_list'] = record_data['trees_list']
+		if record_data['tree_id_list']:
+			parameters['tree_id_list'] = record_data['tree_id_list']
 			statement += (
 				' WHERE '
-				' item.id in $trees_list '
+				' item.id in $tree_id_list '
 			)
 		statement += (
 			' UNWIND $conditions_list as condition_name '
@@ -499,7 +501,7 @@ class Record:
 			'	value: $conditions_dict[condition_name] '
 			' })-[:RECORD_FOR]-(ic) '
 			' ON CREATE SET '
-			'	r.found = False '
+			'	r.found = False, '
 			' ON MATCH SET '
 			'	r.found = True '
 			# unlock ItemCondition node, this is set to true to obtain lock in the conflict query
@@ -508,6 +510,9 @@ class Record:
 			' FOREACH (n IN CASE '
 			'		WHEN r.found = False '
 			'			THEN [1] ELSE [] END | '
+			# We want to update the ic.value (so can retrieve latest condition data without comparing all records
+			'				ic.value = CASE '
+			'					'
 			# track user submissions through /User/Condition container
 			'				MERGE '
 			'					(us)-[:SUBMITTED]->(uc:UserCondition) '
@@ -516,7 +521,7 @@ class Record:
 			'				MERGE '
 			'					(uc)-[:SUBMITTED]->(uic:UserItemCondition) '
 			'					-[:CONTRIBUTED]->(ic) '
-			# then finally the record with a timestamp
+			# then the record with a timestamp
 			'				MERGE '
 			'					(uic)-[s1:SUBMITTED]->(r) '
 			'					ON CREATE SET '
@@ -524,13 +529,13 @@ class Record:
 			' ) '
 			' WITH '
 			'	r, ic, condition, '
-			'	item.uid as item_uid '
+			'	item.uid '
 		)
 		if record_data['level'] in ["block", "tree"]:
 			statement += (
 				' , '
-				' field.uid as field_uid, '
-				' item.id as item_id '
+				' field.uid, '
+				' item.id '
 			)
 		statement += (
 			' MATCH '
