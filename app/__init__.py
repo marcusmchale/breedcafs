@@ -63,10 +63,10 @@ app.add_url_rule('/location/treecount/<uid>/',
 	view_func=views.TreeCount.as_view('treecount'),
 	methods=['GET'])
 
-app.add_url_rule('/record/conditions/<level>/',
-	view_func=views.ListConditionGroups.as_view('condition_groups'),
+app.add_url_rule('/record/<data_type>/<level>/',
+	view_func=views.ListFeatureGroups.as_view('feature_groups'),
 	methods=['GET'])
 
-app.add_url_rule('/record/conditions/<level>/<group>/',
-	view_func=views.ListConditionsDetails.as_view('conditions_details'),
+app.add_url_rule('/record/<data_type>/<level>/<group>/',
+	view_func=views.ListFeaturesDetails.as_view('features_details'),
 	methods=['GET'])

@@ -94,6 +94,7 @@ class FindLocations:
 			'	}) '
 			'	<-[:IS_IN]-(field:Field { '
 			'		name_lower: toLower(trim($field)) '
+			'	}) '
 			' RETURN '
 			'	field '
 		)
@@ -132,7 +133,7 @@ class AddLocations:
 			'	MERGE '
 			'		(us)-[:SUBMITTED]->(ul:Locations) '
 			'	MERGE '
-			'		-[ul:SUBMITTED]->(uc:Countries) '
+			'		(ul)-[:SUBMITTED]->(uc:Countries) '
 			'	CREATE '
 			'		(uc)-[s:SUBMITTED {time: timestamp()}]->(country) '
 			' ) '
@@ -173,7 +174,7 @@ class AddLocations:
 			'	MERGE '
 			'		(us)-[:SUBMITTED]->(ul:Locations) '
 			'	MERGE '
-			'		-[ul:SUBMITTED]->(ur:Regions) '
+			'		(ul)-[:SUBMITTED]->(ur:Regions) '
 			'	CREATE '
 			'		(ur)-[s:SUBMITTED {time: timestamp()}]->(region) '
 			' ) '
@@ -218,7 +219,7 @@ class AddLocations:
 			'	MERGE '
 			'		(us)-[:SUBMITTED]->(ul:Locations) '
 			'	MERGE '
-			'		-[ul:SUBMITTED]->(uf:Farms) '
+			'		(ul)-[:SUBMITTED]->(uf:Farms) '
 			'	CREATE '
 			'		(uf)-[s:SUBMITTED {time: timestamp()}]->(farm) '
 			' ) '
@@ -277,7 +278,7 @@ class AddLocations:
 			'	MERGE '
 			'		(us)-[:SUBMITTED]->(ul:Locations) '
 			'	MERGE '
-			'		-[ul:SUBMITTED]->(uf:Fields) '
+			'		(ul)-[:SUBMITTED]->(uf:Fields) '
 			'	CREATE '
 			'		(uf)-[s:SUBMITTED {time: timestamp()}]->(field) '
 			' ) '
@@ -335,16 +336,21 @@ class AddFieldItems:
 				'		username_lower: toLower(trim($username)) '
 				'	}) '
 				' MATCH '
-				'	(counter:Counter { '
-				'		uid: (toInteger($field_uid) + "_block") '
-				'	}) '
-				'	-[:FOR]->(fb: FieldBlocks) '
-				'	-[:IS_IN]->(field:Field { '
+				'	(field: Field { '
 				'		uid: toInteger($field_uid) '
 				'	}) '
-				' ) '
+				' MERGE '
+				'	(fb: FieldBlocks) '
+				'	-[:IS_IN]->(field) '
+				' MERGE '
+				'	(counter:Counter { '
+				'		name: "block", '
+				'		uid: (toInteger($field_uid) + "_block") '
+				'	}) '
+				'	-[:FOR]->(fb) '
+				'	ON CREATE SET counter.count = 0 '
 				' SET '
-				'	id._LOCK_ = true, '
+				'	counter._LOCK_ = true '
 				' MERGE '
 				'	(block: Block: Item { '
 				'		name_lower: toLower(trim($block_name)) '
@@ -354,30 +360,21 @@ class AddFieldItems:
 				'		block.found = True '
 				' 	ON CREATE SET '
 				'		block.found = False, '
-				'		id.count = id.count + 1, '
+				'		counter.count = counter.count + 1, '
 				'		block.name = trim($block_name), '
-				'		block.uid = (field.uid + "_B" + id.count), '
-				'		block.id = id.count '
+				'		block.uid = (field.uid + "_B" + counter.count), '
+				'		block.id = counter.count '
 				' REMOVE '
-				'	id._LOCK_ '
+				'	counter._LOCK_ '
 				' FOREACH (n IN CASE WHEN block.found = False THEN [1] ELSE [] END | '
 				'	MERGE '
 				'		(user)-[:SUBMITTED]->(us: Submissions) '
 				'	MERGE '
 				'		(us)-[:SUBMITTED]->(ui:Items) '
 				'	MERGE '
-				'		-[ui:SUBMITTED]->(ub:Blocks) '
+				'		(ui)-[:SUBMITTED]->(ub:Blocks) '
 				'	CREATE '
 				'		(ub)-[s:SUBMITTED {time: timestamp()}]->(block) '
-				' 	MERGE '
-				'	(tc: Counter { '
-				'		name: "tree" '
-				'	}) '
-				'	-[:FOR]->(: BlockTrees) '
-				'	-[:IS_IN]->(block) '
-				'	ON CREATE SET '
-				'		tc.count = 0, '
-				'		tc.uid = (block.uid + "_tree") '
 				' ) '
 				' RETURN { '
 				'	uid: block.uid, '
@@ -427,7 +424,7 @@ class AddFieldItems:
 			'	(field) '
 			' MERGE '
 			'	(field_tree_counter:Counter { '
-			'		name: tree, '
+			'		name: "tree", '
 			'		uid: (field.uid + "_tree") '
 			'	})-[:FOR]-> '
 			'	(field_trees) '
@@ -435,15 +432,24 @@ class AddFieldItems:
 			' MERGE '
 			'	(user)-[:SUBMITTED]->(us: Submissions) '
 			' MERGE '
-			'	(us)-[:SUBMITTED]->(ui:Items) '
+			'	(us)-[:SUBMITTED]->(ui: Items) '
 			' MERGE '
-			'	-[ui:SUBMITTED]->(ut:Trees) '
+			'	(ui)-[:SUBMITTED]->(ut: Trees) '
 			# create per user per field trees node (UserFieldTrees) linking these
 			' MERGE '
 			'	(ut)-[:SUBMITTED]-> '
-			'	(uft:UserFieldTrees)-[:CONTRIBUTED]->'
+			'	(uft:UserFieldTrees)-[:CONTRIBUTED]-> '
 			'	(field_trees) '
-			' SET field_tree_counter._LOCK_ = true '
+			' SET '
+			'	field_tree_counter._LOCK_ = true '
+			' WITH '
+			'	field_tree_counter, field_trees, field '
+		)
+		if block_uid:
+			statement += (
+				' , block_tree_counter, block_trees '
+			)
+		statement += (
 			' UNWIND range(1, $tree_count) as tree_count '
 			'	SET '
 			'		field_tree_counter.count = field_tree_counter.count + 1 '
@@ -454,7 +460,8 @@ class AddFieldItems:
 			'			id: field_tree_counter.count '
 			'		})-[:IS_IN]-> '
 			'		(field_trees) '
-			'	SET field_tree_counter._LOCK_ = false '
+			'	SET '
+			'		field_tree_counter._LOCK_ = false '
 		)
 		if block_uid:
 			statement += (
@@ -462,7 +469,7 @@ class AddFieldItems:
 				'	(tree)-[:IS_IN]-> '
 				'	(block_trees) '
 				' SET block_tree_counter.count = block_tree_counter.count + 1 '
-				' SET block_tree_counter.count = false '
+				' SET block_tree_counter._LOCK_ = false '
 			)
 		statement += (
 			'	RETURN count(tree) '
@@ -471,17 +478,17 @@ class AddFieldItems:
 			result = neo4j_session.write_transaction(neo4j_query, statement, parameters)
 			return [record[0] for record in result]
 
-	# Samples are lowest level of item with a single relationship "FROM" to any other item
+	# Samples are lowest level of item with a relationship "FROM" to any other item/s
 	# Samples are any subset of a tree,including:
 	#  - those that are still developing (growing on the tree, e.g. Branch, Leaf)
 	#  - those that are harvested; e.g. harvested Tissue for analyses, beans.
 	# The FROM relationship may be directed to other samples, allowing:
 	#  - sub-sampling
-	#  - relationships among samples (e.g. Leaf from Branch)
+	#  - relationships among samples (e.g. Sample from Leaf from Branch)
 	# The FROM relationship can be updated, but only to provide greater precision:
 	#  - Hierarchy of precision: Field/Block/Tree/Sample
 	#    - i.e. Field to Block or from Block to Tree or from Tree to Sample
-	#    - always ensuring that the new parent item has FROM relationship directed toward the existing parent
+	#    - always ensure that the new parent item has FROM relationship directed toward any existing parent
 	#      - with a longer path for new parent (i.e. greater precision)
 	#  - This is important to not lose the information from initial registration
 	#    - We only record user and time on registering, then all updates are recorded as data from trait "Assign to..."
@@ -581,18 +588,6 @@ class AddFieldItems:
 				statement += (
 					' item.id IN $sample_id_list '
 				)
-		if level == 'field':
-			statement += (
-				' MERGE '
-				'	(field) '
-				'	<-[:FROM]-(item_samples: ItemSamples) '
-			)
-		elif level in ['block', 'tree']:
-			statement += (
-				' MERGE '
-				' (item)'
-				' <-[:FROM]-(item_samples: ItemSamples) '
-			)
 		statement += (
 			' MERGE '
 			'	(user)-[: SUBMITTED]->(us: Submissions) '
@@ -612,6 +607,18 @@ class AddFieldItems:
 			' ON CREATE SET field_sample_counter.count = 0 '
 			' SET field_sample_counter._LOCK_ = true '
 		)
+		if level == 'field':
+			statement += (
+				' MERGE '
+				'	(field) '
+				'	<-[:FROM]-(item_samples: ItemSamples) '
+			)
+		elif level in ['block', 'tree']:
+			statement += (
+				' MERGE '
+				' (item)'
+				' <-[:FROM]-(item_samples: ItemSamples) '
+			)
 		if level == 'sample':
 			statement += (
 			' WITH '
@@ -619,7 +626,6 @@ class AddFieldItems:
 			'	user_item_samples, '
 			'	item as item_samples, '
 			'	field_sample_counter '
-			' ORDER BY field.uid, item.id '
 			)
 		else:
 			statement += (
@@ -629,14 +635,14 @@ class AddFieldItems:
 				'	item_samples, '
 				'	field_sample_counter '
 			)
-			if level == 'field':
-				statement += (
-					' ORDER BY field.uid '
-				)
-			else:
-				statement += (
-					' ORDER BY field.uid, item.id '
-				)
+		if level == 'field':
+			statement += (
+				' ORDER BY field.uid '
+			)
+		else:
+			statement += (
+				' ORDER BY field.uid, item.id '
+			)
 		statement += (
 			' UNWIND $replicates as replicate '
 			'	SET field_sample_counter.count = field_sample_counter.count + 1 '
@@ -650,3 +656,6 @@ class AddFieldItems:
 			'	uid: sample.uid '
 			' } '
 		)
+		with get_driver().session() as neo4j_session:
+			result = neo4j_session.write_transaction(neo4j_query, statement, parameters)
+			return [record[0] for record in result]

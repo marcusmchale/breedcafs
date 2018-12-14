@@ -12,13 +12,11 @@ from create import (
 	TreeCount
 )
 from record import (
-	ListConditionsDetails,
-	ListConditionGroups
+	ListFeaturesDetails,
+	ListFeatureGroups
 )
 from collect import (
 	collect
-	#Tissues,
-	#StorageMethods
 )
 from record import record
 from chart import json_submissions

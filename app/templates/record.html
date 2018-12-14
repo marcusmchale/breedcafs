@@ -6,6 +6,8 @@
 			<div>
                 <form>
                     <dl>
+                        <h3>Data type</h3>
+                        <dd>{{  record_form.data_type }}</dd>
                         <h3>Level</h3>
                         <dd>{{  record_form.level }}</dd>
                         <div id="location">
@@ -26,19 +28,25 @@
                             <h3>Selection</h3>
                             <p><a>0</a> <a>items</a></p>
                         </div>
-                        <div id='condition_selection'>
-                            <h3>Select conditions to record</h3>
-                                <dd>{{  render_field (record_form.condition_group) }}</dd>
-                                <div id="condition_checkbox_div"></div>
-                            <br><br>
-                            {{  render_field (record_form.generate_template) }}
+                        <div id='feature_selection'>
+                            <h3>Select features to record</h3>
+                                <dd>{{  render_field (record_form.feature_group) }}</dd>
+                                <div id="feature_checkbox_div"></div>
                             <div id="web_form_div">
                             <h3>Web Form</h3>
-                                <dt>Record period</dt>
-                                <dd>
-                                    {{ render_field (record_form.record_start) }}
-                                    {{ render_field (record_form.record_end) }}
-                                </dd>
+                                <div id="record_period_div">
+                                    <dt>Record period</dt>
+                                    <dd>
+                                        {{ render_field (record_form.record_start) }}
+                                        {{ render_field (record_form.record_end) }}
+                                    </dd>
+                                </div>
+                                <div id="record_time_div">
+                                    <dt>Record time</dt>
+                                    <dd>
+                                        {{ render_field (record_form.record_time) }}
+                                    </dd>
+                                </div>
                                 <div id="dynamic_form_div"></div>
                                 {{  render_field (record_form.submit_records) }}
                             </div>

@@ -11,6 +11,10 @@ from flask import (
 	jsonify
 )
 from app.models import (
+	AddLocations,
+	FindLocations,
+	FindFieldItems,
+	AddFieldItems,
 	SelectionList,
 	Chart
 )
@@ -20,11 +24,8 @@ from app.forms import (
 	AddRegion, 
 	AddFarm, 
 	AddField,
-	FieldsForm,
-	AddBlock, 
-	# BlocksForm,
+	AddBlock,
 	AddTreesForm
-	# CreateTraits
 )
 # from app.emails import send_attachment, send_static_attachment, send_email
 
@@ -171,11 +172,11 @@ def add_country():
 			form = AddCountry()
 			text_country = request.form['text_country'].strip()
 			if form.validate_on_submit():
-				found = Fields(text_country).find_country()
+				found = FindLocations(text_country).find_country()
 				if found:
 					return jsonify({"found": found[0]['name']})
 				else:
-					result = Fields(text_country).add_country()
+					result = AddLocations(session['username'], text_country).add_country()
 					return jsonify({"submitted": result[0]})
 			else:
 				return jsonify([form.errors])
@@ -198,11 +199,11 @@ def add_region():
 				if country in ['', 'None']:
 					return jsonify([{"country": ["Please select a country to add a new region"]}])
 				else:
-					found = Fields(country).find_region(text_region)
+					found = FindLocations(country).find_region(text_region)
 					if found:
 						return jsonify({"found": found[0]['name']})
 					else:
-						result = Fields(country).add_region(text_region)
+						result = AddLocations(session['username'], country).add_region(text_region)
 						return jsonify({"submitted": result[0]})
 			else:
 				return jsonify([form.errors])
@@ -226,11 +227,11 @@ def add_farm():
 				if bool({country, region} & {'', 'None'}):
 					return jsonify([{"region": ["Please select a region to add a new farm"]}])
 				else:
-					found = Fields(country).find_farm(region, text_farm)
+					found = FindLocations(country).find_farm(region, text_farm)
 					if found:
 						return jsonify({"found": found[0]['name']})
 					else:
-						result = Fields(country).add_farm(region, text_farm)
+						result = AddLocations(session['username'], country).add_farm(region, text_farm)
 						return jsonify({"submitted": result[0]})
 			else:
 				return jsonify([form.errors])
@@ -255,11 +256,11 @@ def add_field():
 				if bool({country, region, farm} & {'', 'None'}):
 					return jsonify([{"farm": ["Please select a farm to add a new field"]}])
 				else:
-					found = Fields(country).find_field(region, farm, text_field)
+					found = FindLocations(country).find_field(region, farm, text_field)
 					if found:
 						return jsonify({"found": {'uid': found[0]['uid'], 'name': found[0]['name']}})
 					else:
-						result = Fields.add_field(country, region, farm, text_field)
+						result = AddLocations(session['username'], country).add_field(region, farm, text_field)
 						return jsonify({"submitted": {'uid': result[0]['uid'], 'name': result[0]['name']}})
 			else:
 				return jsonify([form.errors])
@@ -283,11 +284,11 @@ def add_block():
 				if field_uid in ['','None']:
 					return jsonify([{"country": ["Please select a country to add a new region"]}])
 				else:
-					found = Fields.find_block(field_uid, text_block)
+					found = FindFieldItems(field_uid).find_block(text_block)
 					if found:
 						return jsonify({"found": {'uid': found[0]['uid'], 'name': found[0]['name']}})
 					else:
-						result = Fields.add_block(field_uid, text_block)
+						result = AddFieldItems(session['username'], field_uid).add_block(text_block)
 						return jsonify({"submitted": {'uid': result[0]['uid'], 'name': result[0]['name']}})
 			else:
 				errors = jsonify([location_form.errors, add_block_form.errors])
@@ -310,7 +311,7 @@ def add_trees():
 				field_uid = int(request.form['field'])
 				count = int(request.form['count'])
 				block_uid = request.form['block'] if request.form['block'] != '' else None
-				new_tree_count = Fields.add_trees(field_uid, count, block_uid)[0]
+				new_tree_count = AddFieldItems(session['username'], field_uid).add_trees(count, block_uid)[0]
 				return jsonify({'submitted' : str(new_tree_count) + ' trees registered</a>'})
 			else:
 				errors = jsonify([location_form.errors, add_trees_form.errors])

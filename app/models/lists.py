@@ -179,35 +179,46 @@ class SelectionList:
 		return [record[0] for record in result]
 
 	@staticmethod
-	def get_condition_groups(level):
+	def get_feature_groups(data_type, level):
 		parameters = {
 			"level": level
 		}
 		query = (
 			' MATCH '
-			'	(condition_group: ConditionGroup)'
-			'		<-[:IN_GROUP]-(: Condition) '
-			'		-[:AT_LEVEL]->(:Level {name_lower: $level}) '
-			' WITH DISTINCT (condition_group) '
-			' RETURN { '
-			'	name: condition_group.name, '
-			'	name_lower: condition_group.name_lower '
-			' } '
-			' ORDER BY condition_group.name_lower '
+			'	(feature_group: '
 		)
+		if data_type == 'trait':
+			query += (
+				' TraitGroup '
+				' )<-[:IN_GROUP]-(: Trait) '
+			)
+		elif data_type == 'condition':
+			query += (
+				' ConditionGroup '
+				' )<-[:IN_GROUP]-(: Condition) '
+			)
+		query += (
+				'		-[:AT_LEVEL]->(:Level {name_lower: $level}) '
+				' WITH DISTINCT (feature_group) '
+				' RETURN [ '
+				'	feature_group.name_lower, '
+				'	feature_group.name '
+				' ] '
+				' ORDER BY feature_group.name_lower '
+			)
 		with get_driver().session() as neo4j_session:
 			result = neo4j_session.read_transaction(
 				neo4j_query,
 				query,
 				parameters
 			)
-		return [(record[0]['name_lower'], record[0]['name']) for record in result]
+		return [record[0] for record in result]
 
 	@staticmethod
 	def get_tissues():
 		parameters = {}
 		query = (
-			' MATCH (trait:SampleTrait {name_lower: "tissue type"}) '
+			' MATCH (trait:Trait {name_lower: "tissue type"}) '
 			' RETURN trait.category_list '
 		)
 		with get_driver().session() as neo4j_session:
@@ -223,7 +234,7 @@ class SelectionList:
 	def get_harvest_conditions():
 		parameters = {}
 		query = (
-			' MATCH (trait:SampleTrait {name_lower: "harvest condition"}) '
+			' MATCH (trait:Trait {name_lower: "harvest condition"}) '
 			' RETURN trait.category_list '
 		)
 		with get_driver().session() as neo4j_session:
@@ -843,27 +854,49 @@ class ItemList:
 		return [record[0] for record in result]
 
 
-class ConditionsList:
+class FeaturesList:
 	def __init__(self):
 		pass
 
 	@staticmethod
-	def get_conditions_details(level, group):
+	def get_features_details(data_type, level, group):
 		parameters = {
+			"data_type": data_type,
 			"level": level,
 			"group": group
 		}
 		query = (
 			' MATCH '
-			'	(:ConditionGroup { '
+			'	(feature_group: '
+		)
+		if data_type == 'trait':
+			query += (
+				'TraitGroup'
+			)
+		elif data_type == 'condition':
+			query += (
+				'ConditionGroup'
+			)
+		query += (
+			'	{ '
 			'		name_lower: toLower($group) '
 			'	}) '
-			'	<-[:IN_GROUP]-(condition: Condition) '
-			'	-[:AT_LEVEL]-(:Level {'
+			'	<-[:IN_GROUP]-(feature: '
+		)
+		if data_type == 'trait':
+			query += (
+				'Trait'
+			)
+		if data_type == 'condition':
+			query += (
+				'Condition'
+			)
+		query += (
+			'	)-[:AT_LEVEL]-(:Level { '
 			'		name_lower: toLower($level)'
 			'	}) '
-			' RETURN properties(condition) '
-			' ORDER BY condition.name_lower '
+			' RETURN properties(feature) '
+			' ORDER BY feature.name_lower '
 		)
 		with get_driver().session() as neo4j_session:
 			result = neo4j_session.read_transaction(

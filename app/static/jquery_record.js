@@ -1,15 +1,17 @@
+const data_type_select = $('#data_type');
 const level_select = $('#level');
 const block_div = $('#block_div');
 const tree_div = $('#tree_selection_div');
 const item_count_div = $('#item_count_div');
-const group_select = $('#condition_group');
-const condition_checkbox_div = $('#condition_checkbox_div');
+const group_select = $('#feature_group');
+const feature_checkbox_div = $('#feature_checkbox_div');
 const dynamic_form_div = $('#dynamic_form_div');
 const location_div = $('#location');
-const condition_div = $('#condition_selection');
+const feature_div = $('#feature_selection');
 
 $("#record_start").datepicker({ dateFormat: 'yy-mm-dd'});
 $("#record_end").datepicker({ dateFormat: 'yy-mm-dd'});
+$("#record_time").datepicker({ dateFormat: 'yy-mm-dd'});
 
 block_div.hide();
 tree_div.hide();
@@ -19,6 +21,7 @@ remove_flash = function() {
 };
 
 level_update = function() {
+    const data_type = data_type_select.val();
     const level = level_select.val();
     group_select.empty();
     group_select.append(
@@ -29,10 +32,10 @@ level_update = function() {
         block_div.hide();
         tree_div.hide();
         item_count_div.hide();
-        condition_div.hide();
+        feature_div.hide();
     } else {
         location_div.show();
-        condition_div.show();
+        feature_div.show();
         item_count_div.show();
         if (level === "field") {
             block_div.hide();
@@ -49,14 +52,14 @@ level_update = function() {
     }
     if (level) {
         $.ajax({
-            url: "/record/conditions/" + level + "/",
+            url: "/record/" + data_type + "/" + level + "/",
             type: 'GET',
             success: function (response) {
-                const condition_groups = response.sort();
-                for (let i = 0; i < condition_groups.length; i++) {
+                const feature_groups = response.sort();
+                for (let i = 0; i < feature_groups.length; i++) {
                     group_select.append(
                         $("<option></option>").attr(
-                            "value", condition_groups[i][0]).text(condition_groups[i][1])
+                            "value", feature_groups[i][0]).text(feature_groups[i][1])
                     );
                 }
             },
@@ -70,23 +73,34 @@ level_update = function() {
 };
 
 group_update = function() {
-    condition_checkbox_div.empty();
+    feature_checkbox_div.empty();
     dynamic_form_div.empty();
+    const data_type = data_type_select.val();
     const level = level_select.val();
     const group = group_select.val();
     if (level && group) {
         $.ajax({
-            url: "/record/conditions/" + level + "/" + group + "/",
+            url: "/record/" + data_type + "/" + level + "/" + group + "/",
             type: 'GET',
             success: function (response) {
-                condition_checkbox_div.append(
-                    "<br><input id=select_all_conditions type=checkbox>" +
+                feature_checkbox_div.append(
+                    "<br><input id=select_all_features type=checkbox>" +
                     "<label>Select all</label>" +
-                    "<ul id='select_conditions'></ul>"
+                    "<ul id='select_features'></ul>"
                 );
                 dynamic_form_div.append('<dl></dl>');
                 for (let i = 0; i < response.length; i++) {
-                    if (['numeric', 'percent'].includes(response[i]['format'])) {
+                    if (['text', 'numeric', 'percent'].includes(response[i]['format'])) {
+                        dynamic_form_div.find('dl').append(
+                            '<dt>' + response[i]['name'] + '</dt>' +
+                            '<dd><input type="text" ' +
+                            'id="' + response[i]['name_lower'] + '" ' +
+                            'name="' + response[i]['name_lower'] + '" ' +
+                            'placeholder="' + response[i]['details'] + '" ' +
+                            'title="' + response[i]['details'] + '" ' +
+                            '</dd>'
+                        )
+                    } else if (response[i]['format'] === 'date') {
                         dynamic_form_div.find('dl').append(
                             '<dt>' + response[i]['name'] + '</dt>' +
                             '<dd><input type="text" ' +
@@ -95,7 +109,8 @@ group_update = function() {
                             'placeholder="' + response[i]['details'] + '" ' +
                             'title="' + response[i]['details'] + '" ' +
                             '</dd>'
-                        )
+                        );
+                        $('#'+response[i]["name_lower"]).datepicker({ dateFormat: 'yy-mm-dd'});
                     } else if (response[i]['format'] === 'categorical') {
                         let category_options = "";
                         const category_list = response[i]['category_list'];
@@ -115,10 +130,10 @@ group_update = function() {
                             category_options + '</select></dd>'
                         );
                     }
-                    condition_checkbox_div.find('ul').append(
+                    feature_checkbox_div.find('ul').append(
                         "<li>" +
-                        "<input id=select_conditions-" + i + " " +
-                        "name='select_conditions' " +
+                        "<input id=select_features-" + i + " " +
+                        "name='select_features' " +
                         "type=checkbox value='" + response[i]['name_lower'] + "' " +
                         ">" +
                         "<label for='checkbox_" + response[i]['name_lower'] + "'>" +
@@ -129,7 +144,7 @@ group_update = function() {
                     const form_field = $('[id="' + response[i]['name_lower'] + '"]').parent('dd');
                     form_field.hide();
                     form_field.prev().hide();
-                    $('#select_conditions-' + i).change(function () {
+                    $('#select_features-' + i).change(function () {
                         if (this.checked) {
                              form_field.show();
                              form_field.prev().show()
@@ -141,13 +156,13 @@ group_update = function() {
                         }
                     });
                 }
-                $('#select_all_conditions').change(function () {
+                $('#select_all_features').change(function () {
                     if (this.checked) {
-                        condition_checkbox_div.find(":checkbox:not(#select_all_conditions)").each(function () {
+                        feature_checkbox_div.find(":checkbox:not(#select_all_features)").each(function () {
                             this.checked = true;
                         }).trigger('change');
                     } else {
-                        condition_checkbox_div.find(":checkbox:not(#select_all_conditions)").each(function () {
+                        feature_checkbox_div.find(":checkbox:not(#select_all_features)").each(function () {
                             this.checked = false;
                         }).trigger('change');
                     }
@@ -161,20 +176,31 @@ group_update = function() {
     update_submit_fields();
 };
 
+
+
 update_submit_fields = function () {
-    const checkboxes = condition_checkbox_div.find(":checkbox:not(#select_all_conditions)");
+    const data_type = data_type_select.val();
+    const record_period_div = $('#record_period_div');
+    const record_time_div = $('#record_time_div');
+    const checkboxes = feature_checkbox_div.find(":checkbox:not(#select_all_features)");
     const count_checkboxes = checkboxes.length;
     const count_checked = checkboxes.filter(":checked").length;
     if (count_checked > 0){
         $('#web_form_div').show();
-        $('#generate_template').show();
+        if (data_type === 'trait') {
+            record_period_div.hide();
+            record_time_div.show();
+        } else if (data_type === 'condition') {
+            record_period_div.show();
+            record_time_div.hide();
+        }
         if (count_checked === count_checkboxes) {
-            $('#select_all_conditions').prop('checked', true);
+            $('#select_all_features').prop('checked', true);
         } else {
-            $('#select_all_conditions').prop('checked', false);
+            $('#select_all_features').prop('checked', false);
         }
     } else {
-        $('#select_all_conditions').prop('checked', false);
+        $('#select_all_features').prop('checked', false);
         $('#web_form_div').hide();
         $('#generate_template').hide();
     }
@@ -182,12 +208,15 @@ update_submit_fields = function () {
 
 $(window).on('load', level_update);
 
+
+data_type_select.change(level_update);
 level_select.change(level_update);
 group_select.change(group_update);
 
 
 $('#submit_records').click( function (e) {
     e.preventDefault();
+    update_item_count();
     remove_flash();
     const wait_message = "Please wait for submission to complete";
     const flash_wait = "<div id='records_flash' class='flash'>" + wait_message + "</div>";

@@ -12,11 +12,6 @@ uri = "bolt://localhost:7687"
 auth = (os.environ['NEO4J_USERNAME'], os.environ['NEO4J_PASSWORD'])
 driver = GraphDatabase.driver(uri, auth=auth)
 
-# Node Key constraint requires Neo4j Enterprise Edition
-# we work around this by using two labels on the trait
-# one generic Trait label and one specific level+trait e.g. TreeTrait
-# then create the constraint on that unique label
-
 
 def confirm(question):
 	valid = {"yes": True, "y": True, "no": False, "n": False}
@@ -161,19 +156,16 @@ def create_partners(tx, partner_list):
 				)
 
 
-def create_traits(tx, traits_file, level):
+def create_traits(tx, traits_file):
 	with open(traits_file, 'rb') as traits_csv:
 		reader = csv.DictReader(traits_csv, delimiter=',', quotechar='"')
 		for trait in reader:
 			trait_create = tx.run(
 				' MERGE '
-				# creating with both generic "trait" label, but also the specific level + trait attribute 
-				'	(t:Trait:' + level + 'Trait { '
-				'			name_lower: toLower(trim($name))'
+				'	(t:Trait { '
+				'		name_lower: toLower(trim($name)) '
 				'	}) '
 				'	ON CREATE SET '
-				'		t.level = toLower(trim($level)), '
-				'		t.group = toLower(trim($group)), '
 				'		t.name = trim($name), '
 				'		t.format = toLower(trim($format)), '
 				'		t.default_value = CASE '
@@ -205,9 +197,29 @@ def create_traits(tx, traits_file, level):
 				'		t.found = False '
 				'	ON MATCH SET '
 				'		t.found = True '
+				' FOREACH (group in extract(x in split($groups, "/") | trim(x)) | '
+				'	MERGE '
+				'		(trait_group: TraitGroup {'
+				'			name_lower:toLower(group)'
+				'		}) '
+				'		ON CREATE SET '
+				'			trait_group.name = group '
+				' 	MERGE '
+				'		(t)-[:IN_GROUP]->(trait_group) '
+				' ) '
+				' FOREACH (level in extract(x in split($levels, "/") | trim(x)) | '
+				'	MERGE '
+				'		(item_level: Level { '
+				'			name_lower: toLower(level) '
+				'		}) '
+				'		ON CREATE SET '
+				'			item_level.name = level '
+				'	MERGE '
+				'		(t)-[:AT_LEVEL]->(item_level) '
+				' ) '
 				' RETURN t.found ',
-				group=trait['group'],
-				level=level,
+				groups=trait['groups'],
+				levels=trait['levels'],
 				name=trait['name'],
 				format=trait['format'],
 				default_value=trait['defaultValue'],
@@ -218,11 +230,11 @@ def create_traits(tx, traits_file, level):
 			)
 			for record in trait_create:
 				if record['t.found']:
-					print ('Found: ' + level + 'Trait ' + trait['name'])
+					print ('Found Trait ' + trait['name'])
 				elif not record['t.found']:
-					print ('Created: ' + level + 'Trait ' + trait['name'])
+					print ('Created Trait: ' + trait['name'])
 				else:
-					print ('Error with merger of ' + level + 'Trait ' + trait['name'])
+					print ('Error with merger of Trait: ' + trait['name'])
 
 
 def create_trials(tx, trials):
@@ -230,7 +242,7 @@ def create_trials(tx, trials):
 	# FYI Field Book can't handle long lists of categories (more than 12)
 	# so we handle this trait as text i.e. trait.format = "text" '
 	tx.run(
-		' MATCH (trait: TreeTrait {name_lower: "variety name"}) '
+		' MATCH (trait: Trait {name_lower: "variety name"}) '
 		' SET trait.category_list = [] '
 	)
 	for trial in trials:
@@ -327,7 +339,7 @@ def create_trials(tx, trials):
 		tx.run(
 			' MATCH '
 			'	(trial: Trial {uid:$uid}), '
-			'	(trait: TreeTrait {name_lower: "variety name"}) '
+			'	(trait: Trait {name_lower: "variety name"}) '
 			' MERGE '
 			'	(trial)'
 			'		<-[assessed_in: ASSESSED_IN]-(trait) '
@@ -344,7 +356,7 @@ def create_trials(tx, trials):
 					' MATCH '
 					'	(trial: Trial { '
 					'		uid: $trial '
-					'	})<-[assessed_in:ASSESSED_IN]-(trait: TreeTrait { '
+					'	})<-[assessed_in:ASSESSED_IN]-(trait: Trait { '
 					'		name_lower: "variety name" '
 					'	}) '
 					' SET '
@@ -445,13 +457,13 @@ def create_variety_codes(tx, variety_codes):
 	# FYI Field Book can't handle long lists of categories (more than 12)
 	# so we handle this trait as text i.e. trait.format = "text" '
 	tx.run(
-		' MATCH (trait: TreeTrait {name_lower: "variety code"}) '
+		' MATCH (trait: Trait {name_lower: "variety code"}) '
 		' SET trait.category_list = [] '
 	)
 	for item in variety_codes:
 		if item[1].lower() == item[2].lower():  # if inbred
 			result = tx.run(
-				' MATCH (trait: TreeTrait {name_lower: "variety code"}) '
+				' MATCH (trait: Trait {name_lower: "variety code"}) '
 				' MERGE (var:Variety {name_lower: toLower($variety)}) '
 				'	ON CREATE SET '
 				'		var.name = $variety, '
@@ -467,7 +479,7 @@ def create_variety_codes(tx, variety_codes):
 			)
 		else:  # hybrid
 			result = tx.run(
-				' MATCH (trait: TreeTrait {name_lower: "variety code"}) '
+				' MATCH (trait: Trait {name_lower: "variety code"}) '
 				' MERGE (mat:Variety {name_lower: toLower($maternal)}) '
 				'	ON CREATE SET '
 				'		mat.name = $maternal '
@@ -618,16 +630,12 @@ else:
 			print('creating indexes')
 			session.write_transaction(create_indexes, config.indexes)
 			session.write_transaction(create_partners, config.partners)
-			session.write_transaction(create_traits, 'traits/field_traits.csv', 'Field')
-			session.write_transaction(create_traits, 'traits/block_traits.csv', 'Block')
-			session.write_transaction(create_traits, 'traits/tree_traits.csv', 'Tree')
-			session.write_transaction(create_traits, 'traits/branch_traits.csv', 'Branch')
-			session.write_transaction(create_traits, 'traits/leaf_traits.csv', 'Leaf')
-			session.write_transaction(create_traits, 'traits/sample_traits.csv', 'Sample')
+			session.write_transaction(create_traits, 'traits/traits.csv')
 			session.write_transaction(create_conditions, 'traits/conditions.csv')
 			session.write_transaction(create_trials, config.trials)
 			session.write_transaction(create_variety_codes, config.variety_codes)
 			session.write_transaction(create_field_counter)
 			session.write_transaction(create_start_email)
-	else: print('Nothing done')
+	else:
+		print('Nothing done')
 	print ('Finished')

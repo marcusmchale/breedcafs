@@ -29,7 +29,7 @@ from flask_wtf.file import FileField, FileRequired
 # from app import app
 from app.models import (
 	TraitList,
-	ConditionsList,
+	FeaturesList,
 	SelectionList,
 	Parsers,
 	User
@@ -634,17 +634,31 @@ class CreateTraits(FlaskForm):
 
 # Record form (conditions)
 class RecordForm(FlaskForm):
+	data_type = SelectField(
+		[InputRequired()],
+		description="Conditions or Traits",
+		choices=[
+			('', 'Select data type'),
+			('condition', 'Condition'),
+			('trait', 'Trait')
+		]
+	)
 	level = SelectField(
 		'Level',
 		[InputRequired()],
 		description="Level for record",
 		choices=[
-			('', 'Select Level'),
+			('', 'Select data level'),
 			('field', 'Field'),
 			('block', 'Block'),
-			('tree', 'Tree')
+			('tree', 'Tree'),
+			('sample', 'Sample')
 		]
-		# default='field'
+	)
+	record_time = DateField(
+		'Record start',
+		[Optional()],
+		description='Time recorded'
 	)
 	record_start = DateField(
 		'Record start',
@@ -654,10 +668,7 @@ class RecordForm(FlaskForm):
 	record_end = DateField(
 		'Record end',
 		[Optional()],
-		description=(
-			'End of period'
-		)
-		# In allowing for open ended conditions, must handle retrieval/conflict comparisons carefully
+		description='End of period'
 	)
 	tree_id_list = StringField(
 		'Tree list',
@@ -668,13 +679,13 @@ class RecordForm(FlaskForm):
 		],
 		description="List of tree IDs, e.g. '1, 2-5' "
 	)
-	condition_group = SelectField(
-		'Condition group',
+	feature_group = SelectField(
+		'Feature group',
 		[InputRequired()],
-		description="Condition group to select fields for form/template",
+		description="Feature group to select fields for form/template",
 		choices=[("", "Select group")]
 	)
-	select_conditions = SelectMultipleField(
+	features = SelectMultipleField(
 		[InputRequired()],
 		coerce=unicode,
 		option_widget=widgets.CheckboxInput(),
@@ -687,23 +698,25 @@ class RecordForm(FlaskForm):
 	@staticmethod
 	def update():
 		form = RecordForm()
+		data_type = form.data_type.data if form.data_type.data not in ['', 'None'] else None
 		level = form.level.data if form.level.data not in ['', 'None'] else None
-		form.condition_group.choices += SelectionList.get_condition_groups(level)
-		selected_condition_group = form.condition_group.data if form.condition_group.data not in ['', 'None'] else None
-		if selected_condition_group:
-			conditions_details = ConditionsList.get_conditions_details(level, selected_condition_group)
+		if data_type:
+			form.feature_group.choices += SelectionList.get_feature_groups(data_type, level)
+		selected_feature_group = form.feature_group.data if form.feature_group.data not in ['', 'None'] else None
+		if selected_feature_group:
+			features_details = FeaturesList.get_features_details(data_type, level, selected_feature_group)
 
-			class ConditionFormDetailed(RecordForm):
+			class FeatureFormDetailed(RecordForm):
 				@classmethod
 				def append_field(cls, name, field):
 					setattr(cls, name, field)
 					return cls
 
-			for condition in conditions_details:
-				if condition['name_lower'] in form.data['select_conditions']:
-					if condition['format'] in ["numeric","percent"]:
-						min_value = condition['minimum'] if 'minimum' in condition else None
-						max_value = condition['maximum'] if 'maximum' in condition else None
+			for feature in features_details:
+				if feature['name_lower'] in form.data['features']:
+					if feature['format'] in ["numeric","percent"]:
+						min_value = feature['minimum'] if 'minimum' in feature else None
+						max_value = feature['maximum'] if 'maximum' in feature else None
 						if all([min_value, max_value]):
 							validator_message = (
 								'Must be between ' +
@@ -723,8 +736,8 @@ class RecordForm(FlaskForm):
 							)
 						else:
 							validator_message = "Number range error"
-						ConditionFormDetailed.append_field(
-							condition['name_lower'],
+						FeatureFormDetailed.append_field(
+							feature['name_lower'],
 							DecimalField(
 								[
 									InputRequired(),
@@ -734,20 +747,24 @@ class RecordForm(FlaskForm):
 										message=validator_message
 									)
 								],
-								description=condition['details']
+								description=feature['details']
 							)
 						)
-					elif condition['format'] == "categorical":
-						categories_list = [(category.lower(), category) for category in condition['category_list']]
-						ConditionFormDetailed.append_field(
-							condition['name_lower'],
+					elif feature['format'] == "categorical":
+						categories_list = [(category.lower(), category) for category in feature['category_list']]
+						FeatureFormDetailed.append_field(
+							feature['name_lower'],
 							SelectField(
 								[InputRequired()],
 								choices=categories_list,
-								description=condition['details']
+								description=feature['details']
 							)
 						)
-			form = ConditionFormDetailed()
-			conditions_list = [(condition['name_lower'], condition['name']) for condition in conditions_details]
-			form.select_conditions.choices = conditions_list
+			form = FeatureFormDetailed()
+			if data_type == 'trait':
+				form.record_time.validators = [
+					InputRequired()
+				]
+			features_list = [(feature['name_lower'], feature['name']) for feature in features_details]
+			form.features.choices = features_list
 		return form

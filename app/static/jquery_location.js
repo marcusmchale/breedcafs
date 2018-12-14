@@ -433,37 +433,6 @@ $("#submit_trees").click( function(e) {
 	});
 });
 
-//  update_defaults = function() {
-//  	const sel_field = $("#field").find(":selected").val();
-//  	if (sel_field !== "") {
-//  		$("#trees_start, #trees_end").prop("disabled", true);
-//  		$.ajax({
-//  			type: 'GET',
-//  			url: "/location/treecount/" + sel_field + '/',
-//  			success: function(response) {
-//  				if (response[0] === 0) {
-//  					$("#trees_end").val('');
-//  					$("#trees_start").val('');
-//  				}
-//  				else if (response[0] >= 0) {
-//  					$("#trees_end").val(response[0]);
-//  					//lazily return starting ID as 1
-//  					$("#trees_start").val(1);
-//  				}
-//  				//and be sure to allow the user to edit
-//  				$("#trees_start,#trees_end").prop("disabled", false);
-//  			},
-//  			error: function (error) {
-//  				console.log(error);
-//  			}
-//  		});
-//  	} else {
-//  		//on deselection of field return empty values to input boxes
-//  		$("#trees_start,#trees_end").val('')
-//  	}
-//  };
-//
-
 remove_flash = function() {
 	$(".flash").remove();
 };
@@ -478,9 +447,6 @@ $("input").keypress( function(e) {
 });
 
 
-$('#level, #country, #region, #farm, #field, #block').change(update_item_count);
-
-
 $('#tree_id_list').keypress(function(e){
 	if (e.keyCode === 13 || e.keyCode === 10) {
 		update_item_count();
@@ -488,10 +454,9 @@ $('#tree_id_list').keypress(function(e){
 });
 
 $( window ).load(update_countries).load(update_item_count);
-$("#country").change(update_regions).change(update_farms).change(update_fields).change(update_blocks).change(remove_flash);
-$("#region").change(update_farms).change(update_fields).change(update_blocks).change(remove_flash);
-$("#farm").change(update_fields).change(update_blocks).change(remove_flash);
-$('#field').change(update_blocks).change(remove_flash); //.change(update_defaults)
+$("#country").change(update_regions).change(update_farms).change(update_fields).change(update_blocks).change(update_item_count).change(remove_flash);
+$("#region").change(update_farms).change(update_fields).change(update_blocks).change(update_item_count).change(remove_flash);
+$("#farm").change(update_fields).change(update_blocks).change(update_item_count).change(remove_flash);
+$('#field').change(update_blocks).change(update_item_count).change(remove_flash);
 
-
-
+$('#level, #block').change(update_item_count);

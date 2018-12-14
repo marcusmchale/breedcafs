@@ -104,7 +104,6 @@ class Chart:
 			field_uid=None,
 			block_uid=None,
 			tree_id_list=None
-
 	):
 		if tree_id_list:
 			try:

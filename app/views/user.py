@@ -201,15 +201,19 @@ def confirm_password_reset(token):
 
 @app.route('/user_page', methods=['GET', 'POST'])
 def user_page():
-	if 'username' not in session:
-		flash('Please log in')
-		return redirect(url_for('login'))
-	else:
-		affiliation_form = AffiliationForm.update(session['username'])
-		return render_template(
-			'user_page.html',
-			affiliation_form = affiliation_form
-		)
+	try:
+		if 'username' not in session:
+			flash('Please log in')
+			return redirect(url_for('login'))
+		else:
+			affiliation_form = AffiliationForm.update(session['username'])
+			return render_template(
+				'user_page.html',
+				affiliation_form = affiliation_form
+			)
+	except (ServiceUnavailable, AuthError):
+		flash("Database unavailable")
+		return redirect(url_for('index'))
 
 
 @app.route('/user/get_affiliations', methods=['GET'])

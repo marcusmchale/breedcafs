@@ -23,7 +23,7 @@ from app.forms import (
 from app.models import (
 	SelectionList,
 	Record,
-	ConditionsList,
+	FeaturesList,
 	Parsers
 )
 
@@ -32,15 +32,15 @@ from flask.views import MethodView
 from datetime import datetime, timedelta
 
 
-class ListConditionGroups(MethodView):
-	def get(self, level):
+class ListFeatureGroups(MethodView):
+	def get(self, data_type, level):
 		if 'username' not in session:
 			flash('Please log in')
 			return redirect(url_for('login'))
 		else:
 			try:
-				condition_groups = SelectionList.get_condition_groups(level)
-				response = make_response(jsonify(condition_groups))
+				feature_groups = SelectionList.get_feature_groups(data_type, level)
+				response = make_response(jsonify(feature_groups))
 				response.content_type = 'application/json'
 				return response
 			except (ServiceUnavailable, AuthError):
@@ -48,15 +48,15 @@ class ListConditionGroups(MethodView):
 				return redirect(url_for('index'))
 
 
-class ListConditionsDetails(MethodView):
-	def get(self, level, group):
+class ListFeaturesDetails(MethodView):
+	def get(self, data_type, level, group):
 		if 'username' not in session:
 			flash('Please log in')
 			return redirect(url_for('login'))
 		else:
 			try:
-				conditions_details = ConditionsList.get_conditions_details(level, group)
-				response = make_response(jsonify(conditions_details))
+				features_details = FeaturesList.get_features_details(data_type, level, group)
+				response = make_response(jsonify(features_details))
 				response.content_type = 'application/json'
 				return response
 			except (ServiceUnavailable, AuthError):
@@ -97,6 +97,7 @@ def submit_records():
 				record_form.validate_on_submit(),
 				location_form.validate_on_submit()
 			]):
+				data_type = request.form['data_type'] if request.form['data_type'] != '' else None
 				level = request.form['level'] if request.form['level'] != '' else None
 				country = request.form['country'] if request.form['country'] != '' else None
 				region = request.form['region'] if request.form['region'] != '' else None
@@ -106,6 +107,10 @@ def submit_records():
 				tree_id_list = (
 					Parsers.parse_range_list(request.form['tree_id_list']) if request.form['tree_id_list'] != '' else None
 				)
+				record_time = int(
+					(datetime.strptime(request.form['record_time'], '%Y-%m-%d') - datetime(1970, 1, 1)).total_seconds()
+					* 1000
+				) if request.form['record_time'] != '' else None
 				start_time = int(
 					(datetime.strptime(request.form['record_start'], '%Y-%m-%d') - datetime(1970, 1, 1)).total_seconds()
 					* 1000
@@ -118,18 +123,19 @@ def submit_records():
 						datetime(1970, 1, 1)
 					).total_seconds() * 1000
 				) - 1 if request.form['record_end'] != '' else None
-				if all([end_time, start_time >= end_time]):
+				if all([data_type == 'condition', end_time, start_time >= end_time]):
 					return jsonify({
 						'submitted': 'Please make sure the start date is before the end date'
 					})
-				if 'select_conditions' in request.form:
-					selected_conditions = request.form.getlist('select_conditions')
+				if 'select_features' in request.form:
+					selected_features = request.form.getlist('select_features')
 				else:
-					selected_conditions = None
-				conditions_dict = {}
-				for condition in selected_conditions:
-					conditions_dict[condition] = request.form[condition]
+					selected_features = None
+				features_dict = {}
+				for feature in selected_features:
+					features_dict[feature] = request.form[feature]
 				record_data = {
+					'data_type': data_type,
 					'level': level,
 					'country': country,
 					'region': region,
@@ -137,10 +143,11 @@ def submit_records():
 					'field_uid': field_uid,
 					'block_uid': block_uid,
 					'tree_id_list': tree_id_list,
+					'record_time': record_time,
 					'start_time': start_time,
 					'end_time': end_time,
-					'selected_conditions': selected_conditions,
-					'conditions_dict': conditions_dict
+					'selected_features': selected_features,
+					'features_dict': features_dict
 				}
 				result = Record(session['username']).submit_records(record_data)
 				return result

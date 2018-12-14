@@ -18,7 +18,8 @@ from app.models import (
 	SelectionList,
 	User,
 	Download,
-	Samples,
+	FindFieldItems,
+	AddFieldItems,
 	Parsers
 )
 from app.forms import (

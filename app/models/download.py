@@ -1,7 +1,6 @@
 from app import app, os
 import grp
 from app.cypher import Cypher
-from samples import Samples
 from neo4j_driver import (
 	get_driver,
 	neo4j_query
@@ -16,7 +15,10 @@ from app.models import(
 import unicodecsv as csv
 from datetime import datetime
 from app.models import (
-	Fields,
+	AddFieldItems,
+	FindFieldItems,
+	AddLocations,
+	FindLocations,
 	TraitList
 )
 from xlsxwriter import Workbook
@@ -69,7 +71,10 @@ class Download:
 	):
 		if create_new_items:
 			if level == 'branch':
-				id_list = Fields.add_branches(
+				id_list = AddFieldItems(self.username, field_uid).add_samples(
+
+
+
 					field_uid,
 					per_tree_replicates,
 					tree_id_list=tree_id_list,

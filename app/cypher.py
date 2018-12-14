@@ -1160,7 +1160,7 @@ class Cypher:
 		' MERGE '
 		'	(d:Data { '
 		'		time : time, '
-		'		replicate: CASE WHEN replicate IS NULL THEN 1 ELSE toInteger(replicate) END '
+		'		replicate: CASE WHEN replicate IS NULL THEN NULL ELSE toInteger(replicate) END '
 		'	}) '
 		'	-[:DATA_FOR]->(item_trait) '
 		'	ON MATCH SET '
@@ -1933,17 +1933,4 @@ class Cypher:
 		' (id(region) + "_" + id(country)) as r_id, '
 		' id(region) as r_start, '
 		' id(country) as r_end '
-	)
-	match_record_submission_node = (
-		' MATCH (:User {username_lower: toLower($username)}) '
-		'	-[: SUBMITTED]->(: Submissions) '
-		'	-[: SUBMITTED]->(rs: RecordSubmissions) '
-		' RETURN rs '
-	)
-
-	merge_record_submission_node = (
-		' MERGE (:User {username_lower: toLower($username)}) '
-		'	-[: SUBMITTED]->(sub: Submissions) '
-		' MERGE (sub) '
-		'	-[: SUBMITTED]->(: RecordSubmissions) '
 	)

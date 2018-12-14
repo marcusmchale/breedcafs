@@ -16,8 +16,8 @@ def upload():
 			form = UploadForm()
 			return render_template(
 				'upload.html',
-				form = form,
-				title = 'Upload'
+				form=form,
+				title='Upload'
 			)
 		except (ServiceUnavailable, AuthError):
 			flash("Database unavailable")
