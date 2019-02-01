@@ -411,23 +411,17 @@ class AddTreesForm(FlaskForm):
 class CollectForm(FlaskForm):
 	min = 1
 	max = 1000000
-	trait_level = SelectField(
-		'Trait level',
+	level = SelectField(
+		'Level',
 		[InputRequired()],
+		description="Level for record",
 		choices=[
-			('', 'Select Level'),
+			('', 'Select level'),
 			('field', 'Field'),
 			('block', 'Block'),
 			('tree', 'Tree'),
-			('branch', 'Branch'),
-			('leaf', 'Leaf'),
 			('sample', 'Sample')
 		]
-	)
-	template_format = SelectField(
-		'Template format',
-		[InputRequired()],
-		choices=[('', 'Select Format'), ('xlsx', 'Table (xlsx)'), ('csv', 'Table (CSV)'), ('fb', 'Field Book')]
 	)
 	tree_id_list = StringField(
 		'Tree list',
@@ -438,24 +432,6 @@ class CollectForm(FlaskForm):
 		],
 		description="List of tree IDs, e.g. '1, 2-5' "
 	)
-	branch_id_list = StringField(
-		'Branch list',
-		[
-			Optional(),
-			Regexp("^[0-9,-]*$", message='List should be comma separated with hyphens for ranges'),
-			range_list_check
-		],
-		description="List of branch IDs, e.g. '1, 2-5' "
-	)
-	leaf_id_list = StringField(
-		'Tree list',
-		[
-			Optional(),
-			Regexp("^[0-9,-]*$", message='List should be comma separated with hyphens for ranges'),
-			range_list_check
-		],
-		description="List of leaf IDs, e.g. '1, 2-5' "
-	)
 	sample_id_list = StringField(
 		'Tree list',
 		[
@@ -465,83 +441,20 @@ class CollectForm(FlaskForm):
 		],
 		description="List of sample IDs, e.g. '1, 2-5' "
 	)
-	samples_pooled = SelectField(
-		'Samples are pooled from multiple trees',
+	per_item_count = IntegerField(
+		'Samples to register per item',
+		[
+			Optional(),
+			NumberRange(min=1, max=1000, message='Maximum of 1000 ids per item per submission')
+		],
+		description="Samples to register per item"
+	)
+	template_format = SelectField(
+		'Template format',
 		[InputRequired()],
-		choices=[('single', 'One tree per sample'), ('multiple', 'Multiple trees per sample')]
+		choices=[('', 'Select Format'), ('xlsx', 'Table (xlsx)'), ('csv', 'Table (CSV)')]
 	)
-	samples_count = IntegerField(
-		'Sample count',
-		[NumberRange(min=1, max=10000, message='Register up to 10000 samples per field')],
-		description="Sample count"
-	)
-	date_from = DateField(
-		'Date start (YYYY-mm-dd): ',
-		[Optional()],
-		format='%Y-%m-%d',
-		description='Start date'
-	)
-	date_to = DateField(
-		'Date end (YYYY-mm-dd): ',
-		[Optional()],
-		format='%Y-%m-%d',
-		description='End date'
-	)
-	per_tree_replicates = IntegerField(
-		'Replicates per tree',
-		[
-			Optional(),
-			NumberRange(min=1, max=1000, message='Maximum of 1000 replicates per tree per submission')
-		],
-		description="Items per tree"
-	)
-	per_sample_replicates = IntegerField(
-		'Measures per sample',
-		[
-			Optional(),
-			NumberRange(min=1, max=10000, message='Maximum of 10000 measures per sample per submission')
-		],
-		description="Replicates per sample"
-	)
-	date_collected = DateField(
-		'Date samples collected (YYYY-mm-dd): ',
-		[Optional()],
-		format='%Y-%m-%d',
-		description='Date samples collected'
-	)
-	create_new_items = SelectField(
-		'Find existing or create new items',
-		[InputRequired()],
-		choices=[('existing', 'Find existing items'), ('new', 'Create new items')]
-	)
-	tissue = SelectField(
-		'Tissue',
-		[
-			Optional(),
-		],
-		description='Tissue'
-	)
-	harvest_condition = SelectField(
-		'Harvest condition',
-		[
-			Optional(),
-		],
-		description='Harvest condition'
-	)
-	submit_collect = SubmitField('Generate file/s')
-
-	@staticmethod
-	def update():
-		form = CollectForm()
-		tissues = SelectionList.get_tissues()
-		harvest_conditions = SelectionList.get_harvest_conditions()
-		form.tissue.choices = [('', 'Select Tissue')] + tissues
-		form.harvest_condition.choices = [('', 'Select Harvest condition')] + harvest_conditions
-		if form.samples_pooled == 'single':
-			form.samples_count.validators.insert(0, InputRequired())
-		else:
-			form.samples_count.validators.insert(0, Optional())
-		return form
+	submit_collect = SubmitField('Register samples')
 
 
 # upload
@@ -648,7 +561,7 @@ class RecordForm(FlaskForm):
 		[InputRequired()],
 		description="Level for record",
 		choices=[
-			('', 'Select data level'),
+			('', 'Select level'),
 			('field', 'Field'),
 			('block', 'Block'),
 			('tree', 'Tree'),
@@ -679,13 +592,22 @@ class RecordForm(FlaskForm):
 		],
 		description="List of tree IDs, e.g. '1, 2-5' "
 	)
+	sample_id_list = StringField(
+		'Sample list',
+		[
+			Optional(),
+			Regexp("^[0-9,-]*$", message='List should be comma separated with hyphens for ranges'),
+			range_list_check
+		],
+		description="List of sample IDs, e.g. '1, 2-5' "
+	)
 	feature_group = SelectField(
 		'Feature group',
 		[InputRequired()],
 		description="Feature group to select fields for form/template",
 		choices=[("", "Select group")]
 	)
-	features = SelectMultipleField(
+	select_features = SelectMultipleField(
 		[InputRequired()],
 		coerce=unicode,
 		option_widget=widgets.CheckboxInput(),
@@ -713,8 +635,8 @@ class RecordForm(FlaskForm):
 					return cls
 
 			for feature in features_details:
-				if feature['name_lower'] in form.data['features']:
-					if feature['format'] in ["numeric","percent"]:
+				if feature['name_lower'] in form.data['select_features']:
+					if feature['format'] in ["numeric", "percent"]:
 						min_value = feature['minimum'] if 'minimum' in feature else None
 						max_value = feature['maximum'] if 'maximum' in feature else None
 						if all([min_value, max_value]):
@@ -760,11 +682,19 @@ class RecordForm(FlaskForm):
 								description=feature['details']
 							)
 						)
+					elif feature['format'] == "boolean":
+						FeatureFormDetailed.append_field(
+							feature['name_lower'],
+							BooleanField(
+								[InputRequired()],
+								description=feature['details']
+							)
+						)
 			form = FeatureFormDetailed()
 			if data_type == 'trait':
 				form.record_time.validators = [
 					InputRequired()
 				]
 			features_list = [(feature['name_lower'], feature['name']) for feature in features_details]
-			form.features.choices = features_list
+			form.select_features.choices = features_list
 		return form

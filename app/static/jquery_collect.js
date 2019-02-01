@@ -1,257 +1,106 @@
-//TRAITS
-//Set trait level undefined by default and only display traits when level selected
-traits = $('#field_traits,#block_traits,#tree_traits,#branch_traits,#leaf_traits,#sample_traits');
-$('#trait_selection').hide();
-traits.hide();
-$('#location').hide();
-level_forms = $('#trees, #branches_leaves_samples');
-level_forms.hide();
+const level_select = $('#level');
+const location_div = $('#location');
+const block_div = $('#block_div');
+const tree_div = $('#tree_selection_div');
+const sample_div = $('#sample_selection_div');
+const item_count_div = $('#item_count_div');
+const replicates_div = $('#replicates');
 
-update_traits = function() {
-	remove_flash();
-	if (this.value==='') {
-		$('#trait_selection').hide();
-		traits.hide();
-		$('#location').hide();
-		level_forms.hide();
-	}
-	else if (this.value === 'field') {
-		$('#location').show();
-		$('#field, #block').hide();
-		$('#trait_selection').show();
-		$('#block_traits, #tree_traits, #branch_traits, #leaf_traits, #sample_traits').hide();
-		$('#field_traits').show();
-		level_forms.hide();
-}
-	else if (this.value === 'block') {
-		$('#location').show();
-		$('#field').show();
-		$('#block').hide();
-		$('#trait_selection').show();
-		$('#field_traits, #tree_traits, #branch_traits, #leaf_traits, #sample_traits').hide();
-		$('#block_traits').show();
-		level_forms.hide();
-	}
-	else if (this.value === 'tree') {
-		$('#location').show();
-		$('#field, #block').show();
-		$('#trait_selection').show();
-		$('#field_traits,#block_traits,#branch_traits,#leaf_traits,#sample_traits').hide();
-		$('#tree_traits').show();
-		level_forms.show();
-		$('#trees').show();
-		$('#branches_leaves_samples').hide();
-		update_replicates();
-	}
-	else if (this.value === 'branch') {
-		$('#location').show();
-		$('#field, #block').show();
-		$('#trait_selection').show();
-		$('#field_traits,#block_traits,#tree_traits,#leaf_traits,#sample_traits').hide();
-		$('#branch_traits').show();
-		level_forms.show();
-		$('#trees').show();
-		$('#branches_leaves_samples').show();
-		$('#branches').show()
-		$('#leaves, #samples').hide();
-		update_replicates();
-	}
-	else if (this.value === 'leaf') {
-		$('#location').show();
-		$('#field, #block').show();
-		$('#trait_selection').show();
-		$('#field_traits,#block_traits,#tree_traits,#branch_traits,#sample_traits').hide();
-		$('#leaf_traits').show();
-		level_forms.show();
-		$('#trees').show();
-		$('#branches_leaves_samples').show();
-		$('#leaves').show()
-		$('#branches, #samples').hide();
-		update_replicates();
-	}
-	else if (this.value === 'sample') {
-		$('#location').show();
-		$('#field, #block').show();
-		$('#trait_selection').show();
-		$('#field_traits,#block_traits,#tree_traits,#branch_traits,#leaf_traits').hide();
-		$('#sample_traits').show();
-		level_forms.show();
-		$('#trees').show();
-		$('#branches_leaves_samples').show();
-		$('#samples').show()
-		$('#branches, #leaves').hide();
-		update_replicates();
-	}
+
+update_item_count = function() {
+	const sel_level = $("#level").find(":selected").val();
+	if (sel_level && sel_level !== "") {
+		const item_count_text = $('#item_count_div a:eq(0)');
+		const item_type_text = $('#item_count_div a:eq(1)');
+        const sel_country = $("#country").find(":selected").val();
+        const sel_region = $("#region").find(":selected").val();
+        const sel_farm = $("#farm").find(":selected").val();
+        const sel_field = $("#field").find(":selected").val();
+        const sel_block = $("#block").find(":selected").val();
+        const tree_id_list = $("#tree_id_list").val();
+        const sample_id_list = $("#sample_id_list").val();
+        $.ajax({
+            type: "GET",
+            url: (
+                "/item_count"
+                + "?level=" + sel_level
+                + "&country=" + sel_country
+                + "&region=" + sel_region
+                + "&farm=" + sel_farm
+                + "&field_uid=" + sel_field
+                + "&block_uid=" + sel_block
+				+ "&tree_id_list=" + tree_id_list
+                + "&sample_id_list=" + sample_id_list
+            ),
+            success: function (response) {
+            	if (isNaN(response['item_count']) || response['item_count'] === 0) {
+                    item_count_text.replaceWith(
+                        "<a>None</a>"
+                    );
+                    item_type_text.replaceWith(
+                        "<a></a>"
+                    );
+                } else {
+                    item_count_text.replaceWith(
+                        "<a>" + response['item_count'] + "</a>"
+                    );
+                    const item_type_text_entry = (response['item_count'] === 1)
+                        ? sel_level.toString() : sel_level.toString() + 's';
+                    item_type_text.replaceWith(
+                        "<a>" + item_type_text_entry + "</a>"
+                    );
+                }
+            },
+            error: function (error) {
+            	item_count_text.replaceWith(
+            		"<a>" + error.statusText + "</a>"
+				);
+            	item_type_text.replaceWith(
+					"<a></a>"
+				);
+            }
+        });
+    }
 };
 
-update_existing_ids = function() {
-	remove_flash();
-	var selection=$('#create_new_items').val()
-	if (selection === 'existing') {
-	     $('.new').hide();
-	     $('.existing').show();
-	}
-	else if (selection === 'new') {
-	     $('.new').show();
-	     $('.existing').hide();
-	     $('#email_checkbox').prop("checked", true);
-	}
-	//var trait_level=$('#trait_level').val();
-	//if (trait_level === 'sample') {
-	//	$('#samples_pooled').show();
-	//	$('#per_sample').show();
-	//}
-	//else {
-	//	$('#samples_pooled').hide();
-    //    $('#per_sample').hide();
-    //}
-};
-
-
-$('#trait_level').change(update_traits);
-$('#create_new_items').change(update_existing_ids);
-
-//update replicates div
-update_replicates = function () {
-    var level = $('#trait_level').val();
-    var pooled = $('#samples_pooled').val();
-    if (level === 'sample') {
-        $('.samples').show();
-        if (pooled === 'single') {
-            $('.single').show();
-            $('.pooled').hide();
-            $('#block').prop('disabled', false);
-            $('#trees_start').prop('disabled', false);
-            $('#trees_end').prop('disabled', false);
+level_update = function() {
+    const level = level_select.val();
+    if (level === "") {
+        location_div.hide();
+        block_div.hide();
+        tree_div.hide();
+        sample_div.hide();
+        item_count_div.hide();
+        replicates_div.hide();
+    } else {
+        location_div.show();
+        item_count_div.show();
+        replicates_div.show();
+        if (level === "field") {
+            block_div.hide();
+            tree_div.hide();
+            sample_div.hide();
         }
-        else {
-            $('.single').hide();
-            $('.pooled').show();
-            $('#block').prop('disabled', true);
-            $('#trees_start').prop('disabled', true);
-            $('#trees_end').prop('disabled', true);
+        else if (level === "block") {
+            block_div.show();
+            tree_div.hide();
+            sample_div.hide();
+        }
+        else if (level === 'tree') {
+            block_div.show();
+            tree_div.show();
+            sample_div.hide();
+        }
+        else if (level === 'sample') {
+            block_div.show();
+            tree_div.show();
+            sample_div.show();
         }
     }
-    else {
-    	$('.samples').hide();
-    	$('.single').show();
-    	$('.pooled').hide();
-    	$('#block').prop('disabled', false);
-    	$('#trees_start').prop('disabled', false);
-    	$('#trees_end').prop('disabled', false);
-	}
-}
-
-$('#samples_pooled').change(update_replicates);
-
-update_replicates();
-update_existing_ids();
-
-
-//remove flash message on change of data format select box
-$('#data_format').change(function () {
-	$(".flash").remove();
-});
-
-checkbox_formatting = function () {
-	if ($(this).closest("dl").find("li > input:checked").length === $(this).closest("dl").find("li > input").length) {
-		$(this).closest("dl").find('dt > label').css('text-decoration', 'none');
-		$(this).closest("dl").find('dt > input').prop("checked", true);
-	}
-	else if ($(this).closest("dl").find("li > input:checked").length > 0) {
-		$(this).closest("dl").find('dt > label').css('text-decoration', 'underline');
-		$(this).closest("dl").find('dt > input').prop("checked", false);
-	}
-	else {
-		$(this).closest("dl").find('dt > label').css('text-decoration', 'none');
-		$(this).closest("dl").find('dt > input').prop("checked", false);
-	}
+    update_item_count();
+    remove_flash();
 };
 
-$( window ).load(function () {
-	$('dl').each(checkbox_formatting);
-})
+$(window).on('load', level_update);
 
-//Add select all checkboxes to the form
-$('dl').each( function () {
-	//make trait groups look clickable
-	$(this).find('dt > label').mouseover(function () {
-	    $(this).css('font-weight', 'bold');
-	});
-	//make trait groups look clickable
-	$(this).find('dt > label').mouseout(function () {
-	    $(this).css('font-weight', 'normal');
-	});
-	//expand collapse trait details on click label
-	$(this).find('dt > label').click(function () {
-		$(this).parent().next().toggle();
-	});
-	//and start collapsed
-	$(this).find('dd').hide()
-	//get trait ul id
-	trait_id = $(this).find('dd > ul').attr('id');
-	//add checkbox
-	$(this).find('dt > label').before("<input id='select_all_" + trait_id + "' type='checkbox'>");
-	//on checkbox change toggle children true/false
-	$('[id="select_all_' + trait_id + '"]').change(function () {
-		$(this).parent().find('label').css('text-decoration', 'none');
-		if (this.checked) {
-			$(this).parent().next().find("input").prop("checked", true);
-		}
-		else {
-			$(this).parent().next().find("input").prop("checked", false);
-		}
-	});
-	//make trait groups underlined if any items checked within
-	$(this).find('li > input').change(checkbox_formatting);
-});
-
-//expand the general tab as defaults are set (and as example)
-//$('#select_all_field-general').parent().next().show();
-//$('#select_all_block-general').parent().next().show();
-//$('#select_all_tree-general').parent().next().show();
-//$('#select_all_sample-general').parent().next().show();
-
-//submit collect button
-$("#submit_collect").click( function(e) {
-	e.preventDefault();
-	remove_flash();
-	const wait_message = "Please wait for files to be generated"
-	const flash_wait = "<div id='files_flash' class='flash'>" + wait_message + "</div>";
-	$(this).parent().after(flash_wait);
-	$.ajax({
-	    url: "/collect/generate_files",
-	    data: $("form").serialize(),
-		type: 'POST',
-		success: function(response) {
-			if (response.hasOwnProperty('submitted')) {
-				const flash_submitted = "<div id='files_flash' class='flash'>" + response.submitted + "</div>";
-				$("#files_flash").replaceWith(flash_submitted);
-			} else {
-				if (response.hasOwnProperty('errors')) {
-                    const errors= response['errors'];
-                    for (let i = 0; i < errors.length; i++) {
-                        for (const key in errors[i]) {
-                            if (errors[i].hasOwnProperty(key)) {
-                                const flash = "<div id='flash_" + key + "' class='flash'>" + errors[i][key][0] + "</div>";
-                                $('[id="' + key + '"').after(flash);
-                            }
-                        }
-                    }
-                }
-			}
-		}
-    })
-})
-
-
-
-//button to reset form values
-//$("#custom_samples_csv").after('<br><input id="reset_form_button" name="Reset Form" value="Clear Form" type="submit")><br>')
-
-//$("#reset_form_button").click( function(e) {
-//	e.preventDefault();
-//	$("form").find('input:text').val('');
-//	$("form").find('select').val('');
-//	$(".flash").remove();
-//	})
+level_select.change(level_update);

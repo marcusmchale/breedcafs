@@ -2,93 +2,60 @@
 {% block body %}
 <div class="text_body">
 	<h2>Collect</h2>
-        <p>Here you can generate templates for data collection and sample registration</p>
-        <p>Select the appropriate filters to identify the items of interest</p>
-		{% from "_formhelpers_location_fields.html" import render_field %}
+        <p>Use the filters to identify items to be sampled. </p>
+    {% from "_formhelpers_location_fields.html" import render_field %}
 	<form>
-		{{ collect_form.csrf_token }}
-		<!--{{ location_form.csrf_token }}-->
 		<div id="level_choice">
-		    <h3>Level</h3>
-			{{ collect_form.trait_level }}
+		    <h3>Type of item to be sampled</h3>
+			{{ render_field (collect_form.level) }}
+            <p>
+                If the samples are representative of a single registered item
+                then select the level corresponding to that item. <br>
+                If the samples are representative of a collection of items (i.e. pooled from multiple trees)
+                then select "Field" and later associate each sample with a list of tree IDs
+                by completing and submitting the sample details template generated here. <br>
+                For sub-sampling, i.e. splitting a sample into multiple representative samples, select "Sample".
+            </p>
 		</div>
-        <div id="location" title="Select a location">
-            <h3>Fields, Blocks and/or Trees selection</h3>
-                <dt>{{ location_form.country }}</dt>
-                <dt>{{ location_form.region }}</dt>
-                <dt>{{ location_form.farm }}</dt>
-                <dt>{{ location_form.field }}</dt>
-    			<dt>{{ location_form.block }}</dt>
+        <div id="location">
+            <h3>Filter to select specific item/s</h3>
+            <dd>{{ render_field (location_form.country) }}</dd>
+            <dd>{{ render_field (location_form.region) }}</dd>
+            <dd>{{ render_field (location_form.farm) }}</dd>
+            <dd>{{ render_field (location_form.field) }}</dd>
         </div>
-		<div id=trees>
-            <div id="tree_ids" title="ID is the integer from the end of a UID, e.g. from 1_T2 the ID is 2">
-                    <dt>
-                        {{ collect_form.tree_id_list(placeholder=collect_form.tree_id_list.description) }}
-                    </dt>
-            </div>
-		</div>
-        <div id="branches_leaves_samples">
-            <h3>Branches, Leaves or Samples creation and/or selection</h3>
-            <p>Items will be created for (or selected from) trees corresponding to the above selection</p>
-            <dt>{{ collect_form.create_new_items }}</dt>
-            <div id="branches">
-                <div id=branch_ids class="existing" title="ID is the integer from the end of a UID, e.g. from 1_R2 the ID is 2">
-                    <dl>
-                        <dt>
-                            {{ collect_form.branch_id_list(placeholder=collect_form.branch_id_list.description) }}
-                        </dt>
-                    </dl>
-                </div>
-            </div>
-            <div id="leaves">
-                <div id="leaf_ids" class="existing" title="ID is the integer from the end of a UID, e.g. from 1_L2 the ID is 2">
-                    <dl>
-                        <dt>
-                            {{ collect_form.leaf_id_list(placeholder=collect_form.leaf_id_list.description) }}
-                        </dt>
-                    </dl>
-                </div>
-            </div>
-            <div id="samples">
-                <div id="sample_type">
-					    <dt>{{ collect_form.tissue }}</dt>
-                        <dt>{{ collect_form.harvest_condition }}</dt>
-                </div>
-                <div id="sample_ids" class="existing">
-                       <dt>
-                           {{ collect_form.date_from(placeholder = collect_form.date_from.description) }}
-                           {{ collect_form.date_to(placeholder = collect_form.date_to.description) }}
-                       </dt>
-                       <dt>
-                           {{ collect_form.sample_id_list(placeholder = collect_form.sample_id_list.description) }}
-                       </dt>
-                </div>
-            </div>
-            <div id="replicates" class="new">
-                <dt class="samples">{{collect_form.samples_pooled(placeholder = collect_form.samples_pooled.description)}}</dt>
-                <dt class="single">{{collect_form.per_tree_replicates(placeholder = collect_form.per_tree_replicates.description)}}</dt>
-                <dt class="samples pooled">{{collect_form.samples_count(placeholder = collect_form.samples_count.description)}}</dt>
-                <div id="item_count_div"></div>
-                <dt class="samples" title="Optionally create multiple rows per sample in template">{{collect_form.per_sample_replicates(placeholder = collect_form.per_sample_replicates.description)}}</dt>
-            </div>
+        <div id="block_div">
+            <dd>{{ render_field (location_form.block) }}</dd>
         </div>
-        <div id=trait_selection>
-            <h3>Trait Selection</h3>
-			{% include 'traits_form.html' %}
-		</div>
+        <div id = 'tree_selection_div' title="ID is the integer from the end of a UID, e.g. from 1_T2 the ID is 2">
+            <dd>{{ render_field (collect_form.tree_id_list) }}</dd>
+        </div>
+        <div id = 'sample_selection_div' title="ID is the integer from the end of a UID, e.g. from 1_S2 the ID is 2">
+            <dd>{{ render_field (collect_form.sample_id_list) }}</dd>
+        </div>
+        <div id="item_count_div">
+            <h3>Selection</h3>
+            <p><a>0</a> <a>items</a></p>
+        </div>
+         <div id="replicates">
+            <dt class="single">
+                {{ render_field (collect_form.per_item_count) }}
+            </dt>
+        </div>
+        <div id="file_creation">
 		<h3>File type</h3>
-			<dt>{{ collect_form.template_format }} </dt>
+			<dt>{{ render_field (collect_form.template_format) }} </dt><br><br>
 			<dt>
-				{{ collect_form.submit_collect }}
+				{{ render_field (collect_form.submit_collect) }}
 				<input id="email_checkbox" name="email_checkbox" placeholder="" value="y" type="checkbox">
 				<a>Email a copy</a>
 			</dt>
 		</div>
+	{{ collect_form.csrf_token }}
 	</form>
 </div>
 <script src="{{ url_for('static', filename='jquery_1.8.3_min.js') }}"></script>
 <script src="{{ url_for('static', filename='jquery_location.js') }}"></script>
 <script src="{{ url_for('static', filename='jquery_collect.js') }}"></script>
 <script src="{{ url_for('static', filename='jquery-ui-1.12.1.custom/jquery-ui.js') }}"></script>
-<script src="{{ url_for('static', filename='jquery_samples.js') }}"></script>
 {% endblock %}

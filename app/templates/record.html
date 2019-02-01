@@ -6,13 +6,12 @@
 			<div>
                 <form>
                     <dl>
-                        <h3>Data type</h3>
+                        <h3>Select the type of data to record</h3>
                         <dd>{{  record_form.data_type }}</dd>
-                        <h3>Level</h3>
+                        <h3>Select the type of items to record data for</h3>
                         <dd>{{  record_form.level }}</dd>
                         <div id="location">
-                            <h3>Filter for item/s to associate with this record</h3>
-                            {{ location_form.csrf_token }}
+                            <h3>Filter to select specific item/s</h3>
                             <dd>{{ render_field (location_form.country) }}</dd>
                             <dd>{{ render_field (location_form.region) }}</dd>
                             <dd>{{ render_field (location_form.farm) }}</dd>
@@ -23,6 +22,9 @@
                         </div>
                         <div id = 'tree_selection_div' title="ID is the integer from the end of a UID, e.g. from 1_T2 the ID is 2">
                             <dd>{{ render_field (record_form.tree_id_list) }}</dd>
+                        </div>
+                        <div id = 'sample_selection_div' title="ID is the integer from the end of a UID, e.g. from 1_S2 the ID is 2">
+                            <dd>{{ render_field (record_form.sample_id_list) }}</dd>
                         </div>
                         <div id="item_count_div">
                             <h3>Selection</h3>
@@ -52,6 +54,7 @@
                             </div>
                         </div>
                     </dl>
+                    {{ record_form.csrf_token }}
                 </form>
 			</div>
 </div>

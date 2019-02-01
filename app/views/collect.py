@@ -40,30 +40,67 @@ def collect():
 		return redirect(url_for('login'))
 	else:
 		try:
-			collect_form = CollectForm().update()
+			collect_form = CollectForm()
 			location_form = LocationForm.update()
-			field_traits_form = CreateTraits().update('field')
-			block_traits_form = CreateTraits().update('block')
-			tree_traits_form = CreateTraits().update('tree')
-			branch_traits_form = CreateTraits().update('branch')
-			leaf_traits_form = CreateTraits().update('leaf')
-			sample_traits_form = CreateTraits().update('sample')
 			return render_template(
 				'collect.html',
 				location_form=location_form,
 				collect_form=collect_form,
-				level='all',
-				field_traits_form=field_traits_form,
-				block_traits_form=block_traits_form,
-				tree_traits_form=tree_traits_form,
-				branch_traits_form=branch_traits_form,
-				leaf_traits_form=leaf_traits_form,
-				sample_traits_form=sample_traits_form,
 				title='Collect'
 			)
 		except (ServiceUnavailable, AuthError):
 			flash("Database unavailable")
 			return redirect(url_for('index'))
+
+
+@app.route('/collect/register_samples', methods=['GET', 'POST'])
+def register_samples():
+	if 'username' not in session:
+		flash('Please log in')
+		return redirect(url_for('login'))
+	else:
+		try:
+			collect_form = CollectForm()
+			location_form = LocationForm.update(optional=True)
+			if all([
+				collect_form.validate_on_submit(),
+				location_form.validate_on_submit()
+			]):
+				level = request.form['level'] if request.form['level'] != '' else None
+				country = request.form['country'] if request.form['country'] != '' else None
+				region = request.form['region'] if request.form['region'] != '' else None
+				farm = request.form['farm'] if request.form['farm'] != '' else None
+				field_uid = int(request.form['field']) if request.form['field'].isdigit() else None
+				block_uid = request.form['block'] if request.form['block'] != '' else None
+				tree_id_list = (
+					Parsers.parse_range_list(request.form['tree_id_list']) if request.form['tree_id_list'] != ''
+					else None
+				)
+				sample_id_list = (
+					Parsers.parse_range_list(request.form['sample_id_list']) if request.form['sample_id_list'] != ''
+					else None
+				)
+				per_item_count = int(
+					request.form['per_item_count']
+				) if request.form['per_item_count'].isdigit() else 1
+				request_email = True if request.form.get('email_checkbox') else False
+				download_object = Download(session['username'], request_email)
+				download_object.register_samples(
+					level,
+					country,
+					region,
+					farm,
+					field_uid,
+					block_uid,
+					tree_id_list,
+					sample_id_list,
+					per_item_count
+				)
+
+
+
+
+
 
 
 @app.route('/collect/generate_files', methods=['GET', 'POST'])
@@ -73,7 +110,7 @@ def generate_files():
 		return redirect(url_for('login'))
 	else:
 		try:
-			collect_form = CollectForm.update()
+			collect_form = CollectForm
 			if collect_form.validate_on_submit():
 				level = request.form['trait_level']
 				create_new_items = True if request.form.get('create_new_items') == 'new' else False

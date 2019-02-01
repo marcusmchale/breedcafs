@@ -478,123 +478,207 @@ class AddFieldItems:
 			result = neo4j_session.write_transaction(neo4j_query, statement, parameters)
 			return [record[0] for record in result]
 
-	# Samples are lowest level of item with a relationship "FROM" to any other item/s
-	# Samples are any subset of a tree,including:
-	#  - those that are still developing (growing on the tree, e.g. Branch, Leaf)
-	#  - those that are harvested; e.g. harvested Tissue for analyses, beans.
+# Samples are lowest "level" of item with a relationship "FROM" to any other item/s
 	# The FROM relationship may be directed to other samples, allowing:
 	#  - sub-sampling
 	#  - relationships among samples (e.g. Sample from Leaf from Branch)
-	# The FROM relationship can be updated, but only to provide greater precision:
-	#  - Hierarchy of precision: Field/Block/Tree/Sample
-	#    - i.e. Field to Block or from Block to Tree or from Tree to Sample
-	#    - always ensure that the new parent item has FROM relationship directed toward any existing parent
-	#      - with a longer path for new parent (i.e. greater precision)
-	#  - This is important to not lose the information from initial registration
-	#    - We only record user and time on registering, then all updates are recorded as data from trait "Assign to..."
-	#  - To ensure no cycles created with updates to Inter-Sample relationships (Sample)-[:FROM]->(Sample):
-	#    - FROM required on sample creation
-	#    - FROM updates must create longer path to current parent item
-	#      - i.e. new parent must have FROM/IS_IN path to current parent that does not include self node
-	def add_samples(self, level, replicates, sample_id_list=None, tree_id_list=None, block_uid=None):
+	# Not done here as only creating not updating "FROM" but need to consider the following:
+	#  The FROM relationship can be updated, but only to provide greater precision:
+	#   - Hierarchy of precision: Field/Block/Tree/Sample
+	#     - i.e. Field to Block or from Block to Tree or from Tree to Sample
+	#     - always ensure that the new parent item has FROM relationship directed toward any existing parent
+	#       - with a longer path for new parent (i.e. greater precision)
+	#   - This is important to not lose the information from initial registration
+	#     - We only record user and time on registering, then all updates are recorded as data from trait "Assign to..."
+	#   - To ensure no cycles created with updates to Inter-Sample relationships (Sample)-[:FROM]->(Sample):
+	#     - FROM required on sample creation
+	#     - FROM updates must create longer path to current parent item
+	#       - i.e. new parent must have FROM/IS_IN path to current parent that does not include self node
+	@staticmethod
+	# can have multiple field UIDs so not true to class
+	def add_samples(
+			username,
+			level,
+			country,
+			region,
+			farm,
+			field_uid,
+			block_uid,
+			tree_id_list,
+			sample_id_list,
+			per_item_count
+	):
 		parameters= {
-			'username': self.username,
-			'field_uid': self.field_uid,
-			'replicates': replicates
+			'username': username,
+			'per_item_count': per_item_count
 		}
 		statement = (
 			' MATCH '
 			'	(user: User { '
 			'		username_lower: toLower(trim($username)) '
 			'	}) '
-			'  MATCH '
-			'	(field : Field { '
-			'		uid: $field_uid '
-			'	}) '
-		)
-		if level == 'block':
-			statement += (
-				' <-[: IS_IN]-(: FieldBlocks) '
-				' <-[: IS_IN]-(item: Block '
-			)
-			if block_uid:
-				statement += ' {uid: $block_uid} '
-			statement += ' ) '
-		elif level == 'tree':
-			if block_uid:
-				statement += (
-					' <-[: IS_IN]-(: FieldBlocks) '
-					' <-[: IS_IN]-(: Block ( '
-					'	{uid: $block_uid} '
-					' )<-[:IS_IN]-(: BlockTrees) '
-					' <-[:IS_IN]-(item: Tree) '
-				)
-			else:
-				statement += (
-					' <-[:IS_IN]-(: FieldTrees) '
-					' <-[:IS_IN]-(item: Tree) '
-				)
-			if tree_id_list:
-				statement += (
-					' WHERE item.id in $tree_id_list '
-				)
-		elif level == 'sample':
-			if not any([block_uid, tree_id_list]):
-				statement += (
-					' <-[: FROM* | IS_IN* ]-(item_samples: ItemSamples) '
-					' <-[: FROM]-(item: Sample) '
-				)
-			elif block_uid:
-				parameters['block_uid'] = block_uid
-				statement += (
-					' <-[: IS_IN]-(: FieldBlocks) '
-					' <-[: IS_IN]-(block: Block ( '
-					'	{uid: $block_uid} '
-					' ) '
-				)
-				if tree_id_list:
-					parameters['tree_id_list'] = tree_id_list
-					statement += (
-						' <-[: IS_IN]-(: BlockTrees) '
-						' <-[: IS_IN]-(tree: Tree) '
-						' <-[:FROM]-(item_samples: ItemSamples) '
-						' <-[:FROM]-(item: Sample) '
-						' WHERE tree.id in $tree_id_list '
-					)
-				else:
-					statement += (
-						' <-[:FROM]-(item_samples: ItemSamples) '
-						' <-[: FROM]-(item: Sample) '
-					)
-			elif tree_id_list:
-				parameters['tree_id_list'] = tree_id_list
-				statement += (
-					' <-[:IS_IN]-(: FieldTrees) '
-					' <-[:IS_IN]-(tree: Tree) '
-					' <-[:FROM]-(item_samples: ItemSamples) '
-					' <-[:FROM]-(item: Sample) '
-					' WHERE tree.id in $tree_id_list '
-				)
-			if sample_id_list:
-				parameters['sample_id_list'] = sample_id_list
-				if tree_id_list:
-					statement += (
-						' AND '
-					)
-				else:
-					statement += (
-						' WHERE '
-					)
-				statement += (
-					' item.id IN $sample_id_list '
-				)
-		statement += (
 			' MERGE '
 			'	(user)-[: SUBMITTED]->(us: Submissions) '
 			' MERGE '
 			'	(us)-[: SUBMITTED]->(ui: Items) '
 			' MERGE '
 			'	(ui)-[: SUBMITTED]->(user_samples: Samples) '
+			' WITH user_samples '
+			' MATCH '
+		)
+		if country:
+			parameters['country'] = country
+			statement += (
+				' (:Country '
+				'	{ '
+				'		name_lower: $country '
+				'	}'
+				' )<-[:IS_IN]-(:Region '
+			)
+			if region:
+				parameters['region'] = region
+				statement += (
+					' { '
+					'	name_lower: $region '
+					' } '
+				)
+			statement += (
+				' )<-[:IS_IN]-(:Farm '
+			)
+			if farm:
+				parameters['farm'] = farm
+				statement += (
+					' { '
+					'	name_lower: $farm '
+					' } '
+				)
+			statement += (
+				' )<-[:IS_IN]-(field:Field '
+			)
+			if field_uid:
+				parameters['field_uid'] = field_uid
+				statement += (
+					' { '
+					'	uid: toInteger($field_uid) '
+					' } '
+				)
+			statement += (
+				' ) '
+			)
+		else:
+			statement += (
+				' (field:Field) '
+			)
+		if level == 'field':
+			statement += (
+				' WITH user_samples, field AS item '
+			)
+		else:
+			if any([level == 'block', block_uid]):
+				statement += (
+					' <-[:IS_IN]-(:FieldBlocks) '
+					' <-[:IS_IN]-(block:Block '
+				)
+				if block_uid:
+					parameters['block_uid'] = block_uid
+					statement += (
+						' { '
+						'	uid: $block_uid '
+						' } '
+					)
+				statement += (
+					' ) '
+				)
+				if level == 'block':
+					statement += (
+						' WITH user_samples, block AS item '
+					)
+			if any([level == 'tree', tree_id_list]):
+				statement += (
+					' <-[:IS_IN]-'
+				)
+				if block_uid:
+					statement += (
+						' (:BlockTrees) '
+						' <-[:IS_IN]-'
+					)
+				else:
+					statement += (
+						' (:FieldTrees) '
+						' <-[:IS_IN]-'
+					)
+				statement += (
+					' (tree:Tree) '
+				)
+				if tree_id_list:
+					parameters['tree_id_list'] = tree_id_list
+					statement += (
+						' WHERE '
+						' tree.id in $tree_id_list '
+					)
+				if level == 'tree':
+					statement += (
+						' WITH user_samples, tree AS item  '
+					)
+			if level == 'sample':
+				if not any([block_uid, tree_id_list]):
+					statement += (
+						' <-[: FROM | IS_IN* ]-(: ItemSamples) '
+						' <-[: FROM*]-(sample: Sample) '
+					)
+				elif block_uid:
+					parameters['block_uid'] = block_uid
+					statement += (
+						' <-[: IS_IN]-(: FieldBlocks) '
+						' <-[: IS_IN]-(block: Block ( '
+						'	{uid: $block_uid} '
+						' ) '
+					)
+					if tree_id_list:
+						parameters['tree_id_list'] = tree_id_list
+						statement += (
+							' <-[: IS_IN]-(: BlockTrees) '
+							' <-[: IS_IN]-(tree: Tree) '
+							' <-[:FROM]-(: ItemSamples) '
+							' <-[:FROM*]-(sample: Sample) '
+							' WHERE tree.id in $tree_id_list '
+						)
+					else:
+						statement += (
+							' <-[:FROM]-(: ItemSamples) '
+							' <-[: FROM*]-(sample: Sample) '
+						)
+				elif tree_id_list:
+					parameters['tree_id_list'] = tree_id_list
+					statement += (
+						' <-[:IS_IN]-(: FieldTrees) '
+						' <-[:IS_IN]-(tree: Tree) '
+						' <-[:FROM]-(item_samples: ItemSamples) '
+						' <-[:FROM*]-(sample: Sample) '
+						' WHERE tree.id in $tree_id_list '
+					)
+				if sample_id_list:
+					parameters['sample_id_list'] = sample_id_list
+					if tree_id_list:
+						statement += (
+							' AND '
+						)
+					else:
+						statement += (
+							' WHERE '
+						)
+					statement += (
+						' sample.id IN $sample_id_list '
+					)
+				statement += (
+					' WITH user_samples, item_samples, sample AS item  '
+				)
+		if level != 'sample':
+			statement += (
+				' MERGE '
+				'	(item)<-[:FROM]-(item_samples: ItemSamples) '
+			)
+		statement += (
 			' MERGE '
 			'	(user_samples)-[: SUBMITTED]->(user_item_samples: UserItemSamples)'
 			'	-[:CONTRIBUTED]->(item_samples) '
@@ -607,18 +691,6 @@ class AddFieldItems:
 			' ON CREATE SET field_sample_counter.count = 0 '
 			' SET field_sample_counter._LOCK_ = true '
 		)
-		if level == 'field':
-			statement += (
-				' MERGE '
-				'	(field) '
-				'	<-[:FROM]-(item_samples: ItemSamples) '
-			)
-		elif level in ['block', 'tree']:
-			statement += (
-				' MERGE '
-				' (item)'
-				' <-[:FROM]-(item_samples: ItemSamples) '
-			)
 		if level == 'sample':
 			statement += (
 			' WITH '
@@ -644,7 +716,7 @@ class AddFieldItems:
 				' ORDER BY field.uid, item.id '
 			)
 		statement += (
-			' UNWIND $replicates as replicate '
+			' UNWIND $per_item_count as per_item_count '
 			'	SET field_sample_counter.count = field_sample_counter.count + 1 '
 			'	CREATE '
 			'		(sample: Sample: Item { '

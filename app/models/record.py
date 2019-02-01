@@ -45,6 +45,10 @@ class Record:
 			record_data['username'] = self.username
 			try:
 				if record_data['data_type'] == 'condition':
+					# for condition data we first query for conflicts since there are many types of conflict
+					# for traits we don't need this as it is simpler to perform during the merger
+					#    - traits can only have a single value at a single time
+					#    - so only conflict with different value at that time
 					conflicts_query = self.build_condition_conflicts_query(record_data)
 					conflicts = [
 						record[0] for record in self.neo4j_session.read_transaction(
@@ -58,7 +62,8 @@ class Record:
 						return jsonify({
 							'submitted': (
 									' Record not submitted. <br><br> '
-									' Conflicting values for some of the input records are found in this period: '
+									' Either the value has been set by another partner and is not visible to you'
+									' or the value you are trying to submit conflicts with an existing entry: '
 									+ html_table
 							),
 							'class': 'conflicts'
@@ -75,14 +80,17 @@ class Record:
 				if record_data['data_type'] == 'trait':
 					conflicts = []
 					for record in merged:
-						if record['conflict']:
+						if not record['access']:
+							conflicts.append(record)
+						elif record['conflict']:
 							conflicts.append(record)
 					if conflicts:
 						tx.rollback()
 						html_table = self.result_table(conflicts, "trait")
 						return jsonify({
 							'submitted': (
-								' Conflicts with existing values: '
+								' Existing values found that are either in conflict with the submitted value '
+								' or are not accessible to you. Consider contacting this partner to request access. '
 								+ html_table
 							),
 							'class': 'conflicts'
@@ -112,6 +120,7 @@ class Record:
 			record_data
 	):
 		parameters = {
+			'username': self.username,
 			'level': record_data['level'],
 			'country': record_data['country'],
 			'region': record_data['region'],
@@ -128,7 +137,7 @@ class Record:
 		statement += (
 			' WITH item '
 		)
-		if record_data['level'] in ["block","tree"]:
+		if record_data['level'] in ["block", "tree"]:
 			statement += (
 				', field '
 			)
@@ -145,29 +154,49 @@ class Record:
 			'	<-[: SUBMITTED]-(: DataSubmissions) '
 			'	<-[: SUBMITTED]-(: Submissions) '
 			'	<-[: SUBMITTED]-(u: User) '
+			'	-[:AFFILIATED {data_shared: true}]->(p:Partner) '
+			'	OPTIONAL MATCH '
+			'		(p)<-[: AFFILIATED {confirmed: true}]-(cu: User {username_lower: toLower($username)}) '
+			' WITH '
+			'	item, ic, condition, r, s, u, p, cu '
 			'	WHERE '
-			# no conflicts in cases where values match
-			'		r.value <> $features_dict[feature_name] '
+			# If don't have access or if have access and values don't match then conflict 
+			# (time parsing to allow various degrees of specificity in the relevant time range to check is below)
+			'		( '
+			'			cu IS NULL '
+			'			OR '
+			'			r.value <> $features_dict[feature_name] '
+			'		) '
 		)
-		# allowing open ended timeframes but :
+		# allowing open ended time-frames but :
 		# defined period can not conflict with defined period
 		# OR defined start or defined end
+		#
+		# Here False is stored for undefined instead of the Null value to facilitate specific mergers
+		# (see build_merge_condition_record_query)
+		# So we have to perform case statement checks on the value before comparing
+		#
 		if all([record_data['start_time'], record_data['end_time']]):
 			statement += (
 				' AND (( '
 				# - any overlapping records
-				'	r.start <= $end_time '
-				'	AND r.end >= $start_time '
+				'	CASE WHEN r.start <> False THEN r.start ELSE Null END <= $end_time '
+				'	AND '
+				'	CASE WHEN r.end <> False THEN r.end ELSE Null END >= $start_time '
 				'	) OR ( '
-				# - OR a record that starts in the defined period and has a null end time
-				'	r.end IS NULL '
-				'	AND r.start <= $start_time '
-				'	AND r.end >= $start_time '
+				# - OR a record that starts in the defined period and has a False end time
+				'	r.end = False'
+				'	AND '
+				'	CASE WHEN r.start <> False THEN r.start ELSE Null END <= $start_time '
+				'	AND '
+				'	CASE WHEN r.end <> False THEN r.end ELSE Null END >= $start_time '
 				'	) OR ( '
 				# - OR a record that ends in the defined period and has a null start time
-				'	r.start IS NULL '
-				'	AND r.start <= $end_time '
-				'	AND r.end >= $end_time '
+				'	r.start = False '
+				'	AND '
+				'	CASE WHEN r.start <> False THEN r.start ELSE Null END <= $end_time '
+				'	AND '
+				'	CASE WHEN r.end <> False THEN r.end ELSE Null END >= $end_time '
 				' )) '
 				# set lock on ItemCondition node and only unlock after merge or result
 				# we do a rollback if get results so that this is only set when there are no conflicts 
@@ -175,6 +204,8 @@ class Record:
 				' SET ic._LOCK_ = True '
 				' WITH '
 				'	r, '
+				'	p.name as partner, '
+				'	CASE WHEN cu IS NULL THEN False ELSE True END as access, '
 				'	item.uid as UID, '
 				'	condition.name as condition, '
 				'	s.time as submitted_at, '
@@ -190,35 +221,47 @@ class Record:
 			statement += (
 				# - defined start time is in existing defined period
 				' AND (( '
-				'	r.end >= $start_time '
+				'	CASE WHEN r.end <> False THEN r.end ELSE Null END >= $start_time '
 				'	AND '
-				'	r.start <= $start_time '
+				'	CASE WHEN r.start <> False THEN r.start ELSE Null END <= $start_time '
+				# Or start time is the same as an existing record with no end time
+				'	) OR ( '
+				'	CASE WHEN r.start <> FALSE THEN r.start ELSE Null END = $start_time '
+				'	AND '
+				'	r.end = False '
 				'	) OR ( '
 				# - OR defined start time is less than a record with defined end and no defined start
 				# AND no "closing" statement (another record with start only defined) between these
 				#  - this is checked last with optional match to such records and select nulls
-				'	r.end >= $start_time '
+				'	r.start = False '
 				'	AND '
-				'	r.start IS NULL '
+				'	CASE WHEN r.end <> False THEN r.end ELSE Null END >= $start_time '
 				' )) '
+				' WITH '
+				'	item, ic, condition, r, s, u, p, cu '
 				' OPTIONAL MATCH '
 				'	(r)-[:RECORD_FOR]->(ic) '
 				'	<-[:RECORD_FOR]-(rr:Record) '
 				'	WHERE '
+				'		rr.end = False '
+				'		AND '
 				'		rr.value = r.value '
-				'		AND rr.start >= $start_time '
-				'		AND rr.start <= r.end '
-				'		AND rr.end IS NULL '
+				'		AND '
+				'		CASE WHEN rr.start <> False THEN rr.start ELSE Null END >= $start_time '
+				'		AND '
+				'		CASE WHEN rr.start <> NULL THEN rr.start ELSE Null END <= r.end '
 				# set lock on ItemCondition node and only unlock after merge or result
 				' SET ic._LOCK_ = True '
 				' WITH '
 				'	r, '
+				'	p.name as partner, '
+				'	CASE WHEN cu IS NULL THEN False ELSE True END as access, '
 				'	item.uid as UID, '
 				'	condition.name as condition,'
 				'	s.time as submitted_at, '
 				'	u.name as user '
 			)
-			if record_data['level'] in ["tree","block"]:
+			if record_data['level'] in ["tree", "block"]:
 				statement += (
 					' , field.uid as field_uid, '
 					' item.id as item_id '
@@ -231,29 +274,43 @@ class Record:
 			statement += (
 				# - defined end time is in existing defined period
 				' AND (( '
-				'	r.end >= $end_time '
+				'	CASE WHEN r.end <> False THEN r.end ELSE Null END >= $end_time '
 				'	AND '
-				'	r.start <= $end_time '
+				'	CASE WHEN r.start <> False THEN r.start ELSE Null END <= $end_time '
+				# Or end time time is the same as an existing record with no start time
+				'	) OR ( '
+				'	CASE WHEN r.end <> FALSE THEN r.end ELSE Null END = $end_time '
+				'	AND '
+				'	r.start = False '
 				'	) OR ( '
 				# - OR defined end time is greater than a record with defined start and no defined end
 				# AND no "closing" statement (another record with end only defined) between these
 				#  - this is checked last with optional match to such records and select nulls
-				'	r.start <= $end_time '
+				'	r.end = False '
 				'	AND '
-				'	r.end IS NULL '
-				' )) '				
+				'	CASE WHEN r.start <> False THEN r.start ELSE Null END <= $end_time '
+				' )) '
+				' WITH '
+				'	item, ic, condition, r, s, u, p, cu '
 				' OPTIONAL MATCH '
 				'	(r)-[:RECORD_FOR]->(ic) '
 				'	<-[:RECORD_FOR]-(rr:Record) '
 				'	WHERE '
 				'		rr.value = r.value '
-				'		AND rr.end <= $end_time '
-				'		AND rr.end >= r.start '
-				'		AND rr.start IS NULL '
+				'		AND '
+				'		CASE WHEN rr.end <> False THEN rr.end ELSE Null END <= $end_time '
+				'		AND '
+				'		CASE WHEN rr.end <> False THEN rr.end ELSE Null END '
+				'			>= '
+				'		CASE WHEN r.start <> False THEN r.start ELSE Null END '
+				'		AND '
+				'		rr.start = False '
 				# set lock on ItemCondition node and only unlock after merge or result
 				' SET ic._LOCK_ = True '
 				' WITH '
 				'	r, '
+				'	p.name as partner, '
+				'	CASE WHEN cu IS NULL THEN False ELSE True END as access, '
 				'	item.uid as UID, '
 				'	condition.name as condition,'
 				'	s.time as submitted_at, '
@@ -271,19 +328,21 @@ class Record:
 		elif not any([record_data['start_time'], record_data['end_time']]):
 			statement += (
 				' AND '
-				'	r.start IS NULL '
+				'	r.start = False '
 				' AND '
-				'	r.end IS NULL '
+				'	r.end = False '
 				# set lock on ItemCondition node and only unlock after merge or result
 				' SET ic._LOCK_ = True '
 				' WITH '
 				'	r, '
+				'	p.name as partner, '
+				'	CASE WHEN cu IS NULL THEN False ELSE True END as access, '
 				'	item.uid as UID, '
 				'	condition.name as condition, '
 				'	s.time as submitted_at, '
 				'	u.name as user '
 			)
-			if record_data['level'] in ["tree","block"]:
+			if record_data['level'] in ["tree", "block"]:
 				statement += (
 					' , field.uid as field_uid, '
 					' item.id as item_id '
@@ -291,12 +350,13 @@ class Record:
 		statement += (
 			' RETURN { '
 			'	UID: UID, '
-			'	start: r.start, '
-			'	end: r.end, '
+			'	start: CASE WHEN r.start <> False THEN r.start ELSE Null END, '
+			'	end: CASE WHEN r.end <> False THEN r.end ELSE Null END, '
 			'	condition: condition, '
-			'	value: r.value, '
+			'	value: CASE WHEN access THEN r.value ELSE "ACCESS DENIED" END, '
 			'	submitted_at: submitted_at, '
-			'	user: user '
+			'	user: CASE WHEN access THEN user ELSE partner END, '
+			'	access: access '
 			' } '
 			' ORDER BY toLower(condition) '
 		)
@@ -511,16 +571,12 @@ class Record:
 			'	time: d.time,	'
 			'	trait: trait.name, '
 			'	value: CASE '
-			'		WHEN d.found = False '
-			'			THEN '
-			'				d.value '
-			'		WHEN a.confirmed = True '
-			'			THEN '
-			'				d.value '
-			'		ELSE '
-			'			"Affiliation required: " + p.name '
-			'		END, '
-			'	conflict: CASE'
+			'		WHEN a.confirmed '
+			'		THEN d.value '
+			'		ELSE "ACCESS RESTRICTED" '
+			'	END, '
+			'	access: a.confirmed, '
+			'	conflict: CASE '
 			'		WHEN d.value = $features_dict[trait.name_lower] '
 			'			THEN '
 			'				False '
@@ -594,18 +650,15 @@ class Record:
 				'	(fic)<-[:FOR_CONDITION]-(ic: ItemCondition) '
 				'	-[:FOR_ITEM]->(item) '
 			)
+		# When merging, if the merger properties agree between input and existing then no new node will be created,
+		#  even if other properties in existing are not specified in the input.
+		# This means Null is not suitable as a value for "not-specified" start time
+		# So we coalesce the value and the boolean False, but it means we have to check for this False value
+		# in all comparisons...e.g. in the condition conflict query
 		statement += (
-			'	MERGE (r: Record {'
-		)
-		if record_data['start_time']:
-			statement += (
-				'	start: $start_time, '
-			)
-		if record_data['end_time']:
-			statement += (
-				'	end: $end_time, '
-			)
-		statement += (
+			' MERGE (r: Record { '
+			'	start: COALESCE($start_time, False), '
+			'	end: COALESCE($end_time, False), '
 			'	value: $features_dict[condition_name] '
 			' })-[:RECORD_FOR]->(ic) '
 			' ON CREATE SET '
@@ -652,8 +705,8 @@ class Record:
 			'	<-[: SUBMITTED]-(u: User) '
 			' RETURN { '
 			'	UID: item_uid, '
-			'	start: r.start,	'
-			'	end: r.end, '
+			'	start: CASE WHEN r.start <> False THEN r.start ELSE Null END,	'
+			'	end: CASE WHEN r.end <> False THEN r.end ELSE Null END, '
 			'	condition: condition.name, '
 			'	value: r.value, '
 			'	found: r.found, '
@@ -720,14 +773,21 @@ class Record:
 						submitted_at
 					]
 			row_string += '</td><td>'.join(row_data)
-			# if record was found then highlight the value
+			# if existing record then we highlight it, colour depends on value
+			# this statement means we don't consider the condition conflicts query results for highlighting
+			# (doesn't have 'found')but that is appropriate since they would all just be highlighted red
 			if 'found' in record and record['found']:
 				if 'conflict' in record and record['conflict']:
+					# only relevant to trait merger conflicts which have triggered a rollback of the transaction
+					# highlights these conflicts in red
 					row_string += '</td><td bgcolor = #FF0000>'
 				else:
+					# traits with false conflict flag and condition merge returns are all 'green' (00FF00) if found
 					row_string += '</td><td bgcolor = #00FF00>'
+			# if condition record was found then highlight the value but only if user has access to that value
 			else:
 				row_string += '</td><td>'
 			row_string += record['value'] + '</td></tr>'
 			header_string += row_string
 		return '<table>' + header_string + '<table>'
+

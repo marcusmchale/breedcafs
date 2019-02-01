@@ -6,7 +6,6 @@ from neo4j_driver import (
 	neo4j_query
 )
 from flask import (
-	session,
 	url_for
 )
 from app.models import(
@@ -16,9 +15,6 @@ import unicodecsv as csv
 from datetime import datetime
 from app.models import (
 	AddFieldItems,
-	FindFieldItems,
-	AddLocations,
-	FindLocations,
 	TraitList
 )
 from xlsxwriter import Workbook
@@ -44,6 +40,36 @@ class Download:
 			self
 	):
 		return self.file_list
+
+	def register_samples(
+			self,
+			level,
+			country,
+			region,
+			farm,
+			field_uid,
+			block_uid,
+			tree_id_list,
+			sample_id_list,
+			per_item_count
+	):
+		# returns a simple UID list
+		AddFieldItems.add_samples(
+			self.username,
+			level,
+			country,
+			region,
+			farm,
+			field_uid,
+			block_uid,
+			tree_id_list,
+			sample_id_list,
+			per_item_count
+		)
+
+
+		# need to return details for template
+
 
 	def template_files(
 			self,

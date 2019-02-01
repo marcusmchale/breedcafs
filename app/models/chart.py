@@ -103,7 +103,8 @@ class Chart:
 			farm=None,
 			field_uid=None,
 			block_uid=None,
-			tree_id_list=None
+			tree_id_list=None,
+			sample_id_list=None
 	):
 		if tree_id_list:
 			try:
@@ -112,6 +113,13 @@ class Chart:
 					return "Please select a range of less than 10000 tree IDs"
 			except ValueError:
 				return 'Invalid range of tree IDs'
+		if sample_id_list:
+			try:
+				sample_id_list = Parsers.parse_range_list(sample_id_list)
+				if len(sample_id_list) >= 10000:
+					return "Please select a range of less than 10000 tree IDs"
+			except ValueError:
+				return 'Invalid range of sample IDs'
 		parameters = {}
 		statement = (
 			' MATCH '
@@ -163,51 +171,106 @@ class Chart:
 			statement += (
 				' RETURN count(field) '
 			)
-		elif any([level == 'block', block_uid]):
-			statement += (
-				' <-[:IS_IN]-(:FieldBlocks) '
-				' <-[:IS_IN]-(block:Block '
-			)
-			if block_uid:
-				parameters['block_uid'] = block_uid
+		else:
+			if any([level == 'block', block_uid]):
 				statement += (
-					' { '
-					'	uid: $block_uid '
-					' } '
+					' <-[:IS_IN]-(:FieldBlocks) '
+					' <-[:IS_IN]-(block:Block '
 				)
-			statement += (
-				' ) '
-			)
-			if level == 'block':
+				if block_uid:
+					parameters['block_uid'] = block_uid
+					statement += (
+						' { '
+						'	uid: $block_uid '
+						' } '
+					)
 				statement += (
-					' RETURN count(block) '
+					' ) '
 				)
-		if level == 'tree':
-			statement += (
-				' <-[:IS_IN]-'
-			)
-			if block_uid:
+				if level == 'block':
+					statement += (
+						' RETURN count(block) '
+					)
+			if any([level == 'tree', tree_id_list]):
 				statement += (
-					' (:BlockTrees) '
 					' <-[:IS_IN]-'
 				)
-			else:
+				if block_uid:
+					statement += (
+						' (:BlockTrees) '
+						' <-[:IS_IN]-'
+					)
+				else:
+					statement += (
+						' (:FieldTrees) '
+						' <-[:IS_IN]-'
+					)
 				statement += (
-					' (:FieldTrees) '
-					' <-[:IS_IN]-'
+					' (tree:Tree) '
 				)
-			statement += (
-				' (tree:Tree) '
-			)
-			if tree_id_list:
-				parameters['tree_id_list'] = tree_id_list
+				if tree_id_list:
+					parameters['tree_id_list'] = tree_id_list
+					statement += (
+						' WHERE '
+						' tree.id in $tree_id_list '
+					)
+				if level == 'tree':
+					statement += (
+						' RETURN count(tree) '
+					)
+			if level == 'sample':
+				if not any([block_uid, tree_id_list]):
+					statement += (
+						' <-[: FROM | IS_IN* ]-(: ItemSamples) '
+						' <-[: FROM]-(sample: Sample) '
+					)
+				elif block_uid:
+					parameters['block_uid'] = block_uid
+					statement += (
+						' <-[: IS_IN]-(: FieldBlocks) '
+						' <-[: IS_IN]-(block: Block ( '
+						'	{uid: $block_uid} '
+						' ) '
+					)
+					if tree_id_list:
+						parameters['tree_id_list'] = tree_id_list
+						statement += (
+							' <-[: IS_IN]-(: BlockTrees) '
+							' <-[: IS_IN]-(tree: Tree) '
+							' <-[:FROM]-(: ItemSamples) '
+							' <-[:FROM*]-(sample: Sample) '
+							' WHERE tree.id in $tree_id_list '
+						)
+					else:
+						statement += (
+							' <-[:FROM]-(: ItemSamples) '
+							' <-[: FROM*]-(sample: Sample) '
+						)
+				elif tree_id_list:
+					parameters['tree_id_list'] = tree_id_list
+					statement += (
+						' <-[:IS_IN]-(: FieldTrees) '
+						' <-[:IS_IN]-(tree: Tree) '
+						' <-[:FROM]-(: ItemSamples) '
+						' <-[:FROM*]-(sample: Sample) '
+						' WHERE tree.id in $tree_id_list '
+					)
+				if sample_id_list:
+					parameters['sample_id_list'] = sample_id_list
+					if tree_id_list:
+						statement += (
+							' AND '
+						)
+					else:
+						statement += (
+							' WHERE '
+						)
+					statement += (
+						' sample.id IN $sample_id_list '
+					)
 				statement += (
-					' WHERE '
-					' tree.id in $tree_id_list '
+					' RETURN count(sample) '
 				)
-			statement += (
-				' RETURN count(tree) '
-			)
 		with get_driver().session() as neo4j_session:
 			result = neo4j_session.read_transaction(
 				neo4j_query,

@@ -150,61 +150,6 @@ update_blocks = function(set_block = "") {
 };
 
 
-update_item_count = function() {
-	const sel_level = $("#level").find(":selected").val();
-	if (sel_level && sel_level !== "") {
-		const item_count_text = $('#item_count_div a:eq(0)');
-		const item_type_text = $('#item_count_div a:eq(1)');
-        const sel_country = $("#country").find(":selected").val();
-        const sel_region = $("#region").find(":selected").val();
-        const sel_farm = $("#farm").find(":selected").val();
-        const sel_field = $("#field").find(":selected").val();
-        const sel_block = $("#block").find(":selected").val();
-        const tree_id_list = $("#tree_id_list").val();
-        $.ajax({
-            type: "GET",
-            url: (
-                "/item_count"
-                + "?level=" + sel_level
-                + "&country=" + sel_country
-                + "&region=" + sel_region
-                + "&farm=" + sel_farm
-                + "&field_uid=" + sel_field
-                + "&block_uid=" + sel_block
-				+ "&tree_id_list=" + tree_id_list
-            ),
-            success: function (response) {
-            	if (isNaN(response['item_count'])) {
-            		item_count_text.replaceWith(
-                        "<a>" + response['item_count'] + "</a>"
-                    );
-            		 item_type_text.replaceWith(
-                        "<a></a>"
-                    );
-                } else {
-                    item_count_text.replaceWith(
-                        "<a>" + response['item_count'] + "</a>"
-                    );
-                    const item_type_text_entry = (response['item_count'] === 1)
-                        ? sel_level.toString() : sel_level.toString() + 's';
-                    item_type_text.replaceWith(
-                        "<a>" + item_type_text_entry + "</a>"
-                    );
-                }
-            },
-            error: function (error) {
-            	item_count_text.replaceWith(
-            		"<a>" + error.statusText + "</a>"
-				);
-            	item_type_text.replaceWith(
-					"<a></a>"
-				);
-            }
-        });
-    }
-};
-
-
 //Submit locations
 $("#submit_country").click( function(e) {
 	e.preventDefault();
@@ -447,16 +392,10 @@ $("input").keypress( function(e) {
 });
 
 
-$('#tree_id_list').keypress(function(e){
-	if (e.keyCode === 13 || e.keyCode === 10) {
-		update_item_count();
-	}
-});
 
-$( window ).load(update_countries).load(update_item_count);
-$("#country").change(update_regions).change(update_farms).change(update_fields).change(update_blocks).change(update_item_count).change(remove_flash);
-$("#region").change(update_farms).change(update_fields).change(update_blocks).change(update_item_count).change(remove_flash);
-$("#farm").change(update_fields).change(update_blocks).change(update_item_count).change(remove_flash);
-$('#field').change(update_blocks).change(update_item_count).change(remove_flash);
+$( window ).load(update_countries);
+$("#country").change(update_regions).change(update_farms).change(update_fields).change(update_blocks).change(remove_flash);
+$("#region").change(update_farms).change(update_fields).change(update_blocks).change(remove_flash);
+$("#farm").change(update_fields).change(update_blocks).change(remove_flash);
+$('#field').change(update_blocks).change(remove_flash);
 
-$('#level, #block').change(update_item_count);

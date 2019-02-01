@@ -29,6 +29,7 @@ def item_count():
 	field_uid = request.args.get('field_uid', None)
 	block_uid = request.args.get('block_uid', None)
 	tree_id_list = request.args.get('tree_id_list', None)
+	sample_id_list = request.args.get('sample_id_list', None)
 	if level:
 		try:
 			count = Chart.get_item_count(
@@ -38,7 +39,8 @@ def item_count():
 				farm,
 				field_uid,
 				block_uid,
-				tree_id_list
+				tree_id_list,
+				sample_id_list
 			)
 			return jsonify({
 				"item_count": count

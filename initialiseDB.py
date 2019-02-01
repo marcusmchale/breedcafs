@@ -430,9 +430,9 @@ def create_trials(tx, trials):
 			'	(variety)-[:MATERNAL_DONOR]->(maternal) '
 			' MERGE '
 			'	(variety)-[:PATERNAL_DONOR]->(paternal) ',
-			hybrid = hybrid[0],
-			maternal_donor = hybrid[1],
-			paternal_donor = hybrid[2]
+			hybrid=hybrid[0],
+			maternal_donor=hybrid[1],
+			paternal_donor=hybrid[2]
 		)
 	# same for grafts (no additional lists here though)
 	tx.run(
@@ -449,6 +449,15 @@ def create_trials(tx, trials):
 		'	(variety)-[:SCION]->(scion) '
 		' MERGE '
 		'	(variety)-[:ROOTSTOCK]->(rootstock) '
+	)
+	# now sort the list of variety names (this sorting will handle numbers better than a simple string sort does)
+	tx.run(
+		' MATCH (trait: Trait {name_lower: "variety name"}) '
+		' WITH trait, trait.category_list as L '
+		' UNWIND L as l '
+		' WITH trait, coalesce(toInteger(l), l) as L ORDER BY L '
+		' WITH trait, collect(toString(L)) as l '
+		' SET trait.category_list = l '
 	)
 
 
@@ -510,6 +519,15 @@ def create_variety_codes(tx, variety_codes):
 				print "Existing variety, code set"
 			else:
 				print "New variety created"
+	# now sort that list of codes (this sorting will handle numbers better than a simple string sort does)
+	tx.run(
+		' MATCH (trait: Trait {name_lower: "variety code"}) '
+		' WITH trait, trait.category_list as L '
+		' UNWIND L as l '
+		' WITH trait, coalesce(toInteger(l), l) as L ORDER BY L '
+		' WITH trait, collect(toString(L)) as l '
+		' SET trait.category_list = l '
+	)
 
 
 def create_conditions(tx, conditions_file):
@@ -604,7 +622,7 @@ def create_start_email(tx):
 		' CREATE (emails: Emails {'
 		'	allowed: $email '
 		' }) ',
-		email = [email]
+		email=[email]
 	)
 
 
@@ -613,6 +631,7 @@ if not confirm('Are you sure you want to proceed? This is should probably only b
 else:
 	if confirm(
 			'Would you like to remove data and items, leaving users, their account settings and partner affiliations'
+		' and also the traits?'
 	):
 		with driver.session() as session:
 			print('Deleting all data and items')
