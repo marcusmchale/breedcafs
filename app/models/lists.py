@@ -179,77 +179,244 @@ class SelectionList:
 		return [record[0] for record in result]
 
 	@staticmethod
-	def get_feature_groups(data_type, level):
+	def get_feature_groups(item_level, record_type):
 		parameters = {
-			"level": level
+			"item_level": item_level,
+			"record_type": record_type
 		}
-		query = (
+		statement = (
 			' MATCH '
-			'	(feature_group: '
-		)
-		if data_type == 'trait':
-			query += (
-				' TraitGroup '
-				' )<-[:IN_GROUP]-(: Trait) '
-			)
-		elif data_type == 'condition':
-			query += (
-				' ConditionGroup '
-				' )<-[:IN_GROUP]-(: Condition) '
-			)
-		query += (
-				'		-[:AT_LEVEL]->(:Level {name_lower: $level}) '
-				' WITH DISTINCT (feature_group) '
-				' RETURN [ '
-				'	feature_group.name_lower, '
-				'	feature_group.name '
-				' ] '
-				' ORDER BY feature_group.name_lower '
+			'	(feature_group: FeatureGroup) '
+			'	<-[:IN_GROUP]-(feature: Feature) '
+			'	-[:AT_LEVEL]->(: ItemLevel {name_lower: toLower($item_level)}), '
+			'	(feature)-[:OF_TYPE]->(: RecordType {name_lower: toLower($record_type)}) '
+			' WITH DISTINCT (feature_group) '
+			' RETURN [ '
+			'	feature_group.name_lower, '
+			'	feature_group.name '
+			' ] '
+			' ORDER BY feature_group.name_lower '
 			)
 		with get_driver().session() as neo4j_session:
 			result = neo4j_session.read_transaction(
 				neo4j_query,
-				query,
+				statement,
 				parameters
 			)
 		return [record[0] for record in result]
-
-	@staticmethod
-	def get_tissues():
-		parameters = {}
-		query = (
-			' MATCH (trait:Trait {name_lower: "tissue type"}) '
-			' RETURN trait.category_list '
-		)
-		with get_driver().session() as neo4j_session:
-			result = neo4j_session.read_transaction(
-				neo4j_query,
-				query,
-				parameters
-			)
-		tissue_list = [record[0] for record in result][0]
-		return [(tissue.lower(), tissue) for tissue in tissue_list]
-
-	@staticmethod
-	def get_harvest_conditions():
-		parameters = {}
-		query = (
-			' MATCH (trait:Trait {name_lower: "harvest condition"}) '
-			' RETURN trait.category_list '
-		)
-		with get_driver().session() as neo4j_session:
-			result = neo4j_session.read_transaction(
-				neo4j_query,
-				query,
-				parameters
-			)
-		condition_list = [record[0] for record in result][0]
-		return [(condition.lower(), condition) for condition in condition_list]
 
 
 class ItemList:
 	def __init__(self):
 		pass
+
+	@staticmethod
+	def build_match_item_statement(record_data):
+		parameters = {
+			'record_type': record_data['record_type'],
+			'item_level': record_data['item_level']
+		}
+		statement = (
+			' MATCH (country: Country '
+		)
+		if record_data['country']:
+			parameters['country'] = record_data['country']
+			statement += (
+				' {name_lower: toLower($country)} '
+			)
+		statement += (
+			' )<-[:IS_IN]-(region: Region '
+		)
+		if record_data['region']:
+			parameters['region'] = record_data['region']
+			statement += (
+				' {name_lower: toLower($region)} '
+			)
+		statement += (
+			' )<-[:IS_IN]-(farm: Farm '
+		)
+		if record_data['farm']:
+			parameters['farm'] = record_data['farm']
+			statement += (
+				' {name_lower: toLower($farm)} '
+			)
+		if record_data['item_level'] == 'field':
+			statement += (
+				' )<-[:IS_IN]-(item: Field '
+			)
+		else:
+			statement += (
+				' )<-[:IS_IN]-(field: Field '
+			)
+		if record_data['field_uid']:
+			parameters['field_uid'] = record_data['field_uid']
+			statement += (
+				' {uid: $field_uid} '
+			)
+		statement += (
+			' ) '
+		)
+		if any([
+			record_data['item_level'] == 'block',
+			record_data['block_uid']
+		]):
+			statement += (
+				' <-[:IS_IN]-(:FieldBlocks) '
+			)
+			if record_data['item_level'] == 'block':
+				statement += (
+					' <-[:IS_IN]-(item :Block '
+				)
+			else:
+				statement += (
+					' <-[:IS_IN]-(block: Block '
+				)
+			if record_data['block_uid']:
+				parameters['block_uid'] = record_data['block_uid']
+				statement += (
+					' {uid: $block_uid} '
+				)
+			statement += (
+				')'
+			)
+		if any([
+			record_data['item_level'] == 'tree',
+			record_data['tree_id_list']
+		]):
+			if record_data['block_uid']:
+				parameters['block_uid'] = record_data['block_uid']
+				statement += (
+					' <-[:IS_IN]-(:BlockTrees) '
+				)
+			else:
+				statement += (
+					' <-[:IS_IN]-(:FieldTrees) '
+				)
+			if record_data['item_level'] == 'tree':
+				statement += (
+					' <-[:IS_IN]-(item :Tree) '
+				)
+				if record_data['tree_id_list']:
+					parameters['tree_id_list'] = record_data['tree_id_list']
+					statement += (
+						' WHERE '
+						' item.id in $tree_id_list '
+					)
+			else:
+				statement += (
+					' <-[:IS_IN]-(tree:Tree) '
+				)
+		if record_data['item_level'] == 'sample':
+			statement += (
+				' <-[: FROM | IS_IN* ]-(: ItemSamples) '
+				' <-[: FROM*]-(item: Sample) '
+			)
+			if record_data['tree_id_list']:
+				parameters['tree_id_list'] = record_data['tree_id_list']
+				statement += (
+					' WHERE tree.id in $tree_id_list '
+				)
+			if record_data['sample_id_list']:
+				parameters['sample_id_list'] = record_data['sample_id_list']
+				if record_data['tree_id_list']:
+					statement += (
+						' AND '
+					)
+				else:
+					statement += (
+						' WHERE '
+					)
+				statement += (
+					' item.id IN $sample_id_list '
+				)
+		return statement, parameters
+
+	def generate_id_list(self, record_data):
+		statement, parameters = self.build_match_item_statement(record_data)
+		if parameters['item_level'] in ['tree', 'sample']:
+			if "block_uid" not in parameters:
+				statement += (
+					' OPTIONAL MATCH '
+					'	(item)-[:IS_IN | FROM*]->(block :Block) '
+				)
+			if parameters['item_level'] == 'sample':
+				if 'tree_id_list' not in parameters:
+					statement += (
+						' OPTIONAL MATCH '
+						'	(item)-[:FROM*]->(tree: Tree) '
+					)
+				if 'sample_id_list' not in parameters:
+					statement += (
+						' OPTIONAL MATCH '
+						'	(item)-[:FROM*]->(parent_sample: Sample) '
+					)
+				statement += (
+					' WITH DISTINCT '
+					' item, '
+					' country, region, farm, field, '
+					' collect(DISTINCT block.uid) as block_uids, '
+					' collect(DISTINCT block.name) as block_names, '
+					' collect(DISTINCT tree.uid) as tree_uids, '
+					' collect(DISTINCT tree.custom_id) as tree_custom_ids, '
+					' collect(DISTINCT tree.variety) as tree_varieties, '
+					' collect(DISTINCT parent_sample.uid) as parent_sample_uids, '
+					' collect(DISTINCT parent_sample.storage_condition) as parent_sample_storage_conditions, '
+					# need to ensure these values are consistent in submission. taking first entry anyway
+					' collect(parent_sample.tissue)[0] as parent_sample_tissue, '
+					' collect(parent_sample.harvest_condition)[0] as parent_sample_harvest_condition, '
+					' collect(parent_sample.harvest_time)[0] as parent_sample_harvest_time '
+				)
+		statement += (
+			' RETURN { '
+			'	UID: item.uid, '
+			'	Country: country.name, '
+			'	Region: region.name, '
+			'	Farm: farm.name, '
+		)
+		if parameters['item_level'] == 'field':
+			statement += (
+				' Field: item.name '
+			)
+		else:
+			statement += (
+				'	Field: field.name, '
+				'	`Field UID`: field.uid, '
+			)
+			if parameters['item_level'] == 'block':
+				statement += (
+					' Block: item.name, '
+				)
+			elif parameters['item_level'] == 'tree':
+				statement += (
+					' Block: block.name, '
+					' `Block UID` : block.uid, '
+					' `Tree UID`: item.uid, '
+					' `Tree Custom ID`: item.custom_id, '
+					' Variety: item.variety '
+				)
+			elif parameters['item_level'] == 'sample':
+				statement += (
+					' Block: block_names, '
+					' `Block UID` : block_uids, '
+					' `Tree UID`: tree_uids, '
+					' `Tree Custom ID`: tree_custom_ids, '
+					' Variety: tree_varieties, '
+					# first entry will be immediate parent sample value (item), subsequent are in no particular order
+					' `Parent Sample UID`: item.uid + parent_sample_uids, '
+					' `Storage Condition`: item.storage_condition + parent_sample_storage_conditions, '
+					' Tissue: coalesce(item.tissue, parent_sample_tissue), '
+					' `Harvest Condition`: coalesce(item.harvest_condition, parent_sample_harvest_condition), '
+					' `Harvest Time`: apoc.date.format(coalesce(item.harvest_time, parent_sample_harvest_time)) '
+				)
+		statement += (
+			' } '
+		)
+		with get_driver().session() as neo4j_session:
+			result = neo4j_session.read_transaction(
+				neo4j_query,
+				statement,
+				parameters)
+		return [record[0] for record in result]
 
 	@staticmethod
 	def get_fields(
@@ -471,240 +638,6 @@ class ItemList:
 		return [record[0] for record in result]
 
 	@staticmethod
-	def get_branches(
-			country=None,
-			region=None,
-			farm=None,
-			field_uid=None,
-			block_uid=None,
-			tree_id_list=None,
-			branch_id_list=None
-	):
-		parameters = {}
-		filters = []
-		optional_matches = [(
-			' (tree)-[: IN_TREATMENT_CATEGORY]->(tc: TreatmentCategory) '
-			' -[: FOR_TREATMENT]->(: FieldItemTreatment) '
-			' -[: FOR_TREATMENT]->(treatment: Treatment) '
-		)]
-		query = 'MATCH (c:Country '
-		if country:
-			query += '{name_lower: toLower($country)}'
-			parameters['country'] = country
-		query += ')<-[:IS_IN]-(r:Region '
-		if region:
-			query += '{name_lower: toLower($region)}'
-			parameters['region'] = region
-		query += ')<-[:IS_IN]-(f:Farm '
-		if farm:
-			query += '{name_lower: toLower($farm)}'
-			parameters['farm'] = farm
-		query += ')<-[:IS_IN]-(field:Field '
-		if field_uid:
-			query += '{uid: $field_uid}'
-			parameters['field_uid'] = field_uid
-		query += ')'
-		if block_uid:
-			query += (
-				' MATCH '
-				'	(field) '
-				'	<-[:IS_IN]-(fb: FieldBlocks) '
-				'	<-[:IS_IN]-(block:Block {uid: $block_uid}) '
-				'	<-[:IS_IN]-(bt: BlockTrees) '
-				'	<-[:IS_IN]-(tree: Tree) '
-			)
-			parameters['block_uid'] = block_uid
-		else:
-			query += (
-				' MATCH '
-				'	(field) '
-				'	<-[:IS_IN]-(ft: FieldTrees) '
-				'	<-[:IS_IN]-(tree: Tree) '
-			)
-			optional_matches.append(
-				'	(tree)-[:IS_IN]->(bt:BlockTrees) '
-				'	-[:IS_IN]->(block:Block) '
-			)
-		if tree_id_list:
-			filters.append(
-				' tree.id IN $tree_id_list '
-			)
-			parameters['trees_start'] = tree_id_list
-		query += (
-			' MATCH (tree) '
-			'	<-[:FROM_TREE]-(tb:TreeBranches) '
-			'	<-[:FROM_TREE]-(branch:Branch) '
-		)
-		if branch_id_list:
-			filters.append(
-				' branch.id IN $branch_id_list '
-			)
-			parameters['branch_id_list'] = branch_id_list
-		if filters:
-			query += (
-				' WHERE '
-			)
-			filter_count = len(filters)
-			for f in filters:
-				query += f
-				filter_count -= 1
-				if filter_count != 0:
-					query += ' AND '
-		if optional_matches:
-			query += (
-				' OPTIONAL MATCH '
-			)
-			query += ' OPTIONAL MATCH '.join(optional_matches)
-		query += (
-			' WITH '
-			'	c, r, f, field, block, tree, branch, '
-			'	treatment, '
-			'	collect (distinct tc.category) as categories '
-			' WITH { '
-			' 	UID: branch.uid, '
-			'	`Tree UID`: tree.uid, '
-			'	`Block UID`: block.uid, '
-			'	Block: block.name, '
-			'	`Field UID` : field.uid, '
-			'	Field: field.name, '
-			'	Farm: f.name, '
-			'	Region: r.name, '
-			'	Country: c.name, '
-			'	Treatments: collect({ '
-			'		name: treatment.name, '
-			'		categories: categories '
-			'	}) '
-			'} as result, field.uid as field_uid, branch.id as branch_id '
-			' RETURN result '
-			' ORDER BY field_uid, branch_id '
-		)
-		with get_driver().session() as neo4j_session:
-			result = neo4j_session.read_transaction(
-				neo4j_query,
-				query,
-				parameters)
-		return [record[0] for record in result]
-
-	@staticmethod
-	def get_leaves(
-			country=None,
-			region=None,
-			farm=None,
-			field_uid=None,
-			block_uid=None,
-			tree_id_list=None,
-			leaf_id_list=None
-	):
-		parameters = {}
-		filters = []
-		optional_matches = [(
-			' (tree)-[: IN_TREATMENT_CATEGORY]->(tc: TreatmentCategory) '
-			' -[: FOR_TREATMENT]->(: FieldItemTreatment)'
-			' -[: FOR_TREATMENT]->(treatment: Treatment)'
-		)]
-		query = 'MATCH (c:Country '
-		if country:
-			query += '{name_lower: toLower($country)}'
-			parameters['country'] = country
-		query += ')<-[:IS_IN]-(r:Region '
-		if region:
-			query += '{name_lower: toLower($region)}'
-			parameters['region'] = region
-		query += ')<-[:IS_IN]-(f:Farm '
-		if farm:
-			query += '{name_lower: toLower($farm)}'
-			parameters['farm'] = farm
-		query += ')<-[:IS_IN]-(field:Field '
-		if field_uid:
-			query += '{uid: $field_uid}'
-			parameters['field_uid'] = field_uid
-		query += ')'
-		if block_uid:
-			query += (
-				' MATCH '
-				'	(field) '
-				'	<-[:IS_IN]-(fb: FieldBlocks) '
-				'	<-[:IS_IN]-(block:Block {uid: $block_uid}) '
-				'	<-[:IS_IN]-(bt: BlockTrees) '
-				'	<-[:IS_IN]-(tree: Tree) '
-			)
-			parameters['block_uid'] = block_uid
-		else:
-			query += (
-				' MATCH '
-				'	(field) '
-				'	<-[:IS_IN]-(ft: FieldTrees) '
-				'	<-[:IS_IN]-(tree: Tree) '
-			)
-			optional_matches.append(
-				'	(tree)-[:IS_IN]->(bt:BlockTrees) '
-				'	-[:IS_IN]->(block:Block) '
-			)
-		if tree_id_list:
-			filters.append(
-				' tree.id IN $tree_id_list '
-			)
-			parameters['tree_id_list'] = tree_id_list
-		query += (
-			' MATCH (tree) '
-			'	<-[:FROM_TREE]-(tl:TreeLeaves) '
-			'	<-[:FROM_TREE]-(leaf:Leaf) '
-		)
-		if leaf_id_list:
-			filters.append(
-				' leaf.id IN $leaf_id_list '
-			)
-			parameters['leaf_id_list'] = leaf_id_list
-		optional_matches.append(
-			' (leaf)-[:FROM_BRANCH]->(branch:Branch) '
-		)
-		if filters:
-			query += (
-				' WHERE '
-			)
-			filter_count = len(filters)
-			for f in filters:
-				query += f
-				filter_count -= 1
-				if filter_count != 0:
-					query += ' AND '
-		if optional_matches:
-			query += (
-				' OPTIONAL MATCH '
-			)
-			query += ' OPTIONAL MATCH '.join(optional_matches)
-		query += (
-			' WITH '
-			'	c, r, f, field, block, tree, branch, leaf, '
-			'	treatment, '
-			'	collect (distinct tc.category) as categories '
-			' WITH { '
-			'	UID: leaf.uid, '
-			'	`Branch UID`: branch.uid, '
-			'	`Tree UID`: tree.uid, '
-			'	`Block UID`: block.uid, '
-			'	Block: block.name, '
-			'	`Field UID` : field.uid, '
-			'	Field: field.name, '
-			'	Farm: f.name, '
-			'	Region: r.name, '
-			'	Country: c.name, '
-			'	Treatments: collect({ '
-			'		name: treatment.name, '
-			'		categories: categories '
-			'	}) '
-			'} as result, field.uid as field_uid, leaf.id as leaf_id '
-			' RETURN result '
-			' ORDER BY field_uid, leaf_id '
-		)
-		with get_driver().session() as neo4j_session:
-			result = neo4j_session.read_transaction(
-				neo4j_query,
-				query,
-				parameters)
-		return [record[0] for record in result]
-
-	@staticmethod
 	def get_samples(
 			country=None,
 			region=None,
@@ -854,86 +787,48 @@ class ItemList:
 		return [record[0] for record in result]
 
 
-class FeaturesList:
-	def __init__(self):
-		pass
+class FeatureList:
+	def __init__(self, item_level, record_type):
+		self.item_level = item_level
+		self.record_type = record_type
 
-	@staticmethod
-	def get_features_details(data_type, level, group):
+	def get_features(
+			self,
+			feature_group=None,
+			features=None
+	):
 		parameters = {
-			"data_type": data_type,
-			"level": level,
-			"group": group
+			"record_type": self.record_type,
+			"item_level": self.item_level
 		}
-		query = (
+		statement = (
 			' MATCH '
-			'	(feature_group: '
+			'	(: RecordType {name_lower: toLower($record_type)})'
+			'	<-[:OF_TYPE]-(feature: Feature) '
+			'	-[:AT_LEVEL]-(: ItemLevel {name_lower: toLower($item_level)}) '
 		)
-		if data_type == 'trait':
-			query += (
-				'TraitGroup'
+		if feature_group:
+			parameters['feature_group'] = feature_group
+			statement += (
+				' , '
+				'	(feature)'
+				'	-[:IN_GROUP]->(: FeatureGroup { '
+				'		name_lower: toLower($feature_group) '
+				'	}) '
 			)
-		elif data_type == 'condition':
-			query += (
-				'ConditionGroup'
+		if features:
+			parameters['features'] = features
+			statement += (
+				' WHERE feature.name_lower IN extract(item IN $features | toLower(trim(item))) '
 			)
-		query += (
-			'	{ '
-			'		name_lower: toLower($group) '
-			'	}) '
-			'	<-[:IN_GROUP]-(feature: '
-		)
-		if data_type == 'trait':
-			query += (
-				'Trait'
-			)
-		if data_type == 'condition':
-			query += (
-				'Condition'
-			)
-		query += (
-			'	)-[:AT_LEVEL]-(:Level { '
-			'		name_lower: toLower($level)'
-			'	}) '
+		statement += (
 			' RETURN properties(feature) '
 			' ORDER BY feature.name_lower '
 		)
 		with get_driver().session() as neo4j_session:
 			result = neo4j_session.read_transaction(
 				neo4j_query,
-				query,
+				statement,
 				parameters
 			)
-		return [record[0] for record in result]
-
-
-class TraitList:
-	def __init__(self):
-		pass
-
-	@staticmethod
-	# also used to confirm list of traits from web form selections are real/found at the selected level
-	def get_traits(
-			level,
-			traits=None
-	):
-		parameters = {
-			'level': level,
-			'traits': traits
-		}
-		query = (
-			' MATCH (trait:Trait {level:$level}) '
-		)
-		if traits:
-			query += (
-				' WHERE trait.name_lower in $traits '
-			)
-		query += (
-			' RETURN properties(trait) '
-		)
-		with get_driver().session() as neo4j_session:
-			result = neo4j_session.read_transaction(
-				neo4j_query,
-				query,
-				parameters)
 		return [record[0] for record in result]

@@ -28,8 +28,7 @@ from flask_wtf import FlaskForm
 from flask_wtf.file import FileField, FileRequired
 # from app import app
 from app.models import (
-	TraitList,
-	FeaturesList,
+	FeatureList,
 	SelectionList,
 	Parsers,
 	User
@@ -411,10 +410,10 @@ class AddTreesForm(FlaskForm):
 class CollectForm(FlaskForm):
 	min = 1
 	max = 1000000
-	level = SelectField(
-		'Level',
+	item_level = SelectField(
+		'Item Level',
 		[InputRequired()],
-		description="Level for record",
+		description="Item Level",
 		choices=[
 			('', 'Select level'),
 			('field', 'Field'),
@@ -449,11 +448,6 @@ class CollectForm(FlaskForm):
 		],
 		description="Samples to register per item"
 	)
-	template_format = SelectField(
-		'Template format',
-		[InputRequired()],
-		choices=[('', 'Select Format'), ('xlsx', 'Table (xlsx)'), ('csv', 'Table (CSV)')]
-	)
 	submit_collect = SubmitField('Register samples')
 
 
@@ -474,16 +468,14 @@ class UploadForm(FlaskForm):
 
 # download
 class DownloadForm(FlaskForm):
-	trait_level = SelectField(
-		'Trait level',
+	item_level = SelectField(
+		'Item Level',
 		[InputRequired()],
 		choices = [
 			('', 'Select Level'),
 			('field', 'Field'),
 			('block', 'Block'),
 			('tree', 'Tree'),
-			('branch', 'Branch'),
-			('leaf', 'Leaf'),
 			('sample', 'Sample')
 			]
 	)
@@ -507,7 +499,8 @@ class DownloadForm(FlaskForm):
 	submit_download = SubmitField('Generate file')
 
 
-# traits
+# Features for download page
+# TODO : NEEDS UPDATING
 class CreateTraits(FlaskForm):
 	email_checkbox = BooleanField('Email checkbox')
 
@@ -545,21 +538,20 @@ class CreateTraits(FlaskForm):
 		return form
 
 
-# Record form (conditions)
 class RecordForm(FlaskForm):
-	data_type = SelectField(
+	record_type = SelectField(
 		[InputRequired()],
-		description="Conditions or Traits",
+		description="Record Type",
 		choices=[
 			('', 'Select data type'),
 			('condition', 'Condition'),
 			('trait', 'Trait')
 		]
 	)
-	level = SelectField(
-		'Level',
+	item_level = SelectField(
+		'Item Level',
 		[InputRequired()],
-		description="Level for record",
+		description="Item Level",
 		choices=[
 			('', 'Select level'),
 			('field', 'Field'),
@@ -567,21 +559,6 @@ class RecordForm(FlaskForm):
 			('tree', 'Tree'),
 			('sample', 'Sample')
 		]
-	)
-	record_time = DateField(
-		'Record start',
-		[Optional()],
-		description='Time recorded'
-	)
-	record_start = DateField(
-		'Record start',
-		[Optional()],
-		description='Start of period'
-	)
-	record_end = DateField(
-		'Record end',
-		[Optional()],
-		description='End of period'
 	)
 	tree_id_list = StringField(
 		'Tree list',
@@ -614,87 +591,106 @@ class RecordForm(FlaskForm):
 		widget=widgets.ListWidget(prefix_label=False),
 		choices=[]
 	)
+	record_time = DateField(
+		'Record start',
+		[Optional()],
+		description='Time recorded'
+	)
+	record_start = DateField(
+		'Record start',
+		[Optional()],
+		description='Start of period'
+	)
+	record_end = DateField(
+		'Record end',
+		[Optional()],
+		description='End of period'
+	)
 	submit_records = SubmitField('Submit records')
-	generate_template = SubmitField('Generate template')
 
 	@staticmethod
-	def update():
+	def update(web_form=False):
 		form = RecordForm()
-		data_type = form.data_type.data if form.data_type.data not in ['', 'None'] else None
-		level = form.level.data if form.level.data not in ['', 'None'] else None
-		if data_type:
-			form.feature_group.choices += SelectionList.get_feature_groups(data_type, level)
+		item_level = form.item_level.data if form.item_level.data not in ['', 'None'] else None
+		record_type = form.record_type.data if form.record_type.data not in ['', 'None'] else None
+		if record_type:
+			form.feature_group.choices += SelectionList.get_feature_groups(item_level, record_type)
 		selected_feature_group = form.feature_group.data if form.feature_group.data not in ['', 'None'] else None
 		if selected_feature_group:
-			features_details = FeaturesList.get_features_details(data_type, level, selected_feature_group)
+			features_details = FeatureList(
+				item_level,
+				record_type
+			).get_features(feature_group=selected_feature_group)
 
-			class FeatureFormDetailed(RecordForm):
-				@classmethod
-				def append_field(cls, name, field):
-					setattr(cls, name, field)
-					return cls
+			if web_form:
+				class FeatureFormDetailed(RecordForm):
+					@classmethod
+					def append_field(cls, name, field):
+						setattr(cls, name, field)
+						return cls
 
-			for feature in features_details:
-				if feature['name_lower'] in form.data['select_features']:
-					if feature['format'] in ["numeric", "percent"]:
-						min_value = feature['minimum'] if 'minimum' in feature else None
-						max_value = feature['maximum'] if 'maximum' in feature else None
-						if all([min_value, max_value]):
-							validator_message = (
-								'Must be between ' +
-								min_value +
-								' and ' +
-								max_value
-							)
-						elif min_value:
-							validator_message = (
-									'Must be greater than ' +
-									min_value
-							)
-						elif max_value:
-							validator_message = (
-									'Must be less than ' +
+				for feature in features_details:
+					if feature['name_lower'] in form.select_features.data:
+						if feature['format'] in ["numeric", "percent"]:
+							min_value = feature['minimum'] if 'minimum' in feature else None
+							max_value = feature['maximum'] if 'maximum' in feature else None
+							if all([min_value, max_value]):
+								validator_message = (
+									'Must be between ' +
+									min_value +
+									' and ' +
 									max_value
+								)
+							elif min_value:
+								validator_message = (
+										'Must be greater than ' +
+										min_value
+								)
+							elif max_value:
+								validator_message = (
+										'Must be less than ' +
+										max_value
+								)
+							else:
+								validator_message = "Number range error"
+							FeatureFormDetailed.append_field(
+								feature['name_lower'],
+								DecimalField(
+									[
+										InputRequired(),
+										NumberRange(
+											min=min_value,
+											max=max_value,
+											message=validator_message
+										)
+									],
+									description=feature['details']
+								)
 							)
-						else:
-							validator_message = "Number range error"
-						FeatureFormDetailed.append_field(
-							feature['name_lower'],
-							DecimalField(
-								[
-									InputRequired(),
-									NumberRange(
-										min=min_value,
-										max=max_value,
-										message=validator_message
-									)
-								],
-								description=feature['details']
+						elif feature['format'] == "categorical":
+							categories_list = [(category.lower(), category) for category in feature['category_list']]
+							FeatureFormDetailed.append_field(
+								feature['name_lower'],
+								SelectField(
+									[InputRequired()],
+									choices=categories_list,
+									description=feature['details']
+								)
 							)
-						)
-					elif feature['format'] == "categorical":
-						categories_list = [(category.lower(), category) for category in feature['category_list']]
-						FeatureFormDetailed.append_field(
-							feature['name_lower'],
-							SelectField(
-								[InputRequired()],
-								choices=categories_list,
-								description=feature['details']
+						elif feature['format'] == "boolean":
+							FeatureFormDetailed.append_field(
+								feature['name_lower'],
+								BooleanField(
+									[InputRequired()],
+									description=feature['details']
+								)
 							)
-						)
-					elif feature['format'] == "boolean":
-						FeatureFormDetailed.append_field(
-							feature['name_lower'],
-							BooleanField(
-								[InputRequired()],
-								description=feature['details']
-							)
-						)
-			form = FeatureFormDetailed()
-			if data_type == 'trait':
-				form.record_time.validators = [
-					InputRequired()
-				]
+				form = FeatureFormDetailed()
+				if record_type == 'trait':
+					form.record_time.validators = [
+						InputRequired()
+					]
+
 			features_list = [(feature['name_lower'], feature['name']) for feature in features_details]
 			form.select_features.choices = features_list
 		return form

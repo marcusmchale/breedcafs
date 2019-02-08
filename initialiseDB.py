@@ -42,8 +42,8 @@ def delete_items_data(tx):
 	)
 	tx.run(
 		' MATCH '
-		'	(data:Data) ' 
-		' DETACH DELETE data '
+		'	(record:Record) ' 
+		' DETACH DELETE record '
 	)
 	tx.run(
 		' MATCH '
@@ -156,94 +156,98 @@ def create_partners(tx, partner_list):
 				)
 
 
-def create_traits(tx, traits_file):
-	with open(traits_file, 'rb') as traits_csv:
-		reader = csv.DictReader(traits_csv, delimiter=',', quotechar='"')
-		for trait in reader:
-			trait_create = tx.run(
+def create_features(tx, features_file):
+	with open(features_file, 'rb') as features_csv:
+		reader = csv.DictReader(features_csv, delimiter=',', quotechar='"')
+		for feature in reader:
+			feature_create = tx.run(
 				' MERGE '
-				'	(t:Trait { '
+				'	(f:Feature { '
 				'		name_lower: toLower(trim($name)) '
 				'	}) '
 				'	ON CREATE SET '
-				'		t.name = trim($name), '
-				'		t.format = toLower(trim($format)), '
-				'		t.default_value = CASE '
+				'		f.name = trim($name), '
+				'		f.format = toLower(trim($format)), '
+				'		f.default_value = CASE '
 				'			WHEN size(trim($default_value)) = 0 '
 				'				THEN Null '
 				'			ELSE $default_value '
 				'			END, '
-				'		t.minimum = CASE '
+				'		f.minimum = CASE '
 				'			WHEN size(trim($minimum)) = 0 '
 				'				THEN Null '
 				'			ELSE $minimum '
 				'			END, '
-				'		t.maximum = CASE '
+				'		f.maximum = CASE '
 				'			WHEN size(trim($maximum)) = 0 '
 				'				THEN Null '
 				'			ELSE $maximum '
 				'			END, '
-				'		t.details = $details, '
-				'		t.categories = CASE '
+				'		f.details = $details, '
+				'		f.categories = CASE '
 				'			WHEN size(trim($categories)) = 0 '
 				'				THEN Null '
 				'			ELSE $categories '
 				'			END, '
-				'		t.category_list  = CASE '
+				'		f.category_list  = CASE '
 				'			WHEN size(trim($categories)) = 0 '
 				'				THEN Null '
 				'			ELSE split($categories, "/") '
 				'			END, '
-				'		t.found = False '
+				'		f.found = False '
 				'	ON MATCH SET '
-				'		t.found = True '
+				'		f.found = True '
+				' MERGE '
+				' (record_type: RecordType {name_lower: toLower(trim($type))}) '
+				' MERGE (f)-[:OF_TYPE]->(record_type) '
+				'	ON CREATE SET record_type.name = trim($type) '
 				' FOREACH (group in extract(x in split($groups, "/") | trim(x)) | '
 				'	MERGE '
-				'		(trait_group: TraitGroup {'
-				'			name_lower:toLower(group)'
+				'		(feature_group: FeatureGroup {'
+				'			name_lower:toLower(trim(group))'
 				'		}) '
 				'		ON CREATE SET '
-				'			trait_group.name = group '
+				'			feature_group.name = trim(group) '
 				' 	MERGE '
-				'		(t)-[:IN_GROUP]->(trait_group) '
+				'		(f)-[:IN_GROUP]->(feature_group) '
 				' ) '
 				' FOREACH (level in extract(x in split($levels, "/") | trim(x)) | '
 				'	MERGE '
-				'		(item_level: Level { '
-				'			name_lower: toLower(level) '
+				'		(item_level: ItemLevel { '
+				'			name_lower: toLower(trim(level)) '
 				'		}) '
 				'		ON CREATE SET '
-				'			item_level.name = level '
+				'			item_level.name = trim(level) '
 				'	MERGE '
-				'		(t)-[:AT_LEVEL]->(item_level) '
+				'		(f)-[:AT_LEVEL]->(item_level) '
 				' ) '
-				' RETURN t.found ',
-				groups=trait['groups'],
-				levels=trait['levels'],
-				name=trait['name'],
-				format=trait['format'],
-				default_value=trait['defaultValue'],
-				minimum=trait['minimum'],
-				maximum=trait['maximum'],
-				details=trait['details'],
-				categories=trait['categories']
+				' RETURN f.found ',
+				type=feature['type'],
+				groups=feature['groups'],
+				levels=feature['levels'],
+				name=feature['name'],
+				format=feature['format'],
+				default_value=feature['defaultValue'],
+				minimum=feature['minimum'],
+				maximum=feature['maximum'],
+				details=feature['details'],
+				categories=feature['categories']
 			)
-			for record in trait_create:
-				if record['t.found']:
-					print ('Found Trait ' + trait['name'])
-				elif not record['t.found']:
-					print ('Created Trait: ' + trait['name'])
+			for record in feature_create:
+				if record['f.found']:
+					print ('Found feature ' + feature['name'])
+				elif not record['f.found']:
+					print ('Created feature: ' + feature['name'])
 				else:
-					print ('Error with merger of Trait: ' + trait['name'])
+					print ('Error with merger of feature: ' + feature['name'])
 
 
 def create_trials(tx, trials):
-	# set the category list of variety names trait to empty list
-	# FYI Field Book can't handle long lists of categories (more than 12)
-	# so we handle this trait as text i.e. trait.format = "text" '
+	# also creates the variety name feature and list of varieties as its categories
+	# as well as a number of known locations (from trial information)
 	tx.run(
-		' MATCH (trait: Trait {name_lower: "variety name"}) '
-		' SET trait.category_list = [] '
+		' MATCH (feature: Feature {name_lower: "variety name"}) '
+		' SET feature.category_list = [] '
 	)
 	for trial in trials:
 		# TODO major revision to handle the field trials that span multiple regions/farms.
@@ -333,22 +337,22 @@ def create_trials(tx, trials):
 					name=trial['name'],
 					country=trial['country']
 				)
-		# add a relationship between the trial and the "variety name" trait
+		# add a relationship between the trial and the "variety name" feature
 		# make this relationship contain a category list
 		# use this later with coalesce to obtain location dependent category lists
 		tx.run(
 			' MATCH '
 			'	(trial: Trial {uid:$uid}), '
-			'	(trait: Trait {name_lower: "variety name"}) '
+			'	(feature: Feature {name_lower: "variety name"}) '
 			' MERGE '
 			'	(trial)'
-			'		<-[assessed_in: ASSESSED_IN]-(trait) '
+			'		<-[assessed_in: ASSESSED_IN]-(feature) '
 			' SET assessed_in.category_list = [] ',
-			uid = trial['uid']
+			uid=trial['uid']
 		)
 		# now merge these varieties into the assessed_in relationship as a category_list
-		# but also collect all as categories on trait category_list
-		# will rely on a coalesce of assessed in and the trait category list to return items
+		# but also collect all as categories on feature category_list
+		# will rely on a coalesce of assessed in and the feature category list to return items
 		# also create the varieties
 		for variety_type in trial['varieties']:
 			for variety in trial['varieties'][variety_type]:
@@ -356,7 +360,7 @@ def create_trials(tx, trials):
 					' MATCH '
 					'	(trial: Trial { '
 					'		uid: $trial '
-					'	})<-[assessed_in:ASSESSED_IN]-(trait: Trait { '
+					'	})<-[assessed_in:ASSESSED_IN]-(feature: Feature { '
 					'		name_lower: "variety name" '
 					'	}) '
 					' SET '
@@ -365,10 +369,10 @@ def create_trials(tx, trials):
 					'		THEN assessed_in.category_list '
 					'		ELSE assessed_in.category_list + $variety '
 					'		END, '
-					'	trait.category_list = CASE '
-					'		WHEN $variety IN trait.category_list '
-					'		THEN trait.category_list '
-					'		ELSE trait.category_list + $variety '
+					'	feature.category_list = CASE '
+					'		WHEN $variety IN feature.category_list '
+					'		THEN feature.category_list '
+					'		ELSE feature.category_list + $variety '
 					'		END '
 					' MERGE '
 					'	(variety: Variety { '
@@ -452,32 +456,29 @@ def create_trials(tx, trials):
 	)
 	# now sort the list of variety names (this sorting will handle numbers better than a simple string sort does)
 	tx.run(
-		' MATCH (trait: Trait {name_lower: "variety name"}) '
-		' WITH trait, trait.category_list as L '
+		' MATCH (feature: Feature {name_lower: "variety name"}) '
+		' WITH feature, feature.category_list as L '
 		' UNWIND L as l '
-		' WITH trait, coalesce(toInteger(l), l) as L ORDER BY L '
-		' WITH trait, collect(toString(L)) as l '
-		' SET trait.category_list = l '
+		' WITH feature, coalesce(toInteger(l), l) as L ORDER BY L '
+		' WITH feature, collect(toString(L)) as l '
+		' SET feature.category_list = l '
 	)
 
 
 def create_variety_codes(tx, variety_codes):
-	# set the category list of variety codes trait to empty list
-	# FYI Field Book can't handle long lists of categories (more than 12)
-	# so we handle this trait as text i.e. trait.format = "text" '
 	tx.run(
-		' MATCH (trait: Trait {name_lower: "variety code"}) '
-		' SET trait.category_list = [] '
+		' MATCH (feature: Feature {name_lower: "variety code"}) '
+		' SET feature.category_list = [] '
 	)
 	for item in variety_codes:
 		if item[1].lower() == item[2].lower():  # if inbred
 			result = tx.run(
-				' MATCH (trait: Trait {name_lower: "variety code"}) '
+				' MATCH (feature: Feature {name_lower: "variety code"}) '
 				' MERGE (var:Variety {name_lower: toLower($variety)}) '
 				'	ON CREATE SET '
 				'		var.name = $variety, '
 				'		var.found = False, '
-				'		trait.category_list = trait.category_list + $code '
+				'		feature.category_list = feature.category_list + $code '
 				'	ON MATCH SET '
 				'		var.found = True '
 				' SET var.code = $code '
@@ -488,7 +489,7 @@ def create_variety_codes(tx, variety_codes):
 			)
 		else:  # hybrid
 			result = tx.run(
-				' MATCH (trait: Trait {name_lower: "variety code"}) '
+				' MATCH (feature: Feature {name_lower: "variety code"}) '
 				' MERGE (mat:Variety {name_lower: toLower($maternal)}) '
 				'	ON CREATE SET '
 				'		mat.name = $maternal '
@@ -506,7 +507,7 @@ def create_variety_codes(tx, variety_codes):
 				' SET '
 				'	var.code = $code, '
 				'	var.code_lower = toLower($code), '
-				'	trait.category_list = trait.category_list + $code '
+				'	feature.category_list = feature.category_list + $code '
 				' RETURN var.found ',
 				code = str(item[0]).lower(),
 				maternal = str(item[1]).lower(),
@@ -521,94 +522,13 @@ def create_variety_codes(tx, variety_codes):
 				print "New variety created"
 	# now sort that list of codes (this sorting will handle numbers better than a simple string sort does)
 	tx.run(
-		' MATCH (trait: Trait {name_lower: "variety code"}) '
-		' WITH trait, trait.category_list as L '
+		' MATCH (feature: Feature {name_lower: "variety code"}) '
+		' WITH feature, feature.category_list as L '
 		' UNWIND L as l '
-		' WITH trait, coalesce(toInteger(l), l) as L ORDER BY L '
-		' WITH trait, collect(toString(L)) as l '
-		' SET trait.category_list = l '
+		' WITH feature, coalesce(toInteger(l), l) as L ORDER BY L '
+		' WITH feature, collect(toString(L)) as l '
+		' SET feature.category_list = l '
 	)
-
-
-def create_conditions(tx, conditions_file):
-	with open(conditions_file, 'rb') as conditions_csv:
-		reader = csv.DictReader(conditions_csv, delimiter=',', quotechar='"')
-		for condition in reader:
-			condition_create = tx.run(
-				' MERGE '
-				'	(c:Condition { '
-				'		name_lower: toLower(trim($name)) '
-				'	}) '
-				'	ON CREATE SET '
-				'		c.name = trim($name), '
-				'		c.format = toLower(trim($format)), '
-				'		c.default_value = CASE '
-				'			WHEN size(trim($default_value)) = 0 '
-				'				THEN Null '
-				'			ELSE $default_value '
-				'			END, '
-				'		c.minimum = CASE '
-				'			WHEN size(trim($minimum)) = 0 '
-				'				THEN Null '
-				'			ELSE $minimum '
-				'			END, '
-				'		c.maximum = CASE '
-				'			WHEN size(trim($maximum)) = 0 '
-				'				THEN Null '
-				'			ELSE $maximum '
-				'			END, '
-				'		c.details = $details, '
-				'		c.categories = CASE '
-				'			WHEN size(trim($categories)) = 0 '
-				'				THEN Null '
-				'			ELSE $categories '
-				'			END, '
-				'		c.category_list  = CASE '
-				'			WHEN size(trim($categories)) = 0 '
-				'				THEN Null '
-				'			ELSE split($categories, "/") '
-				'			END, '
-				'		c.found = False '
-				'	ON MATCH SET '
-				'		c.found = True '
-				' FOREACH (group in extract(x in split($groups, "/") | trim(x)) | '
-				'	MERGE '
-				'		(condition_group: ConditionGroup {'
-				'			name_lower:toLower(group)'
-				'		}) '
-				'		ON CREATE SET '
-				'			condition_group.name = group '
-				' 	MERGE '
-				'		(c)-[:IN_GROUP]->(condition_group) '
-				' ) '
-				' FOREACH (level in extract(x in split($levels, "/") | trim(x)) | '
-				'	MERGE '
-				'		(item_level: Level { '
-				'			name_lower: toLower(level) '
-				'		}) '
-				'		ON CREATE SET '
-				'			item_level.name = level '
-				'	MERGE '
-				'		(c)-[:AT_LEVEL]->(item_level) '
-				' ) '
-				' RETURN c.found ',
-				groups=condition['groups'],
-				levels=condition['levels'],
-				name=condition['name'],
-				format=condition['format'],
-				default_value=condition['defaultValue'],
-				minimum=condition['minimum'],
-				maximum=condition['maximum'],
-				details=condition['details'],
-				categories=condition['categories']
-			)
-			for record in condition_create:
-				if record['c.found']:
-					print ('Found Condition ' + condition['name'])
-				elif not record['c.found']:
-					print ('Created Condition: ' + condition['name'])
-				else:
-					print ('Error with merger of Condition: ' + condition['name'])
 
 
 def create_field_counter(tx):
@@ -629,12 +549,11 @@ def create_start_email(tx):
 if not confirm('Are you sure you want to proceed? This is should probably only be run when setting up the database'):
 	sys.exit()
 else:
-	if confirm(
-			'Would you like to remove data and items, leaving users, their account settings and partner affiliations'
-		' and also the traits?'
+	if not confirm(
+			'Would you like to remove everything? Select no to delete just the items (fields/blocks/trees/samples) and records.'
 	):
 		with driver.session() as session:
-			print('Deleting all data and items')
+			print('Deleting all items')
 			session.write_transaction(delete_items_data)
 			session.write_transaction(create_field_counter)
 	elif confirm('Do you want to a delete everything rebuild the constraints and reset the indexes?'):
@@ -649,8 +568,7 @@ else:
 			print('creating indexes')
 			session.write_transaction(create_indexes, config.indexes)
 			session.write_transaction(create_partners, config.partners)
-			session.write_transaction(create_traits, 'traits/traits.csv')
-			session.write_transaction(create_conditions, 'traits/conditions.csv')
+			session.write_transaction(create_features, './instance/features.csv')
 			session.write_transaction(create_trials, config.trials)
 			session.write_transaction(create_variety_codes, config.variety_codes)
 			session.write_transaction(create_field_counter)

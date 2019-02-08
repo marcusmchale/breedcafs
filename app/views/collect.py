@@ -66,7 +66,7 @@ def register_samples():
 				collect_form.validate_on_submit(),
 				location_form.validate_on_submit()
 			]):
-				level = request.form['level'] if request.form['level'] != '' else None
+				level = request.form['item_level'] if request.form['item_level'] != '' else None
 				country = request.form['country'] if request.form['country'] != '' else None
 				region = request.form['region'] if request.form['region'] != '' else None
 				farm = request.form['farm'] if request.form['farm'] != '' else None
@@ -85,7 +85,7 @@ def register_samples():
 				) if request.form['per_item_count'].isdigit() else 1
 				request_email = True if request.form.get('email_checkbox') else False
 				download_object = Download(session['username'], request_email)
-				download_object.register_samples(
+				if download_object.register_samples(
 					level,
 					country,
 					region,
@@ -95,12 +95,69 @@ def register_samples():
 					tree_id_list,
 					sample_id_list,
 					per_item_count
-				)
-
-
-
-
-
+				):
+					download_object.set_item_fieldnames()
+					download_object.item_level = "Sample"
+					download_object.id_list_to_template(
+						base_filename="Sample Registration Template",
+					)
+					file_list = download_object.file_list
+					file_list_html = download_object.get_file_list_html()
+					if request.form.get('email_checkbox'):
+						recipients = [User(session['username']).find('')['email']]
+						subject = "BreedCAFS files requested"
+						body = (
+								" You recently registered samples in the BreedCAFS database. "
+								" Unique identifiers (UIDs) have been generated for these samples"
+								" for future reference. "
+								" A spreadsheet file (.xlsx) has been generated containing these UIDs"
+								" and other relevant information about the parent field/block/tree/sample."
+								" This same file contains a 'Template' sheet that can be completed"
+								" and uploaded to this site to record specific details for these samples. "
+								" The file is available at the following address: "
+								+ file_list_html
+						)
+						html = render_template(
+							'emails/generate_files.html',
+							file_list=[i['url'] for i in file_list]
+						)
+						send_email(
+							subject,
+							app.config['ADMINS'][0],
+							recipients,
+							body,
+							html
+						)
+						return jsonify(
+							{
+								'submitted': (
+										' Your samples are registered and a submission template is available'
+										' for download. '
+										' A link to this file has been sent to your email address:'
+										+ file_list_html
+								)
+							}
+						)
+					return jsonify(
+						{
+							'submitted': (
+									' Your samples are registered and a submission template is available'
+									' for download. '
+									+ file_list_html
+							)
+						}
+					)
+				else:
+					return jsonify({
+						'submitted': 'No items found that match your selection'
+					})
+			else:
+				return jsonify({
+					'errors': [collect_form.errors, location_form.errors]
+				})
+		except (ServiceUnavailable, AuthError):
+			flash("Database unavailable")
+			return redirect(url_for('index'))
 
 
 @app.route('/collect/generate_files', methods=['GET', 'POST'])
@@ -204,18 +261,15 @@ def generate_files():
 						start_time,
 						end_time
 					)
-					file_list = download_object.get_file_list()
-					if not file_list:
+					file_list_html = download_object.get_file_list_html()
+					if not file_list_html:
 						return jsonify(
 							{
 								'submitted': (
-										'No items found that match your selection'
+									'No items found that match your selection'
 								)
 							}
 						)
-					file_list_html = ''
-					for i in file_list:
-						file_list_html = file_list_html + str("<ul><a href=" + i['url'] + ">" + i['filename'] + "</a></ul>")
 					# if selected send an email copy of the file (or link to download if greater than ~5mb)
 					if request.form.get('email_checkbox'):
 						recipients = [User(session['username']).find('')['email']]

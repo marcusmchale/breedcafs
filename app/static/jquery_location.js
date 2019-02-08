@@ -360,16 +360,29 @@ $("#submit_trees").click( function(e) {
 				$("#trees_flash").replaceWith(flash_submitted);
 				load_chart();
 			}  else {
-					for (const i in response) {
-						if (response.hasOwnProperty(i)) {
-							for (const key in response[i]){
-								if (response[i].hasOwnProperty(key)) {
-									const flash = "<div id='flash_" + key + "' class='flash'>" + response[i][key][0] + "</div>";
+					$("#trees_flash").remove();
+					if (response.hasOwnProperty('errors')) {
+						const errors = response['errors'];
+						for (let i = 0; i < errors.length; i++) {
+							for (const key in errors[i]) {
+								if (errors[i].hasOwnProperty(key)) {
+									const flash = "<div id='flash_" + key + "' class='flash'>" + errors[i][key][0] + "</div>";
 									$('#' + key).after(flash);
 								}
 							}
 						}
 					}
+
+
+					//for (const i in response) {
+					//	if (response.hasOwnProperty(i)) {
+					//		for (const key in response[i]){
+					//			if (response[i].hasOwnProperty(key)) {
+					//				const flash = "<div id='flash_" + key + "' class='flash'>" + response[i][key][0] + "</div>";
+					//				$('#' + key).after(flash);
+					//			}
+					//		}
+					//	}
 				}
 		},
 		error: function(error) {

@@ -12,7 +12,7 @@ from create import (
 	TreeCount
 )
 from record import (
-	ListFeaturesDetails,
+	ListFeatures,
 	ListFeatureGroups
 )
 from collect import (

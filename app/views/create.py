@@ -8,7 +8,7 @@ from flask import (
 	render_template,
 	make_response, 
 	# send_from_directory,
-	jsonify
+	jsonify,
 )
 from app.models import (
 	AddLocations,
@@ -16,7 +16,9 @@ from app.models import (
 	FindFieldItems,
 	AddFieldItems,
 	SelectionList,
-	Chart
+	Chart,
+	Download,
+	User
 )
 from app.forms import (
 	LocationForm,
@@ -27,11 +29,10 @@ from app.forms import (
 	AddBlock,
 	AddTreesForm
 )
-# from app.emails import send_attachment, send_static_attachment, send_email
 
 from flask.views import MethodView
 
-# from datetime import datetime
+from app.emails import send_email
 
 
 # endpoints to get locations as tuples for forms
@@ -311,13 +312,75 @@ def add_trees():
 				field_uid = int(request.form['field'])
 				count = int(request.form['count'])
 				block_uid = request.form['block'] if request.form['block'] != '' else None
-				new_tree_count = AddFieldItems(session['username'], field_uid).add_trees(count, block_uid)[0]
-				return jsonify({'submitted' : str(new_tree_count) + ' trees registered</a>'})
+				request_email = True if request.form.get('email_checkbox') else False
+				download_object = Download(session['username'], request_email)
+				if download_object.register_trees(
+						field_uid,
+						block_uid,
+						count
+				):
+					download_object.set_item_fieldnames()
+					download_object.item_level = "Tree"
+					download_object.id_list_to_template(
+						base_filename="Tree Registration Template",
+					)
+					file_list = download_object.file_list
+					file_list_html = download_object.get_file_list_html()
+					if request.form.get('email_checkbox'):
+						recipients = [User(session['username']).find('')['email']]
+						subject = "BreedCAFS files requested"
+						body = (
+								" You recently registered trees in the BreedCAFS database. "
+								" Unique identifiers (UIDs) have been generated for these trees"
+								" for future reference. "
+								" A spreadsheet file (.xlsx) has been generated containing these UIDs"
+								" and other relevant information about the parent field/block."
+								" This same file contains a 'Template' sheet that can be completed"
+								" and uploaded to this site to record specific details for these trees. "
+								" The file is available at the following address: "
+								+ file_list_html
+						)
+						html = render_template(
+							'emails/generate_files.html',
+							file_list=[i['url'] for i in file_list]
+						)
+						send_email(
+							subject,
+							app.config['ADMINS'][0],
+							recipients,
+							body,
+							html
+						)
+						return jsonify(
+							{
+								'submitted': (
+										' Your trees are registered and a submission template is available'
+										' for download.'
+										' A link to this file has been sent to your email address:'
+										+ file_list_html
+								)
+							}
+						)
+					return jsonify(
+						{
+							'submitted': (
+									' Your trees are registered and a submission template is available'
+									' for download.'
+									+ file_list_html
+							)
+						}
+					)
+				else:
+					return jsonify({
+						'submitted': 'No field/block found that matches your selection, please try again'
+					})
 			else:
-				errors = jsonify([location_form.errors, add_trees_form.errors])
-				return errors
+				return jsonify({
+					'errors': [add_trees_form.errors, location_form.errors]
+				})
 		except (ServiceUnavailable, AuthError):
-				flash("Database unavailable")
-				return redirect(url_for('index'))
+			flash("Database unavailable")
+			return redirect(url_for('index'))
+
 
 

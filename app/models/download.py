@@ -9,14 +9,14 @@ from flask import (
 	url_for
 )
 from app.models import(
-	ItemList
+	AddFieldItems,
+	ItemList,
+	FeatureList
 )
 import unicodecsv as csv
+
 from datetime import datetime
-from app.models import (
-	AddFieldItems,
-	TraitList
-)
+
 from xlsxwriter import Workbook
 
 
@@ -25,6 +25,10 @@ class Download:
 	def __init__(self, username, email_requested=False):
 		self.username = username
 		self.email_requested = email_requested
+		self.id_list = None
+		self.item_fieldnames = None
+		self.item_level = None
+		self.features = None
 		self.file_list = []
 		# create user download path if not found
 		self.user_download_folder = os.path.join(app.instance_path, app.config['DOWNLOAD_FOLDER'], username)
@@ -35,11 +39,6 @@ class Download:
 			os.chmod(self.user_download_folder, 0775)
 		# prepare variables to write the file
 		self.time = datetime.utcnow().strftime('%Y%m%d-%H%M%S')
-
-	def get_file_list(
-			self
-	):
-		return self.file_list
 
 	def register_samples(
 			self,
@@ -53,8 +52,7 @@ class Download:
 			sample_id_list,
 			per_item_count
 	):
-		# returns a simple UID list
-		AddFieldItems.add_samples(
+		id_list = AddFieldItems.add_samples(
 			self.username,
 			level,
 			country,
@@ -66,256 +64,134 @@ class Download:
 			sample_id_list,
 			per_item_count
 		)
+		if id_list:
+			self.id_list = id_list
+			return True
+		else:
+			return False
 
-
-		# need to return details for template
-
-
-	def template_files(
+	def register_trees(
 			self,
-			template_format,
-			create_new_items,
-			level,
-			traits,
-			country,
-			region,
-			farm,
 			field_uid,
 			block_uid,
-			per_tree_replicates,
-			tree_id_list,
-			branch_id_list,
-			leaf_id_list,
-			sample_id_list,
-			tissue,
-			harvest_condition,
-			per_sample_replicates,
-			samples_pooled,
-			samples_count,
-			start_time,
-			end_time
+			count
 	):
-		if create_new_items:
-			if level == 'branch':
-				id_list = AddFieldItems(self.username, field_uid).add_samples(
-
-
-
-					field_uid,
-					per_tree_replicates,
-					tree_id_list=tree_id_list,
-					block_uid=block_uid
-				)
-			elif level == 'leaf':
-				id_list = Fields.add_leaves(
-					field_uid,
-					tree_id_list,
-					per_tree_replicates,
-					block_uid
-				)
-			else: # level == 'sample':
-				if samples_pooled:
-					id_list = Samples.add_samples_pooled(
-						field_uid,
-						samples_count
-					)
-				else:
-					# check we have found matching ID's, if not return None
-					id_list = Samples.add_samples_per_tree(
-						field_uid,
-						tree_id_list,
-						per_tree_replicates,
-						block_uid
-					)
-				# if requesting replicates for samples then create these replicates in the id_list
-				if per_sample_replicates > 1:
-					if len(id_list) == 0:
-						return None
-					id_list_reps = []
-					for sample in id_list:
-						sample['Sample UID'] = sample['UID']
-						for i in range(per_sample_replicates):
-							sample['UID'] = str(sample['Sample UID']) + "." + str(int(i + 1))
-							id_list_reps.append(sample.copy())
-					id_list = id_list_reps
+		id_list = AddFieldItems(self.username, field_uid).add_trees(
+			count,
+			block_uid
+		)
+		if id_list:
+			self.id_list = id_list
+			return True
 		else:
-			id_list = self.get_id_list(
-				level,
-				country,
-				region,
-				farm,
-				field_uid,
-				block_uid,
-				tree_id_list,
-				branch_id_list,
-				leaf_id_list,
-				sample_id_list,
-				tissue,
-				harvest_condition,
-				start_time,
-				end_time
-			)
-		if not id_list:
-			return
-		fieldnames = self.get_fieldnames(level, per_sample_replicates)
-		# get trait details
-		traits = TraitList.get_traits(level, traits)
-		if template_format == 'xlsx':
-			self.make_xlsx_data_template(
-				fieldnames,
-				id_list,
-				traits,
-				base_filename=level,
-				with_timestamp=True
-			)
-		elif template_format == 'csv':
-			self.make_csv_table_template(
-				fieldnames,
-				id_list,
-				traits,
-				base_filename=level,
-				with_timestamp=True
-			)
-		else: # template_format == 'fb':
-			self.make_fb_template(
-				fieldnames,
-				id_list,
-				traits,
-				base_filename=level,
-				with_timestamp=True
-			)
+			return False
 
-	@staticmethod
-	def get_fieldnames(
+	def replicate_id_list(
+			self,
 			level,
-			per_sample_replicates=None,
-			pooled=None
+			replicates
 	):
-		fieldnames = [
+		if all([
+			replicates > 1,
+			len(self.id_list) > 0
+		]):
+			id_list_reps = []
+			for item in self.id_list:
+				if level == 'field':
+					item['Field UID'] = item['UID']
+				elif level == 'block':
+					item['Block UID'] = item['UID']
+				elif level == 'tree':
+					item['Tree UID'] = item['UID']
+				elif level == 'sample':
+					item['Sample UID'] = item['UID']
+				for i in range(replicates):
+					item['UID'] = str(item['UID']) + "." + str(int(i + 1))
+					id_list_reps.append(item.copy())
+			self.id_list = id_list_reps
+
+	def set_item_fieldnames(self):
+		fieldnames_order = [
 			'Country',
 			'Region',
 			'Farm',
 			'Field',
+			'Field UID',
+			'Block',
+			'Block UID',
+			'Tree UID',
+			'Tree Custom ID',
+			'Variety',
+			'Parent Sample UID',
+			'Harvest Time',
+			'Harvest Condition',
+			'Tissue',
+			'Storage Condition',
+			'Sample UID',
 			'UID'
 		]
-		if pooled:
-			fieldnames[-1:-1] = [
-				'Field UID'
-			]
-		if level in ['block','tree','branch','leaf','sample']:
-			fieldnames[-1:-1] = [
-				'Field UID',
-				'Block'
-			]
-		if level in ['tree', 'branch', 'leaf', 'sample']:
-			fieldnames[-1:-1] = [
-				'Block UID',
-				'Variety',
-				'Tree Custom ID'
-			]
-		if level in ['branch', 'leaf', 'sample']:
-			fieldnames[-1:-1] = [
-				'Tree UID'
-			]
-		if level in ['leaf','sample']:
-			fieldnames[-1:-1] = [
-				'Branch UID'
-			]
-		if level == 'sample':
-			fieldnames[-1:-1] = [
-				'Leaf UID',
-				'Harvest time',
-				'Harvest condition',
-				'Tissue'
-			]
-			if per_sample_replicates:
-				fieldnames.insert(-1, 'Sample UID')
-		return fieldnames
+		self.item_fieldnames = [i for i in fieldnames_order if i in self.id_list[0].keys()]
 
-	@staticmethod
-	def get_id_list(
-			level,
-			country,
-			region,
-			farm,
-			field_uid,
-			block_uid,
-			tree_id_list,
-			branch_id_list,
-			leaf_id_list,
-			sample_id_list,
-			tissue,
-			harvest_condition,
-			start_time,
-			end_time
+	def id_list_to_xlsx(
+			self
 	):
-		if level == 'field':
-			id_list = ItemList.get_fields(
-				country=country,
-				region=region,
-				farm=farm)
+		if not self.id_list:
+			return False
+		base_filename = ' - '.join([self.id_list[0]['UID'], self.id_list[-1]['UID']])
+		file_path = self.get_file_path(
+			'xlsx',
+			base_filename
+		)
+		wb = Workbook(file_path)
+		worksheet = wb.add_worksheet("UID List")
+		row_number = 0
+		for i, j in enumerate(self.item_fieldnames):
+			worksheet.write(row_number, i, j)
+		for row in self.id_list:
+			row_number += 1
+			col_number = 0
+			for field in self.item_fieldnames:
+				if isinstance(row[field], list):
+					row[field] = ", ".join(row[field])
+				worksheet.write(row_number, col_number, row[field])
+				col_number += 1
+		wb.close()
+		self.file_list.append({
+			"filename": os.path.basename(file_path),
+			"file_path": file_path,
+			"file_size": os.path.getsize(file_path),
+			"url": url_for(
+				"download_file",
+				username=self.username,
+				filename= os.path.basename(file_path),
+				_external=True
+			)
+		})
 
-		elif level == 'block':
-			id_list = ItemList.get_blocks(
-				country=country,
-				region=region,
-				farm=farm,
-				field_uid=field_uid
-			)
-		elif level == 'tree':
-			id_list = ItemList.get_trees(
-				country=country,
-				region=region,
-				farm=farm,
-				field_uid=field_uid,
-				block_uid=block_uid,
-				tree_id_list=tree_id_list
-			)
-		elif level == 'branch':
-			id_list = ItemList.get_branches(
-				country=country,
-				region=region,
-				farm=farm,
-				field_uid=field_uid,
-				block_uid=block_uid,
-				tree_id_list=tree_id_list,
-				branch_id_list=branch_id_list
-			)
-		elif level == 'leaf':
-			id_list = ItemList.get_leaves(
-				country=country,
-				region=region,
-				farm=farm,
-				field_uid=field_uid,
-				block_uid=block_uid,
-				tree_id_list=tree_id_list,
-				leaf_id_list=leaf_id_list
-			)
-		elif level == 'sample':
-			id_list = ItemList.get_samples(
-				country=country,
-				region=region,
-				farm=farm,
-				field_uid=field_uid,
-				block_uid=block_uid,
-				tree_id_list=tree_id_list,
-				sample_id_list=sample_id_list,
-				tissue=tissue,
-				harvest_condition=harvest_condition,
-				start_time=start_time,
-				end_time=end_time
-			)
-		return id_list
+	def get_file_list_html(self):
+		if not self.file_list:
+			return None
+		file_list_html = ''
+		for i in self.file_list:
+			file_list_html = file_list_html + str("<ul><a href=" + i['url'] + ">" + i['filename'] + "</a></ul>")
+		return file_list_html
 
 	def get_file_path(
 			self,
 			file_extension,
-			base_filename = None,
-			with_timestamp = True
+			base_filename=None,
+			with_timestamp=True,
+			id_list=False
 	):
-		if base_filename and with_timestamp:
+		if base_filename and id_list:
+			filename = (
+					base_filename
+					+ ' '
+					+ ' to '.join([str(self.id_list[0]['UID']), str(self.id_list[-1]['UID'])])
+			)
+		elif base_filename and with_timestamp:
 			filename = base_filename + '_' + self.time
-		elif base_filename and not with_timestamp:
+		elif base_filename:
 			filename = base_filename
 		else:
 			filename = self.time
@@ -336,40 +212,64 @@ class Download:
 				if base_filename:
 					filename = base_filename + '_' + time_s + '_' + filename_appendix
 				else:
-					filename = time_s + '_' + filename_appendix
-				filename = filename + '.' + file_extension
+					filename = '_'.join([time_s, filename_appendix])
+				filename = '.'.join([filename, file_extension])
 				file_path = os.path.join(self.user_download_folder, filename)
 		return file_path
 
-	def make_xlsx_data_template(
-			self,
-			fieldnames,
-			id_list,
-			traits,
-			base_filename=None,
-			with_timestamp=True
+	def record_form_to_template(
+		self,
+		record_data
 	):
+		self.id_list = ItemList().generate_id_list(record_data)
+		if not self.id_list:
+			return False
+		self.set_item_fieldnames()
+		self.features = FeatureList(
+			record_data['item_level'],
+			record_data['record_type']).get_features(
+				feature_group=record_data['feature_group'] if 'feature_group' in record_data else None,
+				features=record_data['selected_features'] if 'selected_features' in record_data else None
+		)
+		if not self.features:
+			return False
+		self.id_list_to_template(
+			base_filename=record_data['item_level']
+		)
+		return True
+
+	def id_list_to_template(
+			self,
+			base_filename=None
+	):
+		if not self.id_list and self.item_level:
+			return False
+		if not self.features:
+			self.features = FeatureList(self.item_level, 'trait').get_features(feature_group="Registration")
 		file_path = self.get_file_path(
 			'xlsx',
-			base_filename,
-			with_timestamp=with_timestamp
+			base_filename=base_filename,
+			with_timestamp=False,
+			id_list=True
 		)
 		wb = Workbook(file_path)
 		template_worksheet = wb.add_worksheet("Template")
-		context_worksheet = wb.add_worksheet("Item Context")
-		trait_details_worksheet = wb.add_worksheet("Trait details")
+		item_details_worksheet = wb.add_worksheet("Item Details")
+		feature_details_worksheet = wb.add_worksheet("Feature Details")
+		hidden_worksheet = wb.add_worksheet("hidden")
+		hidden_worksheet.hide()
 		date_format = wb.add_format({'num_format': 'yyyy-mm-dd', 'left': 1})
 		time_format = wb.add_format({'num_format': 'hh:mm'})
 		right_border = wb.add_format({'right': 1})
 		header_format = wb.add_format({'bottom': 1})
 		row_number = 0
 		# write header for context worksheet
-		for i, j in enumerate(fieldnames):
-			context_worksheet.write(row_number, i, j, header_format)
+		for i, j in enumerate(self.item_fieldnames):
+			item_details_worksheet.write(row_number, i, j, header_format)
 		core_template_fieldnames = ['UID', 'Date', 'Time', 'Person']
-		trait_fieldnames = [trait['name'] for trait in traits]
-		template_fieldnames = core_template_fieldnames + trait_fieldnames
-		trait_details_fieldnames = [
+		feature_fieldnames = [feature['name'] for feature in self.features]
+		template_fieldnames = core_template_fieldnames + feature_fieldnames
+		feature_details_fieldnames = [
 			'name',
 			'format',
 			'minimum',
@@ -387,13 +287,13 @@ class Download:
 		# write header for template worksheet
 		for i, j in enumerate(template_fieldnames):
 			template_worksheet.write(row_number, i, j, header_format)
-		# set the formatting for the trait columns
+		# set the formatting for the feature columns
 		numeric_format = wb.add_format({'num_format': '0.#'})
 		date_format = wb.add_format({'num_format': 'yyyy-mm-dd'})
 		text_format = wb.add_format({'num_format': '@'})
 		percent_format = wb.add_format({'num_format': 9})
 		location_format = wb.add_format({'num_format': '0.0000; 0.0000'})
-		trait_formats = {
+		feature_formats = {
 			"numeric": numeric_format,
 			"date": date_format,
 			"text": text_format,
@@ -403,44 +303,51 @@ class Download:
 			"location": location_format,
 			"boolean": text_format
 		}
-		for i, trait in enumerate(traits):
+		for i, feature in enumerate(self.features):
 			column_number = len(core_template_fieldnames) + i
 			template_worksheet.set_column(
 				column_number,
 				column_number,
 				None,
-				cell_format=trait_formats[trait['format']]
+				cell_format=feature_formats[feature['format']]
 			)
-			if 'category_list' in trait:
-				template_worksheet.data_validation(1, column_number, len(id_list), column_number, {
+			# store categories in hidden worksheet
+			if 'category_list' in feature:
+				column_letter = chr(65 + i)
+				category_row_number = 0
+				hidden_worksheet.write(row_number, i, feature['name_lower'])
+				for j, category in enumerate(feature['category_list']):
+					category_row_number += 1
+					hidden_worksheet.write(category_row_number, i, category)
+				template_worksheet.data_validation(1, column_number, len(self.id_list), column_number, {
 					'validate': 'list',
-					'source': trait['category_list']
+					'source': '=hidden!$' + column_letter + '$2:$' + column_letter + '$' + str(j + 1)
 				})
 		# write the id_list
-		for row in id_list:
+		for row in self.id_list:
 			row_number += 1
 			for key, value in row.iteritems():
 				# if there is a list (or nested lists) stored in this item
 				# make sure it is printed as a list of strings
 				if key == 'Treatments':
 					for treatment in value:
-						if treatment['name'] not in fieldnames:
-							fieldnames.append(treatment['name'])
-							column_number = fieldnames.index(treatment['name'])
-							context_worksheet.write(0, column_number, treatment['name'], header_format)
-						column_number = fieldnames.index(treatment['name'])
-						context_worksheet.write(row_number, column_number, ", ".join(treatment['categories']))
+						if treatment['name'] not in self.item_fieldnames:
+							self.item_fieldnames.append(treatment['name'])
+							column_number = self.item_fieldnames.index(treatment['name'])
+							item_details_worksheet.write(0, column_number, treatment['name'], header_format)
+						column_number = self.item_fieldnames.index(treatment['name'])
+						item_details_worksheet.write(row_number, column_number, ", ".join(treatment['categories']))
 				else:
 					if isinstance(value, list):
 						value = ", ".join(value)
-					column_number = fieldnames.index(key)
-					context_worksheet.write(row_number, column_number, value)
+					column_number = self.item_fieldnames.index(key)
+					item_details_worksheet.write(row_number, column_number, value)
 			template_worksheet.write(row_number, 0, row['UID'])
 		# create the details worksheet
 		row_number = 0
-		for header in trait_details_fieldnames:
-			column_number = trait_details_fieldnames.index(header)
-			trait_details_worksheet.write(row_number, column_number, header,  header_format)
+		for header in feature_details_fieldnames:
+			column_number = feature_details_fieldnames.index(header)
+			feature_details_worksheet.write(row_number, column_number, header,  header_format)
 		# add notes about Date/Time/Person
 		date_time_person_details = [
 			("date", "Required: Date these values were determined (YYYY-MM-DD, e.g. 2017-06-01)"),
@@ -448,18 +355,18 @@ class Download:
 			("person", "Optional: Person responsible for determining these values")
 		]
 		for i in date_time_person_details:
-			row_number +=1
-			trait_details_worksheet.write(row_number, 0, i[0])
-			trait_details_worksheet.write(row_number, 4, i[1])
-		# empty row to separate date/time/person from traits
-		row_number +=1
-		for trait in traits:
 			row_number += 1
-			for i, trait_header in enumerate(trait_details_fieldnames):
-				if trait_header in trait:
-					if isinstance(trait[trait_header], list):
-						trait[trait_header] = ", ".join([value for value in trait[trait_header]])
-					trait_details_worksheet.write(row_number, i, trait[trait_header])
+			feature_details_worksheet.write(row_number, 0, i[0])
+			feature_details_worksheet.write(row_number, 4, i[1])
+		# empty row to separate date/time/person from features
+		row_number += 1
+		for feature in self.features:
+			row_number += 1
+			for i, feature_header in enumerate(feature_details_fieldnames):
+				if feature_header in feature:
+					if isinstance(feature[feature_header], list):
+						feature[feature_header] = ", ".join(value for value in feature[feature_header])
+					feature_details_worksheet.write(row_number, i, feature[feature_header])
 		wb.close()
 		# add file to file_list
 		self.file_list.append({
@@ -513,7 +420,7 @@ class Download:
 			self,
 			fieldnames,
 			id_list,
-			traits,
+			features,
 			base_filename=None,
 			with_timestamp=True
 	):
@@ -523,7 +430,7 @@ class Download:
 			base_filename=base_filename,
 			with_timestamp=with_timestamp
 		)
-		trait_fieldnames = [
+		feature_fieldnames = [
 			'name',
 			'format',
 			'defaultValue',
@@ -534,12 +441,12 @@ class Download:
 			'isVisible',
 			'realPosition'
 		]
-		for i, trait in enumerate(traits):
-			trait['realPosition'] = str(i + 1)
-			trait['isVisible'] = 'True'
+		for i, feature in enumerate(features):
+			feature['realPosition'] = str(i + 1)
+			feature['isVisible'] = 'True'
 		self.make_csv_file(
-			trait_fieldnames,
-			traits,
+			feature_fieldnames,
+			features,
 			base_filename=base_filename,
 			with_timestamp=with_timestamp,
 			file_extension='trt'
@@ -550,20 +457,20 @@ class Download:
 			self,
 			fieldnames,
 			id_list,
-			traits,
+			features,
 			base_filename=None,
 			with_timestamp=True
 	):
 		fieldnames += ['Date', 'Time', 'Person']
-		fieldnames += [trait['name'] for trait in traits]
+		fieldnames += [feature['name'] for feature in features]
 		self.make_csv_file(
 			fieldnames,
 			id_list,
 			base_filename=base_filename + '_data',
 			with_timestamp=with_timestamp
 		)
-		# and a file that describes the trait details
-		trait_fieldnames = [
+		# and a file that describes the feature details
+		feature_fieldnames = [
 			'name',
 			'format',
 			'minimum',
@@ -572,12 +479,13 @@ class Download:
 			'category_list'
 		]
 		self.make_csv_file(
-			trait_fieldnames,
-			traits,
+			feature_fieldnames,
+			features,
 			base_filename=base_filename + '_details',
 			with_timestamp=with_timestamp
 		)
 
+#this needs updating!!
 	def get_csv(
 			self,
 			country,
@@ -586,7 +494,7 @@ class Download:
 			field_uid,
 			block_uid,
 			level,
-			traits,
+			features,
 			data_format,
 			start_time,
 			end_time):
@@ -649,7 +557,7 @@ class Download:
 			]
 			td = (
 				' MATCH '
-				'	(trait:SampleTrait) '
+				'	(feature:feature) '
 				'	<-[FOR_TRAIT*2]-(sample_trait:ItemTrait) '
 				'	<-[DATA_FOR]-(data) '
 				' WHERE (trait.name_lower) IN $traits' 

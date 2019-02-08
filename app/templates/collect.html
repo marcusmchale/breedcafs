@@ -7,7 +7,7 @@
 	<form>
 		<div id="level_choice">
 		    <h3>Type of item to be sampled</h3>
-			{{ render_field (collect_form.level) }}
+			{{ render_field (collect_form.item_level) }}
             <p>
                 If the samples are representative of a single registered item
                 then select the level corresponding to that item. <br>
@@ -44,7 +44,6 @@
         </div>
         <div id="file_creation">
 		<h3>File type</h3>
-			<dt>{{ render_field (collect_form.template_format) }} </dt><br><br>
 			<dt>
 				{{ render_field (collect_form.submit_collect) }}
 				<input id="email_checkbox" name="email_checkbox" placeholder="" value="y" type="checkbox">

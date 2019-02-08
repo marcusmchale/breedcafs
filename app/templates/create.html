@@ -8,7 +8,6 @@
 		<form action="{{ url_for('create') }}" id="create" method="post">
 			<div>
 				<h3>Select a location and register a field:</h3>
-				{{ location_form.csrf_token }}
 				{{ render_field (location_form.country) }}
 				{{ render_field (add_country_form.text_country) }}
 				{{ render_field (add_country_form.submit_country) }}
@@ -34,6 +33,9 @@
 				<br><br>
 				{{ render_field (add_trees_form.count) }}
 				{{ render_field (add_trees_form.submit_trees) }}
+                <input id="email_checkbox" name="email_checkbox" placeholder="" value="y" type="checkbox">
+                <a>Email a copy</a>
+                {{ location_form.csrf_token }}
 			</div>
 		</form>
 	</div>

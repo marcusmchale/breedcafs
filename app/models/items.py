@@ -261,7 +261,7 @@ class AddLocations:
 			' SET counter._LOCK_ = true '
 			' MERGE '
 			'	(farm) '
-			'		<-[:IS_IN]-(field: Field { '
+			'		<-[:IS_IN]-(field: Field: Item { '
 			'			name_lower: $field '
 			'	}) '
 			'	ON MATCH SET '
@@ -396,7 +396,10 @@ class AddFieldItems:
 			'		username_lower: toLower(trim($username)) '
 			'	}) '
 			'  MATCH '
-			'	(field: Field { '
+			'	(country:Country) '
+			'	<-[:IS_IN]-(region:Region) '
+			'	<-[:IS_IN]-(farm:Farm) '
+			'	<-[:IS_IN]-(field: Field { '
 			'		uid: $field_uid '	
 			'	}) '
 		)
@@ -443,11 +446,15 @@ class AddFieldItems:
 			' SET '
 			'	field_tree_counter._LOCK_ = true '
 			' WITH '
-			'	field_tree_counter, field_trees, field '
+			'	country.name as country, '
+			'	region.name as region, '
+			'	farm.name as farm, '
+			'	field, '
+			'	field_tree_counter, field_trees '
 		)
 		if block_uid:
 			statement += (
-				' , block_tree_counter, block_trees '
+				' , block, block_tree_counter, block_trees '
 			)
 		statement += (
 			' UNWIND range(1, $tree_count) as tree_count '
@@ -472,7 +479,21 @@ class AddFieldItems:
 				' SET block_tree_counter._LOCK_ = false '
 			)
 		statement += (
-			'	RETURN count(tree) '
+			' RETURN { '
+			'	Country: country, '
+			'	Region: region, '
+			'	Farm: farm, '
+			'	Field: field.name, '
+			'	`Field UID`: field.uid, '
+		)
+		if block_uid:
+			statement += (
+				'	Block: block.name, '
+				'	`Block UID`: block.uid, '
+		)
+		statement += (
+			'	UID: tree.uid	'
+			' } '
 		)
 		with get_driver().session() as neo4j_session:
 			result = neo4j_session.write_transaction(neo4j_query, statement, parameters)
@@ -525,59 +546,61 @@ class AddFieldItems:
 			'	(ui)-[: SUBMITTED]->(user_samples: Samples) '
 			' WITH user_samples '
 			' MATCH '
+			' (country: Country '
 		)
 		if country:
 			parameters['country'] = country
 			statement += (
-				' (:Country '
+
 				'	{ '
 				'		name_lower: $country '
-				'	}'
-				' )<-[:IS_IN]-(:Region '
+				'	} '
 			)
-			if region:
-				parameters['region'] = region
-				statement += (
+		statement += (
+			' )<-[:IS_IN]-(region: Region '
+		)
+		if region:
+			parameters['region'] = region
+			statement += (
 					' { '
 					'	name_lower: $region '
 					' } '
 				)
+		statement += (
+			' )<-[:IS_IN]-(farm: Farm '
+		)
+		if farm:
+			parameters['farm'] = farm
 			statement += (
-				' )<-[:IS_IN]-(:Farm '
+				' { '
+				'	name_lower: $farm '
+				' } '
 			)
-			if farm:
-				parameters['farm'] = farm
-				statement += (
-					' { '
-					'	name_lower: $farm '
-					' } '
-				)
+		statement += (
+			' )<-[:IS_IN]-(field: Field '
+		)
+		if field_uid:
+			parameters['field_uid'] = field_uid
 			statement += (
-				' )<-[:IS_IN]-(field:Field '
+				' { '
+				'	uid: toInteger($field_uid) '
+				' } '
 			)
-			if field_uid:
-				parameters['field_uid'] = field_uid
-				statement += (
-					' { '
-					'	uid: toInteger($field_uid) '
-					' } '
-				)
-			statement += (
-				' ) '
-			)
-		else:
-			statement += (
-				' (field:Field) '
-			)
+		statement += (
+			' ) '
+		)
 		if level == 'field':
 			statement += (
-				' WITH user_samples, field AS item '
+				' WITH '
+				' field AS item, '
+				' user_samples, '
+				' country, region, farm '
 			)
 		else:
 			if any([level == 'block', block_uid]):
 				statement += (
-					' <-[:IS_IN]-(:FieldBlocks) '
-					' <-[:IS_IN]-(block:Block '
+					' <-[:IS_IN]-(: FieldBlocks) '
+					' <-[:IS_IN]-(block: Block '
 				)
 				if block_uid:
 					parameters['block_uid'] = block_uid
@@ -591,70 +614,55 @@ class AddFieldItems:
 				)
 				if level == 'block':
 					statement += (
-						' WITH user_samples, block AS item '
+						' WITH '
+						' block AS item, '
+						' user_samples, '
+						' country, region, farm, field '
 					)
 			if any([level == 'tree', tree_id_list]):
 				statement += (
-					' <-[:IS_IN]-'
+					' <-[: IS_IN]-'
 				)
 				if block_uid:
 					statement += (
-						' (:BlockTrees) '
-						' <-[:IS_IN]-'
+						' (: BlockTrees) '
+						' <-[: IS_IN]-'
 					)
 				else:
 					statement += (
-						' (:FieldTrees) '
-						' <-[:IS_IN]-'
+						' (: FieldTrees) '
+						' <-[: IS_IN]-'
 					)
 				statement += (
-					' (tree:Tree) '
+					' (tree: Tree) '
+				)
+				if level == 'tree':
+					if tree_id_list:
+						parameters['tree_id_list'] = tree_id_list
+						statement += (
+							' WHERE '
+							' tree.id in $tree_id_list '
+						)
+					if not block_uid:
+						statement += (
+							' OPTIONAL MATCH '
+							'	(tree)-[:IS_IN*2]->(block: Block) '
+						)
+					statement += (
+						' WITH '
+						' tree AS item,  '
+						' user_samples, '
+						' country, region, farm, field, '
+						' block '
+					)
+			if level == 'sample':
+				statement += (
+					' <-[: FROM | IS_IN* ]-(: ItemSamples) '
+					' <-[: FROM*]-(sample: Sample) '
 				)
 				if tree_id_list:
 					parameters['tree_id_list'] = tree_id_list
 					statement += (
-						' WHERE '
-						' tree.id in $tree_id_list '
-					)
-				if level == 'tree':
-					statement += (
-						' WITH user_samples, tree AS item  '
-					)
-			if level == 'sample':
-				if not any([block_uid, tree_id_list]):
-					statement += (
-						' <-[: FROM | IS_IN* ]-(: ItemSamples) '
-						' <-[: FROM*]-(sample: Sample) '
-					)
-				elif block_uid:
-					parameters['block_uid'] = block_uid
-					statement += (
-						' <-[: IS_IN]-(: FieldBlocks) '
-						' <-[: IS_IN]-(block: Block ( '
-						'	{uid: $block_uid} '
-						' ) '
-					)
-					if tree_id_list:
-						parameters['tree_id_list'] = tree_id_list
-						statement += (
-							' <-[: IS_IN]-(: BlockTrees) '
-							' <-[: IS_IN]-(tree: Tree) '
-							' <-[:FROM]-(: ItemSamples) '
-							' <-[:FROM*]-(sample: Sample) '
-							' WHERE tree.id in $tree_id_list '
-						)
-					else:
-						statement += (
-							' <-[:FROM]-(: ItemSamples) '
-							' <-[: FROM*]-(sample: Sample) '
-						)
-				elif tree_id_list:
-					parameters['tree_id_list'] = tree_id_list
-					statement += (
-						' <-[:IS_IN]-(: FieldTrees) '
-						' <-[:IS_IN]-(tree: Tree) '
-						' <-[:FROM]-(item_samples: ItemSamples) '
-						' <-[:FROM*]-(sample: Sample) '
 						' WHERE tree.id in $tree_id_list '
 					)
 				if sample_id_list:
@@ -670,8 +678,38 @@ class AddFieldItems:
 					statement += (
 						' sample.id IN $sample_id_list '
 					)
+				if not block_uid:
+					statement += (
+						' OPTIONAL MATCH '
+						'	(sample)-[:FROM | IS_IN*]->(block: Block) '
+					)
+				if not tree_id_list:
+					statement += (
+						' OPTIONAL MATCH '
+						'	(sample)-[:FROM*]->(tree: Tree) '
+					)
+				if level == 'sample':
+					statement += (
+						' OPTIONAL MATCH '
+						'	(sample)-[:FROM*]->(parent_sample: Sample) '
+					)
 				statement += (
-					' WITH user_samples, item_samples, sample AS item  '
+					' WITH DISTINCT '
+					' sample AS item, '
+					' sample as item_samples, '
+					' user_samples, '
+					' country, region, farm, field, '
+					' collect(DISTINCT block.uid) as block_uids, '
+					' collect(DISTINCT block.name) as block_names, '
+					' collect(DISTINCT tree.uid) as tree_uids, '
+					' collect(DISTINCT tree.custom_id) as tree_custom_ids, '
+					' collect(DISTINCT tree.variety) as tree_varieties, '
+					' collect(DISTINCT parent_sample.uid) as parent_sample_uids, '
+					' collect(DISTINCT parent_sample.storage_condition) as parent_sample_storage_conditions, '
+					# need to ensure these values are consistent in submission. taking first entry anyway
+					' collect(parent_sample.tissue)[0] as parent_sample_tissue, '
+					' collect(parent_sample.harvest_condition)[0] as parent_sample_harvest_condition, '
+					' collect(parent_sample.harvest_time)[0] as parent_sample_harvest_time '
 				)
 		if level != 'sample':
 			statement += (
@@ -683,49 +721,141 @@ class AddFieldItems:
 			'	(user_samples)-[: SUBMITTED]->(user_item_samples: UserItemSamples)'
 			'	-[:CONTRIBUTED]->(item_samples) '
 			' MERGE '
-			'	(field)'
+		)
+		if level == 'field':
+			statement += (
+				' (item) '
+			)
+		else:
+			statement += (
+				' (field) '
+			)
+		statement += (
 			'	<-[:FOR]-(field_sample_counter: Counter { '
 			'		name :"sample", '
-			'		uid: (field.uid + "_sample" '
+		)
+		if level == 'field':
+			statement += (
+				'		uid: (item.uid + "_sample") '
+			)
+		else:
+			statement += (
+				'		uid: (field.uid + "_sample") '
+			)
+		statement += (
 			' 	}) '
 			' ON CREATE SET field_sample_counter.count = 0 '
 			' SET field_sample_counter._LOCK_ = true '
 		)
-		if level == 'sample':
-			statement += (
-			' WITH '
-			'	field.uid as field_uid, '
-			'	user_item_samples, '
-			'	item as item_samples, '
-			'	field_sample_counter '
-			)
-		else:
+		if level == 'field':
 			statement += (
 				' WITH '
-				'	field.uid as field_uid, '
-				'	user_item_samples, '
-				'	item_samples, '
-				'	field_sample_counter '
+				' country, region, farm, '
+				' item, '
+				' user_item_samples, '
+				' item_samples, '
+				' field_sample_counter '
+			)
+		elif level == 'block':
+			statement += (
+				' WITH '
+				' country, region, farm, field, '
+				' item, '
+				' user_item_samples, '
+				' item_samples, '
+				' field_sample_counter '
+			)
+		elif level == 'tree':
+			statement += (
+				' WITH '
+				' country, region, farm, field, '
+				' block, '
+				' item, '
+				' user_item_samples, '
+				' item_samples, '
+				' field_sample_counter '
+			)
+		elif level == 'sample':
+			statement += (
+				' WITH '
+				' country, region, farm, field, '
+				' block_uids, block_names, '
+				' tree_uids, tree_custom_ids, tree_varieties, '
+				' parent_sample_uids, parent_sample_storage_conditions, '
+				' parent_sample_tissue, parent_sample_harvest_condition, parent_sample_harvest_time, '
+				' item, item_samples, user_item_samples, '
+				' field_sample_counter '
 			)
 		if level == 'field':
 			statement += (
-				' ORDER BY field.uid '
+				' ORDER BY item.uid '
 			)
 		else:
 			statement += (
 				' ORDER BY field.uid, item.id '
 			)
 		statement += (
-			' UNWIND $per_item_count as per_item_count '
+			' UNWIND range(1, $per_item_count) as per_item_count '
 			'	SET field_sample_counter.count = field_sample_counter.count + 1 '
 			'	CREATE '
 			'		(sample: Sample: Item { '
-			'			uid: (field.uid + "_S" + field_sample_counter.count), '
-			'			id: field_sample_counter.count, '
-			'		})-[:FROM]->(item_samples) '
-			'	SET field_sample_counter._LOCK_ = false '
-			' RETURN { '
-			'	uid: sample.uid '
+		)
+		if level == 'field':
+			statement += (
+				' uid: (item.uid + "_S" + field_sample_counter.count), '
+			)
+		else:
+			statement += (
+				' uid: (field.uid + "_S" + field_sample_counter.count), '
+			)
+		statement += (
+				'			id: field_sample_counter.count '
+				'		})-[:FROM]->(item_samples) '
+				'	SET field_sample_counter._LOCK_ = false '
+				' RETURN { '
+				'	UID: sample.uid, '
+				'	Country: country.name, '
+				'	Region: region.name, '
+				'	Farm: farm.name, '
+			)
+		if level == 'field':
+			statement += (
+				' Field: item.name, '
+				' `Field UID`: item.uid '
+			)
+		else:
+			statement += (
+				'	Field: field.name, '
+				'	`Field UID`: field.uid, '
+			)
+			if level == 'block':
+				statement += (
+					' Block: item.name, '
+					' `Block UID`: item.uid '
+				)
+			elif level == 'tree':
+				statement += (
+					' Block: block.name, '
+					' `Block UID` : block.uid, '
+					' `Tree UID`: item.uid, '
+					' `Tree Custom ID`: item.custom_id, '
+					' Variety: item.variety '
+					)
+			elif level == 'sample':
+				statement += (
+					' Block: block_names, '
+					' `Block UID` : block_uids, '
+					' `Tree UID`: tree_uids, '
+					' `Tree Custom ID`: tree_custom_ids, '
+					' Variety: tree_varieties, '
+					# first entry will be immediate parent sample value (item), subsequent are in no particular order
+					' `Parent Sample UID`: item.uid + parent_sample_uids, '
+					' `Storage Condition`: item.storage_condition + parent_sample_storage_conditions, '
+					' Tissue: coalesce(item.tissue, parent_sample_tissue), '
+					' `Harvest Condition`: coalesce(item.harvest_condition, parent_sample_harvest_condition), '
+					' `Harvest Time`: apoc.date.format(coalesce(item.harvest_time, parent_sample_harvest_time)) '
+				)
+		statement += (
 			' } '
 		)
 		with get_driver().session() as neo4j_session:

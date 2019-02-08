@@ -1,4 +1,4 @@
-const level_select = $('#level');
+const level_select = $('#item_level');
 const location_div = $('#location');
 const block_div = $('#block_div');
 const tree_div = $('#tree_selection_div');
@@ -6,9 +6,17 @@ const sample_div = $('#sample_selection_div');
 const item_count_div = $('#item_count_div');
 const replicates_div = $('#replicates');
 
+const country_select = $('#country');
+const region_select = $('#region');
+const farm_select = $('#farm');
+const field_select = $('#field');
+const block_select = $('#block');
+const tree_id_list_box = $('#tree_id_list');
+const sample_id_list_box = $('#sample_id_list');
+
 
 update_item_count = function() {
-	const sel_level = $("#level").find(":selected").val();
+	const sel_level = level_select.find(":selected").val();
 	if (sel_level && sel_level !== "") {
 		const item_count_text = $('#item_count_div a:eq(0)');
 		const item_type_text = $('#item_count_div a:eq(1)');
@@ -101,6 +109,61 @@ level_update = function() {
     remove_flash();
 };
 
+
 $(window).on('load', level_update);
 
 level_select.change(level_update);
+
+$(country_select, region_select, farm_select, field_select, block_select).change(update_item_count);
+$(block_select).change(update_item_count);
+
+tree_id_list_box.keypress(function(e){
+	if (e.keyCode === 13 || e.keyCode === 10) {
+		update_item_count();
+	}
+});
+
+sample_id_list_box.keypress(function(e){
+	if (e.keyCode === 13 || e.keyCode === 10) {
+		update_item_count();
+	}
+});
+
+$("#submit_collect").click( function(e) {
+	e.preventDefault();
+	remove_flash();
+	const wait_message = "Please wait for samples to be registered. A file listing their UIDs will be generated"
+	const flash_wait = "<div id='files_flash' class='flash'>" + wait_message + "</div>";
+	$(this).parent().after(flash_wait);
+	const data = $("form").serialize();
+	$.ajax({
+	    url: "/collect/register_samples",
+	    data: data,
+		type: 'POST',
+		success: function(response) {
+	        update_item_count();
+			if (response.hasOwnProperty('submitted')) {
+				const flash_submitted = "<div id='files_flash' class='flash'>" + response.submitted + "</div>";
+				$("#files_flash").replaceWith(flash_submitted);
+			} else {
+				$("#files_flash").remove();
+				if (response.hasOwnProperty('errors')) {
+				    const errors = response['errors'];
+                    for (let i = 0; i < errors.length; i++) {
+                        for (const key in errors[i]) {
+                            if (errors[i].hasOwnProperty(key)) {
+                                const flash = "<div id='flash_" + key + "' class='flash'>" + errors[i][key][0] + "</div>";
+                                $('#' + key).after(flash);
+                            }
+                        }
+                    }
+                }
+			}
+		},
+        error: function(error) {
+	        console.log(error);
+        }
+    })
+})
+
+

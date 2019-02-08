@@ -6,10 +6,10 @@
 			<div>
                 <form>
                     <dl>
-                        <h3>Select the type of data to record</h3>
-                        <dd>{{  record_form.data_type }}</dd>
-                        <h3>Select the type of items to record data for</h3>
-                        <dd>{{  record_form.level }}</dd>
+                        <h3>Select the type of record</h3>
+                        <dd>{{  record_form.record_type }}</dd>
+                        <h3>Select the type of items</h3>
+                        <dd>{{  record_form.item_level }}</dd>
                         <div id="location">
                             <h3>Filter to select specific item/s</h3>
                             <dd>{{ render_field (location_form.country) }}</dd>
@@ -34,6 +34,7 @@
                             <h3>Select features to record</h3>
                                 <dd>{{  render_field (record_form.feature_group) }}</dd>
                                 <div id="feature_checkbox_div"></div>
+                            <input id="generate_template" name="generate_template" type="submit" value="Generate template">
                             <div id="web_form_div">
                             <h3>Web Form</h3>
                                 <div id="record_period_div">
@@ -41,12 +42,20 @@
                                     <dd>
                                         {{ render_field (record_form.record_start) }}
                                         {{ render_field (record_form.record_end) }}
+                                        <p>
+                                            This web form defaults to the start of the first day through end of the last,
+                                            for more detailed submissions use a template
+                                        </p>
                                     </dd>
                                 </div>
                                 <div id="record_time_div">
-                                    <dt>Record time</dt>
+                                    <dt>Date determined</dt>
                                     <dd>
                                         {{ render_field (record_form.record_time) }}
+                                        <p>
+                                            This web form defaults to midday on the selected date,
+                                            for more detailed submissions use a template
+                                        </p>
                                     </dd>
                                 </div>
                                 <div id="dynamic_form_div"></div>

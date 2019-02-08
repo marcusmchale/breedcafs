@@ -1,14 +1,16 @@
-const data_type_select = $('#data_type');
-const level_select = $('#level');
+const record_type_select = $('#record_type');
+const item_level_select = $('#item_level');
 const block_div = $('#block_div');
 const tree_div = $('#tree_selection_div');
 const sample_div = $('#sample_selection_div');
 const item_count_div = $('#item_count_div');
-const group_select = $('#feature_group');
+const feature_group_select = $('#feature_group');
 const feature_checkbox_div = $('#feature_checkbox_div');
 const dynamic_form_div = $('#dynamic_form_div');
 const location_div = $('#location');
 const feature_div = $('#feature_selection');
+const generate_template_button = $('#generate_template');
+const submit_records_button = $('#submit_records');
 
 $("#record_start").datepicker({ dateFormat: 'yy-mm-dd'});
 $("#record_end").datepicker({ dateFormat: 'yy-mm-dd'});
@@ -22,10 +24,10 @@ remove_flash = function() {
 	$(".flash").remove();
 };
 
-data_type_update = function() {
-    const data_type = data_type_select.val();
-    const level = level_select.val();
-    if (data_type === "" || level === "") {
+record_type_update = function() {
+    const record_type = record_type_select.val();
+    const item_level = item_level_select.val();
+    if (record_type === "" || item_level === "") {
         location_div.hide();
         block_div.hide();
         tree_div.hide();
@@ -34,17 +36,18 @@ data_type_update = function() {
         feature_div.hide();
     }
     level_update();
+    suppress_input();
 };
 
 
 level_update = function() {
-    const data_type = data_type_select.val();
-    const level = level_select.val();
-    group_select.empty();
-    group_select.append(
+    const record_type = record_type_select.val();
+    const item_level = item_level_select.val();
+    feature_group_select.empty();
+    feature_group_select.append(
         '<option value="">Select group</option>'
     );
-    if (level === "" || data_type === "") {
+    if (item_level === "" || record_type === "") {
         location_div.hide();
         block_div.hide();
         tree_div.hide();
@@ -53,33 +56,33 @@ level_update = function() {
     } else {
         location_div.show();
         item_count_div.show();
-        if (level === "field") {
+        if (item_level === "field") {
             block_div.hide();
             tree_div.hide();
             sample_div.hide();
         }
-        else if (level === "block") {
+        else if (item_level === "block") {
             block_div.show();
             tree_div.hide();
             sample_div.hide();
         }
-        else if (level === 'tree') {
+        else if (item_level === 'tree') {
             block_div.show();
             tree_div.show();
             sample_div.hide();
         }
-        else if (level === 'sample') {
+        else if (item_level === 'sample') {
             block_div.show();
             tree_div.show();
             sample_div.show();
         }
         $.ajax({
-            url: "/record/" + data_type + "/" + level + "/",
+            url: "/record/" + record_type + "/" + item_level + "/",
             type: 'GET',
             success: function (response) {
-                const feature_groups = response.sort();
+                const feature_groups = response;
                 for (let i = 0; i < feature_groups.length; i++) {
-                    group_select.append(
+                    feature_group_select.append(
                         $("<option></option>").attr(
                             "value", feature_groups[i][0]).text(feature_groups[i][1])
                     );
@@ -184,26 +187,27 @@ generate_form = function (response) {
         $('#select_features-' + i).change(function () {
             if (this.checked) {
                  form_field.show();
-                 form_field.prev().show()
+                 form_field.prev().show();
                  update_submit_fields();
             } else {
                  form_field.hide();
-                 form_field.prev().hide()
+                 form_field.prev().hide();
                  update_submit_fields();
             }
         });
     }
+    suppress_input();
 };
 
 group_update = function() {
     feature_checkbox_div.empty();
     dynamic_form_div.empty();
-    const data_type = data_type_select.val();
-    const level = level_select.val();
-    const group = group_select.val();
-    if (level && group) {
+    const record_type = record_type_select.val();
+    const item_level = item_level_select.val();
+    const feature_group = feature_group_select.val();
+    if (item_level && feature_group) {
         $.ajax({
-            url: "/record/" + data_type + "/" + level + "/" + group + "/",
+            url: "/record/" + record_type + "/" + item_level + "/" + feature_group + "/",
             type: 'GET',
             success: function (response) {
                 feature_checkbox_div.append(
@@ -235,7 +239,7 @@ group_update = function() {
 
 
 update_submit_fields = function () {
-    const data_type = data_type_select.val();
+    const record_type = record_type_select.val();
     const record_period_div = $('#record_period_div');
     const record_time_div = $('#record_time_div');
     const checkboxes = feature_checkbox_div.find(":checkbox:not(#select_all_features)");
@@ -243,10 +247,12 @@ update_submit_fields = function () {
     const count_checked = checkboxes.filter(":checked").length;
     if (count_checked > 0){
         $('#web_form_div').show();
-        if (data_type === 'trait') {
+        submit_records_button.show();
+        generate_template_button.show();
+        if (record_type === 'trait') {
             record_period_div.hide();
             record_time_div.show();
-        } else if (data_type === 'condition') {
+        } else if (record_type === 'condition') {
             record_period_div.show();
             record_time_div.hide();
         }
@@ -258,13 +264,14 @@ update_submit_fields = function () {
     } else {
         $('#select_all_features').prop('checked', false);
         $('#web_form_div').hide();
-        $('#generate_template').hide();
+        submit_records_button.hide();
+        generate_template_button.hide();
     }
 };
 
 
 update_item_count = function() {
-	const sel_level = $("#level").find(":selected").val();
+	const sel_level = $("#item_level").find(":selected").val();
 	if (sel_level && sel_level !== "") {
 		const item_count_text = $('#item_count_div a:eq(0)');
 		const item_type_text = $('#item_count_div a:eq(1)');
@@ -321,7 +328,49 @@ update_item_count = function() {
     }
 };
 
-$('#submit_records').click( function (e) {
+generate_template_button.click( function (e) {
+    e.preventDefault();
+    update_item_count();
+    remove_flash();
+    const wait_message = "Please wait for template to be generated";
+    const flash_wait = "<div id='records_flash' class='flash'>" + wait_message + "</div>";
+    generate_template_button.after(flash_wait);
+    const data = $("form").serialize();
+    $.ajax({
+        url: "/record/generate_template",
+        data: data,
+        type: 'POST',
+        success: function(response) {
+            if (response.hasOwnProperty('submitted')) {
+                const flash_submitted = "<div id='records_flash' class='flash'>" + response.submitted + "</div>";
+                $("#records_flash").replaceWith(flash_submitted);
+            } else {
+                $("#records_flash").remove();
+                if (response.hasOwnProperty('errors')) {
+                    const errors= response['errors'];
+                    for (let i = 0; i < errors.length; i++) {
+                        for (const key in errors[i]) {
+                            if (errors[i].hasOwnProperty(key)) {
+                                const flash = "<div id='flash_" + key + "' class='flash'>" + errors[i][key][0] + "</div>";
+                                $('[id="' + key + '"').after(flash);
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        error: function(error) {
+            console.log(error);
+            const error_message = error.status === 500 ? 'An error has occurred. Please try again':
+                'An unknown error as occurred, please contact an administrator';
+            const flash_error = "<div id='records_flash' class='flash'>" + error_message + "</div>";
+            $("#records_flash").replaceWith(flash_error);
+		}
+    })
+});
+
+
+submit_records_button.click( function (e) {
     e.preventDefault();
     update_item_count();
     remove_flash();
@@ -366,20 +415,23 @@ $('#submit_records').click( function (e) {
     })
 });
 
-$('#tree_id_list').keypress(function(e){
-	if (e.keyCode === 13 || e.keyCode === 10) {
-		update_item_count();
-	}
-});
+suppress_input = function () {
+    $(':input').keypress(function (e) {
+        if (e.keyCode === 13 || e.keyCode === 10) {
+            e.preventDefault();
+            update_item_count();
+        }
+    });
+};
 
 
 
-$(window).on('load', data_type_update);
+$(window).on('load', record_type_update);
 //$(window).on('load', group_update);
 //$( window ).load(update_item_count);
 
-data_type_select.change(data_type_update);
-level_select.change(level_update);
-group_select.change(group_update);
+record_type_select.change(record_type_update);
+item_level_select.change(level_update);
+feature_group_select.change(group_update);
 
 $("#country, #region, #farm, #field, #block, #level").change(update_item_count);
