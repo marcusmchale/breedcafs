@@ -1,7 +1,7 @@
 from app import (
 	app,
 	ServiceUnavailable,
-	AuthError
+	SecurityError
 )
 from flask import (
 	session,
@@ -14,7 +14,6 @@ from flask import (
 	request
 )
 from app.models import (
-	MatchNode,
 	SelectionList,
 	User,
 	Download,
@@ -48,7 +47,7 @@ def collect():
 				collect_form=collect_form,
 				title='Collect'
 			)
-		except (ServiceUnavailable, AuthError):
+		except (ServiceUnavailable, SecurityError):
 			flash("Database unavailable")
 			return redirect(url_for('index'))
 
@@ -155,7 +154,7 @@ def register_samples():
 				return jsonify({
 					'errors': [collect_form.errors, location_form.errors]
 				})
-		except (ServiceUnavailable, AuthError):
+		except (ServiceUnavailable, SecurityError):
 			flash("Database unavailable")
 			return redirect(url_for('index'))
 
@@ -318,7 +317,7 @@ def generate_files():
 					'errors': [collect_form.errors]
 				})
 				return errors
-		except (ServiceUnavailable, AuthError):
+		except (ServiceUnavailable, SecurityError):
 			flash("Database unavailable")
 			return redirect(url_for('index'))
 

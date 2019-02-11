@@ -2,7 +2,7 @@ import os
 from app import (
 	app,
 	ServiceUnavailable,
-	AuthError
+	SecurityError
 )
 from flask import (
 	redirect,
@@ -58,7 +58,7 @@ def download():
 				level = 'all',
 				title='Download'
 			)
-		except (ServiceUnavailable, AuthError):
+		except (ServiceUnavailable, SecurityError):
 			flash("Database unavailable")
 			return redirect(url_for('index'))
 
@@ -182,7 +182,7 @@ def generate_csv():
 			else:
 				errors = jsonify([download_form.errors, traits_form.errors])
 				return errors
-		except (ServiceUnavailable, AuthError):
+		except (ServiceUnavailable, SecurityError):
 			flash("Database unavailable")
 			return redirect(url_for('index'))
 
@@ -206,6 +206,6 @@ def download_file(username, filename):
 			else:
 				flash('File no longer exists on the server, please generate a new file for download')
 				return redirect(url_for('download'))
-		except (ServiceUnavailable, AuthError):
+		except (ServiceUnavailable, SecurityError):
 			flash("Database unavailable")
 			return redirect(url_for('index'))

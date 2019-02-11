@@ -5,7 +5,7 @@ from app import (
 	redis_store,
 	redis_exceptions,
 	ServiceUnavailable,
-	AuthError
+	SecurityError
 )
 from app.cypher import Cypher
 from passlib.hash import bcrypt
@@ -87,7 +87,7 @@ class User:
 				return set(
 					[item for sublist in [i['e.allowed'] for i in result] for item in sublist]
 				)
-		except (ServiceUnavailable, AuthError):
+		except (ServiceUnavailable, SecurityError):
 			logging.error('Get allowed emails failed due to service unavailable')
 			return {'error': 'The database is unavailable, please try again later.'}
 
@@ -100,7 +100,7 @@ class User:
 			with get_driver().session() as neo4j_session:
 				result = neo4j_session.read_transaction(self._get_user_allowed_emails)
 				return [record[0] for record in result][0]
-		except (ServiceUnavailable, AuthError):
+		except (ServiceUnavailable, SecurityError):
 			logging.error('Get user allowed email failed due to service unavailable')
 			return {'error': 'The database is unavailable, please try again later.'}
 
@@ -113,7 +113,7 @@ class User:
 			with get_driver().session() as neo4j_session:
 				result = neo4j_session.write_transaction(self._add_allowed_email)
 				return [record[0] for record in result]
-		except (ServiceUnavailable, AuthError):
+		except (ServiceUnavailable, SecurityError):
 			logging.error('Add allowed email failed due to service unavailable')
 			return {'error': 'The database is unavailable, please try again later.'}
 
@@ -130,7 +130,7 @@ class User:
 			with get_driver().session() as neo4j_session:
 				result = neo4j_session.write_transaction(self._remove_allowed_email)
 				return [record[0] for record in result]
-		except (ServiceUnavailable, AuthError):
+		except (ServiceUnavailable, SecurityError):
 			logging.error('Remove allowed email failed due to service unavailable')
 			return {'error': 'The database is unavailable, please try again later.'}
 
@@ -165,7 +165,7 @@ class User:
 			with get_driver().session() as neo4j_session:
 				neo4j_session.write_transaction(self._remove)
 			return True
-		except (ServiceUnavailable, AuthError):
+		except (ServiceUnavailable, SecurityError):
 			return False
 
 	def _remove(self, tx):
@@ -237,7 +237,7 @@ class User:
 					return {'error': 'Username is not confirmed. Please check your email to confirm'}
 			else:
 				return {'error': 'Username is not registered'}
-		except (ServiceUnavailable, AuthError):
+		except (ServiceUnavailable, SecurityError):
 			logging.error('Neo4j database is unavailable')
 			return {'error': 'The database is unavailable, please try again later.'}
 

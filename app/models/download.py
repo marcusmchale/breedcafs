@@ -234,12 +234,14 @@ class Download:
 		if not self.features:
 			return False
 		self.id_list_to_template(
+			record_data['record_type'],
 			base_filename=record_data['item_level']
 		)
 		return True
 
 	def id_list_to_template(
 			self,
+			record_type,
 			base_filename=None
 	):
 		if not self.id_list and self.item_level:
@@ -259,14 +261,17 @@ class Download:
 		hidden_worksheet = wb.add_worksheet("hidden")
 		hidden_worksheet.hide()
 		date_format = wb.add_format({'num_format': 'yyyy-mm-dd', 'left': 1})
-		time_format = wb.add_format({'num_format': 'hh:mm'})
+		time_format = wb.add_format({'num_format': 'hh:mm', 'right': 1})
 		right_border = wb.add_format({'right': 1})
 		header_format = wb.add_format({'bottom': 1})
 		row_number = 0
 		# write header for context worksheet
 		for i, j in enumerate(self.item_fieldnames):
 			item_details_worksheet.write(row_number, i, j, header_format)
-		core_template_fieldnames = ['UID', 'Date', 'Time', 'Person']
+		if record_type == 'trait':
+			core_template_fieldnames = ['UID', 'Date', 'Time', 'Person']
+		else:
+			core_template_fieldnames = ['UID', 'Start Date', 'Start Time', 'End Date', 'End Time', 'Person']
 		feature_fieldnames = [feature['name'] for feature in self.features]
 		template_fieldnames = core_template_fieldnames + feature_fieldnames
 		feature_details_fieldnames = [
@@ -277,11 +282,19 @@ class Download:
 			'details',
 			'category_list'
 		]
+		if record_type == 'trait':
 		# column < row < cell formatting in priority
-		template_worksheet.set_column(0, 0, None, cell_format=right_border)
-		template_worksheet.set_column(1, 1, None, cell_format=date_format)
-		template_worksheet.set_column(2, 2, None, cell_format=time_format)
-		template_worksheet.set_column(3, 3, None, cell_format=right_border)
+			template_worksheet.set_column(0, 0, None, cell_format=right_border)
+			template_worksheet.set_column(1, 1, None, cell_format=date_format)
+			template_worksheet.set_column(2, 2, None, cell_format=time_format)
+			template_worksheet.set_column(3, 3, None, cell_format=right_border)
+		else:
+			template_worksheet.set_column(0, 0, None, cell_format=right_border)
+			template_worksheet.set_column(1, 1, None, cell_format=date_format)
+			template_worksheet.set_column(2, 2, None, cell_format=time_format)
+			template_worksheet.set_column(3, 3, None, cell_format=date_format)
+			template_worksheet.set_column(4, 4, None, cell_format=time_format)
+			template_worksheet.set_column(5, 5, None, cell_format=right_border)
 		template_worksheet.set_column(len(template_fieldnames)-1, len(template_fieldnames)-1, None, cell_format=right_border)
 		row_number = 0
 		# write header for template worksheet

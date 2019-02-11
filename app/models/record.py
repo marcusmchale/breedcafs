@@ -1,4 +1,4 @@
-from app import ServiceUnavailable, AuthError, TransactionError
+from app import ServiceUnavailable, SecurityError, TransactionError
 
 from app.models import ItemList
 
@@ -14,35 +14,7 @@ class Record:
 		self.username = username
 		self.neo4j_session = get_driver().session()
 
-	def ensure_data_submission_node(self):
-		parameters = {
-			'username': self.username
-		}
-		match_statement = (
-			' MATCH (:User {username_lower: toLower($username)}) '
-			'	-[: SUBMITTED]->(: Submissions) '
-			'	-[: SUBMITTED]->(uds: DataSubmissions) '
-			' RETURN uds '
-		)
-		merge_statement = (
-			' MERGE (:User {username_lower: toLower($username)}) '
-			'	-[: SUBMITTED]->(sub: Submissions) '
-			' MERGE (sub) '
-			'	-[: SUBMITTED]->(: DataSubmissions) '
-		)
-		if not self.neo4j_session.read_transaction(
-			neo4j_query,
-			match_statement,
-			parameters
-		):
-			self.neo4j_session.write_transaction(
-				neo4j_query,
-				merge_statement,
-				parameters
-			)
-
 	def submit_records(self, record_data):
-		self.ensure_data_submission_node()
 		record_data['username'] = self.username
 		try:
 			if record_data['record_type'] == 'condition':
@@ -109,7 +81,7 @@ class Record:
 					'submitted': 'No records submitted, likely no items were found matching your filters',
 					'class': 'conflicts'
 				})
-		except (TransactionError, AuthError, ServiceUnavailable):
+		except (TransactionError, SecurityError, ServiceUnavailable):
 			return jsonify({
 				'submitted': (
 					'An error occurred, please try again later'
@@ -127,11 +99,19 @@ class Record:
 			'field_uid': record_data['field_uid'],
 			'block_uid': record_data['block_uid'],
 			'tree_id_list': record_data['tree_id_list'],
+			'sample_id_list': record_data['sample_id_list'],
 			'time': record_data['record_time'],
 			'features_list': record_data['selected_features'],
 			'features_dict': record_data['features_dict']
 		}
 		statement = ItemList.build_match_item_statement(record_data)[0]
+		statement += (
+			' WITH DISTINCT item '
+		)
+		if record_data['item_level'] != 'field':
+			statement += (
+				', field '
+			)
 		statement += (
 			' UNWIND $features_list as feature_name '
 			'	MATCH '
@@ -143,7 +123,7 @@ class Record:
 			'		(:User '
 			'			{ username_lower: toLower($username) } '
 			'		)-[:SUBMITTED]->(: Submissions) '
-			'		-[:SUBMITTED]->(us: DataSubmissions) '
+			'		-[:SUBMITTED]->(us: Records) '
 			'	MERGE (feature) '
 		)
 		if record_data['item_level'] == 'field':
@@ -157,12 +137,12 @@ class Record:
 				'	-[:FROM_FIELD]->(field) '
 				' MERGE '
 				'	(ff) '
-				'	<-[:FOR_FEATURE]-(it: ItemFeature) '
+				'	<-[:FOR_FEATURE]-(if: ItemFeature) '
 				'	-[:FOR_ITEM]->(item) '
 				)
 		statement += (
 			'	MERGE '
-			'		(it) '
+			'		(if) '
 			'		<-[:RECORD_FOR]-(r: Record { '
 			'			time: $time '
 			'		})'
@@ -180,7 +160,16 @@ class Record:
 			# track user submissions through /User/Field/Feature container
 			'				MERGE '
 			'					(us)-[:SUBMITTED]->(uff:UserFieldFeature) '
-			'					-[:CONTRIBUTED]->(ff) '
+		)
+		if record_data['item_level'] == 'field':
+			statement += (
+				'					-[:CONTRIBUTED]->(if) '
+			)
+		else:
+			statement += (
+				'					-[:CONTRIBUTED]->(ff) '
+			)
+		statement += (
 			# then the record with a timestamp
 			'				CREATE '
 			'					(uff)-[s1:SUBMITTED {time: timestamp()}]->(r) '
@@ -189,7 +178,7 @@ class Record:
 			'	r, feature, '
 			'	item.uid as item_uid '
 		)
-		if record_data['item_level'] in ["block", "tree", "sample"]:
+		if record_data['item_level'] != 'field':
 			statement += (
 				' , '
 				' field.uid as field_uid, '
@@ -199,7 +188,7 @@ class Record:
 			' MATCH '
 			'	(r) '
 			'	<-[s: SUBMITTED]-(: UserFieldFeature) '
-			'	<-[: SUBMITTED]-(: DataSubmissions) '
+			'	<-[: SUBMITTED]-(: Records) '
 			'	<-[: SUBMITTED]-(: Submissions) '
 			'	<-[: SUBMITTED]-(u: User) '
 			' OPTIONAL MATCH '
@@ -273,23 +262,23 @@ class Record:
 		}
 		statement = ItemList.build_match_item_statement(record_data)[0]
 		statement += (
-			' WITH item '
+			' WITH DISTINCT item '
 		)
 		if record_data['item_level'] != 'field':
 			statement += (
 				', field '
 			)
 		statement += (
-			' UNWIND $features_list as feature_name'
+			' UNWIND $features_list as feature_name '
 			'	MATCH (item) '
 			'	<-[:FOR_ITEM]-(if: ItemFeature) '
-			'	-[:FOR_FEATURE*2..]->(feature:Feature'
+			'	-[:FOR_FEATURE*..2]->(feature:Feature'
 			'		{name_lower: toLower(feature_name)} '
 			'	), '
 			'	(if) '
 			'	<-[:RECORD_FOR]-(r) '
 			'	<-[s: SUBMITTED]-(: UserFieldFeature) '
-			'	<-[: SUBMITTED]-(: DataSubmissions) '
+			'	<-[: SUBMITTED]-(: Records) '
 			'	<-[: SUBMITTED]-(: Submissions) '
 			'	<-[: SUBMITTED]-(u: User) '
 			'	-[:AFFILIATED {data_shared: true}]->(p:Partner) '
@@ -547,6 +536,13 @@ class Record:
 		}
 		statement = ItemList.build_match_item_statement(record_data)[0]
 		statement += (
+			' WITH DISTINCT item '
+		)
+		if record_data['item_level'] != 'field':
+			statement += (
+				', field '
+			)
+		statement += (
 			' UNWIND $features_list as feature_name '
 			'	MATCH '
 			'		(:RecordType {name_lower: toLower($record_type)})'
@@ -557,7 +553,7 @@ class Record:
 			'		(:User '
 			'			{ username_lower: toLower($username) } '
 			'		)-[:SUBMITTED]->(: Submissions) '
-			'		-[:SUBMITTED]->(us: DataSubmissions) '
+			'		-[:SUBMITTED]->(us: Records) '
 			'	MERGE (feature) '
 		)
 
@@ -597,10 +593,19 @@ class Record:
 			' FOREACH (n IN CASE '
 			'		WHEN r.found = False '
 			'			THEN [1] ELSE [] END | '
-			# track user submissions through /User/Feature container
+			# track user submissions through /User/Field/Feature container
 			'				MERGE '
 			'					(us)-[:SUBMITTED]->(uff:UserFieldFeature) '
-			'					-[:CONTRIBUTED]->(ff) '
+		)
+		if record_data['item_level'] == 'field':
+			statement += (
+				'					-[:CONTRIBUTED]->(if) '
+			)
+		else:
+			statement += (
+				'					-[:CONTRIBUTED]->(ff) '
+			)
+		statement += (
 			# then the record with a timestamp
 			'				CREATE '
 			'					(uff)-[s1:SUBMITTED {time: timestamp()}]->(r) '
@@ -619,7 +624,7 @@ class Record:
 			' MATCH '
 			'	(r) '
 			'	<-[s: SUBMITTED]-(: UserFieldFeature) '
-			'	<-[: SUBMITTED]-(: DataSubmissions) '
+			'	<-[: SUBMITTED]-(: Records) '
 			'	<-[: SUBMITTED]-(: Submissions) '
 			'	<-[: SUBMITTED]-(u: User) '
 			' RETURN { '

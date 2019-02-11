@@ -384,7 +384,7 @@ class ItemList:
 			)
 			if parameters['item_level'] == 'block':
 				statement += (
-					' Block: item.name, '
+					' Block: item.name '
 				)
 			elif parameters['item_level'] == 'tree':
 				statement += (

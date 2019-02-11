@@ -1,4 +1,4 @@
-from app import app, ServiceUnavailable, AuthError
+from app import app, ServiceUnavailable, SecurityError
 from flask import (
 	session,
 	flash, 
@@ -47,7 +47,7 @@ class ListCountries(MethodView):
 				response = make_response(jsonify(countries))
 				response.content_type = 'application/json'
 				return response
-			except (ServiceUnavailable, AuthError):
+			except (ServiceUnavailable, SecurityError):
 				flash("Database unavailable")
 				return redirect(url_for('index'))
 
@@ -63,7 +63,7 @@ class ListRegions(MethodView):
 				response = make_response(jsonify(regions))
 				response.content_type = 'application/json'
 				return response
-			except (ServiceUnavailable, AuthError):
+			except (ServiceUnavailable, SecurityError):
 				flash("Database unavailable")
 				return redirect(url_for('index'))
 
@@ -79,7 +79,7 @@ class ListFarms(MethodView):
 				response = make_response(jsonify(farms))
 				response.content_type = 'application/json'
 				return response
-			except (ServiceUnavailable, AuthError):
+			except (ServiceUnavailable, SecurityError):
 				flash("Database unavailable")
 				return redirect(url_for('index'))
 
@@ -95,7 +95,7 @@ class ListFields(MethodView):
 				response = make_response(jsonify(fields))
 				response.content_type = 'application/json'
 				return response
-			except (ServiceUnavailable, AuthError):
+			except (ServiceUnavailable, SecurityError):
 				flash("Database unavailable")
 				return redirect(url_for('index'))
 
@@ -111,7 +111,7 @@ class ListBlocks(MethodView):
 				response = make_response(jsonify(blocks))
 				response.content_type = 'application/json'
 				return response
-			except (ServiceUnavailable, AuthError):
+			except (ServiceUnavailable, SecurityError):
 				flash("Database unavailable")
 				return redirect(url_for('index'))
 
@@ -128,7 +128,7 @@ class TreeCount(MethodView):
 				response = make_response(jsonify(tree_count))
 				response.content_type = 'application/json'
 				return response
-			except (ServiceUnavailable, AuthError):
+			except (ServiceUnavailable, SecurityError):
 				flash("Database unavailable")
 				return redirect(url_for('index'))
 
@@ -158,7 +158,7 @@ def create():
 				add_trees_form = add_trees_form,
 				title = 'Register fields and submit details'
 			)
-		except (ServiceUnavailable, AuthError):
+		except (ServiceUnavailable, SecurityError):
 				flash("Database unavailable")
 				return redirect(url_for('index'))
 
@@ -181,7 +181,7 @@ def add_country():
 					return jsonify({"submitted": result[0]})
 			else:
 				return jsonify([form.errors])
-		except (ServiceUnavailable, AuthError):
+		except (ServiceUnavailable, SecurityError):
 			flash("Database unavailable")
 			return redirect(url_for('index'))
 
@@ -208,7 +208,7 @@ def add_region():
 						return jsonify({"submitted": result[0]})
 			else:
 				return jsonify([form.errors])
-		except (ServiceUnavailable, AuthError):
+		except (ServiceUnavailable, SecurityError):
 				flash("Database unavailable")
 				return redirect(url_for('index'))
 
@@ -236,7 +236,7 @@ def add_farm():
 						return jsonify({"submitted": result[0]})
 			else:
 				return jsonify([form.errors])
-		except (ServiceUnavailable, AuthError):
+		except (ServiceUnavailable, SecurityError):
 				flash("Database unavailable")
 				return redirect(url_for('index'))
 
@@ -265,7 +265,7 @@ def add_field():
 						return jsonify({"submitted": {'uid': result[0]['uid'], 'name': result[0]['name']}})
 			else:
 				return jsonify([form.errors])
-		except (ServiceUnavailable, AuthError):
+		except (ServiceUnavailable, SecurityError):
 				flash("Database unavailable")
 				return redirect(url_for('index'))
 
@@ -294,7 +294,7 @@ def add_block():
 			else:
 				errors = jsonify([location_form.errors, add_block_form.errors])
 				return errors
-		except (ServiceUnavailable, AuthError):
+		except (ServiceUnavailable, SecurityError):
 				flash("Database unavailable")
 				return redirect(url_for('index'))
 
@@ -378,7 +378,7 @@ def add_trees():
 				return jsonify({
 					'errors': [add_trees_form.errors, location_form.errors]
 				})
-		except (ServiceUnavailable, AuthError):
+		except (ServiceUnavailable, SecurityError):
 			flash("Database unavailable")
 			return redirect(url_for('index'))
 

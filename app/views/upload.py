@@ -1,4 +1,4 @@
-from app import app, ServiceUnavailable, AuthError
+from app import app, ServiceUnavailable, SecurityError
 from flask import (
 	flash, redirect, url_for, session, render_template, jsonify
 )
@@ -19,7 +19,7 @@ def upload():
 				form=form,
 				title='Upload'
 			)
-		except (ServiceUnavailable, AuthError):
+		except (ServiceUnavailable, SecurityError):
 			flash("Database unavailable")
 			return redirect(url_for('index'))
 

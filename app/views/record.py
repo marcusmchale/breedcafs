@@ -1,7 +1,7 @@
 from app import (
 	app,
 	ServiceUnavailable,
-	AuthError
+	SecurityError
 )
 
 from flask import (
@@ -47,7 +47,7 @@ class ListFeatureGroups(MethodView):
 				response = make_response(jsonify(feature_groups))
 				response.content_type = 'application/json'
 				return response
-			except (ServiceUnavailable, AuthError):
+			except (ServiceUnavailable, SecurityError):
 				flash("Database unavailable")
 				return redirect(url_for('index'))
 
@@ -63,7 +63,7 @@ class ListFeatures(MethodView):
 				response = make_response(jsonify(features_details))
 				response.content_type = 'application/json'
 				return response
-			except (ServiceUnavailable, AuthError):
+			except (ServiceUnavailable, SecurityError):
 				flash("Database unavailable")
 				return redirect(url_for('index'))
 
@@ -83,7 +83,7 @@ def record():
 				record_form=record_form,
 				location_form=location_form
 			)
-		except (ServiceUnavailable, AuthError):
+		except (ServiceUnavailable, SecurityError):
 			flash("Database unavailable")
 			return redirect(url_for('index'))
 
@@ -186,7 +186,7 @@ def generate_template():
 				return jsonify({
 					'errors': [record_form.errors, location_form.errors]
 				})
-		except (ServiceUnavailable, AuthError):
+		except (ServiceUnavailable, SecurityError):
 			flash("Database unavailable")
 			return redirect(url_for('index'))
 
@@ -270,6 +270,6 @@ def submit_records():
 					'errors': [record_form.errors, location_form.errors]
 				})
 				return errors
-		except (ServiceUnavailable, AuthError):
+		except (ServiceUnavailable, SecurityError):
 			flash("Database unavailable")
 			return redirect(url_for('index'))

@@ -2,9 +2,7 @@ from app import (
 	app,
 	os,
 	GraphDatabase, 
-	# ServiceUnavailable,
-	# AuthError,
-	watch, 
+	# watch,
 	logging
 )
 
@@ -31,7 +29,7 @@ def get_driver():
 		connection_acquisition_timeout=5,
 		max_retry_time=5
 	)
-	watch("neo4j.bolt", logging.INFO, open(app.config['NEO4J_DRIVER_LOG'], 'w+'))
+	# watch("neo4j.bolt", logging.INFO, open(app.config['NEO4J_DRIVER_LOG'], 'w+'))
 	return DriverHolder.driver
 
 

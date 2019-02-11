@@ -1,4 +1,4 @@
-from app import app, os, celery, ServiceUnavailable, AuthError
+from app import app, os, celery, ServiceUnavailable, SecurityError
 import grp
 from app.cypher import Cypher
 from app.emails import send_email
@@ -1149,5 +1149,5 @@ class Upload:
 						'status': 'SUCCESS',
 						'result': response
 						}
-		except (ServiceUnavailable, AuthError) as exc:
+		except (ServiceUnavailable, SecurityError) as exc:
 			raise self.retry(exc=exc)

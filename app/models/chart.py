@@ -1,7 +1,7 @@
 from app import (
 	# app,
 	ServiceUnavailable,
-	AuthError
+	SecurityError
 )
 from app.cypher import Cypher
 from neo4j_driver import get_driver, neo4j_query
@@ -62,7 +62,7 @@ class Chart:
 			rels = {rel['id']: rel for rel in rels}.values()
 			# and create the d3 input
 			return jsonify({"nodes": nodes, "links": rels})
-		except (ServiceUnavailable, AuthError):
+		except (ServiceUnavailable, SecurityError):
 			return jsonify({"status": "Database unavailable"})
 
 	# get lists of submitted nodes (relationships and directly linked nodes) in json format

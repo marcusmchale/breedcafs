@@ -1,4 +1,4 @@
-from app import app, ServiceUnavailable, AuthError
+from app import app, ServiceUnavailable, SecurityError
 from flask import session, flash, redirect, url_for, request, jsonify
 from app.models import Chart
 from datetime import datetime, timedelta
@@ -45,7 +45,7 @@ def item_count():
 			return jsonify({
 				"item_count": count
 			})
-		except AuthError:
+		except SecurityError:
 			return redirect(url_for('index'))
 		except ServiceUnavailable:
 			return jsonify({

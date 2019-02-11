@@ -5,9 +5,7 @@ from lists import (
 	ItemList,
 	SelectionList
 )
-from matches import (
-	MatchNode
-)
+
 from items import (
 	AddLocations,
 	FindLocations,
