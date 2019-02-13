@@ -406,6 +406,79 @@ class AddTreesForm(FlaskForm):
 	submit_trees = SubmitField('Register new trees')
 
 
+# Trials
+class TrialForm(FlaskForm):
+	country = SelectField('Country')
+	region = SelectField('Region')
+	farm = SelectField('Farm')
+	field = SelectField('Field')
+	select_trial = SelectField(
+		'Trial',
+		[InputRequired()],
+		description="Trial to modify",
+		choices=[("", "Select Trial")]
+	)
+	# to display either fields or trees relevant fields for item selection
+	item_level = SelectField(
+		'Item Level',
+		[InputRequired()],
+		description="Item Level",
+		choices=[
+			('', 'Select level'),
+			('field', 'Field'),
+			('tree', 'Tree')
+		]
+	)
+	tree_id_list = StringField(
+		'Tree list',
+		[
+			Optional(),
+			Regexp("^[0-9,-]*$", message='List should be comma separated with hyphens for ranges'),
+			range_list_check
+		],
+		description="List of tree IDs, e.g. '1, 2-5' "
+	)
+	assign_to_trial = SubmitField('Assign to trial')
+
+	@staticmethod
+	def update():
+		form = TrialForm()
+		country = form.country.data if form.country.data != '' else None
+		region = form.region.data if form.region.data != '' else None
+		farm = form.farm.data if form.farm.data != '' else None
+		field_uid = form.field.data if form.field.data != '' else None
+		countries = SelectionList.get_countries()
+		regions = SelectionList.get_regions(country)
+		farms = SelectionList.get_farms(country, region)
+		fields = SelectionList.get_fields(country, region, farm)
+		form.country.choices = [('', 'Select Country')] + countries
+		form.region.choices = [('', 'Select Region')] + regions
+		form.farm.choices = [('', 'Select Farm')] + farms
+		form.field.choices = [('', 'Select Field')] + fields
+		form.select_trial.choices = [('', 'Select Trial')] + SelectionList.get_trials(
+			country,
+			region,
+			farm,
+			field_uid
+		)
+		return form
+
+
+class AddTrial(FlaskForm):
+	id = "add_trial"
+	text_trial = StringField(
+		'Trial text input',
+		[
+			InputRequired(),
+			Regexp('([^\x00-\x7F]|\w|\s)+$', message='Trial name contains illegal characters'),
+			Length(min=1, max=50, message='Maximum 50 characters')
+		],
+		filters=[strip_filter],
+		description="Add new trial"
+	)
+	submit_trial = SubmitField('+')
+
+
 # Collect
 class CollectForm(FlaskForm):
 	min = 1
@@ -417,7 +490,6 @@ class CollectForm(FlaskForm):
 		choices=[
 			('', 'Select level'),
 			('field', 'Field'),
-			('block', 'Block'),
 			('tree', 'Tree'),
 			('sample', 'Sample')
 		]

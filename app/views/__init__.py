@@ -19,5 +19,6 @@ from collect import (
 	collect
 )
 from record import record
+from trials import trials
 from chart import json_submissions
-# from flask.views import View
+

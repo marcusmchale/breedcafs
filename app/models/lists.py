@@ -205,6 +205,62 @@ class SelectionList:
 			)
 		return [record[0] for record in result]
 
+	@staticmethod
+	def get_trials(
+			country=None,
+			region=None,
+			farm=None,
+			field_uid=None
+	):
+		statement = (
+			' MATCH '
+			'	(trial: Trial) '
+		)
+		parameters = {}
+		# checking against string u'None' because wtforms is still broken
+		# https://github.com/wtforms/wtforms/pull/288
+		if field_uid and field_uid != 'None':
+			parameters['field_uid'] = field_uid
+			statement += (
+				' -[:PERFORMED_IN]->(:Field {uid:$field_uid})'
+			)
+		elif farm and farm != 'None':
+			parameters['farm'] = farm
+			parameters['region'] = region
+			parameters['country'] = country
+			statement += (
+				' -[:PERFORMED_IN | IS_IN*..2]->(:Farm {name_lower: toLower($farm)}) '
+				' -[:IS_IN]->(:Region {name_lower: toLower($region)}) '
+				' -[:IS_IN]->(:Country {name_lower: toLower($country)}) '
+			)
+		elif region and region != 'None':
+			parameters['region'] = region
+			parameters['country'] = country
+			statement += (
+				' -[:PERFORM_IN | IS_IN*..3]->(:Region {name_lower: toLower($region)}) '
+				' -[:IS_IN]->(:Country {name_lower: toLower($country)}) '
+			)
+		elif country and country != 'None':
+			parameters['country'] = country
+			statement += (
+				' -[:PERFORM_IN | IS_IN*..4]->(:Region {name_lower: toLower($region)}) '
+				' -[:IS_IN]->(:Country {name_lower: toLower($country)}) '
+			)
+		statement += (
+			' RETURN [ '
+			'	trial.uid, '
+			'	toString(trial.uid) + " - " + trial.name '
+			' ] '
+			' ORDER BY trial.uid '
+		)
+		with get_driver().session() as neo4j_session:
+			result = neo4j_session.read_transaction(
+				neo4j_query,
+				statement,
+				parameters
+			)
+		return [record[0] for record in result]
+
 
 class ItemList:
 	def __init__(self):
@@ -410,7 +466,16 @@ class ItemList:
 				)
 		statement += (
 			' } '
+			' ORDER BY '
 		)
+		if parameters['item_level'] == 'field':
+			statement += (
+				' item.uid '
+			)
+		else:
+			statement += (
+				' field.uid, item.id '
+			)
 		with get_driver().session() as neo4j_session:
 			result = neo4j_session.read_transaction(
 				neo4j_query,

@@ -54,7 +54,7 @@ def upload_submit():
 				# as an asynchronous function with celery
 				# result is stored in redis and accessible from the status/task_id endpoint
 				task = Upload.async_submit.apply_async(args=[username, upload_object])
-			except (ServiceUnavailable, AuthError):
+			except (ServiceUnavailable, SecurityError):
 				return jsonify({'submitted': 'The database is currently unavailable - please try again later'})
 			return jsonify({'submitted': (
 				'Your file has been uploaded and is being checked before submission to the database.\n'
@@ -67,7 +67,7 @@ def upload_submit():
 
 
 @app.route('/status/<task_id>/')
-def taskstatus(task_id):
+def task_status(task_id):
 	task = Upload.async_submit.AsyncResult(task_id)
 	if task.status != 'SUCCESS':
 		return jsonify({'status': task.status})

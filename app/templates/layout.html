@@ -19,18 +19,21 @@
 				{% if ('global_admin' in session.access) or ('partner_admin' in session.access) %}
 					<a href="{{ url_for('admin') }}"><img src = "{{ url_for('static', filename='admin.svg') }}"> </a>
 				{% endif %}
-                <a href="{{ url_for('logout') }}"><img src="{{ url_for('static', filename='logout.svg') }}"</a>
+                <a href="{{ url_for('logout') }}"><img src="{{ url_for('static', filename='logout.svg') }}"></a>
 			{% endif %}
 		</div>
 		<div class="header">
 			{% if session.username %}
-			<div class="utils">
-				<a href="{{ url_for('create') }}"><img src="{{ url_for('static', filename='create_field.svg') }}"></a>
-                <a href="{{ url_for('collect') }}"><img src="{{ url_for('static', filename='collect.svg') }}"></a>
-                <a href="{{ url_for('record') }}"><img src="{{ url_for('static', filename='record.svg') }}"></a>
-				<a href="{{ url_for('upload') }}"><img src="{{ url_for('static', filename='upload.svg') }}"></a>
-				<a href="{{ url_for('download') }}"><img src="{{ url_for('static', filename='download_espresso.svg') }}"></a>
-			</div>
+                <div class="utils">
+                    <a href="{{ url_for('create') }}"><img src="{{ url_for('static', filename='create_field.svg') }}"></a>
+                    <!--<a href="{{ url_for('trials') }}"><img src="{{ url_for('static', filename='treatments.svg') }}"></a>-->
+                    <a href="{{ url_for('collect') }}"><img src="{{ url_for('static', filename='collect.svg') }}"></a>
+                </div>
+                <div class="utils">
+                    <a href="{{ url_for('record') }}"><img src="{{ url_for('static', filename='record.svg') }}"></a>
+                    <a href="{{ url_for('upload') }}"><img src="{{ url_for('static', filename='upload.svg') }}"></a>
+                    <a href="{{ url_for('download') }}"><img src="{{ url_for('static', filename='download_espresso.svg') }}"></a>
+                </div>
 			{% endif %}
 		</div>
 		{% for message in get_flashed_messages() %}

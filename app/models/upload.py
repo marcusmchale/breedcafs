@@ -2,6 +2,7 @@ from app import app, os, celery, ServiceUnavailable, SecurityError
 import grp
 from app.cypher import Cypher
 from app.emails import send_email
+from app.models.parsers import Parsers
 from flask import render_template, url_for
 from user import User
 from config import ALLOWED_EXTENSIONS
@@ -212,23 +213,62 @@ class ParseResult:
 		# Check time, and for trait duplicates in tables simply check for duplicate fields in header
 		else:  # submission_type == "table":
 			# check for date time info.
-			parsed_date = Parsers.date_format(row_data['date'])
-			parsed_time = Parsers.time_format(row_data['time'])
-			if not parsed_date:
-				self.merge_error(
-					line_num,
-					row_data,
-					"date",
-					"format"
-				)
-			if not parsed_time:
-				self.merge_error(
-					line_num,
-					row_data,
-					"time",
-					"format"
-				)
-			unique_key = (parsed_uid, parsed_time, parsed_date)
+			if 'date' in row_data:
+				parsed_date = Parsers.date_format(row_data['date'])
+				# date required for trait data
+				if not parsed_date or parsed_date is True:
+					self.merge_error(
+						line_num,
+						row_data,
+						"date",
+						"format"
+					)
+				parsed_time = Parsers.time_format(row_data['time'])
+				if not parsed_time:
+					self.merge_error(
+						line_num,
+						row_data,
+						"time",
+						"format"
+					)
+				unique_key = (parsed_uid, parsed_date, parsed_time)
+			if 'start date' in row_data:
+				parsed_start_date = Parsers.date_format(row_data['start date'])
+				if not parsed_start_date:
+					self.merge_error(
+						line_num,
+						row_data,
+						"start date",
+						"format"
+					)
+				if 'start time' in row_data:
+					parsed_start_time = Parsers.time_format(row_data['start time'])
+					if not parsed_start_time:
+						self.merge_error(
+							line_num,
+							row_data,
+							"start time",
+							"format"
+						)
+				if 'end date' in row_data:
+					parsed_end_date = Parsers.date_format(row_data['end date'])
+					if not parsed_end_date:
+						self.merge_error(
+							line_num,
+							row_data,
+							"end date",
+							"format"
+						)
+				if 'end time' in row_data:
+					parsed_end_time = Parsers.time_format(row_data['end time'])
+					if not parsed_end_time:
+						self.merge_error(
+							line_num,
+							row_data,
+							"end time",
+							"format"
+						)
+				unique_key = (parsed_uid, parsed_start_date, parsed_start_time, parsed_end_date, parsed_end_time)
 			if unique_key not in self.unique_keys:
 				self.unique_keys.add(unique_key)
 			else:
@@ -243,18 +283,18 @@ class ParseResult:
 			field,
 			error_type,
 			# optional arguments only relevant to value errors
-			trait_name = None,
-			trait_format = None,
+			feature_name = None,
+			feature_format = None,
 			category_list = None,
 	):
 		if not self.parse_result:
 			self.parse_result = {}
 		parse_result = self.parse_result
 		if line_num in parse_result:
-			parse_result[line_num].add_error(field, error_type, trait_name, trait_format, category_list)
+			parse_result[line_num].add_error(field, error_type, feature_name, feature_format, category_list)
 		else:
 			parse_result[line_num] = RowParseResult(line_num, row_data)
-			parse_result[line_num].add_error(field, error_type, trait_name, trait_format, category_list)
+			parse_result[line_num].add_error(field, error_type, feature_name, feature_format, category_list)
 
 	def row_errors(self):
 		return self.parse_result
@@ -353,14 +393,24 @@ class ItemSubmissionResult:
 		self.timestamp = None
 		self.text_date = None
 		self.text_time = None
+		self.text_start_date = None
+		self.text_start_time = None
+		self.text_end_date = None
+		self.text_end_time = None
 		self.time = datetime.datetime.utcfromtimestamp(int(time) / 1000).strftime("%Y-%m-%d %H:%M:%S")
 
 	def fb_item(self, timestamp):
 		self.timestamp = timestamp
 
-	def table_item(self, text_date, text_time):
+	def table_trait_item(self, text_date, text_time):
 		self.text_date = text_date
 		self.text_time = text_time
+
+	def table_condition_item(self, text_start_date, text_start_time, text_end_date, text_end_time):
+		self.text_start_date = text_start_date
+		self.text_start_time = text_start_time
+		self.text_end_date = text_end_date
+		self.text_end_time = text_end_time
 
 	def conflict(self):
 		if self.value == self.uploaded_value:
@@ -419,13 +469,23 @@ class SubmissionResult:
 			record['value'],
 			record['uploaded_value'],
 			record['uid'],
-			record['trait'],
-			record['time']
+			record['feature'],
+			record['time'],
+			record['start'],
+			record['end']
 		)
 		if submission_type == "FB":
 			submission_item.fb_item(record['timestamp'])
 		else:  # submission type == 'table'
-			submission_item.table_item(record['text_date'], record['text_time'])
+			if record['time']:
+				submission_item.table_trait_item(record['text_date'], record['text_time'])
+			else:
+				submission_item.table_condition_item(
+					record['text_start_date'],
+					record['text_start_time'],
+					record['text_end_date'],
+					record['text_end_time']
+				)
 		if not record['found']:
 			self.submitted.append(submission_item)
 		elif submission_item.conflict():
@@ -564,78 +624,6 @@ class SubmissionResult:
 		return submitted_filename
 
 
-class Parsers:
-	def __init__(self):
-		pass
-
-	@staticmethod
-	def timestamp_fb_format(timestamp_string):
-		timestamp = str(timestamp_string).strip()
-		try:
-			datetime.datetime.strptime(timestamp[0:19], '%Y-%m-%d %H:%M:%S')
-			if not all([
-				timestamp[-5] in ['+', '-'],
-				int(timestamp[-4:-2]) < 24,
-				int(timestamp[-4:-2]) >= 0,
-				int(timestamp[-2:]) < 60,
-				int(timestamp[-2:]) >= 0
-			]):
-				return False
-			else:
-				return timestamp
-		except (ValueError, IndexError):
-			return False
-
-	@staticmethod
-	def date_format(date_string):
-		date_string = str(date_string).strip()
-		try:
-			time = datetime.datetime.strptime(date_string, '%Y-%m-%d')
-			# the below is just to make sure can render it again, strftime fails on dates pre-1990
-			datetime.datetime.strftime(time, '%Y')
-			return date_string
-		except ValueError:
-			return False
-
-	@staticmethod
-	def time_format(time_string):
-		time_string = str(time_string).strip()
-		if not time_string:
-			return True
-		else:
-			try:
-				datetime.datetime.strptime(time_string, '%H:%M')
-				return time_string
-			except (ValueError, IndexError):
-				return False
-
-	@staticmethod
-	def uid_format(uid):
-		uid = str(uid).strip().upper()
-		if uid.isdigit():
-			return True
-		else:
-			if len(uid.split("_")) == 2:
-				if all([
-					uid.split("_")[0].isdigit(),
-					uid.split("_")[1][0] in ["B", "T", "R", "L", "S"],
-					uid.split("_")[1][1:].isdigit()
-				]):
-					return uid
-				else:
-					if all([
-						uid.split("_")[0].isdigit(),
-						uid.split("_")[1][0] == "S",
-						uid.split("_")[1].split(".")[0][1:].isdigit(),
-						uid.split("_")[1].split(".")[1].isdigit()
-					]):
-						return uid
-					else:
-						return False
-			else:
-				return False
-
-
 class Upload:
 	def __init__(self, username, submission_type, raw_filename):
 		time = datetime.datetime.utcnow().strftime('_%Y%m%d-%H%M%S_')
@@ -650,6 +638,7 @@ class Upload:
 		self.fieldnames = None
 		self.file_extension = None
 		self.contains_data = None
+		self.features = None
 
 	def allowed_file(self):
 		if '.' in self.raw_filename:
@@ -714,12 +703,32 @@ class Upload:
 			first_row = next(rows)
 			self.fieldnames = [c.value.strip().lower() for c in first_row if c.value]
 			fieldnames_lower = {c.value.strip().lower() for c in first_row if c.value}
-			required = {'uid', 'date', 'time', 'person'}
+			required = {'uid', 'person'}
 			if not required.issubset(fieldnames_lower):
 				missing_fieldnames = required - fieldnames_lower
 				return (
 						'The "Template" worksheet is missing the following fields: '
 						+ ', '.join([i for i in missing_fieldnames])
+				)
+			other_required = [
+				{'date', 'time'},
+				{'start date', 'start time', 'end date', 'end time'}
+			]
+			if not any(
+				other_set.issubset(fieldnames_lower) for other_set in other_required
+			):
+				return (
+						'The "Template" worksheet is missing required date/time fields.'
+						' For trait data these are "date" and "time", for condition data these are '
+						' "start date", "start time", "end date", "end time".'
+				)
+			# check if more than one of the "other required" sets are found
+			elif sum(bool(other_set & fieldnames_lower) for other_set in other_required) > 1:
+				return (
+					'If you are submitting Trait data then please just include "date" and "time". '
+					'If you are submitting Condition data then please just include '
+					'"start date", "start time", "end date", "end time". '
+					'Do not provide date/time elements from the other data type.'
 				)
 		else:
 			return None
@@ -794,29 +803,22 @@ class Upload:
 				# firstly, if a table check for trait data, if none then just skip
 				if self.submission_type == 'table':
 					# firstly check if trait data in the row and ignore if empty
-					required = ['uid', 'date', 'time', 'person']
-					index_headers = [
-						'country',
-						'region',
-						'farm',
-						'field',
-						'field uid',
-						'block',
-						'block uid',
-						'variety',
-						'tree uid',
-						'tree custom id',
-						'branch uid',
-						'leaf uid',
-						'sample uid',
-						'uid',
-						'date sampled',
-						'tissue',
-						'storage'
+					record_properties = [
+						'date',
+						'start date',
+						'start time',
+						'end date',
+						'end time',
+						'time',
+						'person'
 					]
-					not_traits = required + index_headers
-					traits = set(row_data.keys()).difference(set(not_traits))
-					if [row_data[trait] for trait in traits if row_data[trait]]:
+					index_headers = [
+						'uid'
+					]
+					not_features = record_properties + index_headers
+					self.features = set(row_data.keys()).difference(set(not_features))
+					# TODO check features first?
+					if [row_data[feature] for feature in self.features if row_data[feature]]:
 						line_num = int(trimmed_dict.line_num)
 						parse_result.parse_row(line_num, row_data)
 					else:
@@ -895,41 +897,19 @@ class Upload:
 									item['trait']
 								)
 			else:
-				required = ['uid', 'date', 'time', 'person']
-				index_headers = [
-					'country',
-					'region',
-					'farm',
-					'field',
-					'field uid',
-					'block',
-					'block uid',
-					'variety',
-					'tree uid',
-					'tree custom id',
-					'branch uid',
-					'leaf uid',
-					'sample uid',
-					'uid',
-					'date sampled',
-					'tissue',
-					'storage'
-				]
-				not_traits = required + index_headers
-				traits = [i for i in trimmed_dict.fieldnames if i not in not_traits]
 				check_result = [record[0] for record in tx.run(
 					Cypher.upload_table_check,
 					username=username,
 					filename=("file:///" + username + '/' + trimmed_filename),
 					submission_type=submission_type,
-					traits=traits
+					features=self.features
 				)]
 				for row_data in trimmed_dict:
 					line_num = int(trimmed_dict.line_num)
 					# 0 based list call and have to account for header row so -2
 					item_num = line_num - 2
-					for i, trait in enumerate(traits):
-						item = check_result[item_num * len(traits) + i]
+					for i, feature in enumerate(self.features):
+						item = check_result[item_num * len(self.features) + i]
 						if not item['uid']:
 							parse_result.merge_error(
 								line_num,
@@ -938,27 +918,27 @@ class Upload:
 								"missing"
 							)
 						# this isn't so simple with mixed levels, sometimes the trait is found for some levels.
-						if not item['trait']:
+						if not item['feature']:
 							parse_result.add_field_error(
-								trait,
+								feature,
 								(
-									"This trait is not found. Please check your spelling. "
-									"This may also be because the trait is not registered at the level of these items"
+									"This feature is not found. Please check your spelling. "
+									"This may also be because the feature is not available at the level of these items"
 								)
 							)
 						else:
 							# this is to handle mixed levels,
 							# otherwise the upload would fail if a trait was only found for some levels
-							parse_result.add_field_found(trait)
+							parse_result.add_field_found(feature)
 						if not item['value']:
-							if all([row_data[trait], item['trait'], item['uid']]):
+							if all([row_data[feature], item['feature'], item['uid']]):
 								if 'category_list' in item:
 									parse_result.merge_error(
 										line_num,
 										row_data,
-										trait,
+										feature,
 										"format",
-										item['trait'],
+										item['feature'],
 										item['format'],
 										item['category_list']
 									)
@@ -966,18 +946,18 @@ class Upload:
 									parse_result.merge_error(
 										line_num,
 										row_data,
-										trait,
+										feature,
 										"format",
-										item['trait'],
+										item['feature'],
 										item['format']
 									)
 								else:
 									parse_result.merge_error(
 										line_num,
 										row_data,
-										trait,
+										feature,
 										"format",
-										item['trait']
+										item['feature']
 									)
 				if parse_result.field_found_list():
 					for field in parse_result.field_found_list():
@@ -993,46 +973,25 @@ class Upload:
 		trimmed_filename = os.path.basename(trimmed_file_path)
 		submission_type = self.submission_type
 		filename = self.filename
+		features = self.features
 		self.submission_result = SubmissionResult(username, filename, submission_type)
 		submission_result = self.submission_result
 		if submission_type == 'FB':
 			query = Cypher.upload_fb
 			result = [record[0] for record in tx.run(
 				query,
-				username = username,
-				filename = ("file:///" + username + '/' + trimmed_filename),
-				submission_type = submission_type
+				username=username,
+				filename=("file:///" + username + '/' + trimmed_filename),
+				submission_type=submission_type
 			)]
 		else:  # submission_type == 'table':
-			with open(trimmed_file_path, 'r') as uploaded_file:
-				uploaded_dict = DictReaderInsensitive(uploaded_file)
-				required = ['uid', 'date', 'time', 'person']
-				index_headers = [
-					'country',
-					'region',
-					'farm',
-					'field',
-					'field uid',
-					'block',
-					'block uid',
-					'variety',
-					'tree uid',
-					'tree custom id',
-					'branch uid',
-					'leaf uid',
-					'sample uid',
-					'tissue',
-					'storage'
-				]
-				not_traits = required + index_headers
-				traits = [i for i in uploaded_dict.fieldnames if i not in not_traits]
-			query = Cypher.upload_table
+			statement = Cypher.upload_table
 			result = [record[0] for record in tx.run(
-				query,
+				statement,
 				username=username,
 				filename=("file:///" + username + '/' + trimmed_filename),
 				submission_type=submission_type,
-				traits=traits
+				features=features
 			)]
 		# create a submission result
 		for record in result:

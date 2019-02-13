@@ -663,17 +663,17 @@ class Record:
 		header_string += '</p></th></tr>'
 		for record in result_list:
 			if record['submitted_at']:
-				submitted_at = datetime.datetime.utcfromtimestamp(int(record['submitted_at']) / 1000).strftime("%Y-%m-%d %H:%M:%S")
+				submitted_at = datetime.datetime.utcfromtimestamp(int(record['submitted_at']) / 1000).strftime("%Y-%m-%d %H:%M")
 			else:
 				submitted_at = ""
 			row_string = '<tr><td>'
 			if record_type == 'condition':
 				if record['start']:
-					start_time = datetime.datetime.utcfromtimestamp(int(record['start']) / 1000).strftime("%Y-%m-%d")
+					start_time = datetime.datetime.utcfromtimestamp(int(record['start']) / 1000).strftime("%Y-%m-%d %H:%M")
 				else:
 					start_time = ""
 				if record['end']:
-					end_time = datetime.datetime.utcfromtimestamp(int(record['end']) / 1000).strftime("%Y-%m-%d")
+					end_time = datetime.datetime.utcfromtimestamp(int(record['end']) / 1000).strftime("%Y-%m-%d %H:%M")
 				else:
 					end_time = ""
 				row_data = [
@@ -686,7 +686,7 @@ class Record:
 					]
 			else:  # record_type == 'trait':
 				if record['time']:
-					time = datetime.datetime.utcfromtimestamp(int(record['time']) / 1000).strftime("%Y-%m-%d")
+					time = datetime.datetime.utcfromtimestamp(int(record['time']) / 1000).strftime("%Y-%m-%d %H:%M")
 
 				else:
 					time = ""

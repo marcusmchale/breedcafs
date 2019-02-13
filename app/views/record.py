@@ -228,14 +228,14 @@ def submit_records():
 					(datetime.strptime(request.form['record_start'], '%Y-%m-%d') - datetime(1970, 1, 1)).total_seconds()
 					* 1000
 				) if request.form['record_start'] != '' else None
-				# end time is the last millisecond of the end date
+				# end time defaults to last minute of the end date
 				end_time = int(
 					(
 						datetime.strptime(request.form['record_end'], '%Y-%m-%d') +
 						timedelta(days=1) -
 						datetime(1970, 1, 1)
 					).total_seconds() * 1000
-				) - 1 if request.form['record_end'] != '' else None
+				) - 60000 if request.form['record_end'] != '' else None
 				if all([record_type == 'condition', end_time, start_time >= end_time]):
 					return jsonify({
 						'submitted': 'Please make sure the start date is before the end date'

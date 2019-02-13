@@ -1,9 +1,8 @@
 {% extends "layout.html" %}	
 {% block body %}
 	<div class="text_body">
-		<h2>Create fields and register trees</h2>
-		<p>Register new fields and trees in optional experimental blocks
-		</p>
+		<h2>Register Fields and Trees</h2>
+		<p>Trees can optionally be arranged into experimental blocks.</p>
 		{% from "_formhelpers_location_fields.html" import render_field %}
 		<form action="{{ url_for('create') }}" id="create" method="post">
 			<div>
