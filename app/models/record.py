@@ -276,7 +276,7 @@ class Record:
 			'		{name_lower: toLower(feature_name)} '
 			'	), '
 			'	(if) '
-			'	<-[:RECORD_FOR]-(r) '
+			'	<-[:RECORD_FOR]-(r: Record) '
 			'	<-[s: SUBMITTED]-(: UserFieldFeature) '
 			'	<-[: SUBMITTED]-(: Records) '
 			'	<-[: SUBMITTED]-(: Submissions) '
@@ -284,6 +284,10 @@ class Record:
 			'	-[:AFFILIATED {data_shared: true}]->(p:Partner) '
 			'	OPTIONAL MATCH '
 			'		(p)<-[: AFFILIATED {confirmed: true}]-(cu: User {username_lower: toLower($username)}) '
+			# set lock on ItemCondition node and only unlock after merge or result
+			# this is either rolled back or set to false on subsequent merger, 
+			# prevents conflicts (per item/feature) emerging from race condition 
+			' SET if._LOCK_ = True '
 			' WITH '
 			'	item, feature, if, r, s, u, p, cu '
 		)
@@ -301,173 +305,64 @@ class Record:
 			'			r.value <> $features_dict[feature_name] '
 			'		) '
 		)
-		# allowing open ended time-frames but :
-		# defined period can not conflict with defined period
-		# OR defined start or defined end
-		#
-		# Here False is stored for undefined instead of the Null value to facilitate specific mergers
-		# (see build_merge_condition_record_query)
-		# So we have to perform case statement checks on the value before comparing
-		#
+		# allowing unbound time ranges but, where values don't match:
+		#   - bound cannot be set in overlapping range with existing bound
+		#   - lower/upper bounded cannot be set over existing bound
+		#   - Lower or upper bound cannot be set at same time as existing lower or upper bound, respectively.
+		# Lower bound is inclusive, upper bound is exclusive
+		# Unbound is stored as False instead of Null to facilitate specific mergers
 		if all([record_data['start_time'], record_data['end_time']]):
 			statement += (
 				' AND (( '
 				# - any overlapping records
-				'	CASE WHEN r.start <> False THEN r.start ELSE Null END <= $end_time '
+				'	CASE WHEN r.start <> False THEN r.start ELSE Null END < $end_time '
 				'	AND '
-				'	CASE WHEN r.end <> False THEN r.end ELSE Null END >= $start_time '
+				'	CASE WHEN r.end <> False THEN r.end ELSE Null END => $start_time '
 				'	) OR ( '
-				# - OR a record that starts in the defined period and has a False end time
+				# - OR a record that has a lower bound in the bound period and unbound upper
 				'	r.end = False'
 				'	AND '
-				'	CASE WHEN r.start <> False THEN r.start ELSE Null END <= $start_time '
+				'	CASE WHEN r.start <> False THEN r.start ELSE Null END >= $start_time '
 				'	AND '
-				'	CASE WHEN r.end <> False THEN r.end ELSE Null END >= $start_time '
+				'	CASE WHEN r.start <> False THEN r.start ELSE Null END < $end_time '
 				'	) OR ( '
-				# - OR a record that ends in the defined period and has a null start time
+				# - OR a record that has an upper bound in the bound period and unbound lower
 				'	r.start = False '
 				'	AND '
-				'	CASE WHEN r.start <> False THEN r.start ELSE Null END <= $end_time '
+				'	CASE WHEN r.end <> False THEN r.end ELSE Null END > $start_time '
 				'	AND '
-				'	CASE WHEN r.end <> False THEN r.end ELSE Null END >= $end_time '
+				'	CASE WHEN r.end <> False THEN r.end ELSE Null END <= $end_time '
 				' )) '
-				# set lock on ItemCondition node and only unlock after merge or result
-				# we do a rollback if get results so that this is only set when there are no conflicts 
-				# (and the merge proceeds)
-				' SET if._LOCK_ = True '
-				' WITH '
-				'	r, '
-				'	p.name as partner, '
-				'	CASE WHEN cu IS NULL THEN False ELSE True END as access, '
-				'	item.uid as UID, '
-				'	feature.name as feature, '
-				'	s.time as submitted_at, '
-				'	u.name as user '
 			)
-			if record_data['item_level'] != 'field':
-				statement += (
-					' , field.uid as field_uid, '
-					' item.id as item_id '
-				)
 		# defined start conflicts if:
 		elif record_data['start_time']:
 			statement += (
-				# - defined start time is in existing defined period
+				# - defined start time is in existing bound period
 				' AND (( '
-				'	CASE WHEN r.end <> False THEN r.end ELSE Null END >= $start_time '
+				'	CASE WHEN r.end <> False THEN r.end ELSE Null END > $start_time '
 				'	AND '
 				'	CASE WHEN r.start <> False THEN r.start ELSE Null END <= $start_time '
 				# Or start time is the same as an existing record with no end time
 				'	) OR ( '
-				'	CASE WHEN r.start <> FALSE THEN r.start ELSE Null END = $start_time '
+				'	r.start = $start_time '
 				'	AND '
 				'	r.end = False '
-				'	) OR ( '
-				# - OR defined start time is less than a record with defined end and no defined start
-				# AND no "closing" statement (another record with start only defined) between these
-				#  - this is checked last with optional match to such records and select nulls
-				'	r.start = False '
-				'	AND '
-				'	CASE WHEN r.end <> False THEN r.end ELSE Null END >= $start_time '
 				' )) '
-				' WITH '
-				'	item, if, feature, r, s, u, p, cu '
 			)
-			if record_data['item_level'] != 'field':
-				statement += (
-					', field '
-				)
-			statement += (
-				' OPTIONAL MATCH '
-				'	(r)-[:RECORD_FOR]->(if) '
-				'	<-[:RECORD_FOR]-(rr:Record) '
-				'	WHERE '
-				'		rr.end = False '
-				'		AND '
-				'		rr.value = r.value '
-				'		AND '
-				'		CASE WHEN rr.start <> False THEN rr.start ELSE Null END >= $start_time '
-				'		AND '
-				'		CASE WHEN rr.start <> NULL THEN rr.start ELSE Null END <= r.end '
-				# set lock on ItemFeature node and only unlock after merge or result
-				' SET if._LOCK_ = True '
-				' WITH '
-				'	r, '
-				'	p.name as partner, '
-				'	CASE WHEN cu IS NULL THEN False ELSE True END as access, '
-				'	item.uid as UID, '
-				'	feature.name as feature,'
-				'	s.time as submitted_at, '
-				'	u.name as user '
-			)
-			if record_data['item_level'] != 'field':
-				statement += (
-					' , field.uid as field_uid, '
-					' item.id as item_id '
-				)
-			statement += (
-				' WHERE rr IS NULL '
-			)
-		# defined end conflicts if:
+		# defined start conflicts if:
 		elif record_data['end_time']:
 			statement += (
-				# - defined end time is in existing defined period
+				# - defined end time is in existing bound period
 				' AND (( '
 				'	CASE WHEN r.end <> False THEN r.end ELSE Null END >= $end_time '
 				'	AND '
-				'	CASE WHEN r.start <> False THEN r.start ELSE Null END <= $end_time '
-				# Or end time time is the same as an existing record with no start time
+				'	CASE WHEN r.start <> False THEN r.start ELSE Null END < $end_time '
+				# Or end time is the same as an existing record with no start time
 				'	) OR ( '
-				'	CASE WHEN r.end <> FALSE THEN r.end ELSE Null END = $end_time '
+				'	r.end = $end_time '
 				'	AND '
 				'	r.start = False '
-				'	) OR ( '
-				# - OR defined end time is greater than a record with defined start and no defined end
-				# AND no "closing" statement (another record with end only defined) between these
-				#  - this is checked last with optional match to such records and select nulls
-				'	r.end = False '
-				'	AND '
-				'	CASE WHEN r.start <> False THEN r.start ELSE Null END <= $end_time '
 				' )) '
-				' WITH '
-				'	item, if, feature, r, s, u, p, cu '
-			)
-			if record_data['item_level'] != 'field':
-				statement += (
-					', field '
-				)
-			statement += (
-				' OPTIONAL MATCH '
-				'	(r)-[:RECORD_FOR]->(if) '
-				'	<-[:RECORD_FOR]-(rr:Record) '
-				'	WHERE '
-				'		rr.value = r.value '
-				'		AND '
-				'		CASE WHEN rr.end <> False THEN rr.end ELSE Null END <= $end_time '
-				'		AND '
-				'		CASE WHEN rr.end <> False THEN rr.end ELSE Null END '
-				'			>= '
-				'		CASE WHEN r.start <> False THEN r.start ELSE Null END '
-				'		AND '
-				'		rr.start = False '
-				# set lock on ItemCondition node and only unlock after merge or result
-				' SET if._LOCK_ = True '
-				' WITH '
-				'	r, '
-				'	p.name as partner, '
-				'	CASE WHEN cu IS NULL THEN False ELSE True END as access, '
-				'	item.uid as UID, '
-				'	feature.name as feature,'
-				'	s.time as submitted_at, '
-				'	u.name as user '
-			)
-			if record_data['item_level'] != 'field':
-				statement += (
-					' , field.uid as field_uid, '
-					' item.id as item_id '
-				)
-			statement += (
-				' WHERE rr IS NULL '
 			)
 		# No defined start or end will only conflict with another record that has no-defined start or end
 		elif not any([record_data['start_time'], record_data['end_time']]):
@@ -476,22 +371,22 @@ class Record:
 				'	r.start = False '
 				' AND '
 				'	r.end = False '
-				# set lock on ItemCondition node and only unlock after merge or result
-				' SET if._LOCK_ = True '
-				' WITH '
-				'	r, '
-				'	p.name as partner, '
-				'	CASE WHEN cu IS NULL THEN False ELSE True END as access, '
-				'	item.uid as UID, '
-				'	feature.name as feature, '
-				'	s.time as submitted_at, '
-				'	u.name as user '
 			)
-			if record_data['item_level'] != 'field':
-				statement += (
-					' , field.uid as field_uid, '
-					' item.id as item_id '
-				)
+		statement += (
+			' WITH '
+			'	r, '
+			'	p.name as partner, '
+			'	CASE WHEN cu IS NULL THEN False ELSE True END as access, '
+			'	item.uid as UID, '
+			'	feature.name as feature, '
+			'	s.time as submitted_at, '
+			'	u.name as user '
+		)
+		if record_data['item_level'] != 'field':
+			statement += (
+				' , field.uid as field_uid, '
+				' item.id as item_id '
+			)
 		statement += (
 			' RETURN { '
 			'	UID: UID, '
@@ -609,6 +504,7 @@ class Record:
 			# then the record with a timestamp
 			'				CREATE '
 			'					(uff)-[s1:SUBMITTED {time: timestamp()}]->(r) '
+			'				'
 			' ) '
 			' WITH '
 			'	r, feature, '

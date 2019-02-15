@@ -57,10 +57,10 @@ class RowParseResult:
 				"  - Sample UID should include the Field and Sample ID separated by '_S' (e.g. '1_S1')\n",
 				"missing": "This UID is not found in the database. "
 			},
-			"trait": {
-				"missing": "This trait is not found in the database. "
+			"feature": {
+				"missing": "This feature is not found in the database. "
 				"Please check the spelling and "
-				"that this trait is found among those supported by BreedCAFS "
+				"that this feature is found among those supported by BreedCAFS "
 				"for the level of data you are submitting."
 			},
 			"other": {
@@ -86,15 +86,15 @@ class RowParseResult:
 			field,
 			error_type,
 			# optional arguments only relevant to value errors
-			trait_name = None,
-			trait_format = None,
+			feature_name = None,
+			feature_format = None,
 			category_list = None
 	):
 		if field not in self.errors:
 			self.errors[field] = {
 					'error_type': error_type,
-					'trait_name': trait_name,
-					'trait_format': trait_format,
+					'feature_name': feature_name,
+					'feature_format': feature_format,
 					'category_list': category_list
 				}
 		else:
@@ -117,26 +117,25 @@ class RowParseResult:
 			else:
 				row_string += '<td bgcolor = #FFFF00 title = "'
 				field_error_type = self.errors[field]['error_type']
-				field_trait_name = self.errors[field]['trait_name']
-				field_trait_format = self.errors[field]['trait_format']
+				field_feature_name = self.errors[field]['feature_name']
+				field_feature_format = self.errors[field]['feature_format']
 				field_category_list = self.errors[field]['category_list']
-				# if it is a simple error (time format, UID format or UID/Trait not found)
+				# if it is a simple error (time format, UID format or UID/Feature not found)
 				if field in self.error_comments:
 					row_string += self.error_comments[field][field_error_type]
 				else:
-					row_string += self.error_comments['other'][field_error_type][field_trait_format]
-					if field_trait_name == 'variety name (text)':
+					row_string += self.error_comments['other'][field_error_type][field_feature_format]
+					if field_feature_name == 'variety name':
 						row_string += 'Expected one of the following variety names: \n'
-					elif field_trait_name == 'el frances code (text)':
+					elif field_feature_name == 'variety code':
 						row_string += 'Expected one of the following codes: \n'
-					elif field_trait_name == 'synthetic fertiliser n:p:k ratio':
+					elif field_feature_name == 'fertiliser n:p:k ratio':
 						row_string += 'Expected N:P:K ratio format, e.g. 1:1:1'
-					elif 'time' in field_trait_name:
+					elif 'time' in field_feature_name:
 						row_string += 'Expected time format as HH:MM e.g. 13:01'
-					elif 'assign to' in field_trait_name:
+					elif 'assign to' in field_feature_name:
 						row_string += (
-							'Expected a valid UID (or a comma separated list thereof) '
-							'for the relevant trait. (e.g. "1_B1" or "1_T1, 1_T2") '
+							'Expected a comma separated list of integers corresponding to the ID within the field '
 						)
 					if field_category_list:
 						row_string += ", ".join([i for i in field_category_list])
@@ -232,8 +231,11 @@ class ParseResult:
 						"format"
 					)
 				unique_key = (parsed_uid, parsed_date, parsed_time)
-			if 'start date' in row_data:
+			elif 'start date' in row_data:
 				parsed_start_date = Parsers.date_format(row_data['start date'])
+				parsed_start_time = None
+				parsed_end_date = None
+				parsed_end_time = None
 				if not parsed_start_date:
 					self.merge_error(
 						line_num,
@@ -268,7 +270,15 @@ class ParseResult:
 							"end time",
 							"format"
 						)
-				unique_key = (parsed_uid, parsed_start_date, parsed_start_time, parsed_end_date, parsed_end_time)
+				unique_key = (
+					parsed_uid,
+					parsed_start_date,
+					parsed_start_time,
+					parsed_end_date,
+					parsed_end_time
+				)
+			else:
+				unique_key = None
 			if unique_key not in self.unique_keys:
 				self.unique_keys.add(unique_key)
 			else:
@@ -371,76 +381,31 @@ class ParseResult:
 		return False
 
 
-class ItemSubmissionResult:
+class SubmissionRecord:
 	def __init__(
 			self,
-			found,
-			submitted_by,
-			submitted_at,
-			value,
-			uploaded_value,
-			uid,
-			trait,
-			time
+			record
 	):
-		self.found = found
-		self.submitted_by = submitted_by
-		self.submitted_at = datetime.datetime.utcfromtimestamp(int(submitted_at) / 1000).strftime("%Y-%m-%d %H:%M:%S")
-		self.value = value
-		self.uploaded_value = uploaded_value
-		self.uid = uid
-		self.trait = trait
-		self.timestamp = None
-		self.text_date = None
-		self.text_time = None
-		self.text_start_date = None
-		self.text_start_time = None
-		self.text_end_date = None
-		self.text_end_time = None
-		self.time = datetime.datetime.utcfromtimestamp(int(time) / 1000).strftime("%Y-%m-%d %H:%M:%S")
-
-	def fb_item(self, timestamp):
-		self.timestamp = timestamp
-
-	def table_trait_item(self, text_date, text_time):
-		self.text_date = text_date
-		self.text_time = text_time
-
-	def table_condition_item(self, text_start_date, text_start_time, text_end_date, text_end_time):
-		self.text_start_date = text_start_date
-		self.text_start_time = text_start_time
-		self.text_end_date = text_end_date
-		self.text_end_time = text_end_time
+		record['time'] = datetime.datetime.utcfromtimestamp(int(record['time']) / 1000).strftime("%Y-%m-%d %H:%M")
+		record['start'] = datetime.datetime.utcfromtimestamp(int(record['start']) / 1000).strftime("%Y-%m-%d %H:%M")
+		record['end'] = datetime.datetime.utcfromtimestamp(int(record['end']) / 1000).strftime("%Y-%m-%d %H:%M")
+		record['submitted_at'] = datetime.datetime.utcfromtimestamp(int(record['submitted_at']) / 1000).strftime("%Y-%m-%d %H:%M:%S")
+		self.record = record
 
 	def conflict(self):
-		if self.value == self.uploaded_value:
-			return False
-		else:
-			if isinstance(self.value, list):
-				if isinstance(self.uploaded_value, list):
-					if set(self.uploaded_value) == set(self.value):
+		if self.record['access']:
+			if self.record['value'] == self.record['uploaded_value']:
+				return False
+			else:
+				if isinstance(self.record['value'], list):
+					if isinstance(self.record['uploaded_value'], list):
+						if set(self.record['uploaded_value']) == set(self.record['value']):
+							return False
+					elif set([i.lower() for i in self.record['uploaded_value'].split(":")]) == set([y.lower() for y in self.record['value']]):
 						return False
-				elif set([i.lower() for i in self.uploaded_value.split(":")]) == set([y.lower() for y in self.value]):
-					return False
+				return True
+		else:
 			return True
-
-	def as_dict(self, submission_type):
-		item_dict = {
-			"found": self.found,
-			"submitted_by": self.submitted_by,
-			"submitted_at": self.submitted_at,
-			"value": self.value,
-			"uploaded_value": self.uploaded_value,
-			"uid": self.uid,
-			"trait": self.trait,
-			"time": self.time
-		}
-		if submission_type == "FB":
-			item_dict['timestamp'] = self.timestamp
-		else:  # submission type == 'table'
-			item_dict['text_date'] = self.text_date
-			item_dict['text_time'] = self.text_time
-		return item_dict
 
 
 class SubmissionResult:
@@ -460,32 +425,7 @@ class SubmissionResult:
 		}
 
 	def parse_record(self, record):
-		submission_type = self.submission_type
-		# quickly check date is after 1900 or fails on ItemSubmissionResult create
-		submission_item = ItemSubmissionResult(
-			record['found'],
-			record['submitted_by'],
-			record['submitted_at'],
-			record['value'],
-			record['uploaded_value'],
-			record['uid'],
-			record['feature'],
-			record['time'],
-			record['start'],
-			record['end']
-		)
-		if submission_type == "FB":
-			submission_item.fb_item(record['timestamp'])
-		else:  # submission type == 'table'
-			if record['time']:
-				submission_item.table_trait_item(record['text_date'], record['text_time'])
-			else:
-				submission_item.table_condition_item(
-					record['text_start_date'],
-					record['text_start_time'],
-					record['text_end_date'],
-					record['text_end_time']
-				)
+		submission_item = SubmissionRecord(record)
 		if not record['found']:
 			self.submitted.append(submission_item)
 		elif submission_item.conflict():
@@ -496,7 +436,6 @@ class SubmissionResult:
 	def conflicts_file(self):
 		username = self.username
 		filename = self.filename
-		submission_type = self.submission_type
 		if len(self.conflicts) == 0:
 			return None
 		else:
@@ -515,7 +454,7 @@ class SubmissionResult:
 			)
 			conflicts_fieldnames = [
 				"uid",
-				"trait",
+				"feature",
 				"time",
 				"submitted_by",
 				"submitted_at",
@@ -525,23 +464,24 @@ class SubmissionResult:
 			with open(conflicts_file_path, 'w') as conflicts_file:
 				writer = csv.DictWriter(
 					conflicts_file,
-					fieldnames = conflicts_fieldnames,
-					quoting = csv.QUOTE_ALL,
-					extrasaction = 'ignore'
+					fieldnames=conflicts_fieldnames,
+					quoting=csv.QUOTE_ALL,
+					extrasaction='ignore'
 				)
 				writer.writeheader()
 				for row in self.conflicts:
-					row_dict = row.as_dict(submission_type)
-					for item in row_dict:
-						if isinstance(row_dict[item], list):
-							row_dict[item] = str(':'.join([str(i).encode() for i in row_dict[item]]))
-					writer.writerow(row_dict)
+					if not row.record['access']:
+						row.record['value'] = 'ACCESS DENIED'
+						row.record['submitted_by'] = row.record['partner']
+					for item in row.record:
+						if isinstance(row.record[item], list):
+							row.record[item] = str(':'.join([str(i).encode() for i in row.record[item]]))
+					writer.writerow(row.record)
 		return conflicts_filename
 
 	def resubmissions_file(self):
 		username = self.username
 		filename = self.filename
-		submission_type = self.submission_type
 		if len(self.resubmissions) == 0:
 			return None
 		else:
@@ -559,7 +499,7 @@ class SubmissionResult:
 				resubmissions_filename)
 			resubmissions_fieldnames = [
 				"uid",
-				"trait",
+				"feature",
 				"time",
 				"submitted_by",
 				"submitted_at",
@@ -574,17 +514,15 @@ class SubmissionResult:
 					extrasaction = 'ignore')
 				writer.writeheader()
 				for row in self.resubmissions:
-					row_dict = row.as_dict(submission_type)
-					for item in row_dict:
-						if isinstance(row_dict[item], list):
-							row_dict[item] = str(':'.join([str(i).encode() for i in row_dict[item]]))
-					writer.writerow(row_dict)
+					for item in row.record:
+						if isinstance(row.record[item], list):
+							row.record[item] = str(':'.join([str(i).encode() for i in row.record[item]]))
+					writer.writerow(row.record)
 		return resubmissions_filename
 
 	def submitted_file(self):
 		username = self.username
 		filename = self.filename
-		submission_type = self.submission_type
 		if len(self.submitted) == 0:
 			return None
 		else:
@@ -602,7 +540,7 @@ class SubmissionResult:
 				submitted_filename)
 			submitted_fieldnames = [
 				"uid",
-				"trait",
+				"feature",
 				"time",
 				"submitted_by",
 				"submitted_at",
@@ -616,11 +554,10 @@ class SubmissionResult:
 					extrasaction = 'ignore')
 				writer.writeheader()
 				for row in self.submitted:
-					row_dict = row.as_dict(submission_type)
-					for item in row_dict:
-						if isinstance(row_dict[item], list):
-							row_dict[item] = str(':'.join([str(i).encode() for i in row_dict[item]]))
-					writer.writerow(row_dict)
+					for item in row.record:
+						if isinstance(row.record[item], list):
+							row.record[item] = str(':'.join([str(i).encode() for i in row.record[item]]))
+					writer.writerow(row.record)
 		return submitted_filename
 
 
@@ -632,6 +569,7 @@ class Upload:
 		self.filename = secure_filename(time + '_' + raw_filename)
 		self.submission_type = submission_type
 		self.file_path = os.path.join(app.instance_path, app.config['UPLOAD_FOLDER'], username, self.filename)
+		self.record_type = None
 		self.trimmed_file_path = None
 		self.parse_result = None
 		self.submission_result = None
@@ -711,25 +649,29 @@ class Upload:
 						+ ', '.join([i for i in missing_fieldnames])
 				)
 			other_required = [
-				{'date', 'time'},
-				{'start date', 'start time', 'end date', 'end time'}
+				('trait', {'date', 'time'}),
+				('condition',{'start date', 'start time', 'end date', 'end time'})
 			]
 			if not any(
-				other_set.issubset(fieldnames_lower) for other_set in other_required
+				other_set[1].issubset(fieldnames_lower) for other_set in other_required
 			):
 				return (
 						'The "Template" worksheet is missing required date/time fields.'
-						' For trait data these are "date" and "time", for condition data these are '
+						' For Trait data these are "date" and "time", for condition data these are '
 						' "start date", "start time", "end date", "end time".'
 				)
 			# check if more than one of the "other required" sets are found
-			elif sum(bool(other_set & fieldnames_lower) for other_set in other_required) > 1:
+			elif sum(bool(other_set[1] & fieldnames_lower) for other_set in other_required) > 1:
 				return (
 					'If you are submitting Trait data then please just include "date" and "time". '
 					'If you are submitting Condition data then please just include '
 					'"start date", "start time", "end date", "end time". '
 					'Do not provide date/time elements from the other data type.'
 				)
+			else:
+				for other_set in other_required:
+					if other_set[1].issubset(fieldnames_lower):
+						self.record_type = other_set[0]
 		else:
 			return None
 
@@ -800,9 +742,9 @@ class Upload:
 		with open(trimmed_file_path, 'r') as trimmed_file:
 			trimmed_dict = DictReaderInsensitive(trimmed_file)
 			for row_data in trimmed_dict:
-				# firstly, if a table check for trait data, if none then just skip
+				# firstly, if a table check for feature data, if none then just skip
 				if self.submission_type == 'table':
-					# firstly check if trait data in the row and ignore if empty
+					# firstly check if feature data in the row and ignore if empty
 					record_properties = [
 						'date',
 						'start date',
@@ -816,8 +758,7 @@ class Upload:
 						'uid'
 					]
 					not_features = record_properties + index_headers
-					self.features = set(row_data.keys()).difference(set(not_features))
-					# TODO check features first?
+					self.features = list(set(row_data.keys()).difference(set(not_features)))
 					if [row_data[feature] for feature in self.features if row_data[feature]]:
 						line_num = int(trimmed_dict.line_num)
 						parse_result.parse_row(line_num, row_data)
@@ -845,9 +786,9 @@ class Upload:
 			if submission_type == "FB":
 				check_result = [record[0] for record in tx.run(
 					Cypher.upload_fb_check,
-					username = username,
-					filename = ("file:///" + username + '/' + trimmed_filename),
-					submission_type = submission_type
+					username=username,
+					filename=("file:///" + username + '/' + trimmed_filename),
+					submission_type=submission_type
 				)]
 				for row_data in trimmed_dict:
 					line_num = int(trimmed_dict.line_num)
@@ -898,7 +839,7 @@ class Upload:
 								)
 			else:
 				check_result = [record[0] for record in tx.run(
-					Cypher.upload_table_check,
+					Cypher.upload_table_feature_format_check,
 					username=username,
 					filename=("file:///" + username + '/' + trimmed_filename),
 					submission_type=submission_type,
@@ -917,7 +858,7 @@ class Upload:
 								"uid",
 								"missing"
 							)
-						# this isn't so simple with mixed levels, sometimes the trait is found for some levels.
+						# this isn't so simple with mixed levels, sometimes the feature is found for some levels.
 						if not item['feature']:
 							parse_result.add_field_error(
 								feature,
@@ -928,7 +869,7 @@ class Upload:
 							)
 						else:
 							# this is to handle mixed levels,
-							# otherwise the upload would fail if a trait was only found for some levels
+							# otherwise the upload would fail if a feature was only found for some levels
 							parse_result.add_field_found(feature)
 						if not item['value']:
 							if all([row_data[feature], item['feature'], item['uid']]):
@@ -962,6 +903,19 @@ class Upload:
 				if parse_result.field_found_list():
 					for field in parse_result.field_found_list():
 						parse_result.rem_field_error(field)
+			# need to check for condition conflicts and
+			# TODO also have to make sure that start < end, maybe do this earlier as doesn't need database
+			if self.record_type == 'condition':
+				condition_conflicts = [record[0] for record in tx.run(
+					Cypher.upload_table_condition_conflict_check,
+					username = username,
+					filename = ("file:///" + username + '/' + trimmed_filename),
+					submission_type = submission_type,
+					features = self.features
+				)]
+
+
+
 			return parse_result
 
 	def submit(
@@ -1027,7 +981,6 @@ class Upload:
 						'status': 'ERRORS',
 						'result': db_check_result
 					}
-
 				else:
 					# submit data
 					submission_result = neo4j_session.write_transaction(
@@ -1045,9 +998,9 @@ class Upload:
 						if conflicts_file:
 							conflicts_file_url = url_for(
 								'download_file',
-								username = username,
-								filename = conflicts_file,
-								_external = True
+								username=username,
+								filename=conflicts_file,
+								_external=True
 							)
 						else:
 							conflicts_file_url = None
