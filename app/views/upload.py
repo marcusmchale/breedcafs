@@ -74,12 +74,12 @@ def task_status(task_id):
 	else:
 		result = task.get()
 		if result['status'] == 'ERRORS':
-			if result['result'].duplicate_keys_dict():
+			if result['result'].duplicate_keys:
 				error_table = result['result'].duplicate_keys_table()
-			elif result['result'].row_errors():
+			elif result['result'].errors:
 				error_table = result['result'].html_table()
-			elif result['result'].field_errors_dict():
-				errors_dict = result['result'].field_errors_dict()
+			elif result['result'].field_errors:
+				errors_dict = result['result'].field_errors
 				error_table = (
 					'<p>The uploaded table includes the below unrecognised fields. ' 
 					'Please check the spelling of any traits ' 

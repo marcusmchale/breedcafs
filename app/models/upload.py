@@ -4,6 +4,7 @@ from app.cypher import Cypher
 from app.emails import send_email
 from app.models.parsers import Parsers
 from flask import render_template, url_for
+from werkzeug import urls
 from user import User
 from config import ALLOWED_EXTENSIONS
 from neo4j_driver import get_driver
@@ -33,9 +34,8 @@ class DictInsensitive(dict):
 
 
 class RowParseResult:
-	def __init__(self, row_num, row_data):
-		self.row_num = int(row_num)
-		self.row_data = row_data
+	def __init__(self, row):
+		self.row = row
 		self.errors = {}
 		self.error_comments = {
 			"timestamp": {
@@ -86,9 +86,9 @@ class RowParseResult:
 			field,
 			error_type,
 			# optional arguments only relevant to value errors
-			feature_name = None,
-			feature_format = None,
-			category_list = None
+			feature_name=None,
+			feature_format=None,
+			category_list=None
 	):
 		if field not in self.errors:
 			self.errors[field] = {
@@ -101,19 +101,13 @@ class RowParseResult:
 			pass
 
 	def headers(self):
-		return self.row_data.keys()
-
-	def get_row_data(self):
-			return self.row_data
-
-	def get_row_errors(self):
-			return self.errors
+		return self.row.keys()
 
 	def html_row(self, fieldnames):
-		row_string = '<tr><td>' + str(self.row_num) + '</td>'
+		row_string = '<tr><td>' + str(self.row['row_index']) + '</td>'
 		for field in fieldnames:
 			if field not in self.errors:
-				row_string += '<td>' + self.row_data[field] + '</td>'
+				row_string += '<td>' + self.row[field] + '</td>'
 			else:
 				row_string += '<td bgcolor = #FFFF00 title = "'
 				field_error_type = self.errors[field]['error_type']
@@ -139,7 +133,7 @@ class RowParseResult:
 						)
 					if field_category_list:
 						row_string += ", ".join([i for i in field_category_list])
-				row_string += '">' + str(self.row_data[field]) + '</td>'
+				row_string += '">' + str(self.row[field]) + '</td>'
 		return row_string
 
 
@@ -147,126 +141,104 @@ class ParseResult:
 	def __init__(self, submission_type, fieldnames):
 		self.submission_type = submission_type
 		self.fieldnames = fieldnames
-		self.field_errors = None
-		self.field_found = None
-		self.parse_result = None
-		self.unique_keys = None
-		self.duplicate_keys = None
+		self.field_errors = {}
+		self.field_found = []
+		self.errors = {}
+		self.unique_keys = set()
+		self.duplicate_keys = {}
 		self.contains_data = None
 
 	def add_field_error(self, field, error_type):
-		if not self.field_errors:
-			self.field_errors = {}
 		self.field_errors[field] = error_type
-
-	def get_unique_keys(self):
-		return self.unique_keys
 
 	# this is needed to create a list of found fields in case the error is found at one level in a table but not others
 	# the list is removed from field_errors at the end of parsing
 	def add_field_found(self, field):
-		if not self.field_found:
-			self.field_found = []
 		self.field_found.append(field)
-
-	def field_found_list(self):
-		return self.field_found
 
 	def rem_field_error(self, field):
 		if self.field_errors:
 			if field in self.field_errors:
 				del self.field_errors[field]
 
-	def parse_row(self, line_num, row_data):
+	def parse_row(self, row):
 		submission_type = self.submission_type
-		if not self.unique_keys:
-			self.unique_keys = set()
 		# check uid formatting
-		parsed_uid = Parsers.uid_format(row_data['uid'])
+		parsed_uid = Parsers.uid_format(row['uid'])
 		if not parsed_uid:
 			self.merge_error(
-				line_num,
-				row_data,
+				row,
 				"uid",
 				"format"
 			)
 		# check time formatting and for FB use trait in unique key.
 		if submission_type == "FB":
-			if row_data['trait']:
+			if row['trait']:
 				self.contains_data = True
-			parsed_timestamp = Parsers.timestamp_fb_format(row_data['timestamp'])
+			parsed_timestamp = Parsers.timestamp_fb_format(row['timestamp'])
 			if not parsed_timestamp:
 				self.merge_error(
-					line_num,
-					row_data,
+					row,
 					"timestamp",
 					"format"
 				)
-			unique_key = (parsed_uid, parsed_timestamp, row_data['trait'])
+			unique_key = (parsed_uid, parsed_timestamp, row['trait'])
 			if unique_key not in self.unique_keys:
 				self.unique_keys.add(unique_key)
 			else:
-				if not self.duplicate_keys:
-					self.duplicate_keys = {}
-				self.duplicate_keys[line_num] = row_data
+				self.duplicate_keys[row['row_index']] = row
 		# Check time, and for trait duplicates in tables simply check for duplicate fields in header
 		else:  # submission_type == "table":
 			# check for date time info.
-			if 'date' in row_data:
-				parsed_date = Parsers.date_format(row_data['date'])
+			if 'date' in row:
+				parsed_date = Parsers.date_format(row['date'])
 				# date required for trait data
 				if not parsed_date or parsed_date is True:
 					self.merge_error(
-						line_num,
-						row_data,
+						row,
 						"date",
 						"format"
 					)
-				parsed_time = Parsers.time_format(row_data['time'])
+				parsed_time = Parsers.time_format(row['time'])
 				if not parsed_time:
 					self.merge_error(
-						line_num,
-						row_data,
+						row,
 						"time",
 						"format"
 					)
 				unique_key = (parsed_uid, parsed_date, parsed_time)
-			elif 'start date' in row_data:
-				parsed_start_date = Parsers.date_format(row_data['start date'])
+			elif 'start date' in row:
+				parsed_start_date = Parsers.date_format(row['start date'])
 				parsed_start_time = None
 				parsed_end_date = None
 				parsed_end_time = None
 				if not parsed_start_date:
 					self.merge_error(
-						line_num,
-						row_data,
+						row,
 						"start date",
 						"format"
 					)
-				if 'start time' in row_data:
-					parsed_start_time = Parsers.time_format(row_data['start time'])
+				if 'start time' in row:
+					parsed_start_time = Parsers.time_format(row['start time'])
 					if not parsed_start_time:
 						self.merge_error(
-							line_num,
-							row_data,
+							row,
 							"start time",
 							"format"
 						)
-				if 'end date' in row_data:
-					parsed_end_date = Parsers.date_format(row_data['end date'])
+				if 'end date' in row:
+					parsed_end_date = Parsers.date_format(row['end date'])
 					if not parsed_end_date:
 						self.merge_error(
-							line_num,
-							row_data,
+							row,
 							"end date",
 							"format"
 						)
-				if 'end time' in row_data:
-					parsed_end_time = Parsers.time_format(row_data['end time'])
+				if 'end time' in row:
+					parsed_end_time = Parsers.time_format(row['end time'])
 					if not parsed_end_time:
 						self.merge_error(
-							line_num,
-							row_data,
+							row,
 							"end time",
 							"format"
 						)
@@ -284,36 +256,31 @@ class ParseResult:
 			else:
 				if not self.duplicate_keys:
 					self.duplicate_keys = {}
-				self.duplicate_keys[line_num] = row_data
+				self.duplicate_keys[row['row_index']] = row
 
 	def merge_error(
 			self,
-			line_num,
-			row_data,
+			row,
 			field,
 			error_type,
 			# optional arguments only relevant to value errors
-			feature_name = None,
-			feature_format = None,
-			category_list = None,
+			feature_name=None,
+			feature_format=None,
+			category_list=None,
 	):
-		if not self.parse_result:
-			self.parse_result = {}
-		parse_result = self.parse_result
-		if line_num in parse_result:
-			parse_result[line_num].add_error(field, error_type, feature_name, feature_format, category_list)
+		errors = self.errors
+		if int(row['row_index']) in errors:
+			errors[int(row['row_index'])].add_error(field, error_type, feature_name, feature_format, category_list)
 		else:
-			parse_result[line_num] = RowParseResult(line_num, row_data)
-			parse_result[line_num].add_error(field, error_type, feature_name, feature_format, category_list)
+			errors[int(row['row_index'])] = RowParseResult(row)
+			errors[int(row['row_index'])].add_error(field, error_type, feature_name, feature_format, category_list)
 
-	def row_errors(self):
-		return self.parse_result
-
-	def field_errors_dict(self):
-		return self.field_errors
-
-	def duplicate_keys_dict(self):
-		return self.duplicate_keys
+	def merge_conflict(
+		self,
+		row,
+		conflicts
+	):
+		pass
 
 	def duplicate_keys_table(self):
 		if not self.duplicate_keys:
@@ -350,7 +317,7 @@ class ParseResult:
 	def html_table(self):
 		max_length = 100
 		# create a html table string with tooltip for details
-		if self.parse_result:
+		if self.errors:
 			header_string = '<tr><th><p>Line#</p></th>'
 			for field in self.fieldnames:
 				if self.field_errors:
@@ -364,10 +331,10 @@ class ParseResult:
 			header_string += '</tr>'
 			html_table = header_string
 			# construct each row and append to growing table
-			for i, item in enumerate(self.parse_result):
+			for i, item in enumerate(sorted(self.errors)):
 				if i >= max_length:
 					return html_table
-				row_string = self.parse_result[item].html_row(self.fieldnames)
+				row_string = self.errors[item].html_row(self.fieldnames)
 				html_table += row_string
 			return '<table>' + html_table + '</table>'
 		else:
@@ -375,8 +342,8 @@ class ParseResult:
 
 	def long_enough(self):
 		max_length = 100
-		if self.parse_result:
-			if len(self.parse_result) >= max_length:
+		if self.errors:
+			if len(self.errors) >= max_length:
 				return True
 		return False
 
@@ -694,7 +661,7 @@ class Upload:
 					quoting=csv.QUOTE_ALL
 				)
 				file_writer.writeheader()
-				for row in file_dict:
+				for j, row in file_dict:
 					# remove rows without entries
 					if any(field.strip() for field in row):
 						for field in file_dict.fieldnames:
@@ -711,14 +678,16 @@ class Upload:
 				)
 				rows = ws.iter_rows()
 				first_row = next(rows)
-				file_writer.writerow(cell.value.lower() for cell in first_row if cell.value)
+				file_writer.writerow(['row_index'] + [cell.value.lower() for cell in first_row if cell.value])
 				# handle deleted columns in the middle of the worksheet
 				empty_headers = []
 				for i, cell in enumerate(first_row):
 					if not cell.value:
 						empty_headers.append(i)
-				for row in rows:
-					cell_values = [cell.value for cell in row]
+				for j, row in enumerate(rows):
+					# j+2 to store the "Line number" as index
+					# this is 0 based, and accounts for header
+					cell_values = [j+2] + [cell.value for cell in row]
 					# remove columns with empty header
 					for i in sorted(empty_headers, reverse=True):
 						del cell_values[i]
@@ -741,7 +710,7 @@ class Upload:
 		self.parse_result = parse_result
 		with open(trimmed_file_path, 'r') as trimmed_file:
 			trimmed_dict = DictReaderInsensitive(trimmed_file)
-			for row_data in trimmed_dict:
+			for row in trimmed_dict:
 				# firstly, if a table check for feature data, if none then just skip
 				if self.submission_type == 'table':
 					# firstly check if feature data in the row and ignore if empty
@@ -755,18 +724,18 @@ class Upload:
 						'person'
 					]
 					index_headers = [
+						'row_index',
 						'uid'
 					]
 					not_features = record_properties + index_headers
-					self.features = list(set(row_data.keys()).difference(set(not_features)))
-					if [row_data[feature] for feature in self.features if row_data[feature]]:
-						line_num = int(trimmed_dict.line_num)
-						parse_result.parse_row(line_num, row_data)
+					self.features = list(set(row.keys()).difference(set(not_features)))
+					if [row[feature] for feature in self.features if row[feature]]:
+						parse_result.parse_row(row)
 					else:
 						pass
 				if submission_type == "FB":
-					line_num = int(trimmed_dict.line_num)
-					parse_result.parse_row(line_num, row_data)
+					row_index = int(row['row_index'])
+					parse_result.parse(row_index, row)
 				# if many errors already then return immediately
 				if parse_result.long_enough():
 					return parse_result
@@ -782,140 +751,124 @@ class Upload:
 		trimmed_filename = os.path.basename(trimmed_file_path)
 		submission_type = self.submission_type
 		with open(trimmed_file_path, 'r') as trimmed_file:
-			trimmed_dict = DictReaderInsensitive(trimmed_file)
-			if submission_type == "FB":
-				check_result = [record[0] for record in tx.run(
-					Cypher.upload_fb_check,
-					username=username,
-					filename=("file:///" + username + '/' + trimmed_filename),
-					submission_type=submission_type
-				)]
-				for row_data in trimmed_dict:
-					line_num = int(trimmed_dict.line_num)
-					# 0 based list call and have to account for header row so -2
-					item = check_result[line_num - 2]
-					if not item['uid']:
-						parse_result.merge_error(
-							line_num,
-							row_data,
-							"uid",
-							"missing"
-						)
-					if not item['trait']:
-						parse_result.merge_error(
-							line_num,
-							row_data,
-							"trait",
-							"missing"
-						)
-					if not item['value']:
-						if all([item['trait'], item['uid']]):
-							if 'category_list' in item:
-								parse_result.merge_error(
-									line_num,
-									row_data,
-									"value",
-									"format",
-									item['trait'],
-									item['format'],
-									item['category_list']
-								)
-							elif 'format' in item:
-								parse_result.merge_error(
-									line_num,
-									row_data,
-									"value",
-									"format",
-									item['trait'],
-									item['format']
-								)
-							else:
-								parse_result.merge_error(
-									line_num,
-									row_data,
-									"value",
-									"format",
-									item['trait']
-								)
-			else:
-				check_result = [record[0] for record in tx.run(
-					Cypher.upload_table_feature_format_check,
-					username=username,
-					filename=("file:///" + username + '/' + trimmed_filename),
-					submission_type=submission_type,
-					features=self.features
-				)]
-				for row_data in trimmed_dict:
-					line_num = int(trimmed_dict.line_num)
-					# 0 based list call and have to account for header row so -2
-					item_num = line_num - 2
-					for i, feature in enumerate(self.features):
-						item = check_result[item_num * len(self.features) + i]
-						if not item['uid']:
-							parse_result.merge_error(
-								line_num,
-								row_data,
-								"uid",
-								"missing"
-							)
-						# this isn't so simple with mixed levels, sometimes the feature is found for some levels.
-						if not item['feature']:
-							parse_result.add_field_error(
-								feature,
-								(
-									"This feature is not found. Please check your spelling. "
-									"This may also be because the feature is not available at the level of these items"
-								)
-							)
-						else:
-							# this is to handle mixed levels,
-							# otherwise the upload would fail if a feature was only found for some levels
-							parse_result.add_field_found(feature)
-						if not item['value']:
-							if all([row_data[feature], item['feature'], item['uid']]):
-								if 'category_list' in item:
-									parse_result.merge_error(
-										line_num,
-										row_data,
-										feature,
-										"format",
-										item['feature'],
-										item['format'],
-										item['category_list']
-									)
-								elif 'format' in item:
-									parse_result.merge_error(
-										line_num,
-										row_data,
-										feature,
-										"format",
-										item['feature'],
-										item['format']
-									)
-								else:
-									parse_result.merge_error(
-										line_num,
-										row_data,
-										feature,
-										"format",
-										item['feature']
-									)
-				if parse_result.field_found_list():
-					for field in parse_result.field_found_list():
-						parse_result.rem_field_error(field)
+			#if submission_type == "FB":
+				#check_result = [record[0] for record in tx.run(
+				#	Cypher.upload_fb_check,
+				#	username=username,
+				#	filename=("file:///" + username + '/' + trimmed_filename),
+				#	submission_type=submission_type
+				#)]
+				#for row_data in trimmed_dict:
+				#	row_index = int(row_data['row_index'])
+				#	item = check_result[row_index]
+				#	if not item['uid']:
+				#		parse_result.merge_error(
+				#			row_index,
+				#			row_data,
+				#			"uid",
+				#			"missing"
+				#		)
+				#	if not item['trait']:
+				#		parse_result.merge_error(
+				#			row_index,
+				#			row_data,
+				#			"trait",
+				#			"missing"
+				#		)
+				#	if not item['value']:
+				#		if all([item['trait'], item['uid']]):
+				#			if 'category_list' in item:
+				#				parse_result.merge_error(
+				#					row_index,
+				#					row_data,
+				#					"value",
+				#					"format",
+				#					item['trait'],
+				#					item['format'],
+				#					item['category_list']
+				#				)
+				#			elif 'format' in item:
+				#				parse_result.merge_error(
+				#					row_index,
+				#					row_data,
+				#					"value",
+				#					"format",
+				#					item['trait'],
+				#					item['format']
+				#				)
+				#			else:
+				#				parse_result.merge_error(
+				#					row_index,
+				#					row_data,
+				#					"value",
+				#					"format",
+				#					item['trait']
+				#				)
+			#else:
 			# need to check for condition conflicts and
 			# TODO also have to make sure that start < end, maybe do this earlier as doesn't need database
-			if self.record_type == 'condition':
-				condition_conflicts = [record[0] for record in tx.run(
-					Cypher.upload_table_condition_conflict_check,
-					username = username,
-					filename = ("file:///" + username + '/' + trimmed_filename),
-					submission_type = submission_type,
-					features = self.features
-				)]
-
-
-
+			#if self.record_type == 'condition':
+			check_result = tx.run(
+				Cypher.upload_table_condition_conflict_check,
+				username=username,
+				filename=urls.url_fix('file:///' + username + '/' + trimmed_filename ),
+				submission_type=submission_type,
+				features=self.features
+			)
+			#else:  # trait data
+			#	check_result = tx.run(
+			#		Cypher.upload_table_feature_format_check,
+			#		username=username,
+			#		filename=("file:///" + username + '/' + trimmed_filename),
+			#		submission_type=submission_type,
+			#		features=self.features
+			#	)
+			trimmed_dict_reader = DictReaderInsensitive(trimmed_file)
+			row = trimmed_dict_reader.next()
+			# need to check_result sorted by file/dictreader row_index
+			for item in check_result:
+				record = item[0]
+				while record['row_index'] != int(row['row_index']):
+					row = trimmed_dict_reader.next()
+				if not record['UID']:
+					parse_result.merge_error(
+						row,
+						"uid",
+						"missing"
+					)
+				if not record['feature']:
+					parse_result.add_field_error(
+						record['input_feature'],
+						(
+							"This feature is not found. Please check your spelling. "
+							"This may also be because the feature is not available at the level of these items"
+						)
+					)
+				else:
+				# we add found fields to a list to handle mixed items in input
+				# i.e. if found at level of one item but not another
+					parse_result.add_field_found(record['feature'])
+				if all([
+					record['UID'],
+					record['feature'],
+					not record['value']
+				]):
+					parse_result.merge_error(
+						row,
+						record['input_feature'],
+						"format",
+						record['feature'],
+						record['format'],
+						record['category_list']
+					)
+				if record['conflicts']:
+					parse_result.merge_conflict(
+						row,
+						record['conflicts']
+					)
+			if parse_result.field_found:
+				for field in parse_result.field_found:
+					parse_result.rem_field_error(field)
 			return parse_result
 
 	def submit(
@@ -943,7 +896,7 @@ class Upload:
 			result = [record[0] for record in tx.run(
 				statement,
 				username=username,
-				filename=("file:///" + username + '/' + trimmed_filename),
+				filename=urls.url_fix("file:///" + username + '/' + trimmed_filename),
 				submission_type=submission_type,
 				features=features
 			)]
@@ -965,18 +918,18 @@ class Upload:
 						'status': 'ERRORS',
 						'result': parse_result
 					}
-				elif parse_result.duplicate_keys_dict():
+				elif parse_result.duplicate_keys:
 					return {
 						'status': 'ERRORS',
 						'result': parse_result
 					}
+				# if not too many errors continue to db check (reducing the number of client feedback loops)
 				else:
-					# if not too many errors continue to db check (reducing the number of client feedback loops)
 					db_check_result = neo4j_session.read_transaction(
 						upload_object.db_check,
 						parse_result
 					)
-				if any([db_check_result.field_errors_dict(), db_check_result.row_errors()]):
+				if any([db_check_result.field_errors, db_check_result.errors]):
 					return {
 						'status': 'ERRORS',
 						'result': db_check_result
