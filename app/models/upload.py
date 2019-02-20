@@ -10,9 +10,11 @@ from config import ALLOWED_EXTENSIONS
 from neo4j_driver import get_driver
 import unicodecsv as csv
 import datetime
+import itertools
 from werkzeug.utils import secure_filename
 from openpyxl import load_workbook
 from zipfile import BadZipfile
+
 
 
 class DictReaderInsensitive(csv.DictReader):
@@ -36,6 +38,7 @@ class DictInsensitive(dict):
 class RowParseResult:
 	def __init__(self, row):
 		self.row = row
+		self.conflicts = {}
 		self.errors = {}
 		self.error_comments = {
 			"timestamp": {
@@ -44,7 +47,19 @@ class RowParseResult:
 			"date": {
 				"format": "Date format does not match the required input (e.g. 2018-01-01)"
 			},
+			"start date": {
+				"format": "Date format does not match the required input (e.g. 2018-01-01)"
+			},
+			"end date": {
+				"format": "Date format does not match the required input (e.g. 2018-01-01)"
+			},
 			"time": {
+				"format": "Time format does not match the required input (e.g. 13:00)"
+			},
+			"start time": {
+				"format": "Time format does not match the required input (e.g. 13:00)"
+			},
+			"end time": {
 				"format": "Time format does not match the required input (e.g. 13:00)"
 			},
 			"uid": {
@@ -52,8 +67,6 @@ class RowParseResult:
 				"  - Field UID should be an integers (e.g. '1')\n"
 				"  - Block UID should include the Field and Block ID separated by '_B' (e.g. '1_B1')\n"
 				"  - Tree UID should include the Field and Tree ID separated by '_T' (e.g. '1_T1')\n"
-				"  - Branch UID should include the Field and Branch ID separated by '_Y' (e.g. '1_Y1')\n"
-				"  - Leaf UID should include the Field and Leaf ID separated by '_L' (e.g. '1_L1')\n"
 				"  - Sample UID should include the Field and Sample ID separated by '_S' (e.g. '1_S1')\n",
 				"missing": "This UID is not found in the database. "
 			},
@@ -77,7 +90,8 @@ class RowParseResult:
 					"multicat": "Expected any of the following categories separated by a colon (':'): \n",
 					"categorical": "Expected one of the following categories only: \n",
 					"text": "Text field value error. \n"
-				}
+				},
+				"conflict":  "Conflicts were found with existing records: \n"
 			}
 		}
 
@@ -88,17 +102,19 @@ class RowParseResult:
 			# optional arguments only relevant to value errors
 			feature_name=None,
 			feature_format=None,
-			category_list=None
+			category_list=None,
+			# optional arguments only relevant to conflicts
+			conflicts=None
 	):
 		if field not in self.errors:
-			self.errors[field] = {
-					'error_type': error_type,
-					'feature_name': feature_name,
-					'feature_format': feature_format,
-					'category_list': category_list
-				}
-		else:
-			pass
+			self.errors[field] = []
+		self.errors[field].append({
+				'error_type': error_type,
+				'feature_name': feature_name,
+				'feature_format': feature_format,
+				'category_list': category_list,
+				'conflicts': conflicts
+		})
 
 	def headers(self):
 		return self.row.keys()
@@ -110,29 +126,69 @@ class RowParseResult:
 				row_string += '<td>' + self.row[field] + '</td>'
 			else:
 				row_string += '<td bgcolor = #FFFF00 title = "'
-				field_error_type = self.errors[field]['error_type']
-				field_feature_name = self.errors[field]['feature_name']
-				field_feature_format = self.errors[field]['feature_format']
-				field_category_list = self.errors[field]['category_list']
-				# if it is a simple error (time format, UID format or UID/Feature not found)
-				if field in self.error_comments:
-					row_string += self.error_comments[field][field_error_type]
-				else:
-					row_string += self.error_comments['other'][field_error_type][field_feature_format]
-					if field_feature_name == 'variety name':
-						row_string += 'Expected one of the following variety names: \n'
-					elif field_feature_name == 'variety code':
-						row_string += 'Expected one of the following codes: \n'
-					elif field_feature_name == 'fertiliser n:p:k ratio':
-						row_string += 'Expected N:P:K ratio format, e.g. 1:1:1'
-					elif 'time' in field_feature_name:
-						row_string += 'Expected time format as HH:MM e.g. 13:01'
-					elif 'assign to' in field_feature_name:
-						row_string += (
-							'Expected a comma separated list of integers corresponding to the ID within the field '
-						)
-					if field_category_list:
-						row_string += ", ".join([i for i in field_category_list])
+				for error in self.errors[field]:
+					field_error_type = error['error_type']
+					field_feature_name = error['feature_name']
+					field_feature_format = error['feature_format']
+					field_category_list = error['category_list']
+					field_conflicts = error['conflicts']
+					# if it is a simple error (time format, UID format or UID/Feature not found)
+					if field in self.error_comments:
+						row_string += self.error_comments[field][field_error_type]
+					else:
+						if field_error_type == 'format':
+							row_string += self.error_comments['other'][field_error_type][field_feature_format]
+							if field_feature_name == 'variety name':
+								row_string += 'Expected one of the following variety names: \n'
+							elif field_feature_name == 'variety code':
+								row_string += 'Expected one of the following codes: \n'
+							elif field_feature_name == 'fertiliser n:p:k ratio':
+								row_string += 'Expected N:P:K ratio format, e.g. 1:1:1'
+							elif 'time' in field_feature_name:
+								row_string += 'Expected time format as HH:MM e.g. 13:01'
+							elif 'assign to' in field_feature_name:
+								row_string += (
+									'Expected a comma separated list of integers corresponding to the ID within the field '
+								)
+							if field_category_list:
+								row_string += ", ".join([i for i in field_category_list])
+						elif field_error_type == 'conflict':
+							row_string += self.error_comments['other'][field_error_type]
+							# only show 3 conflicts or "title" attribute is overloaded
+							# TODO implement better tooltips to include as a table rather than "title" attribite
+							for conflict in itertools.islice(field_conflicts, 3):
+								row_string += '\n\n'
+								row_string += ''.join(['Existing value: ', conflict['existing_value'], '\n'])
+								if conflict['time']:
+									row_string += (
+										'Time: '
+										+ datetime.datetime.utcfromtimestamp(int(conflict['time']) / 1000).strftime(
+											"%Y-%m-%d %H:%M")
+										+ '\n'
+									)
+								if conflict['start']:
+									row_string += (
+										'Start: '
+										+ datetime.datetime.utcfromtimestamp(int(conflict['start']) / 1000).strftime(
+											"%Y-%m-%d %H:%M")
+										+ '\n'
+									)
+								if conflict['end']:
+									row_string += (
+										'End: '
+										+ datetime.datetime.utcfromtimestamp(int(conflict['end']) / 1000).strftime(
+											"%Y-%m-%d %H:%M")
+										+ '\n'
+									)
+								row_string += ''.join(['Submitted by: ', conflict['user'], '\n'])
+								row_string += ''.join([
+									'Submitted at: ',
+									datetime.datetime.utcfromtimestamp(
+										int(conflict['submitted_at']) / 1000
+									).strftime("%Y-%m-%d %H:%M"),
+									'\n'
+								])
+					row_string += '\n'
 				row_string += '">' + str(self.row[field]) + '</td>'
 		return row_string
 
@@ -267,20 +323,13 @@ class ParseResult:
 			feature_name=None,
 			feature_format=None,
 			category_list=None,
+			# optional arguemtns only releveant to conflicts
+			conflicts=None
 	):
 		errors = self.errors
-		if int(row['row_index']) in errors:
-			errors[int(row['row_index'])].add_error(field, error_type, feature_name, feature_format, category_list)
-		else:
+		if not int(row['row_index']) in errors:
 			errors[int(row['row_index'])] = RowParseResult(row)
-			errors[int(row['row_index'])].add_error(field, error_type, feature_name, feature_format, category_list)
-
-	def merge_conflict(
-		self,
-		row,
-		conflicts
-	):
-		pass
+		errors[int(row['row_index'])].add_error(field, error_type, feature_name, feature_format, category_list, conflicts)
 
 	def duplicate_keys_table(self):
 		if not self.duplicate_keys:
@@ -807,22 +856,13 @@ class Upload:
 			#else:
 			# need to check for condition conflicts and
 			# TODO also have to make sure that start < end, maybe do this earlier as doesn't need database
-			#if self.record_type == 'condition':
 			check_result = tx.run(
-				Cypher.upload_table_condition_conflict_check,
+				Cypher.upload_table_check,
 				username=username,
 				filename=urls.url_fix('file:///' + username + '/' + trimmed_filename ),
 				submission_type=submission_type,
 				features=self.features
 			)
-			#else:  # trait data
-			#	check_result = tx.run(
-			#		Cypher.upload_table_feature_format_check,
-			#		username=username,
-			#		filename=("file:///" + username + '/' + trimmed_filename),
-			#		submission_type=submission_type,
-			#		features=self.features
-			#	)
 			trimmed_dict_reader = DictReaderInsensitive(trimmed_file)
 			row = trimmed_dict_reader.next()
 			# need to check_result sorted by file/dictreader row_index
@@ -844,9 +884,9 @@ class Upload:
 							"This may also be because the feature is not available at the level of these items"
 						)
 					)
-				else:
 				# we add found fields to a list to handle mixed items in input
 				# i.e. if found at level of one item but not another
+				else:
 					parse_result.add_field_found(record['feature'])
 				if all([
 					record['UID'],
@@ -857,14 +897,17 @@ class Upload:
 						row,
 						record['input_feature'],
 						"format",
-						record['feature'],
-						record['format'],
-						record['category_list']
+						feature_name=record['feature'],
+						feature_format=record['format'],
+						category_list=record['category_list']
 					)
-				if record['conflicts']:
-					parse_result.merge_conflict(
+				# need to check an element of the list as all results
+				if record['conflicts'][0]['existing_value']:
+					parse_result.merge_error(
 						row,
-						record['conflicts']
+						record['input_feature'],
+						"conflict",
+						conflicts=record['conflicts']
 					)
 			if parse_result.field_found:
 				for field in parse_result.field_found:
