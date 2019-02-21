@@ -498,6 +498,48 @@ class Download:
 			with_timestamp=with_timestamp
 		)
 
+	def collect_records(self, download_filters):
+		parameters = download_filters
+		statement = (
+			' MATCH '
+			'	(: User {username_lower: toLower($username)}) '
+			'	-[: AFFILIATED {confirmed: True})->(partner: Partner) '
+			' MATCH '
+			'	(feature: Feature '
+			' MATCH '
+			'	(partner)'
+			'	<-[: AFFILIATED {data_shared: True}]-(user: User) '
+			'	-[: SUBMITTED]->(: Submissions)'
+			'	-[: SUBMITTED]->(: Records) '
+			'	-[: SUBMITTED]->(: UserFieldFeature) '
+			'	-[submitted: SUBMITTED]->(record: Record) '
+			'	-[:RECORD_FOR]->(item_feature:ItemFeature) '
+			'	-[:FOR_FEATURE*..2]->(feature:Feature) '
+			'	, (item_feature) '
+			'	-[:FOR_ITEM]->(item:Item) '
+		)
+		if download_filters['tree_id_list']:
+			statement += (
+				' -[:FROM*]->(:Tree) '
+
+		)
+		if any([
+			download_filters['submission_start'],
+			download_filters['submission_end'],
+			download_filters['record_start'],
+			download_filters['record_end'],
+			download_filters['item_level'],
+		])
+		if download_filters['submission_start']:
+			statement +=
+
+
+
+
+
+
+
+
 #this needs updating!!
 	def get_csv(
 			self,

@@ -14,6 +14,15 @@ h3	{
 svg { 
 	border: 5px solid #6f4e37; 
 	padding: 10px; }
+
+#feature_selection {
+	max-height:500px;
+}
+#feature_checkbox_div {
+	max-height:400px;
+	overflow: auto;
+}
+
 .page				{
 					margin: 10%;
 					margin-top: 5%;

@@ -1,26 +1,52 @@
 {% extends "layout.html" %}
 {% block body %}
-{% from "_formhelpers.html" import render_field %}
+    {% from "_formhelpers_record.html" import render_field %}
 <div class="text_body">
-	<h2> Select data to download</h2>
 		<form action="{{ url_for('download') }}" id="download" method="post">
-			<h3>Location</h3>
-				<dt>{{ location_form.csrf_token }}</dt>
-				<dt>{{ location_form.country }}</dt>
-				<dt>{{ location_form.region }}</dt>
-				<dt>{{ location_form.farm }}</dt>
-				<dt>{{ location_form.field }}</dt>
-				<dt>{{ location_form.block }}</dt>
-			<h3>Date recorded</h3>
-				<dt>{{ download_form.date_from(placeholder="From date") }}</dt>
-				<dt>{{ download_form.date_to(placeholder="To date") }}</dt>
-			<h3>Level</h3>
-				<dt>{{ download_form.trait_level }}</dt> <br>
-<!-- render all the traits forms and hide those that aren't relevant (the fields have prefixes so not name shadowning -->
-			<h3>Traits</h3>
-				{% include 'traits_form.html' %}
-			<dt>{{ download_form.data_format }}</dt> <br>
-			<dt>{{ download_form.submit_download }} {{ render_field(block_traits_form.email_checkbox) }}</dt>
+            <h2>Filter Records</h2>
+                <h3>Date</h3>
+                    <h4>Submission period</h4>
+                    <dd>
+                        {{ download_form.submission_date_from(placeholder="Submission from date") }}
+                        {{ download_form.submission_date_to(placeholder="Submission to date") }}</dd>
+                    <h4>Record period</h4>
+                    <dd>
+                        {{ download_form.record_date_from(placeholder="Record from date") }}
+                        {{ download_form.record_date_to(placeholder="Record to date") }}
+                    </dd>
+                <h3>Item type</h3>
+                <dd>{{  download_form.item_level }}</dd>
+                <div id="location">
+                    <h3>Item/s</h3>
+                        <dd>{{ render_field (location_form.country) }}</dd>
+                        <dd>{{ render_field (location_form.region) }}</dd>
+                        <dd>{{ render_field (location_form.farm) }}</dd>
+                        <dd>{{ render_field (location_form.field) }}</dd>
+                </div>
+                <div id="block_div">
+                    <dd>{{ render_field (location_form.block) }}</dd>
+                </div>
+                <div id = 'tree_selection_div' title="ID is the integer from the end of a UID, e.g. from 1_T2 the ID is 2">
+                    <dd>{{ render_field (download_form.tree_id_list) }}</dd>
+                </div>
+                <div id = 'sample_selection_div' title="ID is the integer from the end of a UID, e.g. from 1_S2 the ID is 2">
+                    <dd>{{ render_field (download_form.sample_id_list) }}</dd>
+                </div>
+                <h3>Record type</h3>
+                    <dd>{{  download_form.record_type }}</dd>
+			    <h3>Features</h3>
+                    <div id='feature_selection'>
+                        <dd>{{  render_field (download_form.feature_group) }}</dd>
+                        <br>
+                            <input title='select_all_features' id='select_all_features' type='checkbox'>
+                                <label>Select all</label>
+                                <ul id='select_features'></ul>
+                        <div id="feature_checkbox_div"></div>
+                    </div>
+            <h2>Generate file</h2>
+                <dt>{{ download_form.data_format }}</dt> <br>
+                <dt>{{ download_form.submit_download }}</dt>
+            {{ location_form.csrf_token }}
 		</form>
 </div>
 {% endblock %}

@@ -883,7 +883,7 @@ class Cypher:
 		'			THEN '
 		'				replace(csvLine.`end time`, " ", "") '
 		'			ELSE '
-		'				"23:59" '
+		'				"24:00" '
 		'			END '
 		'		, "ms", "yyyy-MM-dd HH:mm") as end '
 		' OPTIONAL MATCH  '
@@ -1167,7 +1167,7 @@ class Cypher:
 		'			THEN '
 		'				replace(csvLine.`end time`, " ", "") '
 		'			ELSE '
-		'				"23:59" '
+		'				"24:00" '
 		'			END '
 		'		, "ms", "yyyy-MM-dd HH:mm") as end '		
 		# And identify the fields and traits assessed

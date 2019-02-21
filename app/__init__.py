@@ -38,7 +38,6 @@ from neo4j import GraphDatabase, ServiceUnavailable, TransactionError
 from neo4j.exceptions import SecurityError
 #from neo4j import watch
 
-
 from app import views
 
 # these are the variable view rules for retrieving lists:
@@ -78,14 +77,14 @@ app.add_url_rule(
 	methods=['GET']
 )
 
-app.add_url_rule(
-	'/record/<record_type>/<item_level>/',
-	view_func=views.ListFeatureGroups.as_view('feature_groups'),
-	methods=['GET']
-)
-
-app.add_url_rule(
-	'/record/<record_type>/<item_level>/<feature_group>/',
-	view_func=views.ListFeatures.as_view('features'),
-	methods=['GET']
-)
+#app.add_url_rule(
+#	'/record/<record_type>/<item_level>/',
+#	view_func=views.ListFeatureGroups.as_view('feature_groups'),
+#	methods=['GET']
+#)
+#
+#app.add_url_rule(
+#	'/record/<record_type>/<item_level>/<feature_group>/',
+#	view_func=views.ListFeatures.as_view('features'),
+#	methods=['GET']
+#)

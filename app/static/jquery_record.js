@@ -77,7 +77,11 @@ level_update = function() {
             sample_div.show();
         }
         $.ajax({
-            url: "/record/" + record_type + "/" + item_level + "/",
+            url: (
+                "/feature_groups"
+                + "?record_type=" + record_type
+                + "&item_level=" + item_level
+            ),
             type: 'GET',
             success: function (response) {
                 const feature_groups = response;
@@ -207,7 +211,12 @@ group_update = function() {
     const feature_group = feature_group_select.val();
     if (item_level && feature_group) {
         $.ajax({
-            url: "/record/" + record_type + "/" + item_level + "/" + feature_group + "/",
+            url: (
+                "/features"
+                + "?record_type=" + record_type
+                + "&item_level=" + item_level
+                + "&feature_group=" + feature_group
+            ),
             type: 'GET',
             success: function (response) {
                 feature_checkbox_div.append(
@@ -235,7 +244,6 @@ group_update = function() {
     }
     update_submit_fields();
 };
-
 
 
 update_submit_fields = function () {

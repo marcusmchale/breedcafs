@@ -184,19 +184,41 @@ class SelectionList:
 			"item_level": item_level,
 			"record_type": record_type
 		}
-		statement = (
-			' MATCH '
-			'	(feature_group: FeatureGroup) '
-			'	<-[:IN_GROUP]-(feature: Feature) '
-			'	-[:AT_LEVEL]->(: ItemLevel {name_lower: toLower($item_level)}), '
-			'	(feature)-[:OF_TYPE]->(: RecordType {name_lower: toLower($record_type)}) '
-			' WITH DISTINCT (feature_group) '
-			' RETURN [ '
-			'	feature_group.name_lower, '
-			'	feature_group.name '
-			' ] '
-			' ORDER BY feature_group.name_lower '
+		if item_level and record_type:
+			statement = (
+				' MATCH '
+				'	(feature_group: FeatureGroup) '
+				'	<-[:IN_GROUP]-(feature: Feature) '
+				'	-[:AT_LEVEL]->(: ItemLevel {name_lower: toLower($item_level)}), '
+				'	(feature)-[:OF_TYPE]->(: RecordType {name_lower: toLower($record_type)}) '
 			)
+		elif item_level:
+			statement = (
+				' MATCH '
+				'	(feature_group: FeatureGroup) '
+				'	<-[:IN_GROUP]-(: Feature) '
+				'	-[:AT_LEVEL]->(: ItemLevel {name_lower: toLower($item_level)}) '
+			)
+		elif record_type:
+			statement = (
+				' MATCH '
+				'	(feature_group: FeatureGroup) '
+				'	<-[:IN_GROUP]-(: Feature) '
+				'	-[:OF_TYPE]->(: RecordType {name_lower: toLower($record_type)}) '
+			)
+		else:
+			statement = (
+				' MATCH '
+				'	(feature_group: FeatureGroup) '
+			)
+		statement += (
+				' WITH DISTINCT (feature_group) '
+				' RETURN [ '
+				'	feature_group.name_lower, '
+				'	feature_group.name '
+				' ] '
+				' ORDER BY feature_group.name_lower '
+		)
 		with get_driver().session() as neo4j_session:
 			result = neo4j_session.read_transaction(
 				neo4j_query,
@@ -866,12 +888,29 @@ class FeatureList:
 			"record_type": self.record_type,
 			"item_level": self.item_level
 		}
-		statement = (
-			' MATCH '
-			'	(: RecordType {name_lower: toLower($record_type)})'
-			'	<-[:OF_TYPE]-(feature: Feature) '
-			'	-[:AT_LEVEL]-(: ItemLevel {name_lower: toLower($item_level)}) '
-		)
+		if self.record_type and self.item_level:
+			statement = (
+				' MATCH '
+				'	(: RecordType {name_lower: toLower($record_type)})'
+				'	<-[:OF_TYPE]-(feature: Feature) '
+				'	-[:AT_LEVEL]->(: ItemLevel {name_lower: toLower($item_level)}) '
+			)
+		elif self.record_type:
+			statement = (
+				' MATCH '
+				'	(: RecordType {name_lower: toLower($record_type)})'
+				'	<-[:OF_TYPE]-(feature: Feature) '
+			)
+		elif self.item_level:
+			statement = (
+				' MATCH '
+				'	(feature:Feature) '
+				'	-[:AT_LEVEL]->(: ItemLevel {name_lower: toLower($item_level)}) '
+			)
+		else:
+			statement = (
+				' MATCH (feature: Feature) '
+			)
 		if feature_group:
 			parameters['feature_group'] = feature_group
 			statement += (

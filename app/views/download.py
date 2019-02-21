@@ -12,22 +12,62 @@ from flask import (
 	session, 
 	render_template, 
 	jsonify,
-	send_from_directory
+	send_from_directory,
+	make_response
 )
 from app.models import (
 	User,
-	Download
+	Download,
+	SelectionList,
+	FeatureList,
+	Parsers
 )
 from app.forms import (
 	DownloadForm,
-	LocationForm, 
-	CreateTraits
+	LocationForm
 )
 from app.emails import (
 	send_email,
 	send_static_attachment
 )
-from datetime import datetime
+from datetime import datetime, timedelta
+
+
+@app.route("/feature_groups")
+def feature_groups():
+	item_level = request.args.get('item_level', None)
+	record_type = request.args.get('record_type', None)
+	if 'username' not in session:
+		flash('Please log in')
+		return redirect(url_for('login'))
+	else:
+		try:
+			feature_groups_list = SelectionList.get_feature_groups(item_level, record_type)
+			response = make_response(jsonify(feature_groups_list))
+			response.content_type = 'application/json'
+			return response
+		except (ServiceUnavailable, SecurityError):
+			flash("Database unavailable")
+			return redirect(url_for('index'))
+
+
+@app.route("/features")
+def features():
+	item_level = request.args.get('item_level', None)
+	record_type = request.args.get('record_type', None)
+	feature_group = request.args.get('feature_group', None)
+	if 'username' not in session:
+		flash('Please log in')
+		return redirect(url_for('login'))
+	else:
+		try:
+			features_details = FeatureList(item_level, record_type).get_features(feature_group=feature_group)
+			response = make_response(jsonify(features_details))
+			response.content_type = 'application/json'
+			return response
+		except (ServiceUnavailable, SecurityError):
+			flash("Database unavailable")
+			return redirect(url_for('index'))
 
 
 @app.route('/download', methods=['GET', 'POST'])
@@ -37,25 +77,12 @@ def download():
 		return redirect(url_for('login'))
 	else:
 		try:	
-			location_form = LocationForm().update(optional=True)
-			download_form = DownloadForm()
-			sample_traits_form = CreateTraits().update('sample')
-			leaf_traits_form = CreateTraits().update('leaf')
-			branch_traits_form = CreateTraits().update('branch')
-			tree_traits_form = CreateTraits().update('tree')
-			block_traits_form = CreateTraits().update('block')
-			field_traits_form = CreateTraits().update('field')
+			location_form = LocationForm.update(optional=True)
+			download_form = DownloadForm.update()
 			return render_template(
 				'download.html',
-				download_form = download_form,
-				location_form = location_form,
-				branch_traits_form=branch_traits_form,
-				leaf_traits_form=leaf_traits_form,
-				sample_traits_form = sample_traits_form,
-				tree_traits_form = tree_traits_form,
-				block_traits_form = block_traits_form,
-				field_traits_form = field_traits_form,
-				level = 'all',
+				download_form=download_form,
+				location_form=location_form,
 				title='Download'
 			)
 		except (ServiceUnavailable, SecurityError):
@@ -63,46 +90,94 @@ def download():
 			return redirect(url_for('index'))
 
 
-@app.route('/download/generate_csv', methods=['POST'])
-def generate_csv():
+@app.route('/download/generate_file', methods=['POST'])
+def generate_file():
 	if 'username' not in session:
 		flash('Please log in')
 		return redirect(url_for('login'))
 	else:
 		try:
-			username = session['username']
-			download_form = DownloadForm()
-			location_form = LocationForm().update(optional=True)
-			level = request.form['trait_level']
-			start_date = request.form['date_from']
-			end_date = request.form['date_to']
-			traits_form = CreateTraits().update(level)
-			if all([download_form.validate_on_submit(), traits_form.validate_on_submit(), location_form.validate_on_submit()]):
-				country = request.form['country']
-				region = request.form['region']
-				farm = request.form['farm']
-				field_uid = request.form['field']
-				if field_uid != "":
-					field_uid = int(field_uid)
-				block_uid = request.form['block']
-				# selected traits of current level as flat list
-				traits = [
-					item for sublist in [
-						request.form.getlist(i) for i in request.form if all(
-							[i.startswith(level + '-'), 'csrf_token' not in i]
-						)] for item in sublist
-				]
-				# get selected data format
+			download_form = DownloadForm.update()
+			location_form = LocationForm.update(optional=True)
+			if all([
+				download_form.validate_on_submit(),
+				location_form.validate_on_submit()
+			]):
+
+				username = session['username']
+				download_object = Download(username)
+				record_type = request.form['record_type'] if request.form['record_type'] != '' else None
 				data_format = request.form['data_format']
-				# convert the date to epoch time (ms)
-				if start_date != "":
-					start_time = int((datetime.strptime(start_date, '%Y-%m-%d')-datetime(1970, 1, 1)).total_seconds()*1000)
+				# collect the filters into a dictionary to pass as parameters
+				submission_start = int(
+					(
+						datetime.strptime(request.form['submission_date_from'], '%Y-%m-%d')
+						- datetime(1970, 1, 1)
+					).total_seconds() * 1000
+				) if request.form['submission_date_from'] != '' else None
+				submission_end = int(
+					(
+						datetime.strptime(request.form['submission_date_to'], '%Y-%m-%d')
+						+ timedelta(days=1)
+						- datetime(1970, 1, 1)
+					).total_seconds() * 1000
+				) if request.form['submission_date_to'] != '' else None
+				record_start = int(
+					(
+						datetime.strptime(request.form['record_date_from'], '%Y-%m-%d')
+						- datetime(1970, 1, 1)
+					).total_seconds() * 1000
+				) if request.form['record_date_from'] != '' else None
+				record_end = int(
+					(
+						datetime.strptime(request.form['record_date_to'], '%Y-%m-%d')
+						+ timedelta(days=1)
+						- datetime(1970, 1, 1)
+					).total_seconds() * 1000
+				) if request.form['record_date_to'] != '' else None
+				# sanity check on start and end
+				if any([ submission_start >= submission_end, record_start >= record_end]):
+					return jsonify({
+						'submitted': 'Please make sure the start date is before the end date'
+					})
+				item_level = request.form['item_level'] if request.form['item_level'] != '' else None
+				country = request.form['country'] if request.form['country'] != '' else None
+				region = request.form['region'] if request.form['region'] != '' else None
+				farm = request.form['farm'] if request.form['farm'] != '' else None
+				field_uid = int(request.form['field']) if request.form['field'].isdigit() else None
+				block_uid = request.form['block'] if request.form['block'] != '' else None
+				tree_id_list = (
+					Parsers.parse_range_list(request.form['tree_id_list']) if request.form['tree_id_list'] != '' else None
+				)
+				sample_id_list = (
+					Parsers.parse_range_list(request.form['sample_id_list']) if request.form['sample_id_list'] != '' else None
+				)
+				if 'select_features' in request.form:
+					selected_features = request.form.getlist('select_features')
 				else:
-					start_time = ""
-				if end_date != "":
-					end_time = int((datetime.strptime(end_date, '%Y-%m-%d')-datetime(1970, 1, 1)).total_seconds()*1000)
-				else:
-					end_time = ""
+					selected_features = None
+				download_filters = {
+					'username': username,
+					'submission_start': submission_start,
+					'submission_end': submission_end,
+					'record_start': record_start,
+					'record_end': record_end,
+					'item_level': item_level,
+					'country': country,
+					'region': region,
+					'farm': farm,
+					'field_uid': field_uid,
+					'block_uid': block_uid,
+					'tree_id_list': tree_id_list,
+					'sample_id_list': sample_id_list,
+					'selected_features': selected_features
+				}
+				download_object.collect_records(download_filters)
+
+
+
+
+
 				# make the file and return file details
 				file_details = Download(username).get_csv(
 					country,
@@ -180,7 +255,7 @@ def generate_csv():
 						)
 					})
 			else:
-				errors = jsonify([download_form.errors, traits_form.errors])
+				errors = jsonify([location_form.errors, download_form.errors])
 				return errors
 		except (ServiceUnavailable, SecurityError):
 			flash("Database unavailable")

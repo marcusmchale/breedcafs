@@ -12,7 +12,6 @@ from flask import (
 	render_template,
 	jsonify,
 	request,
-	make_response
 )
 
 from app.forms import (
@@ -21,9 +20,7 @@ from app.forms import (
 )
 
 from app.models import (
-	SelectionList,
 	Record,
-	FeatureList,
 	Parsers,
 	Download,
 	User
@@ -31,41 +28,7 @@ from app.models import (
 
 from app.emails import send_email
 
-from flask.views import MethodView
-
 from datetime import datetime, timedelta
-
-
-class ListFeatureGroups(MethodView):
-	def get(self, record_type, item_level):
-		if 'username' not in session:
-			flash('Please log in')
-			return redirect(url_for('login'))
-		else:
-			try:
-				feature_groups = SelectionList.get_feature_groups(item_level, record_type)
-				response = make_response(jsonify(feature_groups))
-				response.content_type = 'application/json'
-				return response
-			except (ServiceUnavailable, SecurityError):
-				flash("Database unavailable")
-				return redirect(url_for('index'))
-
-
-class ListFeatures(MethodView):
-	def get(self, record_type, item_level, feature_group):
-		if 'username' not in session:
-			flash('Please log in')
-			return redirect(url_for('login'))
-		else:
-			try:
-				features_details = FeatureList(item_level, record_type).get_features(feature_group=feature_group)
-				response = make_response(jsonify(features_details))
-				response.content_type = 'application/json'
-				return response
-			except (ServiceUnavailable, SecurityError):
-				flash("Database unavailable")
-				return redirect(url_for('index'))
 
 
 @app.route('/record', methods=['GET', 'POST'])
@@ -94,13 +57,14 @@ def generate_template():
 		flash('Please log in')
 		return redirect(url_for('login'))
 	else:
-		record_form = RecordForm.update()
-		location_form = LocationForm.update(optional=True)
 		try:
+			record_form = RecordForm.update()
+			location_form = LocationForm.update(optional=True)
 			if all([
 				record_form.validate_on_submit(),
 				location_form.validate_on_submit()
 			]):
+				username = session['username']
 				record_type = request.form['record_type'] if request.form['record_type'] != '' else None
 				item_level = request.form['item_level'] if request.form['item_level'] != '' else None
 				country = request.form['country'] if request.form['country'] != '' else None
@@ -134,12 +98,12 @@ def generate_template():
 					'selected_features': selected_features,
 					'features_dict': features_dict
 				}
-				download_object = Download(session['username'])
+				download_object = Download(username)
 				if download_object.record_form_to_template(record_data):
 					file_list = download_object.file_list
 					file_list_html = download_object.get_file_list_html()
 					if request.form.get('email_checkbox'):
-						recipients = [User(session['username']).find('')['email']]
+						recipients = [User(username).find('')['email']]
 						subject = "BreedCAFS files requested"
 						body = (
 								" You recently requested a template from the BreedCAFS database. "
@@ -204,6 +168,7 @@ def submit_records():
 				record_form.validate_on_submit(),
 				location_form.validate_on_submit()
 			]):
+				username = session['username']
 				record_type = request.form['record_type'] if request.form['record_type'] != '' else None
 				item_level = request.form['item_level'] if request.form['item_level'] != '' else None
 				country = request.form['country'] if request.form['country'] != '' else None
@@ -228,14 +193,14 @@ def submit_records():
 					(datetime.strptime(request.form['record_start'], '%Y-%m-%d') - datetime(1970, 1, 1)).total_seconds()
 					* 1000
 				) if request.form['record_start'] != '' else None
-				# end time defaults to last minute of the end date
+				# end time defaults last millisecond of the day
 				end_time = int(
 					(
 						datetime.strptime(request.form['record_end'], '%Y-%m-%d') +
 						timedelta(days=1) -
 						datetime(1970, 1, 1)
 					).total_seconds() * 1000
-				) - 60000 if request.form['record_end'] != '' else None
+				) if request.form['record_end'] != '' else None
 				if all([record_type == 'condition', end_time, start_time >= end_time]):
 					return jsonify({
 						'submitted': 'Please make sure the start date is before the end date'
@@ -263,7 +228,7 @@ def submit_records():
 					'selected_features': selected_features,
 					'features_dict': features_dict
 				}
-				result = Record(session['username']).submit_records(record_data)
+				result = Record(username).submit_records(record_data)
 				return result
 			else:
 				errors = jsonify({

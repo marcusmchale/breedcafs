@@ -317,7 +317,7 @@ class Record:
 				# - any overlapping records
 				'	CASE WHEN r.start <> False THEN r.start ELSE Null END < $end_time '
 				'	AND '
-				'	CASE WHEN r.end <> False THEN r.end ELSE Null END => $start_time '
+				'	CASE WHEN r.end <> False THEN r.end ELSE Null END >= $start_time '
 				'	) OR ( '
 				# - OR a record that has a lower bound in the bound period and unbound upper
 				'	r.end = False'

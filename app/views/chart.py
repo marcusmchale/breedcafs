@@ -6,16 +6,20 @@ from datetime import datetime, timedelta
 
 @app.route("/json_submissions")
 def json_submissions():
-	tomorrow = (datetime.utcnow()+timedelta(days=1)).strftime("%Y-%m-%d")
-	yesterday = (datetime.utcnow()-timedelta(days=7)).strftime("%Y-%m-%d")
-	return Chart().get_submissions_range(session['username'], yesterday, tomorrow)
+	try:
+		tomorrow = (datetime.utcnow()+timedelta(days=1)).strftime("%Y-%m-%d")
+		yesterday = (datetime.utcnow()-timedelta(days=7)).strftime("%Y-%m-%d")
+		return Chart().get_submissions_range(session['username'], yesterday, tomorrow)
+	except (ServiceUnavailable, SecurityError):
+		flash("Database unavailable")
+		return redirect(url_for('index'))
 
 
 @app.route("/json_fields_treecount")
 def json_fields_treecount():
 	try:
 		return Chart().get_fields_treecount()
-	except (ServiceUnavailable, AuthError):
+	except (ServiceUnavailable, SecurityError):
 		flash("Database unavailable")
 		return redirect(url_for('index'))
 
@@ -45,9 +49,7 @@ def item_count():
 			return jsonify({
 				"item_count": count
 			})
-		except SecurityError:
-			return redirect(url_for('index'))
-		except ServiceUnavailable:
+		except (ServiceUnavailable, SecurityError):
 			return jsonify({
 				'result': 'Database unavailable'
 			})
@@ -55,6 +57,7 @@ def item_count():
 		return jsonify({
 			'result': 'Select level'
 		})
+
 
 
 

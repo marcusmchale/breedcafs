@@ -1,193 +1,135 @@
-//LOCATION
+const record_type_select = $('#record_type');
+const item_level_select = $('#item_level');
+const feature_group_select = $('#feature_group');
+const feature_selection_div = $('#feature_selection');
+const feature_checkbox_div = $('#feature_checkbox_div');
+const submit_download_button = $('#submit_download');
 
-//hide boxes that aren't relevant
-$('#country').change(update_blocks).change(function () {
-	if (this.value === "") {
-		$('#region').hide().val("");
-		$('#farm').hide().val("");
-		$('#field').hide().val("");
-		$('#block').hide().val("");
-	} else {
-		$('#region').show();
-	}
-});
-$('#region').change(update_blocks).change(function () {
-	if (this.value === "") {
-		$('#farm').hide().val("");
-		$('#field').hide().val("");
-		$('#block').hide().val("");
-	} else {
-		$('#farm').show();
-	}
-});
-$('#farm').change(update_blocks).change(function () {
-	if (this.value === "") {
-		$('#field').hide().val("");
-		$('#block').hide().val("");
-	} else {
-		$('#field').show();
-	}
-});
-$('#field').change(update_blocks).change(function () {
-	if (this.value === "") {
-		$('#block').hide().val("");
-	} else {
-		$('#block').show();
-	}
-});
-
-//start hidden, only show when parent locale selected
-$('#region').hide();
-$('#farm').hide();
-$('#field').hide();
-$('#block').hide();
-
-//TRAITS
-//remove submit traits buttons (these are loaded with the traits forms)
-//$('#submit_block_traits').remove();
-//$('#submit_tree_traits').remove();
-
-//also load set trait level undefined by default and only display level traits when selected
-$('#trait_level').val('0');
-$('#sample_traits,#leaf_traits,#branch_traits,#tree_traits,#block_traits,#field_traits').hide();
-
-$('#trait_level').change(function () {
-	$(".flash").remove();
-	if (this.value === '') {
-		$('#sample_traits,#leaf_traits,#branch_traits,#tree_traits,#block_traits,#field_traits').hide();
-	}
-	else if (this.value === 'sample') {
-		$('#leaf_traits,#branch_traits,#tree_traits,#block_traits,#field_traits').hide();
-		$('#sample_traits').show();
-	}
-	else if (this.value === 'leaf') {
-		$('#sample_traits,#branch_traits,#tree_traits,#block_traits,#field_traits').hide();
-		$('#leaf_traits').show();
-	}
-	else if (this.value === 'branch') {
-		$('#sample_traits,#leaf_traits,#tree_traits,#block_traits,#field_traits').hide();
-		$('#branch_traits').show();
-	}
-	else if (this.value === 'tree') {
-		$('#sample_traits,#leaf_traits,#branch_traits,#block_traits,#field_traits').hide();
-		$('#tree_traits').show();
-	}
-	else if (this.value === 'block') {
-		$('#sample_traits,#leaf_traits,#branch_traits,#tree_traits,#field_traits').hide();
-		$('#block_traits').show();
-	}
-	else if (this.value === 'field') {
-		$('#sample_traits,#leaf_traits,#branch_traits,#tree_traits,#block_traits').hide();
-		$('#field_traits').show();
-	}
-})
-
-
-$('#data_format').change(function () {
-	$(".flash").remove();
-})
-
-
-checkbox_formatting = function () {
-	if ($(this).closest("dl").find("li > input:checked").length === $(this).closest("dl").find("li > input").length) {
-		$(this).closest("dl").find('dt > label').css('text-decoration', 'none');
-		$(this).closest("dl").find('dt > input').prop("checked", true);
-	}
-	else if ($(this).closest("dl").find("li > input:checked").length > 0) {
-		$(this).closest("dl").find('dt > label').css('text-decoration', 'underline');
-		$(this).closest("dl").find('dt > input').prop("checked", false);
-	}
-	else {
-		$(this).closest("dl").find('dt > label').css('text-decoration', 'none');
-		$(this).closest("dl").find('dt > input').prop("checked", false);
-	}
-};
-
-$( window ).load(function () {
-	$('dl').each(checkbox_formatting);
-})
-
-//Add select all checkboxes to the form
-$('dl').each( function () {
-	//make trait groups look clickable
-	$(this).find('dt > label').mouseover(function () {
-	    $(this).css('font-weight', 'bold');
-	});
-	//make trait groups look clickable
-	$(this).find('dt > label').mouseout(function () {
-	    $(this).css('font-weight', 'normal');
-	});
-	//expand collapse trait details on click label
-	$(this).find('dt > label').click(function () {
-		$(this).parent().next().toggle();
-	});
-	//and start collapsed
-	$(this).find('dd').hide()
-	//get trait ul id
-	trait_id = $(this).find('dd > ul').attr('id');
-	//add checkbox
-	$(this).find('dt > label').before("<input id='select_all_" + trait_id + "' type='checkbox'>");
-	//on checkbox change toggle children true/false
-	$('[id="select_all_' + trait_id + '"]').change(function () {
-		$(this).parent().find('label').css('text-decoration', 'none');
-		if (this.checked) {
-			$(this).parent().next().find("input").prop("checked", true);
-		}
-		else {
-			$(this).parent().next().find("input").prop("checked", false);
-		}
-	});
-	//make trait groups underlined if any items checked within
-	$(this).find('li > input').change(checkbox_formatting);
-});
-
-//DOWNLOAD
-$('#submit_download').click(function(e) {
-	e.preventDefault();
-	$(".flash").remove();
-	var sel_level = $("#trait_level").find(":selected").val();
-	wait_message = "Please wait for file to be generated"
-	flash_wait = "<div id='download_flash' class='flash'>" + wait_message + "</div>"
-	$('form').append(flash_wait);
-	if ($('#trait_level').find(":selected").val() === "") {
-		select_level_message = "This field is required"
-		$('#trait_level').after("<div id='level_flash' class='flash'>" + select_level_message + "</div>")
-	}
-	trait_count = $('#' + sel_level + '_traits').find('input[type=checkbox]:checked').length - $('#' + sel_level + '_traits').find('[id^=select_all_]:checked').length;	
-	if (trait_count === 0) {
-		select_message = "Please select traits to include in traits.trt"
-		flash_select = "<div id='traits_flash' class='flash'>" + select_message + "</div>"
-		$("#download_flash").replaceWith(flash_select)
-	} else {
-		var submit_traits = $.ajax({
-			url: "/download/generate_csv",
-			data: $("form").serialize(),
-			type: 'POST',
-			success: function(response) {
-				if (response.hasOwnProperty('submitted')) {
-					flash_submitted = "<div id='download_flash' class='flash'>" + response.submitted + "</div>";
-					$("#download_flash").replaceWith(flash_submitted);
-				} else {
-					$("#download_flash").remove();
-					for (var key in response[0]){
-						if (response[0].hasOwnProperty(key)) {
-							flash = "<div id='flash_" + key + "' class='flash'>" + response[0][key][0] + "</div>";
-							$('#' + key).after(flash);
-						}
-					}
-					//this response is an array from two forms so need two of these (alternatively could iterate over these...)
-					for (var key in response[1]){
-						if (response[1].hasOwnProperty(key)) {
-							flash = "<div id='flash_" + key + "' class='flash'>" + response[1][key][0] + "</div>";
-							$('#' + key).after(flash);
-						}
-					}
-				}
-			}
-		});
-	}
-})
 
 //Render a calendar in jquery-ui for date selection
 $("#date_from").datepicker({ dateFormat: 'yy-mm-dd'});
 $("#date_to").datepicker({ dateFormat: 'yy-mm-dd'});
+
+group_select_update = function() {
+    const record_type = record_type_select.val();
+    const item_level = item_level_select.val();
+    feature_group_select.empty();
+    feature_group_select.append(
+        '<option value="">Select group</option>'
+    );
+    $.ajax({
+        url: (
+            "/feature_groups"
+            + "?record_type=" + record_type
+            + "&item_level=" + item_level
+        ),
+        type: 'GET',
+        success: function (response) {
+            const feature_groups = response;
+            for (let i = 0; i < feature_groups.length; i++) {
+                feature_group_select.append(
+                    $("<option></option>").attr(
+                        "value", feature_groups[i][0]).text(feature_groups[i][1])
+                );
+            }
+        },
+        error: function (error) {
+            console.log(error);
+        }
+    });
+};
+
+features_update = function() {
+    feature_checkbox_div.empty();
+    const record_type = record_type_select.val();
+    const item_level = item_level_select.val();
+    const feature_group = feature_group_select.val();
+    $.ajax({
+        url: (
+            "/features"
+            + "?record_type=" + record_type
+            + "&item_level=" + item_level
+            + "&feature_group=" + feature_group
+        ),
+        type: 'GET',
+        success: function (response) {
+            $('#select_all_features').change(function () {
+                    const _this = this;
+                    if (_this.checked) {
+                        feature_checkbox_div.find(":checkbox").each(function () {
+                            this.checked = true;
+                        })
+                    } else {
+                        feature_checkbox_div.find(":checkbox").each(function () {
+                            this.checked = false;
+                        })
+                    }
+                });
+            for (let i = 0; i < response.length; i++) {
+                feature_checkbox_div.append(
+                    "<li>" +
+                    "<input id=select_features-" + i + " " +
+                    "name='select_features' " +
+                    "type=checkbox value='" + response[i]['name_lower'] + "' " +
+                    ">" +
+                    "<label for='checkbox_" + response[i]['name_lower'] + "'>" +
+                    response[i]['name'] +
+                    "</label>" +
+                    "</li>"
+                );
+            }
+        },
+        error: function (error) {
+            console.log(error);
+        }
+    });
+};
+
+submit_download_button.click( function (e) {
+    e.preventDefault();
+    remove_flash();
+    const wait_message = "Please wait for template to be generated";
+    const flash_wait = "<div id='submit_flash' class='flash'>" + wait_message + "</div>";
+    submit_download_button.after(flash_wait);
+    const data = $("form").serialize();
+    $.ajax({
+        url: "/download/generate_file",
+        data: data,
+        type: 'POST',
+        success: function(response) {
+            if (response.hasOwnProperty('submitted')) {
+                const flash_submitted = "<div id='records_flash' class='flash'>" + response.submitted + "</div>";
+                $("#submit_flash").replaceWith(flash_submitted);
+            } else {
+                $("#submit_flash").remove();
+                if (response.hasOwnProperty('errors')) {
+                    const errors= response['errors'];
+                    for (let i = 0; i < errors.length; i++) {
+                        for (const key in errors[i]) {
+                            if (errors[i].hasOwnProperty(key)) {
+                                const flash = "<div id='flash_" + key + "' class='flash'>" + errors[i][key][0] + "</div>";
+                                $('[id="' + key + '"').after(flash);
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        error: function(error) {
+            console.log(error);
+            const error_message = error.status === 500 ? 'An error has occurred. Please try again':
+                'An unknown error as occurred, please contact an administrator';
+            const flash_error = "<div id='submit_flash' class='flash'>" + error_message + "</div>";
+            $("#submit_flash").replaceWith(flash_error);
+		}
+    })
+});
+
+
+
+item_level_select.change(group_select_update);
+record_type_select.change(group_select_update);
+item_level_select.change(features_update);
+record_type_select.change(features_update);
+feature_group_select.change(features_update);
+group_select_update();features_update();
