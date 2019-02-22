@@ -498,14 +498,17 @@ class Download:
 			with_timestamp=with_timestamp
 		)
 
-	def collect_records(self, download_filters):
+	def collect_records(
+			self,
+			download_filters,
+			data_format
+	):
 		parameters = download_filters
+		# TODO this statement could be optimised per level (or even just 'include sample or not')
 		statement = (
 			' MATCH '
 			'	(: User {username_lower: toLower($username)}) '
-			'	-[: AFFILIATED {confirmed: True})->(partner: Partner) '
-			' MATCH '
-			'	(feature: Feature '
+			'	-[: AFFILIATED {confirmed: True}]->(partner: Partner) '
 			' MATCH '
 			'	(partner)'
 			'	<-[: AFFILIATED {data_shared: True}]-(user: User) '
@@ -517,21 +520,242 @@ class Download:
 			'	-[:FOR_FEATURE*..2]->(feature:Feature) '
 			'	, (item_feature) '
 			'	-[:FOR_ITEM]->(item:Item) '
+			'	-[:FROM | IS_IN *]->(farm: Farm) '
+			'	-[:IS_IN]->(region: Region) '
+			'	-[:IS_IN]->(country: Country) '
+			' OPTIONAL MATCH (item)-[: FROM*]->(sample_sample: Sample) '
+			' OPTIONAL MATCH (item)-[: FROM*]->(sample_tree: Tree) '
+			' OPTIONAL MATCH (sample_tree)-[:IS_IN]->(:BlockTrees) '
+			'	-[:IS_IN]->(sample_tree_block: Block) '
+			' OPTIONAL MATCH (sample_tree)-[:IS_IN]->(:FieldTrees) '
+			'	-[:IS_IN]->(sample_tree_field: Field) '
+			' OPTIONAL MATCH (item)-[: FROM*]->(sample_field: Field) '
+			' OPTIONAL MATCH (item)-[: IS_IN]->(: BlockTrees) '
+			'	-[: IS_IN]->(tree_block: Block) '
+			' OPTIONAL MATCH (item)-[: IS_IN]->(: FieldTrees) '
+			'	-[: IS_IN]->(tree_field: Field) '
+			' OPTIONAL MATCH (item)-[: IS_IN]->(: FieldBlocks) '
+			'	-[: IS_IN]->(block_field: Field) '
 		)
-		if download_filters['tree_id_list']:
-			statement += (
-				' -[:FROM*]->(:Tree) '
-
-		)
-		if any([
-			download_filters['submission_start'],
-			download_filters['submission_end'],
-			download_filters['record_start'],
-			download_filters['record_end'],
-			download_filters['item_level'],
-		])
+		filters = []
 		if download_filters['submission_start']:
-			statement +=
+			filters.append(' submitted.time >= $submission_start ')
+		if download_filters['submission_end']:
+			filters.append(' submitted.time <= $submission_end ')
+		# collect all the records that have start or end inside the selected ranges
+		# not including unbounded records that surround the window
+		# if include these would need to compare between records to characterise closures.
+		if download_filters['record_start'] and download_filters['record_end']:
+			filters.append(
+				' ('
+				'	( '
+				'	CASE WHEN record.time THEN record.time ELSE Null >= $record_start '
+				'	AND '
+				'	CASE WHEN record.time THEN record.time ELSE Null < $record_end '
+				'	) OR ( '
+				'	CASE WHEN record.start THEN record.start ELSE Null < $record_end '
+				'	AND '
+				'	CASE WHEN record.end THEN record.end ELSE Null > $record_start '
+				'	) OR ( '
+				'	record.start IS FALSE '
+				'	AND '
+				'	CASE WHEN record.end THEN record.end ELSE Null > $record_start '
+				'	AND '
+				'	CASE WHEN record.end THEN record.end ELSE Null <= $record_end'
+				'	) OR ( '
+				'	CASE WHEN record.start THEN record.start ELSE Null < $record_end '
+				'	AND '
+				'	CASE WHEN record.start THEN record.start ELSE Null >= $record_start '
+				'	AND '
+				'	record.end IS FALSE '
+				'	) '
+				') '
+			)
+		elif download_filters['record_start']:
+			filters.append(
+				' ( '
+				'	CASE WHEN record.time THEN record.time ELSE Null >= $record_start '
+				'	OR '
+				'	CASE WHEN record.end THEN record.end ELSE Null > $record_start '
+				'	OR '
+				'	CASE WHEN record.start THEN record.start ELSE Null >= $record_start '
+				' ) '
+			)
+		elif download_filters['record_end']:
+			filters.append(
+				' ( '
+				'	CASE WHEN record.time THEN record.time ELSE Null < $record_end '
+				'	OR '
+				'	CASE WHEN record.end THEN record.end ELSE Null <= $record_end '
+				'	OR '
+				'	CASE WHEN record.start THEN record.start ELSE Null < $record_end '
+				' ) '
+			)
+		if download_filters['item_level']:
+			# match item_level label, has title case
+			# as we are string building here rather than using parameters we need to be sure we aren't allowing injection
+			# so i do a quick check on the item_level to make sure it conforms to our expectations
+			# this is already done at the form level but in case this constructor gets exposed elsewhere I will do it here too
+			if download_filters['item_level'].title() in ['Field', 'Block', 'Tree', 'Sample']:
+				filters.append(
+					' item: ' + download_filters['item_level'].title()
+				)
+		if download_filters['country']:
+			filters.append(
+				' country.name_lower = toLower(trim($country)) '
+			)
+		if download_filters['region']:
+			filters.append(
+				' region.name_lower = toLower(trim($region)) '
+			)
+		if download_filters['farm']:
+			filters.append(
+				' farm.name_lower = toLower(trim($farm)) '
+			)
+		if download_filters['field_uid']:
+			filters.append(
+				' ( '
+				'	sample_field.uid = $field_uid '
+				'	OR '
+				'	tree_field.uid = $field_uid '
+				'	OR '
+				'	block_field.uid = $field_uid '
+				'	OR '
+				'	item.uid = $field_uid '
+				' ) '
+			)
+		if download_filters['block_uid']:
+			filters.append(
+				' ( '
+				'	sample_block.uid = $block_uid '
+				'	OR '
+				'	tree_block.uid = $block_uid '
+				'	OR '
+				'	item.uid = $block_uid '
+				' ) '
+			)
+		if download_filters['tree_id_list']:
+			filters.append (
+				' ( '
+				'	sample_tree.id IN $tree_id_list '
+				'	OR '
+				'	(	'
+				'		item: Tree '
+				'		AND '
+				'		item.id IN $tree_id_list '
+				'	) '
+				' ) '
+			)
+		if download_filters['sample_id_list']:
+			filters.append (
+				' (	'
+				'	item: Sample '
+				'	AND '
+				'	item.id IN $tree_id_list '
+				' ) '
+			)
+		if download_filters['selected_features']:
+			filters.append(
+				' feature.name_lower in $selected_features '
+			)
+		if filters:
+			statement += (
+				' WHERE '
+			)
+			statement += ' AND '.join(filters)
+		statement += (
+			' WITH '
+			'	feature.name as Feature, '
+			'	partner.name as Partner, '
+			'	user.name as `Submitted by`, '
+			'	submitted.time as `Submitted at`, '
+			'	record.value as Value, '
+			'	record.time as Time, '
+			'	record.start as Start, '
+			'	record.end as End, '
+			'	record.person as `Recorded by`, '
+			'	item.uid as UID, '
+			'	item.id as ID, '
+			'	COLLECT(sample_sample.id) as `Source samples`, '
+			'	COLLECT(sample_tree.id) as `Source trees`, '
+			'	COALESCE( '
+			'		tree_block.name, '
+			'		COLLECT(sample_tree_block.name) '
+			'	) as Block, '
+			'	COALESCE( '
+			'		tree_block.id, '
+			'		COLLECT(sample_tree_block.id) '
+			'	) as `Block ID`, '
+			'	COALESCE ( '
+			'		sample_tree_field.uid, '
+			'		sample_field.uid, '
+			'		tree_field.uid, '
+			'		block_field.uid '
+			'	) as `Field UID`, '
+			'	COALESCE ( '
+			'		sample_tree_field.name, '
+			'		sample_field.name, '
+			'		tree_field.name, '
+			'		block_field.name '
+			'	) as Field, '
+			'	farm.name as Farm, '
+			'	region.name as Region, '
+			'	country.name as Country '
+		)
+		if data_format == 'database':
+			statement += (
+				' RETURN { '
+				'	Feature: Feature, '
+				'	Partner: Partner, '
+				'	`Submitted by`: `Submitted by`, '
+				'	`Submitted at`: `Submitted at`, '
+				'	Value: Value, '
+				'	Time: Time, '
+				'	Start: Start, '
+				'	End: End, '
+				'	`Recorded by`: `Recorded by`, '
+				'	UID: UID, '
+				'	`Source samples`: `Source samples`, '
+				'	`Source trees`: `Source trees`, '
+				'	Block: Block, '
+				'	`Block ID`: `Block ID`, '
+				'	Field: Field, '
+				'	`Field UID`: `Field UID`, '
+				'	Farm: Farm, '
+				'	Region: Region, '
+				'	Country: Country '
+				' } '
+				' ORDER BY '
+				'	CASE '
+				'		WHEN `Field UID` IS NOT NULL THEN `Field UID` '
+				'		ELSE UID END, '
+				'	ID '
+				)
+		else:  # data_format == 'table'
+			statement += (
+				' RETURN { '
+				'	Records: collect({Feature: Feature, Values: collect(Value)}), '
+				'	UID: UID, '
+				'	`Source samples`: `Source samples`, '
+				'	`Source trees`: `Source trees`, '
+				'	Block: Block, '
+				'	`Block ID`: `Block ID`, '
+				'	Field: Field, '
+				'	`Field UID`: `Field UID`, '
+				'	Farm: Farm, '
+				'	Region: Region, '
+				'	Country: Country '
+				' } '
+				' ORDER BY '
+				'	CASE '
+				'		WHEN `Field UID` IS NOT NULL THEN `Field UID` '
+				'		ELSE UID END, '
+				'	ID '
+			)
+
+		import pdb; pdb.set_trace()
+
+
 
 
 

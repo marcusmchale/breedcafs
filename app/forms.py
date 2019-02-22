@@ -538,7 +538,7 @@ class UploadForm(FlaskForm):
 # download
 class DownloadForm(FlaskForm):
 	record_type = SelectField(
-		[InputRequired()],
+		[Optional()],
 		description="Record Type",
 		choices=[
 			('', 'Any'),
@@ -548,7 +548,7 @@ class DownloadForm(FlaskForm):
 	)
 	item_level = SelectField(
 		'Item Level',
-		[InputRequired()],
+		[Optional()],
 		choices = [
 			('', 'Any'),
 			('field', 'Field'),
@@ -601,12 +601,12 @@ class DownloadForm(FlaskForm):
 	)
 	feature_group = SelectField(
 		'Feature group',
-		[InputRequired()],
+		[Optional()],
 		description="Feature group to select fields for form/template",
 		choices=[("", "Select group")]
 	)
 	select_features = SelectMultipleField(
-		[InputRequired()],
+		[Optional()],
 		coerce=unicode,
 		option_widget=widgets.CheckboxInput(),
 		widget=widgets.ListWidget(prefix_label=False),

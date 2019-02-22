@@ -342,7 +342,7 @@ class Record:
 				'	CASE WHEN r.end <> False THEN r.end ELSE Null END > $start_time '
 				'	AND '
 				'	CASE WHEN r.start <> False THEN r.start ELSE Null END <= $start_time '
-				# Or start time is the same as an existing record with no end time
+				# Or lower bound is the same as an existing record with no upper bound
 				'	) OR ( '
 				'	r.start = $start_time '
 				'	AND '

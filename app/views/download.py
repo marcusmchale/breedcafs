@@ -136,7 +136,10 @@ def generate_file():
 					).total_seconds() * 1000
 				) if request.form['record_date_to'] != '' else None
 				# sanity check on start and end
-				if any([ submission_start >= submission_end, record_start >= record_end]):
+				if any([
+					submission_start and submission_start >= submission_end,
+					record_start and record_start >= record_end
+				]):
 					return jsonify({
 						'submitted': 'Please make sure the start date is before the end date'
 					})
@@ -172,10 +175,8 @@ def generate_file():
 					'sample_id_list': sample_id_list,
 					'selected_features': selected_features
 				}
-				download_object.collect_records(download_filters)
-
-
-
+				import pdb; pdb.set_trace()
+				download_object.collect_records(download_filters, data_format)
 
 
 				# make the file and return file details
