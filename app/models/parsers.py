@@ -65,7 +65,9 @@ class Parsers:
 			return True
 		else:
 			try:
-				datetime.datetime.strptime(time_string, '%H:%M')
+				time = datetime.datetime.strptime(time_string, '%H:%M')
+				# the below is just to make sure can render it again, strftime fails on dates pre-1990
+				datetime.datetime.strftime(time, '%Y')
 				return time_string
 			except (ValueError, IndexError):
 				return False
@@ -73,25 +75,22 @@ class Parsers:
 	@staticmethod
 	def uid_format(uid):
 		uid = str(uid).strip().upper()
-		if uid.isdigit():
-			return True
+		# handle replicates
+		if len(uid.split(".")) == 2:
+			if uid.split(".")[1].isdigit():
+				base_uid = uid.split(".")[0]
 		else:
-			if len(uid.split("_")) == 2:
+			base_uid = uid
+		# now check if remaining is digit (Field UID)
+		if base_uid.isdigit():
+			return uid
+		else:
+			if len(base_uid.split("_")) == 2:
 				if all([
-					uid.split("_")[0].isdigit(),
-					uid.split("_")[1][0] in ["B", "T", "R", "L", "S"],
-					uid.split("_")[1][1:].isdigit()
+					base_uid.split("_")[0].isdigit(),
+					base_uid.split("_")[1][0] in ["B", "T", "S"],
+					base_uid.split("_")[1][1:].isdigit()
 				]):
 					return uid
-				else:
-					if all([
-						uid.split("_")[0].isdigit(),
-						uid.split("_")[1][0] == "S",
-						uid.split("_")[1].split(".")[0][1:].isdigit(),
-						uid.split("_")[1].split(".")[1].isdigit()
-					]):
-						return uid
-					else:
-						return False
 			else:
 				return False

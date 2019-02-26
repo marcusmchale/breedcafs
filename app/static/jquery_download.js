@@ -7,8 +7,10 @@ const submit_download_button = $('#submit_download');
 
 
 //Render a calendar in jquery-ui for date selection
-$("#date_from").datepicker({ dateFormat: 'yy-mm-dd'});
-$("#date_to").datepicker({ dateFormat: 'yy-mm-dd'});
+$("#submission_date_from").datepicker({ dateFormat: 'yy-mm-dd'});
+$("#submission_date_to").datepicker({ dateFormat: 'yy-mm-dd'});
+$("#record_date_from").datepicker({ dateFormat: 'yy-mm-dd'});
+$("#record_date_to").datepicker({ dateFormat: 'yy-mm-dd'});
 
 group_select_update = function() {
     const record_type = record_type_select.val();
@@ -97,8 +99,9 @@ submit_download_button.click( function (e) {
         data: data,
         type: 'POST',
         success: function(response) {
-            if (response.hasOwnProperty('submitted')) {
-                const flash_submitted = "<div id='records_flash' class='flash'>" + response.submitted + "</div>";
+            console.log(response);
+            if (response.hasOwnProperty('result')) {
+                const flash_submitted = "<div id='submit_flash' class='flash'>" + response.result + "</div>";
                 $("#submit_flash").replaceWith(flash_submitted);
             } else {
                 $("#submit_flash").remove();

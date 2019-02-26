@@ -48,19 +48,24 @@ class RowParseResult:
 				"format": "Date format does not match the required input (e.g. 2018-01-01)"
 			},
 			"start date": {
-				"format": "Date format does not match the required input (e.g. 2018-01-01)"
+				"format": "Date format does not match the required input (e.g. 2018-01-01)",
+				"order": "Please be sure to start before you finish!"
 			},
 			"end date": {
-				"format": "Date format does not match the required input (e.g. 2018-01-01)"
+				"format": "Date format does not match the required input (e.g. 2018-01-01)",
+				"order": "Please be sure to start before you finish!"
 			},
 			"time": {
 				"format": "Time format does not match the required input (e.g. 13:00)"
 			},
 			"start time": {
-				"format": "Time format does not match the required input (e.g. 13:00)"
+				"format": "Time format does not match the required input (e.g. 13:00)",
+				"order": "Please be sure to start before you finish!"
+
 			},
 			"end time": {
-				"format": "Time format does not match the required input (e.g. 13:00)"
+				"format": "Time format does not match the required input (e.g. 13:00)",
+				"order": "Please be sure to start before you finish!"
 			},
 			"uid": {
 				"format": "UID doesn't match BreedCAFS pattern: \n"
@@ -218,7 +223,7 @@ class ParseResult:
 				del self.field_errors[field]
 
 	def parse_row(self, row):
-		submission_type = self.submission_type
+		# submission_type = self.submission_type
 		# check uid formatting
 		parsed_uid = Parsers.uid_format(row['uid'])
 		if not parsed_uid:
@@ -228,91 +233,136 @@ class ParseResult:
 				"format"
 			)
 		# check time formatting and for FB use trait in unique key.
-		if submission_type == "FB":
-			if row['trait']:
-				self.contains_data = True
-			parsed_timestamp = Parsers.timestamp_fb_format(row['timestamp'])
-			if not parsed_timestamp:
+		#if submission_type == "FB":
+		#	if row['trait']:
+		#		self.contains_data = True
+		#	parsed_timestamp = Parsers.timestamp_fb_format(row['timestamp'])
+		#	if not parsed_timestamp:
+		#		self.merge_error(
+		#			row,
+		#			"timestamp",
+		#			"format"
+		#		)
+		#	unique_key = (parsed_uid, parsed_timestamp, row['trait'])
+		#	if unique_key not in self.unique_keys:
+		#		self.unique_keys.add(unique_key)
+		#	else:
+		#		self.duplicate_keys[row['row_index']] = row
+		# Check time, and for trait duplicates in tables simply check for duplicate fields in header
+		#else:  # submission_type == "table":
+			# check for date time info.
+		if 'date' in row:
+			parsed_date = Parsers.date_format(row['date'])
+			# date required for trait data
+			if not parsed_date or parsed_date is True:
 				self.merge_error(
 					row,
-					"timestamp",
+					"date",
 					"format"
 				)
-			unique_key = (parsed_uid, parsed_timestamp, row['trait'])
-			if unique_key not in self.unique_keys:
-				self.unique_keys.add(unique_key)
+			parsed_time = Parsers.time_format(row['time'])
+			if not parsed_time:
+				self.merge_error(
+					row,
+					"time",
+					"format"
+				)
+			if parsed_date and parsed_time and parsed_time is not True:
+				time = datetime.datetime.strptime(parsed_date + ' ' + parsed_time, '%Y-%m-%d %H:%M')
+			elif parsed_date:
+				time = datetime.datetime.strptime(parsed_date + ' ' + '12:00', '%Y-%m-%d %H:%M')
 			else:
-				self.duplicate_keys[row['row_index']] = row
-		# Check time, and for trait duplicates in tables simply check for duplicate fields in header
-		else:  # submission_type == "table":
-			# check for date time info.
-			if 'date' in row:
-				parsed_date = Parsers.date_format(row['date'])
-				# date required for trait data
-				if not parsed_date or parsed_date is True:
+				time = None
+			unique_key = (parsed_uid, time)
+		elif 'start date' in row:
+			parsed_start_date = Parsers.date_format(row['start date'])
+			parsed_start_time = None
+			parsed_end_date = None
+			parsed_end_time = None
+			if not parsed_start_date:
+				self.merge_error(
+					row,
+					"start date",
+					"format"
+				)
+			if 'start time' in row:
+				parsed_start_time = Parsers.time_format(row['start time'])
+				if not parsed_start_time:
 					self.merge_error(
 						row,
-						"date",
+						"start time",
 						"format"
 					)
-				parsed_time = Parsers.time_format(row['time'])
-				if not parsed_time:
+
+			if 'end date' in row:
+				parsed_end_date = Parsers.date_format(row['end date'])
+				if not parsed_end_date:
 					self.merge_error(
 						row,
-						"time",
+						"end date",
 						"format"
 					)
-				unique_key = (parsed_uid, parsed_date, parsed_time)
-			elif 'start date' in row:
-				parsed_start_date = Parsers.date_format(row['start date'])
-				parsed_start_time = None
-				parsed_end_date = None
-				parsed_end_time = None
-				if not parsed_start_date:
+			if 'end time' in row:
+				parsed_end_time = Parsers.time_format(row['end time'])
+				if not parsed_end_time:
 					self.merge_error(
 						row,
-						"start date",
+						"end time",
 						"format"
 					)
-				if 'start time' in row:
-					parsed_start_time = Parsers.time_format(row['start time'])
-					if not parsed_start_time:
+			if parsed_start_date:
+				if parsed_start_time and parsed_start_time is not True:
+					start = datetime.datetime.strptime(parsed_start_date + ' ' + parsed_start_time, '%Y-%m-%d %H:%M')
+				else:
+					start = datetime.datetime.strptime(parsed_start_date + ' ' + '00:00', '%Y-%m-%d %H-%M')
+			else:
+				start = None
+			if parsed_end_date:
+				if parsed_end_time and parsed_end_time is not True:
+					end = datetime.datetime.strptime(parsed_end_date + ' ' + parsed_end_time, '%Y-%m-%d %H:%M')
+				else:
+					end = datetime.datetime.strptime(parsed_end_date + ' ' + '00:00', '%Y-%m-%d %H:%M') + datetime.timedelta(1)
+			else:
+				end = None
+			if start and end:
+				if start >= end:
+					if parsed_start_date:
+						self.merge_error(
+							row,
+							"start date",
+							"order"
+						)
+					if parsed_start_time and parsed_start_time is not True:
 						self.merge_error(
 							row,
 							"start time",
-							"format"
+							"order"
 						)
-				if 'end date' in row:
-					parsed_end_date = Parsers.date_format(row['end date'])
-					if not parsed_end_date:
+					if parsed_end_date:
 						self.merge_error(
 							row,
 							"end date",
-							"format"
+							"order"
 						)
-				if 'end time' in row:
-					parsed_end_time = Parsers.time_format(row['end time'])
-					if not parsed_end_time:
+					if parsed_end_time and parsed_end_time is not True:
 						self.merge_error(
 							row,
 							"end time",
-							"format"
+							"order"
 						)
-				unique_key = (
-					parsed_uid,
-					parsed_start_date,
-					parsed_start_time,
-					parsed_end_date,
-					parsed_end_time
-				)
-			else:
-				unique_key = None
-			if unique_key not in self.unique_keys:
-				self.unique_keys.add(unique_key)
-			else:
-				if not self.duplicate_keys:
-					self.duplicate_keys = {}
-				self.duplicate_keys[row['row_index']] = row
+			unique_key = (
+				parsed_uid,
+				start,
+				end
+			)
+		else:
+			unique_key = None
+		if unique_key not in self.unique_keys:
+			self.unique_keys.add(unique_key)
+		else:
+			if not self.duplicate_keys:
+				self.duplicate_keys = {}
+			self.duplicate_keys[row['row_index']] = row
 
 	def merge_error(
 			self,
@@ -323,7 +373,7 @@ class ParseResult:
 			feature_name=None,
 			feature_format=None,
 			category_list=None,
-			# optional arguemtns only releveant to conflicts
+			# optional arguments only relevant to conflicts
 			conflicts=None
 	):
 		errors = self.errors
@@ -743,7 +793,18 @@ class Upload:
 					# remove empty rows
 					for i, value in enumerate(cell_values):
 						if isinstance(value, datetime.datetime):
-							cell_values[i] = value.strftime("%Y-%m-%d")
+							# when importing 00:00 time from excel, which uses 1900 date system
+							# we get a datetime.datetime object of 30th December 1899 for the time field
+							# we have to catch this here. If the date/time is an exact match, we just render it as a time
+							# it will be picked up in the subsequent scan of the trimmed file
+							# although won't make a lot of sense to the user...
+							if cell_values[i] == datetime.datetime(1899, 12, 30, 0, 0):
+								cell_values[i] = "00:00"
+							else:
+								try:
+									cell_values[i] = value.strftime("%Y-%m-%d")
+								except ValueError:
+									cell_values[i] = 'Dates before 1900 not supported'
 						elif isinstance(value, datetime.time):
 							cell_values[i] = value.strftime("%H:%M")
 						else:
@@ -1021,7 +1082,6 @@ class Upload:
 						if not any([conflicts_file, resubmissions_file, submitted_file]):
 							response = 'No data submitted, please check that you uploaded a completed file'
 							return {
-								'status': 'SUCCESS',
 								'result': response
 							}
 						# send result of merger in an email
@@ -1050,7 +1110,7 @@ class Upload:
 						body += "   These are available at the following url: " + str(conflicts_file_url) + "\n"
 						html = render_template(
 							'emails/upload_report.html',
-							response = response
+							response=response
 						)
 						send_email(subject, app.config['ADMINS'][0], recipients, body, html)
 					return {

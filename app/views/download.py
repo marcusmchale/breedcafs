@@ -103,7 +103,6 @@ def generate_file():
 				download_form.validate_on_submit(),
 				location_form.validate_on_submit()
 			]):
-
 				username = session['username']
 				download_object = Download(username)
 				record_type = request.form['record_type'] if request.form['record_type'] != '' else None
@@ -159,7 +158,7 @@ def generate_file():
 					selected_features = request.form.getlist('select_features')
 				else:
 					selected_features = None
-				download_filters = {
+				parameters = {
 					'username': username,
 					'submission_start': submission_start,
 					'submission_end': submission_end,
@@ -175,88 +174,11 @@ def generate_file():
 					'sample_id_list': sample_id_list,
 					'selected_features': selected_features
 				}
-				import pdb; pdb.set_trace()
-				download_object.collect_records(download_filters, data_format)
-
-
-				# make the file and return file details
-				file_details = Download(username).get_csv(
-					country,
-					region,
-					farm,
-					field_uid,
-					block_uid,
-					level,
-					traits,
-					data_format,
-					start_time,
-					end_time
-				)
-				# if result = none then no data was found
-				if not file_details:
-					return jsonify({'submitted': "No entries found that match your selection"})
-				# create a download url
-				download_url = url_for(
-					'download_file',
-					username = session['username'], 
-					filename=file_details['filename'],
-					_external = True
-				)
-				# if request.form.get(level + '-email_checkbox'):
-				if request.form.get('block-email_checkbox'):
-					recipients = [User(session['username']).find('')['email']]
-					subject = "BreedCAFS: Data file generated"
-					body = (
-							'You requested data from the BreedCAFS database. '
-							'The file is attached (if less than 5mb) and available at the following address: '
-							+ download_url
-					)
-					html = render_template(
-						'emails/data_file.html',
-						download_url = download_url
-					)
-					if file_details['file_size'] < 5000000:
-						send_static_attachment(
-							subject,
-							app.config['ADMINS'][0],
-							recipients, 
-							body, 
-							html,
-							file_details['filename'],
-							'text/csv',
-							file_details['file_path']
-						)
-						return jsonify({
-							'submitted': (
-								'Your file is ready for download: '
-								'"<a href="' + download_url + '">' + file_details['filename'] + '</a>"'
-								' A copy of this file has been sent to your email address'
-							)
-						})
-					else:
-						send_email(
-							subject,
-							app.config['ADMINS'][0],
-							recipients, 
-							body, 
-							html
-						)
-						return jsonify({
-							'submitted': (
-								'Your file is ready for download: '
-								'"<a href="' + download_url + '">' + file_details['filename'] + '</a>"'
-								' A copy of this link has been sent to your email address'
-							)
-						})
-				else:
-					return jsonify({
-						'submitted': (
-							'Your file is ready for download: '
-							'"<a href="' + download_url + '">' + file_details['filename'] + '</a>"'
-						)
-					})
+				return jsonify(download_object.collect_records(parameters, data_format))
 			else:
-				errors = jsonify([location_form.errors, download_form.errors])
+				errors = jsonify({
+					'errors':[location_form.errors, download_form.errors]
+				})
 				return errors
 		except (ServiceUnavailable, SecurityError):
 			flash("Database unavailable")

@@ -624,57 +624,15 @@ class DownloadForm(FlaskForm):
 		form = DownloadForm()
 		item_level = form.item_level.data if form.item_level.data not in ['', 'None'] else None
 		record_type = form.record_type.data if form.record_type.data not in ['', 'None'] else None
-		if record_type:
-			form.feature_group.choices += SelectionList.get_feature_groups(item_level, record_type)
+		form.feature_group.choices += SelectionList.get_feature_groups(item_level, record_type)
 		selected_feature_group = form.feature_group.data if form.feature_group.data not in ['', 'None'] else None
-		if selected_feature_group:
-			features_details = FeatureList(
-				item_level,
-				record_type
-			).get_features(feature_group=selected_feature_group)
-			features_list = [(feature['name_lower'], feature['name']) for feature in features_details]
-			form.select_features.choices = features_list
+		features_details = FeatureList(
+			item_level,
+			record_type
+		).get_features(feature_group=selected_feature_group)
+		features_list = [(feature['name_lower'], feature['name']) for feature in features_details]
+		form.select_features.choices = features_list
 		return form
-
-
-### Features for download page
-### TODO : NEEDS UPDATING/REPLACING
-##class CreateTraits(FlaskForm):
-##	email_checkbox = BooleanField('Email checkbox')
-##
-##	def __init__(self, *args, **kwargs):
-##		super(CreateTraits, self).__init__(*args, **kwargs)
-##		# the updates are methods so that flask can load while the database is unavailable
-##		levels = ['field', 'block', 'tree', 'sample']
-##		self.levels_groups_traits = defaultdict(lambda: defaultdict(list))
-##		# fill this dictionary
-##		for level in levels:
-##			# get a list of dictionaries of properties from each trait node at this level
-##			traits = sorted(FeatureList(level, 'trait').get_features(), key=lambda dict: dict['name_lower'])
-##			# merge this into our nested defaultdict[level] with group as key and list of traits as value
-##			for trait in traits:
-##				self.levels_groups_traits[level][trait['group']].append((trait['name_lower'], trait['name']))
-##			# and create empty attributes for each group
-##			for group in self.levels_groups_traits[level]:
-##				setattr(CreateTraits, group, SelectMultipleField(group,
-##					option_widget = widgets.CheckboxInput(),
-##					widget = widgets.ListWidget(prefix_label=False)))
-##
-##	def update(self, level):
-##		# create a form instance
-##		form = CreateTraits(prefix = level)
-##		# need to replacce the prefix that FlaskForm generates with nothing for matching to dictionary,
-##		# generate the string here to match for the replace
-##		prefix = level + '-'
-##		# give it a relevant ID
-##		id = level + "_traits_form"
-##		# dynamically add the group choices to the form instance
-##		for field in form:
-##			#the recursive part here is just to add the prefix to the item to compare against the fieldnames
-##			if field.name[len(prefix):] in self.levels_groups_traits[level]:
-##				field.choices = self.levels_groups_traits[level][field.name[len(prefix):]]
-##		return form
-##
 
 
 class RecordForm(FlaskForm):
@@ -716,6 +674,14 @@ class RecordForm(FlaskForm):
 			range_list_check
 		],
 		description="List of sample IDs, e.g. '1, 2-5' "
+	)
+	replicates = IntegerField(
+		'Replicates',
+		[
+			Optional(),
+			NumberRange(min=1, max=100, message='Currently limited to to a maximum of 100 replicates per template')
+		],
+		description="Number of replicated measures per item selected"
 	)
 	feature_group = SelectField(
 		'Feature group',

@@ -30,6 +30,10 @@
                             <h3>Selection</h3>
                             <p><a>0</a> <a>items</a></p>
                         </div>
+                        <div id="replicates_div">
+                            <h3>Replicates</h3>
+                            {{  render_field (record_form.replicates) }}
+                        </div>
                         <div id='feature_selection'>
                             <h3>Select features to record</h3>
                                 <dd>{{  render_field (record_form.feature_group) }}</dd>

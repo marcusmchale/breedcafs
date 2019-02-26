@@ -11,6 +11,7 @@ const location_div = $('#location');
 const feature_div = $('#feature_selection');
 const generate_template_button = $('#generate_template');
 const submit_records_button = $('#submit_records');
+const replicates_div = $('#replicates_div')
 
 $("#record_start").datepicker({ dateFormat: 'yy-mm-dd'});
 $("#record_end").datepicker({ dateFormat: 'yy-mm-dd'});
@@ -34,11 +35,11 @@ record_type_update = function() {
         sample_div.hide();
         item_count_div.hide();
         feature_div.hide();
+        replicates_div.hide();
     }
     level_update();
     suppress_input();
 };
-
 
 level_update = function() {
     const record_type = record_type_select.val();
@@ -75,6 +76,12 @@ level_update = function() {
             block_div.show();
             tree_div.show();
             sample_div.show();
+        }
+        if (record_type === 'trait' && item_level !== '') {
+        replicates_div.show();
+        }
+        else {
+            replicates_div.hide();
         }
         $.ajax({
             url: (
@@ -431,7 +438,6 @@ suppress_input = function () {
         }
     });
 };
-
 
 
 $(window).on('load', record_type_update);

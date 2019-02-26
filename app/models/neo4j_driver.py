@@ -40,3 +40,12 @@ def neo4j_query(tx, query, parameters=None):
 		return [record for record in result]
 	except Exception as e:
 		logging.error("Error with neo4j_query:" + str(e))
+
+
+def bolt_result(tx, query, parameters=None):
+	try:
+		result = tx.run(query, parameters)
+		# must not return live result object or may break retry
+		return result
+	except Exception as e:
+		logging.error("Error with neo4j_query:" + str(e))
