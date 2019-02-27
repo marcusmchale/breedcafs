@@ -418,7 +418,8 @@ class AddFieldItems:
 				'		uid: (block.uid + "_tree") '
 				'	})-[:FOR]-> '
 				'	(block_trees) '
-				' ON CREATE SET block_tree_counter.count = 0 '
+				' ON CREATE SET '
+				'	block_tree_counter.count = 0 '
 				' SET block_tree_counter._LOCK_ = True '
 			)
 		statement += (
@@ -473,7 +474,7 @@ class AddFieldItems:
 		if block_uid:
 			statement += (
 				' CREATE '
-				'	(tree)-[:IS_IN]-> '
+				'	(tree)-[:IS_IN {current: True}]-> '
 				'	(block_trees) '
 				' SET block_tree_counter.count = block_tree_counter.count + 1 '
 				' SET block_tree_counter._LOCK_ = false '

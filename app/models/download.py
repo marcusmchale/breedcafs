@@ -395,7 +395,7 @@ class Download:
 			date_time_person_details = [
 				("start date", "Optional: Date this condition started (YYYY-MM-DD, e.g. 2017-06-01)"),
 				("start time", "Optional: Time this condition started (24hr, e.g. 13:00. Defaults to 00:00"),
-				("end date", "Required: Date this condition ended (YYYY-MM-DD, e.g. 2017-06-01)"),
+				("end date", "Optional: Date this condition ended (YYYY-MM-DD, e.g. 2017-06-01)"),
 				("end time", "Optional: Time this condition ended (24hr, e.g. 13:00. Defaults to 00:00 of the following day"),
 				("person", "Optional: Person responsible for establishing this condition")
 			]
@@ -685,12 +685,12 @@ class Download:
 		statement += (
 			' OPTIONAL MATCH (item)-[: FROM*]->(sample_sample: Sample) '
 			' OPTIONAL MATCH (item)-[: FROM*]->(sample_tree: Tree) '
-			' OPTIONAL MATCH (sample_tree)-[:IS_IN]->(:BlockTrees) '
+			' OPTIONAL MATCH (sample_tree)-[:IS_IN {current: True}]->(:BlockTrees) '
 			'	-[:IS_IN]->(sample_tree_block: Block) '
 			' OPTIONAL MATCH (sample_tree)-[:IS_IN]->(:FieldTrees) '
 			'	-[:IS_IN]->(sample_tree_field: Field) '
 			' OPTIONAL MATCH (item)-[: FROM*]->(sample_field: Field) '
-			' OPTIONAL MATCH (item)-[: IS_IN]->(: BlockTrees) '
+			' OPTIONAL MATCH (item)-[: IS_IN {current: True}]->(: BlockTrees) '
 			'	-[: IS_IN]->(tree_block: Block) '
 			' OPTIONAL MATCH (item)-[: IS_IN]->(: FieldTrees) '
 			'	-[: IS_IN]->(tree_field: Field) '

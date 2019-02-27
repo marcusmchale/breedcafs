@@ -343,28 +343,6 @@ class Cypher:
 		'					THEN value '
 		'					ELSE Null '
 		'					END '
-		#'			WHEN feature.name_lower = "assign to trees" '
-		#'				THEN CASE '
-		#'					WHEN '
-		#'						size( '
-		#'							FILTER ('
-		#'								x in split(value, ",") '
-		#'								WHERE size(split(trim(toUpper(x)), "_T")) = 2 '
-		#'								AND toInteger(split(trim(toUpper(x)), "_T")[0]) IS NOT NULL '
-		#'								AND toInteger(split(trim(toUpper(x)), "_T")[1]) IS NOT NULL '
-		#'							) '
-		#'						) > 0 '
-		#'					THEN '
-		#'						EXTRACT('
-		#'							n in FILTER ('
-		#'								x in split(value, ",") '
-		#'								WHERE size(split(trim(toUpper(x)), "_T")) = 2 '
-		#'								AND toInteger(split(trim(toUpper(x)), "_T")[0]) IS NOT NULL '
-		#'								AND toInteger(split(trim(toUpper(x)), "_T")[1]) IS NOT NULL '
-		#'							) | toUpper(trim(n)) '
-		#'						) '
-		#'					ELSE Null '
-		#'					END '
 		'			WHEN feature.name_lower = "variety name" '
 		'				THEN CASE '
 		'					WHEN toLower(value) in extract(item in feature.category_list | toLower(item)) '
@@ -488,16 +466,15 @@ class Cypher:
 		'	-[: SUBMITTED]->(data_sub: Records) '
 		# and the item/feature node
 		' MATCH '
-		' (item)<-[: FOR_ITEM]-(item_feature:ItemFeature)-[ :FOR_FEATURE*..2]->(feature) '
+		' (item)<-[: FOR_ITEM]-(item_feature: ItemFeature)-[ :FOR_FEATURE*..2]->(feature) '
 		' OPTIONAL MATCH '
-		' (field_feature:FieldFeature)<-[: FOR_FEATURE]-(item_feature) '
+		' (field_feature: FieldFeature)<-[: FOR_FEATURE]-(item_feature) '
 		# Perform optional matches so can modify relationships for some features
-		#
 		# In case feature "assign to block"
 		# if has block assignment find current IS_IN block-trees rel (to remove current flag) and counter (to decrement)
 		' OPTIONAL MATCH '
 		'	(item) '
-		'		-[is_in_block_current:IS_IN {current: True}]->(: BlockTrees)'
+		'		-[is_in_block_current:IS_IN {current: True}]->(: BlockTrees) '
 		'		<-[:FOR]-(block_counter_current:Counter) '
 		# and then find the block by uid for update of IS_IN block-trees rel and counter 
 		' OPTIONAL MATCH '
@@ -533,7 +510,6 @@ class Cypher:
 		'	collect(from_current) as from_current, '
 		'	collect(tree_update) as tree_update '
 		# need to check for conflicts with existing records before merger due to condition flexible start/end
-		# TODO do this after getting the basic query working..consider using a separate query? 
 		' MERGE '
 		'	(r:Record { '
 		'		time : CASE WHEN time IS NULL THEN False ELSE time END, '
