@@ -256,7 +256,7 @@ class Download:
 		if not self.id_list and self.item_level:
 			return False
 		if not self.features:
-			self.features = FeatureList(self.item_level, 'trait').get_features(feature_group="Registration")
+			self.features = FeatureList(self.item_level, 'condition').get_features(feature_group="Registration")
 		file_path = self.get_file_path(
 			'xlsx',
 			base_filename=base_filename,
@@ -385,11 +385,20 @@ class Download:
 			column_number = feature_details_fieldnames.index(header)
 			feature_details_worksheet.write(row_number, column_number, header,  header_format)
 		# add notes about Date/Time/Person
-		date_time_person_details = [
-			("date", "Required: Date these values were determined (YYYY-MM-DD, e.g. 2017-06-01)"),
-			("time", "Optional: Time these values were determined (24hr, e.g. 13:00. Defaults to 12:00"),
-			("person", "Optional: Person responsible for determining these values")
-		]
+		if record_type == 'trait':
+			date_time_person_details = [
+				("date", "Required: Date these values were determined (YYYY-MM-DD, e.g. 2017-06-01)"),
+				("time", "Optional: Time these values were determined (24hr, e.g. 13:00. Defaults to 12:00"),
+				("person", "Optional: Person responsible for determining these values")
+			]
+		else:  # record_type == 'condition'
+			date_time_person_details = [
+				("start date", "Optional: Date this condition started (YYYY-MM-DD, e.g. 2017-06-01)"),
+				("start time", "Optional: Time this condition started (24hr, e.g. 13:00. Defaults to 00:00"),
+				("end date", "Required: Date this condition ended (YYYY-MM-DD, e.g. 2017-06-01)"),
+				("end time", "Optional: Time this condition ended (24hr, e.g. 13:00. Defaults to 00:00 of the following day"),
+				("person", "Optional: Person responsible for establishing this condition")
+			]
 		for i in date_time_person_details:
 			row_number += 1
 			feature_details_worksheet.write(row_number, 0, i[0])

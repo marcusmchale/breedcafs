@@ -218,7 +218,7 @@ def add_trees():
 					download_object.set_item_fieldnames()
 					download_object.item_level = "Tree"
 					download_object.id_list_to_template(
-						'trait',
+						'condition',
 						base_filename="Tree Registration Template",
 					)
 					file_list = download_object.file_list

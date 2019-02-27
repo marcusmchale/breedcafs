@@ -2,18 +2,20 @@
 {% block body %}
 <div class="text_body">
 	<h2>
-		Register fields and trees with
-		<a href="{{ url_for('create') }}"><img src = "{{ url_for('static', filename='create_field.svg') }}"></a>
+        <a href="{{ url_for('create') }}">
+            <img src = "{{ url_for('static', filename='create_field.svg') }}">
+        </a>
+		Register fields and trees
 	</h2>
-		<h3>Locations</h3>
+		<h3 id="locations">Locations</h3>
 			<p>
-				Countries, Regions and Farms provide location context for fields, a core component of the
-                BreedCAFS data model. The Farm represents a large farm or research facility
+                Countries, Regions and Farms provide location context for <a href="#fields">Fields</a>
+                , a core component of the BreedCAFS data model. The Farm represents a large farm or research facility
 				where multiple fields and/or growth environments are available.
 			</p>
-		<h3>Fields</h3>
+		<h3 id="fields">Fields</h3>
 			<p>
-				The Field represents a collection of Trees under common non-experimental conditions.
+				The Field represents a collection of <a href="#trees">Trees</a> under common non-experimental conditions.
                 It is also the largest unit in the BreedCAFS data model to which records may be attributed.
 
                 In a typical farm setting the Field will be a single field,
@@ -26,96 +28,93 @@
 				each Field is registered to a Farm and assigned a unique identifier (UID).
 				For Fields this UID is an integer (e.g. "1") that increments with each additional field in the database.
 			</p>
-		<h3>Blocks</h3>
+		<h3  id="blocks">Blocks</h3>
 			<p>
 				Blocked experimental designs are often necessary to account for conditions (nuisance factors) that vary
 				within a given field. Similarly, in controlled growth experiments such variation is often found
 				between growth chambers. To facilitate analyses in such experimental designs,
-                Trees can be optionally assigned to Blocks within a Field. Certain records may then be attributed to these blocks
-                "blocks" can be	registered within each field and certain records, such as temperature can be attributed to these units.
+                <a href="#trees">Trees</a> can be optionally assigned to Blocks within a <a href="#fields">Field</a>.
+			</p>
+			<p>
+				Blocks are assigned a UID that is incremented from the <a href="#fields">Field</a> UID.
+				As an example, "1_B2" is the UID for the second block registered within the <a href="#fields">Field</a>
+                with UID 1. Blocks are best added first so that subsequent <a href="#trees">Trees</a>
+                may be registered directly into a Block.
+                However, <a href="#trees">Trees</a> may be later assigned to a
+                registered Block by recording the block ID number in the "Assign to block" condition.
+			</p>
+		<h3 id="trees">Trees</h3>
+			<p>
+				Trees are registered within a <a href="#fields">Field</a> and optionally within a <a href="#blocks">Block</a>.
+                Each Tree is assigned a UID that increments from the <a href="#fields">Field</a> UID.
+				As an example, "1_T2" is the UID for the second tree registered within the <a href="#fields">Field</a> with UID 1.
+			</p>
+            <p>
+                In registering Trees you are be provided a BreedCAFS template listing the Tree UIDs and allowing you
+                to record details for later <a href="#upload">submission</a>. These templates can also be generated on the
+                <a href="#record">Record</a> page.
+            </p>
 
-			</p>
-			<p>
-				Blocks are assigned a UID that is incremented from the field UID.
-				As an example, "1_B2" is the UID for the second block registered within the field with UID 1.
-				Blocks are best added here so that subsequent trees may be registered directly into a block.
-				However, the block UID may also be entered per tree through the "Record" and "Upload" procedure.
-			</p>
-		<h3>Trees</h3>
-			<p>
-				The tree is the experimental unit against which the "tree" level trait data is recorded.
-				These traits include a number of different types of value, including not just
-				experimental data, but also treatments applied and contextual information such as custom identifiers.
-			</p>
-			<p>
-				Each tree is registered within a field (optionally within a block)
-				and assigned a UID that increments from the field UID.
-				As an example, "1_T2" is the UID for the second tree registered within the field with UID 1.
-			</p>
 	<h2>
-		Generate templates to record data with
-		<a href="{{ url_for('collect') }}"><img src = "{{ url_for('static', filename='collect.svg') }}"></a>
+        <a href="{{ url_for('collect') }}">
+            <img src = "{{ url_for('static', filename='collect.svg') }}">
+        </a>
+		Register samples
 	</h2>
-		<h3>Data formats</h3>
-			<p>
-				The database tools support both traditional tables
-				and the Field Book app for data collection and submission.
-			</p>
-			<h4>Tables</h4>
-				<p>
-					Tables are generated in "comma separated values" (.csv) files.
-					These are suited to import into spreadsheet software such as Microsoft Excel.
-				</p>
-				<p>
-					The first columns of each table will provide contextual information;
-					Country, Region, Farm, Field etc.
-					The last of these will be UID,
-					the unique identifier of the item to which the following values correspond.
-					The next two columns require the input of the date (formatted as YYYY-MM-DD, e.g. 2018-01-01)
-					and the time (formatted as HH:MM in 24 hour time, e.g. 13:00).
-					Subsequent columns contain a field label corresponding to a trait for which data can be entered.
-				</p>
-				<p>
-					An additional file is generated along with this table template. This "details" file describes
-					the types of values that are accepted for the traits you have selected.
-				</p>
-			<h4>Field Book</h4>
-				<p>
-					To assist field data collection and ensure standardised reporting,
-					the BreedCAFS database tools support use of the
-					<a href="http://wheatgenetics.org/field-book">Field Book</a> app for Android mobile devices.
-				</p>
-				<p>
-					To collect data with Field-Book you need two files, one that describes the "fields" (a .csv file),
-					and another that describes the traits to be measured (a .trt file).
-					Both of these files (specific to the level of data; field, block, tree, branch, leaf or sample)
-					are generated by this site.
-				</p>
-				<p>
-					For further guidance on using Field Book please see the
-					<a href="{{ url_for('field_book_help') }}">Field Book help</a> page
-				</p>
-			<h4>Trait selection</h4>
-				<p>
-					First select the level of the traits then explore the expanding groups of traits
-					to select those for which you are interested in recording data.
-				</p>
-			<h4>Location</h4>
-				<p>
-					Next you will be able to filter by location to select the appropriate items at that level
-					(e.g. trees for tree level traits).
-				</p>
-			<h4>File type</h4>
-				<p>
-					Select the desired format for the template files (Table or Field Book as described above) and click
-					to generate these files.
-				</p>
-
-	<h2>
-		Retrieve data with
+        <h3>
+            Items
+        </h3>
+            <p>
+                If each sample to be collected is representative of a <a href="#fields">Field</a>
+                or <a href="#trees">Tree</a> then select the corresponding level.
+            </p>
+            <p>
+                If each sample is representative of a collection of <a href="#trees">Trees</a>
+                (i.e. pooled) then select "Field" and later associate each sample with a list of Tree IDs
+                by recording the "Assign to trees" condition.
+            </p>
+            <p>
+                For sub-sampling (i.e. splitting a sample into multiple representative samples),
+                select "Sample". This is designed to support distributing samples among labs
+                and where samples may be split for different post-harvest processing procedures.
+                New IDs are generated but the association with the original sample is preserved in the database.
+            </p>
+        <h3>
+            Filters
+        </h3>
+            <p>
+                The filters allow you to select specific items to sample (Fields/Trees/Samples).
+                Your selection here will update the <a href="#selection">selection</a> below.
+            </p>
+        <h3>
+            Selection
+        </h3>
+            <p>
+                Here you can see the number of items selected to sample. You can optionally specify
+                the number of samples to register per item (default is 1).
+            </p>
+            <p>
+                When you register samples you are provided a BreedCAFS template detailing the sample UIDs
+                and allowing you to record details for later <a href="#upload">submission</a>.
+                These templates can also be generated on the <a href="#record">Record</a> page.
+            </p>
+    <h2 id="record">
+        <a href="{{ url_for('record') }}">
+            <img src = "{{ url_for('static', filename='record.svg') }}">
+        </a>
+        Record data
+    </h2>
+    <h2 id="upload">
+        <a href="{{ url_for('upload') }}">
+            <img src = "{{ url_for('static', filename='upload.svg') }}">
+        </a>
+        Upload data
+    </h2>
+	<h2 id="download">
 		<a href="{{ url_for('download') }}">
 			<img src = "{{ url_for('static', filename='download_espresso.svg') }}">
 		</a>
+		Retrieve data
 	</h2>
 		<p>
 			Retrieve data submitted by your affiliated partners, filtering by location and time period.
@@ -132,8 +131,10 @@
 			as a list within a single cell of the table.
 		</p>
 	<h2>
-		Manage your account with
-		<a href="{{ url_for('user_page') }}"><img src = "{{ url_for('static', filename='user.svg') }}"></a>
+        <a href="{{ url_for('user_page') }}">
+            <img src = "{{ url_for('static', filename='user.svg') }}">
+        </a>
+		Manage your account
 	</h2>
 		<p> This page allows you to select and see the status of your affiliations
 			that provide access to submitted data.
@@ -152,8 +153,10 @@
 		<p><i>Partner administrator access is granted by a Global Administrator.</i></p>
 	{% if ('global_admin' in session.access) or ('partner_admin' in session.access) %}
 	<h2>
-		Manage your team with
-		<a href="{{ url_for('admin') }}"><img src = "{{ url_for('static', filename='admin.svg') }}"></a>
+		<a href="{{ url_for('admin') }}">
+            <img src = "{{ url_for('static', filename='admin.svg') }}">
+        </a>
+        Manage your team
 	</h2>
 		<p>
 			Only administrators have access to this page.
