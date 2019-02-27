@@ -552,7 +552,6 @@ class DownloadForm(FlaskForm):
 		choices = [
 			('', 'Any'),
 			('field', 'Field'),
-			('block', 'Block'),
 			('tree', 'Tree'),
 			('sample', 'Sample')
 			]
@@ -652,7 +651,6 @@ class RecordForm(FlaskForm):
 		choices=[
 			('', 'Select level'),
 			('field', 'Field'),
-			('block', 'Block'),
 			('tree', 'Tree'),
 			('sample', 'Sample')
 		]

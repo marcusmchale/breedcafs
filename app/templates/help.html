@@ -7,30 +7,33 @@
 	</h2>
 		<h3>Locations</h3>
 			<p>
-				Countries, regions and farms provide context for submission and retrieval of data.
-				The "farm" represents a large farm/research facility
-				where multiple fields/growth environments are available.
+				Countries, Regions and Farms provide location context for fields, a core component of the
+                BreedCAFS data model. The Farm represents a large farm or research facility
+				where multiple fields and/or growth environments are available.
 			</p>
 		<h3>Fields</h3>
 			<p>
-				The field is the experimental unit against which the "field" level trait data is recorded.
-				In a typical farm setting this will be a single field,
-				although it may represent an entire small-holder farm.
-				In research facilities with controlled growth environments,
-				the field will be a collection of chambers/glasshouses.
+				The Field represents a collection of Trees under common non-experimental conditions.
+                It is also the largest unit in the BreedCAFS data model to which records may be attributed.
+
+                In a typical farm setting the Field will be a single field,
+				although in BreedCAFS on-farm trials it may represent an entire small-holder farm.
+				In research facilities with controlled growth environments, the Field will likely be a glasshouse
+                or a collection of chambers.
 			</p>
 			<p>
-				To facilitate the data submission and retrieval process,
-				each field is registered to a Country, Region and Farm  and assigned a unique identifier (UID).
-				For fields this UID is an integer (e.g. "1") that increments with each additional field in the database.
+                To facilitate the data submission and retrieval process,
+				each Field is registered to a Farm and assigned a unique identifier (UID).
+				For Fields this UID is an integer (e.g. "1") that increments with each additional field in the database.
 			</p>
 		<h3>Blocks</h3>
 			<p>
 				Blocked experimental designs are often necessary to account for conditions (nuisance factors) that vary
-				within a given field. Similarly, in controlled growth experiments such variation is often also found
-				between growth chambers. To facilitate registering data with such experimental designs, "blocks" can be
-				registered within each field and trait data can then be recorded against these units. Accordingly,
-				the "block" level traits are often identical to those at the "field" level.
+				within a given field. Similarly, in controlled growth experiments such variation is often found
+				between growth chambers. To facilitate analyses in such experimental designs,
+                Trees can be optionally assigned to Blocks within a Field. Certain records may then be attributed to these blocks
+                "blocks" can be	registered within each field and certain records, such as temperature can be attributed to these units.
+
 			</p>
 			<p>
 				Blocks are assigned a UID that is incremented from the field UID.
