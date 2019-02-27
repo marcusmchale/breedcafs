@@ -4,7 +4,7 @@
 import sys
 import os
 import csv
-from instance import config
+from instance import config, varieties
 from neo4j.v1 import GraphDatabase
 
 # neo4j config
@@ -409,7 +409,7 @@ def create_trials(tx, trials):
 		'	(variety)-[:PATERNAL_DONOR]->(paternal) '
 	)
 	# and now just a couple more that have non-obvious naming but for which I was provided details about parents
-	for hybrid in config.hybrid_parents:
+	for hybrid in varieties.hybrid_parents:
 		tx.run(
 			' MERGE '
 			'	(variety: Variety { '
@@ -569,8 +569,8 @@ else:
 			session.write_transaction(create_indexes, config.indexes)
 			session.write_transaction(create_partners, config.partners)
 			session.write_transaction(create_features, './instance/features.csv')
-			session.write_transaction(create_trials, config.trials)
-			session.write_transaction(create_variety_codes, config.variety_codes)
+			session.write_transaction(create_trials, varieties.trials)
+			session.write_transaction(create_variety_codes, varieties.variety_codes)
 			session.write_transaction(create_field_counter)
 			session.write_transaction(create_start_email)
 	else:
