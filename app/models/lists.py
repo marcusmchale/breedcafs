@@ -19,7 +19,7 @@ class SelectionList:
 			'	partner.name, '
 			'	partner.fullname'
 			' ] '
-			' ORDER BY partner.name'
+			' ORDER BY partner.fullname'
 		)
 		with get_driver().session() as neo4j_session:
 			result = neo4j_session.read_transaction(
