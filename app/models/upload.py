@@ -310,14 +310,14 @@ class ParseResult:
 						"end time",
 						"format"
 					)
-			if parsed_start_date:
+			if parsed_start_date and parsed_start_date is not True:
 				if parsed_start_time and parsed_start_time is not True:
 					start = datetime.datetime.strptime(parsed_start_date + ' ' + parsed_start_time, '%Y-%m-%d %H:%M')
 				else:
 					start = datetime.datetime.strptime(parsed_start_date + ' ' + '00:00', '%Y-%m-%d %H-%M')
 			else:
 				start = None
-			if parsed_end_date:
+			if parsed_end_date and parsed_end_date is not True:
 				if parsed_end_time and parsed_end_time is not True:
 					end = datetime.datetime.strptime(parsed_end_date + ' ' + parsed_end_time, '%Y-%m-%d %H:%M')
 				else:
@@ -452,9 +452,19 @@ class SubmissionRecord:
 			self,
 			record
 	):
-		record['time'] = datetime.datetime.utcfromtimestamp(int(record['time']) / 1000).strftime("%Y-%m-%d %H:%M")
-		record['start'] = datetime.datetime.utcfromtimestamp(int(record['start']) / 1000).strftime("%Y-%m-%d %H:%M")
-		record['end'] = datetime.datetime.utcfromtimestamp(int(record['end']) / 1000).strftime("%Y-%m-%d %H:%M")
+		if isinstance(record['Time/Period'], list):
+			if record['Time/Period'][0]:
+				record['Time/Period'][0] = datetime.utcfromtimestamp(record['Time/Period'][0] / 1000).strftime("%Y-%m-%d %H:%M")
+			else:
+				record['Time/Period'][0] = 'Undefined'
+			if record['Time/Period'][1]:
+				record['Time/Period'][1] = datetime.utcfromtimestamp(record['Time/Period'][1] / 1000).strftime("%Y-%m-%d %H:%M")
+			else:
+				record['Time/Period'][1] = 'Undefined'
+			record['Time/Period'] = ' - '.join(record['Time/Period'])
+		else:
+			record['Time/Period'] = datetime.utcfromtimestamp(record['Time/Period'] / 1000).strftime(
+				"%Y-%m-%d %H:%M")
 		record['submitted_at'] = datetime.datetime.utcfromtimestamp(int(record['submitted_at']) / 1000).strftime("%Y-%m-%d %H:%M:%S")
 		self.record = record
 
@@ -521,7 +531,7 @@ class SubmissionResult:
 			conflicts_fieldnames = [
 				"uid",
 				"feature",
-				"time",
+				"Time/Period",
 				"submitted_by",
 				"submitted_at",
 				"value",
@@ -566,7 +576,7 @@ class SubmissionResult:
 			resubmissions_fieldnames = [
 				"uid",
 				"feature",
-				"time",
+				"Time/Period",
 				"submitted_by",
 				"submitted_at",
 				"value",
@@ -575,9 +585,9 @@ class SubmissionResult:
 			with open(resubmissions_file_path, 'w') as resubmissions_file:
 				writer = csv.DictWriter(
 					resubmissions_file,
-					fieldnames = resubmissions_fieldnames,
-					quoting = csv.QUOTE_ALL,
-					extrasaction = 'ignore')
+					fieldnames=resubmissions_fieldnames,
+					quoting=csv.QUOTE_ALL,
+					extrasaction='ignore')
 				writer.writeheader()
 				for row in self.resubmissions:
 					for item in row.record:
@@ -607,7 +617,7 @@ class SubmissionResult:
 			submitted_fieldnames = [
 				"uid",
 				"feature",
-				"time",
+				"Time/Period",
 				"submitted_by",
 				"submitted_at",
 				"value"
