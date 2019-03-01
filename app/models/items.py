@@ -5,7 +5,8 @@
 from app.cypher import Cypher
 from neo4j_driver import (
 	# get_driver,
-	neo4j_query
+	neo4j_query,
+	bolt_result
 )
 from flask import session
 # from datetime import datetime
@@ -497,8 +498,8 @@ class AddFieldItems:
 			' } '
 		)
 		with get_driver().session() as neo4j_session:
-			result = neo4j_session.write_transaction(neo4j_query, statement, parameters)
-			return [record[0] for record in result]
+			result = neo4j_session.write_transaction(bolt_result, statement, parameters)
+			return result
 
 # Samples are lowest "level" of item with a relationship "FROM" to any other item/s
 	# The FROM relationship may be directed to other samples, allowing:
@@ -860,5 +861,5 @@ class AddFieldItems:
 			' } '
 		)
 		with get_driver().session() as neo4j_session:
-			result = neo4j_session.write_transaction(neo4j_query, statement, parameters)
-			return [record[0] for record in result]
+			result = neo4j_session.write_transaction(bolt_result, statement, parameters)
+			return result

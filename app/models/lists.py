@@ -1,6 +1,7 @@
 from neo4j_driver import (
 	get_driver,
-	neo4j_query
+	neo4j_query,
+	bolt_result
 )
 
 
@@ -364,15 +365,15 @@ class ItemList:
 			if record_data['block_uid']:
 				parameters['block_uid'] = record_data['block_uid']
 				statement += (
-					' <-[:IS_IN]-(:BlockTrees) '
+					' <-[:IS_IN]-(:BlockTrees)<-[IS_IN]- '
 				)
 			else:
 				statement += (
-					' <-[:IS_IN]-(:FieldTrees) '
+					' <-[:IS_IN]-(:FieldTrees)<-[:IS_IN]- '
 				)
 			if record_data['item_level'] == 'tree':
 				statement += (
-					' <-[:IS_IN]-(item :Tree) '
+					' (item :Tree) '
 				)
 				if record_data['tree_id_list']:
 					parameters['tree_id_list'] = record_data['tree_id_list']
@@ -382,7 +383,7 @@ class ItemList:
 					)
 			else:
 				statement += (
-					' <-[:IS_IN]-(tree:Tree) '
+					' (tree:Tree) '
 				)
 		if record_data['item_level'] == 'sample':
 			statement += (
@@ -411,11 +412,25 @@ class ItemList:
 
 	def generate_id_list(self, record_data):
 		statement, parameters = self.build_match_item_statement(record_data)
+		statement += (
+			' OPTIONAL MATCH '
+			'	(item)-[:FROM | OF_VARIETY | CONTAINS_VARIETY *]->(variety:Variety) '
+		)
+		if parameters['item_level'] == 'field':
+			statement += (
+				' WITH country, region, farm, item, collect(DISTINCT variety.name) as varieties '
+			)
+
 		if parameters['item_level'] in ['tree', 'sample']:
 			if "block_uid" not in parameters:
 				statement += (
 					' OPTIONAL MATCH '
-					'	(item)-[:IS_IN | FROM*]->(block :Block) '
+					'	(item)-[:IS_IN | FROM*]->(:BlockTrees)'
+					'	-[:IS_IN]->(block :Block) '
+				)
+			if parameters['item_level'] == 'tree':
+				statement += (
+					' WITH country, region, farm, field, block, item, collect(DISTINCT variety.name) as varieties '
 				)
 			if parameters['item_level'] == 'sample':
 				if 'tree_id_list' not in parameters:
@@ -426,23 +441,23 @@ class ItemList:
 				if 'sample_id_list' not in parameters:
 					statement += (
 						' OPTIONAL MATCH '
-						'	(item)-[:FROM*]->(parent_sample: Sample) '
+						'	(item)-[:FROM*]->(source_sample: Sample) '
 					)
 				statement += (
 					' WITH DISTINCT '
 					' item, '
 					' country, region, farm, field, '
+					' collect(DISTINCT variety.name) as varieties, '
 					' collect(DISTINCT block.uid) as block_uids, '
 					' collect(DISTINCT block.name) as block_names, '
 					' collect(DISTINCT tree.uid) as tree_uids, '
 					' collect(DISTINCT tree.custom_id) as tree_custom_ids, '
-					' collect(DISTINCT tree.variety) as tree_varieties, '
-					' collect(DISTINCT parent_sample.uid) as parent_sample_uids, '
-					' collect(DISTINCT parent_sample.storage_condition) as parent_sample_storage_conditions, '
+					' collect(DISTINCT source_sample.id) as source_sample_ids, '
+					' collect(DISTINCT source_sample.storage_condition) as source_sample_storage_conditions, '
 					# need to ensure these values are consistent in submission. taking first entry anyway
-					' collect(parent_sample.tissue)[0] as parent_sample_tissue, '
-					' collect(parent_sample.harvest_condition)[0] as parent_sample_harvest_condition, '
-					' collect(parent_sample.harvest_time)[0] as parent_sample_harvest_time '
+					' collect(source_sample.tissue)[0] as source_sample_tissue, '
+					' collect(source_sample.harvest_condition)[0] as source_sample_harvest_condition, '
+					' collect(source_sample.harvest_time)[0] as source_sample_harvest_time '
 				)
 		statement += (
 			' RETURN { '
@@ -450,10 +465,11 @@ class ItemList:
 			'	Country: country.name, '
 			'	Region: region.name, '
 			'	Farm: farm.name, '
+			'	Variety: varieties, '
 		)
 		if parameters['item_level'] == 'field':
 			statement += (
-				' Field: item.name '
+				' Field: item.name, '
 			)
 		else:
 			statement += (
@@ -469,8 +485,7 @@ class ItemList:
 					' Block: block.name, '
 					' `Block UID` : block.uid, '
 					' `Tree UID`: item.uid, '
-					' `Tree Custom ID`: item.custom_id, '
-					' Variety: item.variety '
+					' `Tree Custom ID`: item.custom_id '
 				)
 			elif parameters['item_level'] == 'sample':
 				statement += (
@@ -478,13 +493,12 @@ class ItemList:
 					' `Block UID` : block_uids, '
 					' `Tree UID`: tree_uids, '
 					' `Tree Custom ID`: tree_custom_ids, '
-					' Variety: tree_varieties, '
+					' `Sample Custom ID`: item.custom_id, '
 					# first entry will be immediate parent sample value (item), subsequent are in no particular order
-					' `Parent Sample UID`: item.uid + parent_sample_uids, '
-					' `Storage Condition`: item.storage_condition + parent_sample_storage_conditions, '
-					' Tissue: coalesce(item.tissue, parent_sample_tissue), '
-					' `Harvest Condition`: coalesce(item.harvest_condition, parent_sample_harvest_condition), '
-					' `Harvest Time`: apoc.date.format(coalesce(item.harvest_time, parent_sample_harvest_time)) '
+					' `Source Sample IDs`: source_sample_ids, '
+					' Tissue: coalesce(item.tissue, source_sample_tissue), '
+					' `Harvest Condition`: coalesce(item.harvest_condition, source_sample_harvest_condition), '
+					' `Harvest Time`: apoc.date.format(coalesce(item.harvest_time, source_sample_harvest_time)) '
 				)
 		statement += (
 			' } '
@@ -500,10 +514,10 @@ class ItemList:
 			)
 		with get_driver().session() as neo4j_session:
 			result = neo4j_session.read_transaction(
-				neo4j_query,
+				bolt_result,
 				statement,
 				parameters)
-		return [record[0] for record in result]
+		return result
 
 	@staticmethod
 	def get_fields(

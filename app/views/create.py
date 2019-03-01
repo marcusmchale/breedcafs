@@ -215,8 +215,7 @@ def add_trees():
 						block_uid,
 						count
 				):
-					download_object.set_item_fieldnames()
-					download_object.item_level = "Tree"
+					download_object.item_level = "tree"
 					download_object.id_list_to_template(
 						'condition',
 						base_filename="Tree Registration Template",

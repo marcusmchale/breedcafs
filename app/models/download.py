@@ -93,30 +93,6 @@ class Download:
 		else:
 			return False
 
-	def replicate_id_list(
-			self,
-			level,
-			replicates
-	):
-		if all([
-			replicates > 1,
-			len(self.id_list) > 0
-		]):
-			id_list_reps = []
-			for item in self.id_list:
-				if level == 'field':
-					item['Field UID'] = item['UID']
-				elif level == 'block':
-					item['Block UID'] = item['UID']
-				elif level == 'tree':
-					item['Tree UID'] = item['UID']
-				elif level == 'sample':
-					item['Sample UID'] = item['UID']
-				for i in range(replicates):
-					item['UID'] = str(item['UID']) + "." + str(int(i + 1))
-					id_list_reps.append(item.copy())
-			self.id_list = id_list_reps
-
 	def set_item_fieldnames(self):
 		fieldnames_order = [
 			'Country',
@@ -128,23 +104,22 @@ class Download:
 			'Block UID',
 			'Tree UID',
 			'Tree Custom ID',
+			'Sample Custom ID',
 			'Variety',
-			'Parent Sample UID',
+			'Source Sample IDs',
 			'Harvest Time',
 			'Harvest Condition',
 			'Tissue',
-			'Storage Condition',
-			'Sample UID',
 			'UID'
 		]
-		self.item_fieldnames = [i for i in fieldnames_order if i in self.id_list[0].keys()]
+		self.item_fieldnames = [i for i in fieldnames_order if i in self.id_list.peek()[0].keys()]
 
 	def id_list_to_xlsx(
 			self
 	):
 		if not self.id_list:
 			return False
-		base_filename = ' - '.join([self.id_list[0]['UID'], self.id_list[-1]['UID']])
+		base_filename = ' '
 		file_path = self.get_file_path(
 			'xlsx',
 			base_filename
@@ -154,13 +129,13 @@ class Download:
 		row_number = 0
 		for i, j in enumerate(self.item_fieldnames):
 			worksheet.write(row_number, i, j)
-		for row in self.id_list:
+		for record in self.id_list:
 			row_number += 1
 			col_number = 0
 			for field in self.item_fieldnames:
-				if isinstance(row[field], list):
-					row[field] = ", ".join(row[field])
-				worksheet.write(row_number, col_number, row[field])
+				if isinstance(record[0][field], list):
+					record[0][field] = ", ".join(record[0][field])
+				worksheet.write(row_number, col_number, record[0][field])
 				col_number += 1
 		wb.close()
 		self.file_list.append({
@@ -187,16 +162,9 @@ class Download:
 			self,
 			file_extension,
 			base_filename=None,
-			with_timestamp=True,
-			id_list=False
+			with_timestamp=True
 	):
-		if base_filename and id_list:
-			filename = (
-					base_filename
-					+ ' '
-					+ ' to '.join([str(self.id_list[0]['UID']), str(self.id_list[-1]['UID'])])
-			)
-		elif base_filename and with_timestamp:
+		if base_filename and with_timestamp:
 			filename = base_filename + '_' + self.time
 		elif base_filename:
 			filename = base_filename
@@ -233,7 +201,6 @@ class Download:
 			return False
 		if record_data['record_type'] == 'trait' and record_data['replicates'] and record_data['replicates'] > 1:
 			self.replicates = record_data['replicates']
-		self.set_item_fieldnames()
 		self.features = FeatureList(
 			record_data['item_level'],
 			record_data['record_type']).get_features(
@@ -257,11 +224,11 @@ class Download:
 			return False
 		if not self.features:
 			self.features = FeatureList(self.item_level, 'condition').get_features(feature_group="Registration")
+		self.set_item_fieldnames()
 		file_path = self.get_file_path(
 			'xlsx',
 			base_filename=base_filename,
-			with_timestamp=False,
-			id_list=True
+			with_timestamp=False
 		)
 		wb = Workbook(file_path)
 		template_worksheet = wb.add_worksheet("Template")
@@ -325,33 +292,9 @@ class Download:
 			"location": location_format,
 			"boolean": text_format
 		}
-		if self.replicates:
-			id_list_length = self.replicates * len(self.id_list)
-		else:
-			id_list_length = len(self.id_list)
-		for i, feature in enumerate(self.features):
-			column_number = len(core_template_fieldnames) + i
-			template_worksheet.set_column(
-				column_number,
-				column_number,
-				None,
-				cell_format=feature_formats[feature['format']]
-			)
-			# store categories in hidden worksheet
-			if 'category_list' in feature:
-				column_letter = chr(65 + i)
-				category_row_number = 0
-				hidden_worksheet.write(row_number, i, feature['name_lower'])
-				for j, category in enumerate(feature['category_list']):
-					category_row_number += 1
-					hidden_worksheet.write(category_row_number, i, category)
-				template_worksheet.data_validation(1, column_number, id_list_length, column_number, {
-					'validate': 'list',
-					'source': '=hidden!$' + column_letter + '$2:$' + column_letter + '$' + str(j + 1)
-				})
 		# write the id_list
-		for row in self.id_list:
-			for key, value in row.iteritems():
+		for record in self.id_list:
+			for key, value in record[0].iteritems():
 				# if there is a list (or nested lists) stored in this item
 				# make sure it is printed as a list of strings
 				#if key == 'Treatments':
@@ -375,10 +318,30 @@ class Download:
 				replicate_ids = [str(i) for i in range(1, self.replicates + 1)]
 				for rep in replicate_ids:
 					row_number += 1
-					template_worksheet.write(row_number, 0, str(row['UID']) + '.' + str(rep))
+					template_worksheet.write(row_number, 0, str(record[0]['UID']) + '.' + str(rep))
 			else:
 				row_number += 1
-				template_worksheet.write(row_number, 0, str(row['UID']))
+				template_worksheet.write(row_number, 0, str(record[0]['UID']))
+		for i, feature in enumerate(self.features):
+			column_number = len(core_template_fieldnames) + i
+			template_worksheet.set_column(
+				column_number,
+				column_number,
+				None,
+				cell_format=feature_formats[feature['format']]
+			)
+			# store categories in hidden worksheet
+			if 'category_list' in feature:
+				column_letter = chr(65 + i)
+				category_row_number = 0
+				hidden_worksheet.write(row_number, i, feature['name_lower'])
+				for j, category in enumerate(feature['category_list']):
+					category_row_number += 1
+					hidden_worksheet.write(category_row_number, i, category)
+				template_worksheet.data_validation(1, column_number, row_number, column_number, {
+					'validate': 'list',
+					'source': '=hidden!$' + column_letter + '$2:$' + column_letter + '$' + str(j + 1)
+				})
 		# create the details worksheet
 		row_number = 0
 		for header in feature_details_fieldnames:

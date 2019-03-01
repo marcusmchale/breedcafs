@@ -462,13 +462,11 @@ class Cypher:
 		# if has block assignment find current IS_IN block-trees rel (to remove current flag) and counter (to decrement)
 		' OPTIONAL MATCH '
 		'	(item) '
-		'	-[is_in_block_current:IS_IN {current: True}]->(: BlockTrees) '
-		'	<-[:FOR]-(block_counter_current:Counter) '
+		'	-[is_in_block_current:IS_IN]->(: BlockTrees) '
 		# and then find the block by uid for update of IS_IN block-trees rel and counter 
 		' OPTIONAL MATCH '
-		'	(block_counter_update: Counter) '
-		'	-[: FOR]->(block_trees_update: BlockTrees) '
-		'	-[: IS_IN]->(: Block {id: value}) '
+		'	(item)'
+		'	-[: IS_IN]->(block_update: Block {id: value}) '
 		'	-[: IS_IN]->( :FieldBlocks)'
 		'	-[: IS_IN]->(field) '
 		# Using many with statements around long optional match blocks
@@ -479,9 +477,9 @@ class Cypher:
 		'	location, timestamp, text_time, text_date, text_start_time, text_start_date, text_end_time, text_end_date, '
 		'	replicate, value, person, '
 		'	data_sub, '
-		'	is_in_block_current, block_counter_current, block_trees_update, block_counter_update '		   
+		'	is_in_block_current, block_update '		   
 		# In case sample feature "assign to trees" 
-		# should only work for samples currently registered to a field
+		# should only work for samples currently registered to a field and not a tree
 		# find current assignment
 		' OPTIONAL MATCH '
 		'	(item)-[from_current: FROM]->(:ItemSamples)-[:FROM]->(field) '
@@ -495,7 +493,7 @@ class Cypher:
 		'	location, timestamp, text_time, text_date, text_start_time, text_start_date, text_end_time, text_end_date, '
 		'	replicate, value, person, '
 		'	data_sub, '
-		'	is_in_block_current, block_counter_current, block_trees_update, block_counter_update, '
+		'	is_in_block_current, block_update, '
 		'	from_current, '
 		'	collect(tree_update) as tree_update '
 		# variety matching		
@@ -555,29 +553,33 @@ class Cypher:
 		' ) '
 		# Now update relationship feature values
 		# "assign to block" 
+		# only allow when not already assigned to block
 		' FOREACH (n IN CASE '
 		'	WHEN r.value = value '
 		'	AND feature.name_lower = "assign to block" '
-		'	AND block_trees_update IS NOT NULL '
+		'	AND is_in_block_current IS NULL '
+		'	AND block_update IS NOT NULL '
 		'	THEN [1] ELSE [] END | '
-		# link tree to block (and adjust number of trees in block with counter)
+		'		MERGE '
+		'			(block_trees_update: BlockTrees)-[:IS_IN]-> '
+		'			(block_update) '
+		'		MERGE '
+		'			(block_tree_counter_update: Counter { '
+		'				name: "tree", '
+		'				uid: (block_update.uid + "_tree") '
+		'			})-[:FOR]->(block_trees_update) '
+		'			ON CREATE SET '
+		'			block_tree_counter_update.count = 0 '
+		'		SET block_tree_counter_update._LOCK_ = True '
 		'		MERGE '
 		'			(item)-[s1:IS_IN]->(block_trees_update) '
 		'		ON CREATE SET '
 		'			s1.time = timestamp(), '
-		'			s1.user = $username, '
-		'			s1.from = "upload" '
+		'			s1.user = $username '
 		'		SET '
-		'			block_counter_current._LOCK_ = true, '
-		'			block_counter_update._LOCK_ = true '
-		'		SET '
-		'			is_in_block_current.current = False, '
-		'			s1.current = True, '
-		'			block_counter_current.count = block_counter_current.count - 1, '
-		'			block_counter_update.count = block_counter_update.count + 1 '
+		'			block_tree_counter_update.count = block_tree_counter_update.count + 1 '
 		'		REMOVE '
-		'			block_counter_current._LOCK_, '
-		'			block_counter_update._LOCK_ '
+		'			block_tree_counter_update._LOCK_ '
 		' ) '
 		# "assign to trees"
 		# In this case samples are either:
@@ -589,6 +591,7 @@ class Cypher:
 		' FOREACH (n IN CASE '
 		'	WHEN r.value = value '
 		'	AND feature.name_lower = "assign to trees" '
+		'	AND from_current IS NOT NULL '
 		'	AND tree_update IS NOT NULL '
 		'	THEN [1] ELSE [] END | '
 		'		DELETE from_current '
@@ -620,11 +623,11 @@ class Cypher:
 		'			s1.user = $username '
 		' ) '
 		# now set item properties
-		# if custom ID set custom id property. 
+		# if custom ID set custom id property but only if no current property. 
 		' SET item.custom_id = CASE '
 		'	WHEN r.value = value '
 		'	AND r.value IS NOT NULL '
-		'	AND feature.name_lower = "assign custom id" '
+		'	AND feature.name_lower = "custom id" '
 		'	THEN toString(r.value) '
 		'	ELSE item.custom_id '
 		'	END '
@@ -1302,14 +1305,14 @@ class Cypher:
 		' OPTIONAL MATCH '
 		'	(item)-[:FROM_TREE*2]->(tree_item_tree:Tree) '
 		' OPTIONAL MATCH '
-		'	(tree_item_tree)-[:IS_IN {current: True}]-() '
+		'	(tree_item_tree)-[:IS_IN]-() '
 		'	-[:IS_IN]->(tree_item_block: Block) '
 		'	-[:IS_IN*2]->(tree_item_block_field: Field) '
 		' OPTIONAL MATCH '
 		'	(tree_item_tree)-[:IS_IN*2]->(tree_item_field: Field) '
 		' OPTIONAL MATCH '
 		'	(item) '
-		'	-[:IS_IN {current: True}]-()'
+		'	-[:IS_IN]-()'
 		'	-[:IS_IN]->(tree_block: Block) '
 		'	-[:IS_IN*2]->(tree_block_field: Field) '
 		' OPTIONAL MATCH '

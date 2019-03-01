@@ -46,6 +46,120 @@ class Record:
 			else:  # record_data['record_type'] == 'condition':
 				merge_query = self.build_merge_condition_record_query(record_data)
 			tx = self.neo4j_session.begin_transaction()
+			# if any updates to perform:
+			if bool(
+					{
+						'variety name',
+						'variety code',
+						'custom id',
+						'assign to block',
+						'assign to trees'
+					} & set(record_data['selected_features'])
+			):
+				match_item_query = ItemList.build_match_item_statement(record_data)
+				if bool(
+						{'variety name', 'variety code'} & set(record_data['selected_features'])
+				):
+					update_variety_statement = match_item_query[0] + ' WITH DISTINCT item '
+					if record_data['item_level'] != 'field':
+						update_variety_statement += ', field '
+					update_variety_parameters = match_item_query[1]
+					update_variety_parameters['username'] = record_data['username']
+					if 'variety name' in record_data['selected_features']:
+						update_variety_parameters['variety_name'] = record_data['features_dict']['variety name']
+						update_variety_statement += ' MATCH (update_variety:Variety {name_lower: $variety_name}) '
+					else:  # 'variety code' in record_data['selected_features']:
+						update_variety_parameters['variety_code'] = record_data['features_dict']['variety code']
+						update_variety_statement += ' MATCH (update_variety:Variety {code: $variety_code}) '
+					update_variety_statement += (
+						' OPTIONAL MATCH '
+						'	(item)'
+						'	-[of_current_variety: OF_VARIETY]->(:FieldVariety) '
+						' WITH item, update_variety WHERE of_current_variety IS NULL '
+					)
+					if record_data['item_level'] == 'field':
+						update_variety_statement += (
+							' MERGE (item)-[:CONTAINS_VARIETY]->(fv:FieldVariety)-[:OF_VARIETY]->(update_variety) '
+						)
+					else:
+						update_variety_statement += (
+							' MERGE (field)-[:CONTAINS_VARIETY]->(fv:FieldVariety)-[:OF_VARIETY]->(update_variety) '
+						)
+					update_variety_statement += (
+						' MERGE (item)-[s1:OF_VARIETY]->(fv) '
+						'	ON CREATE SET '
+						'		s1.time = timestamp(), '
+						'		s1.username = $username '
+					)
+					tx.run(update_variety_statement, update_variety_parameters)
+				if 'assign to block' in record_data['selected_features']:
+					update_block_statement = match_item_query[0]
+					update_block_parameters = match_item_query[1]
+					update_block_parameters['username'] = record_data['username']
+					update_block_parameters['assign_to_block'] = int(record_data['features_dict']['assign to block'])
+					update_block_statement += (
+						' WITH DISTINCT item, field '
+						' MATCH '
+						'	(block_update: Block {id: $assign_to_block})-[:IS_IN]->(:FieldBlocks)-[:IS_IN]->(field) '
+						' OPTIONAL MATCH '
+						'	(item)-[:IS_IN]->(bt: BlockTrees) '
+						' WITH '
+						'	item, block_update '
+						' WHERE bt IS NULL '
+						' MERGE '
+						' 	(block_trees_update: BlockTrees)-[:IS_IN]-> '
+						' 	(block_update) '
+						' MERGE '
+						' 	(block_tree_counter_update: Counter { '
+						' 		name: "tree", '
+						' 		uid: (block_update.uid + "_tree") '
+						' 	})-[:FOR]->(block_trees_update) '
+						' 	ON CREATE SET '
+						' 	block_tree_counter_update.count = 0 '
+						' MERGE '
+						' 	(item)-[s1:IS_IN]->(block_trees_update) '
+						' ON CREATE SET '
+						' 	s1.time = timestamp(), '
+						' 	s1.user = $username '
+						' SET '
+						' 	block_tree_counter_update._LOCK_ = True, '
+						' 	block_tree_counter_update.count = block_tree_counter_update.count + 1 '
+						' REMOVE '
+						' 	block_tree_counter_update._LOCK_ '
+					)
+					tx.run(update_block_statement, update_block_parameters)
+				if 'assign to trees' in record_data['selected_features']:
+					update_trees_statement = match_item_query[0]
+					update_trees_parameters = match_item_query[1]
+					update_trees_parameters['username'] = record_data['username']
+					update_trees_parameters['assign_to_trees'] = int(record_data['features_dict']['assign to trees'])
+					update_trees_statement += (
+						' WITH DISTINCT item, field '
+						' OPTIONAL MATCH '
+						'	(item)-[:FROM]->(:ItemSamples)-[:FROM]->(assigned_tree:Tree) '
+						' WITH item, field '
+						' WHERE assigned_tree IS NULL '
+						' MATCH '
+						'	(tree: Tree)-[:IS_IN]->(:FieldTrees)-[:IS_IN]->(field) '
+						' WHERE tree.id IN $assign_to_trees '
+						' MERGE '
+						' 	(item_samples: ItemSamples)'
+						'	-[: FROM]->(tree) '
+						' MERGE '
+						' 	(item)-[s1: FROM]->(item_samples) '
+						' ON CREATE SET '
+						' 	s1.time = timestamp(), '
+						' 	s1.user = $username '
+					)
+					tx.run(update_trees_statement, update_trees_parameters)
+
+				if 'custom id' in record_data['selected_features']:
+					update_custom_id_statement = match_item_query[0] + ' WITH DISTINCT item '
+					update_custom_id_parameters = match_item_query[1]
+					update_custom_id_parameters['custom_id'] = record_data['features_dict']['custom id']
+					update_custom_id_statement += (
+						' SET item.custom_id = CASE WHEN item.custom_id IS NULL then $custom_id ELSE item.custom_id '
+					)
 			merged = [
 				record[0] for record in tx.run(merge_query['statement'], merge_query['parameters'])
 			]
