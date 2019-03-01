@@ -593,34 +593,23 @@ class AddFieldItems:
 		)
 		if level == 'field':
 			statement += (
+				' OPTIONAL MATCH (field) '
+				'	-[:OF_VARIETY | CONTAINS VARIETY *2]->(variety: Variety)'
 				' WITH '
 				' field AS item, '
 				' user_samples, '
+				' COLLECT(DISTINCT(variety.name)) as varieties, '
 				' country, region, farm '
 			)
 		else:
-			if any([level == 'block', block_uid]):
+			if block_uid:
+				parameters['block_uid'] = block_uid
 				statement += (
 					' <-[:IS_IN]-(: FieldBlocks) '
-					' <-[:IS_IN]-(block: Block '
+					' <-[:IS_IN]-(block: Block { '
+					'	uid: $block_uid '
+					' }) '
 				)
-				if block_uid:
-					parameters['block_uid'] = block_uid
-					statement += (
-						' { '
-						'	uid: $block_uid '
-						' } '
-					)
-				statement += (
-					' ) '
-				)
-				if level == 'block':
-					statement += (
-						' WITH '
-						' block AS item, '
-						' user_samples, '
-						' country, region, farm, field '
-					)
 			if any([level == 'tree', tree_id_list]):
 				statement += (
 					' <-[: IS_IN]-'
@@ -651,9 +640,12 @@ class AddFieldItems:
 							'	(tree)-[:IS_IN*2]->(block: Block) '
 						)
 					statement += (
+						' OPTIONAL MATCH (tree) '
+						'	-[:OF_VARIETY*2]->(variety: Variety)'
 						' WITH '
 						' tree AS item,  '
 						' user_samples, '
+						' COLLECT(DISTINCT(variety.name)) as varieties, '
 						' country, region, farm, field, '
 						' block '
 					)
@@ -690,12 +682,11 @@ class AddFieldItems:
 						' OPTIONAL MATCH '
 						'	(sample)-[:FROM*]->(tree: Tree) '
 					)
-				if level == 'sample':
-					statement += (
-						' OPTIONAL MATCH '
-						'	(sample)-[:FROM*]->(parent_sample: Sample) '
-					)
 				statement += (
+					' OPTIONAL MATCH '
+					'	(sample)-[:FROM*]->(source_sample: Sample) '
+					' OPTIONAL MATCH '
+					'	(sample)-[:FROM | OF_VARIETY*]->(variety: Variety)'
 					' WITH DISTINCT '
 					' sample AS item, '
 					' sample as item_samples, '
@@ -705,13 +696,11 @@ class AddFieldItems:
 					' collect(DISTINCT block.name) as block_names, '
 					' collect(DISTINCT tree.uid) as tree_uids, '
 					' collect(DISTINCT tree.custom_id) as tree_custom_ids, '
-					' collect(DISTINCT tree.variety) as tree_varieties, '
-					' collect(DISTINCT parent_sample.uid) as parent_sample_uids, '
-					' collect(DISTINCT parent_sample.storage_condition) as parent_sample_storage_conditions, '
+					' collect(DISTINCT source_sample.id) as source_samples, '
+					' collect(DISTINCT(variety.name)) as varieties, '
 					# need to ensure these values are consistent in submission. taking first entry anyway
-					' collect(parent_sample.tissue)[0] as parent_sample_tissue, '
-					' collect(parent_sample.harvest_condition)[0] as parent_sample_harvest_condition, '
-					' collect(parent_sample.harvest_time)[0] as parent_sample_harvest_time '
+					' collect(source_sample.tissue)[0] as sample_tissue, '
+					' collect(source_sample.time)[0] as sample_time '
 				)
 		if level != 'sample':
 			statement += (
@@ -753,15 +742,7 @@ class AddFieldItems:
 			statement += (
 				' WITH '
 				' country, region, farm, '
-				' item, '
-				' user_item_samples, '
-				' item_samples, '
-				' field_sample_counter '
-			)
-		elif level == 'block':
-			statement += (
-				' WITH '
-				' country, region, farm, field, '
+				' varieties, '
 				' item, '
 				' user_item_samples, '
 				' item_samples, '
@@ -771,6 +752,7 @@ class AddFieldItems:
 			statement += (
 				' WITH '
 				' country, region, farm, field, '
+				' varieties, '
 				' block, '
 				' item, '
 				' user_item_samples, '
@@ -781,9 +763,10 @@ class AddFieldItems:
 			statement += (
 				' WITH '
 				' country, region, farm, field, '
+				' varieties, '
 				' block_uids, block_names, '
 				' tree_uids, tree_custom_ids, tree_varieties, '
-				' parent_sample_uids, parent_sample_storage_conditions, '
+				' parent_sample_uids, '
 				' parent_sample_tissue, parent_sample_harvest_condition, parent_sample_harvest_time, '
 				' item, item_samples, user_item_samples, '
 				' field_sample_counter '
@@ -819,6 +802,7 @@ class AddFieldItems:
 				'	Country: country.name, '
 				'	Region: region.name, '
 				'	Farm: farm.name, '
+				'	Variety: varieties, '
 			)
 		if level == 'field':
 			statement += (
@@ -830,18 +814,13 @@ class AddFieldItems:
 				'	Field: field.name, '
 				'	`Field UID`: field.uid, '
 			)
-			if level == 'block':
-				statement += (
-					' Block: item.name, '
-					' `Block UID`: item.uid '
-				)
-			elif level == 'tree':
+			if level == 'tree':
 				statement += (
 					' Block: block.name, '
 					' `Block UID` : block.uid, '
 					' `Tree UID`: item.uid, '
 					' `Tree Custom ID`: item.custom_id, '
-					' Variety: item.variety '
+					' Variety: varieties '
 					)
 			elif level == 'sample':
 				statement += (
@@ -849,7 +828,6 @@ class AddFieldItems:
 					' `Block UID` : block_uids, '
 					' `Tree UID`: tree_uids, '
 					' `Tree Custom ID`: tree_custom_ids, '
-					' Variety: tree_varieties, '
 					# first entry will be immediate parent sample value (item), subsequent are in no particular order
 					' `Parent Sample UID`: item.uid + parent_sample_uids, '
 					' `Storage Condition`: item.storage_condition + parent_sample_storage_conditions, '

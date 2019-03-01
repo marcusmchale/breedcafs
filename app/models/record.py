@@ -152,7 +152,6 @@ class Record:
 						' 	s1.user = $username '
 					)
 					tx.run(update_trees_statement, update_trees_parameters)
-
 				if 'custom id' in record_data['selected_features']:
 					update_custom_id_statement = match_item_query[0] + ' WITH DISTINCT item '
 					update_custom_id_parameters = match_item_query[1]
@@ -160,6 +159,55 @@ class Record:
 					update_custom_id_statement += (
 						' SET item.custom_id = CASE WHEN item.custom_id IS NULL then $custom_id ELSE item.custom_id '
 					)
+					tx.run(update_custom_id_statement, update_custom_id_parameters)
+				if 'tissue type' in record_data['selected_features']:
+					update_tissue_type_statement = match_item_query[0] + ' WITH DISTINCT item '
+					update_tissue_type_parameters = match_item_query[1]
+					update_tissue_type_parameters['tissue_type'] = record_data['features_dict']['tissue type']
+					update_tissue_type_statement += (
+						' SET item.tissue = CASE WHEN item.tissue IS NULL then $tissue_type ELSE item.tissue '
+					)
+					tx.run(update_custom_id_statement, update_custom_id_parameters)
+				# we only store the harvest time in the source sample, although tissue type can change
+				# e.g. splitting subsequent to harvest
+				if 'harvest time' in record_data['selected_features']:
+					update_harvest_time_statement = match_item_query[0] + ' WITH DISTINCT item '
+					update_harvest_time_parameters = match_item_query[1]
+					update_harvest_time_parameters['harvest_time'] = record_data['features_dict']['harvest time']
+					update_harvest_time_statement += (
+						' OPTIONAL MATCH '
+						'	(item)-[:FROM]->(source_sample:Sample) '
+						' WITH item WHERE source_sample IS NULL '
+						' SET item.`harvest time` = CASE '
+						'	WHEN item.`harvest time` IS NULL THEN $harvest_time ELSE item.`harvest time` END '
+						' SET item.time = CASE '
+						'	WHEN item.`harvest date` IS NULL THEN null '
+						'	ELSE CASE '
+						'		WHEN item.`harvest time` IS NULL THEN '
+						'			apoc.date.parse(item.`harvest date` + "12:00" '
+						'		ELSE '
+						'			apoc.date.parse(item.`harvest date` + " " + item.`harvest time` '
+					)
+					tx.run(update_harvest_time_statement, update_harvest_time_parameters)
+				if 'harvest date' in record_data['selected_features']:
+					update_harvest_date_statement = match_item_query[0] + ' WITH DISTINCT item '
+					update_harvest_date_parameters = match_item_query[1]
+					update_harvest_date_parameters['harvest_date'] = record_data['features_dict']['harvest date']
+					update_harvest_date_statement += (
+						' OPTIONAL MATCH '
+						'	(item)-[:FROM]->(source_sample:Sample) '
+						' WITH item WHERE source_sample IS NULL '
+						' SET item.`harvest date` = CASE '
+						'	WHEN item.`harvest date` IS NULL THEN $harvest_date ELSE item.`harvest date` END '
+						' SET item.time = CASE '
+						'	WHEN item.`harvest date` IS NULL THEN null '
+						'	ELSE CASE '
+						'		WHEN item.`harvest time` IS NULL THEN '
+						'			apoc.date.parse(item.`harvest date` + "12:00" '
+						'		ELSE '
+						'			apoc.date.parse(item.`harvest date` + " " + item.`harvest time` '
+					)
+					tx.run(update_harvest_date_statement, update_harvest_date_parameters)
 			merged = [
 				record[0] for record in tx.run(merge_query['statement'], merge_query['parameters'])
 			]

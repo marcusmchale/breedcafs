@@ -788,6 +788,21 @@ class RecordForm(FlaskForm):
 									description=feature['details']
 								)
 							)
+						elif feature['format'] == "text":
+							validators = [InputRequired()]
+							if 'time' in feature['name_lower']:
+								validators.append(
+									Regexp("^([0-9]|0[0-9]|1[0-9]|2[0-3]):[0-5][0-9]$", message='Please use time format HH:mm e.g. 13:00 ')
+								)
+							if 'assign to' in feature['name_lower']:
+								validators.append(range_list_check)
+							FeatureFormDetailed.append_field(
+								feature['name_lower'],
+								StringField(
+									validators,
+									description=feature['details']
+								)
+							)
 				form = FeatureFormDetailed()
 				if record_type == 'trait':
 					form.record_time.validators = [
