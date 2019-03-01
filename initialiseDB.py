@@ -34,21 +34,29 @@ def clear_schema(tx):
 	tx.run('CALL apoc.schema.assert({}, {})')
 
 
-def delete_items_data(tx):
+def delete_items(tx):
 	tx.run(
 		' MATCH '
-		'	(item:Item) ' 
-		' DETACH DELETE item '
+		'	(item:Item), '
+		'	(counter:Counter) ' 
+		' DETACH DELETE counter, item '
+		' CREATE (:Counter {name: "field", count: 0})'
 	)
+
+
+def delete_data(tx):
 	tx.run(
 		' MATCH '
 		'	(record:Record) ' 
 		' DETACH DELETE record '
 	)
+
+
+def delete_features(tx):
 	tx.run(
 		' MATCH '
-		'	(counter:Counter) ' 
-		' DETACH DELETE counter '
+		'	(feature:Feature) ' 
+		' DETACH DELETE feature '
 	)
 
 
@@ -531,10 +539,6 @@ def create_variety_codes(tx, variety_codes):
 	)
 
 
-def create_field_counter(tx):
-	tx.run(' CREATE (:Counter {name: "field", count: 0})')
-
-
 def create_start_email(tx):
 	email = raw_input('Enter the email address to be first registrant: ')
 	print ('Adding email to allowed users: ' + email)
@@ -550,12 +554,18 @@ if not confirm('Are you sure you want to proceed? This is should probably only b
 	sys.exit()
 else:
 	if not confirm(
-			'Would you like to remove everything? Select no to delete just the items (fields/blocks/trees/samples) and records.'
+			'Would you like to remove everything? Select no to delete just the items, data or features.'
 	):
 		with driver.session() as session:
-			print('Deleting all items')
-			session.write_transaction(delete_items_data)
-			session.write_transaction(create_field_counter)
+			if confirm('Would you like to delete all data?'):
+				session.write_transaction(delete_data)
+			if confirm('Would you like to delete all items?'):
+				session.write_transaction(delete_items)
+			if confirm('Would you like to delete features and varieties then recreate them from features.csv and varieties.py?'):
+				session.write_transaction(delete_features)
+				session.write_transaction(create_features, './instance/features.csv')
+				session.write_transaction(create_trials, varieties.trials)
+				session.write_transaction(create_variety_codes, varieties.variety_codes)
 	elif confirm('Do you want to a delete everything rebuild the constraints and reset the indexes?'):
 		print('Performing a full reset of database')
 		with driver.session() as session:
@@ -571,7 +581,6 @@ else:
 			session.write_transaction(create_features, './instance/features.csv')
 			session.write_transaction(create_trials, varieties.trials)
 			session.write_transaction(create_variety_codes, varieties.variety_codes)
-			session.write_transaction(create_field_counter)
 			session.write_transaction(create_start_email)
 	else:
 		print('Nothing done')
