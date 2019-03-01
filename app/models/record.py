@@ -184,9 +184,9 @@ class Record:
 						'	WHEN item.`harvest date` IS NULL THEN null '
 						'	ELSE CASE '
 						'		WHEN item.`harvest time` IS NULL THEN '
-						'			apoc.date.parse(item.`harvest date` + "12:00" '
+						'			THEN apoc.date.parse(value + " 12:00", "ms", "yyyy-MM-dd HH:mm") '
 						'		ELSE '
-						'			apoc.date.parse(item.`harvest date` + " " + item.`harvest time` '
+						'			ELSE apoc.date.parse(value + " " + item.`harvest time`, "ms", "yyyy-MM-dd HH:mm")'
 					)
 					tx.run(update_harvest_time_statement, update_harvest_time_parameters)
 				if 'harvest date' in record_data['selected_features']:
@@ -203,9 +203,9 @@ class Record:
 						'	WHEN item.`harvest date` IS NULL THEN null '
 						'	ELSE CASE '
 						'		WHEN item.`harvest time` IS NULL THEN '
-						'			apoc.date.parse(item.`harvest date` + "12:00" '
+						'			apoc.date.parse(value + " 12:00", "ms", "yyyy-MM-dd HH:mm") '
 						'		ELSE '
-						'			apoc.date.parse(item.`harvest date` + " " + item.`harvest time` '
+						'			apoc.date.parse(value + " " + item.`harvest time`, "ms", "yyyy-MM-dd HH:mm") '
 					)
 					tx.run(update_harvest_date_statement, update_harvest_date_parameters)
 			merged = [
