@@ -340,7 +340,7 @@ class Download:
 					hidden_worksheet.write(category_row_number, i, category)
 				template_worksheet.data_validation(1, column_number, row_number, column_number, {
 					'validate': 'list',
-					'source': '=hidden!$' + column_letter + '$2:$' + column_letter + '$' + str(j + 1)
+					'source': '=hidden!$' + column_letter + '$2:$' + column_letter + '$' + str(j + 2)
 				})
 		# create the details worksheet
 		row_number = 0
