@@ -270,7 +270,11 @@ update_submit_fields = function () {
         } else if (record_type === 'condition') {
             record_period_div.show();
             record_time_div.hide();
+        } else {
+            record_period_div.hide();
+            record_time_div.hide();
         }
+
         if (count_checked === count_checkboxes) {
             $('#select_all_features').prop('checked', true);
         } else {
