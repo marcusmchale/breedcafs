@@ -459,7 +459,7 @@ class Cypher:
 		# and then find the block by uid for update of IS_IN block-trees rel and counter 
 		' OPTIONAL MATCH '
 		'	(item)'
-		'	-[: IS_IN]->(block_update: Block {id: value}) '
+		'	-[: IS_IN]->(block_update: Block {id: toInteger(value)}) '
 		'	-[: IS_IN]->( :FieldBlocks)'
 		'	-[: IS_IN]->(field) '
 		# Using many with statements around long optional match blocks
