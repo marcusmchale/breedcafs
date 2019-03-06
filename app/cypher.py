@@ -432,6 +432,7 @@ class Cypher:
 		' ) '
 		# get rid of some of the optional matches since they are no longer needed
 		' WITH '
+		'	record_type, '
 		'	field, item, feature, level, time, start, end, replicate, '
 		'	person, '
 		'	location, timestamp, text_time, text_date, text_start_time, text_start_date, text_end_time, text_end_date, '
@@ -464,6 +465,7 @@ class Cypher:
 		# Using many with statements around long optional match blocks
 		# otherwise there is a database error I haven't diagnosed
 		' WITH '
+		'	record_type, '
 		'	field, item, feature, level, item_feature, coalesce(field_feature, item_feature) as field_feature, '
 		'	time, start, end, '
 		'	location, timestamp, text_time, text_date, text_start_time, text_start_date, text_end_time, text_end_date, '
@@ -483,6 +485,7 @@ class Cypher:
 		' OPTIONAL MATCH '
 		'	(item)-[: FROM]->(source_sample: Sample)-[:FROM]->(:ItemSamples) '
 		' WITH '
+		'	record_type, '
 		'	field, item, feature, level, item_feature, field_feature, '
 		'	time, start, end, '
 		'	location, timestamp, text_time, text_date, text_start_time, text_start_date, text_end_time, text_end_date, '
@@ -500,11 +503,11 @@ class Cypher:
 		' OPTIONAL MATCH '
 		'	(variety_update: Variety) '
 		'	WHERE '
-		'		toLower(variety_update.name_lower) = toLower(value) '
+		'		toLower(variety_update.name_lower) = toLower(toString(value)) '
 		'	OR ('
 		'		variety_update.code IS NOT NULL '
 		'		AND '
-		'		toLower(variety_update.code) = toLower(value) '
+		'		toLower(variety_update.code) = toLower(toString(value)) '
 		'	) '
 		# need to check for conflicts with existing records before merger due to condition flexible start/end
 		' MERGE '
@@ -670,7 +673,7 @@ class Cypher:
 		'	ELSE item.tissue '
 		'	END '	
 		' WITH '
-		'	item, feature, value, r '
+		'	field, item, feature, value, r, record_type '
 		' MATCH '
 		'	(partner:Partner) '
 		'	<-[:AFFILIATED {data_shared: True}]-(user:User)'
@@ -685,16 +688,15 @@ class Cypher:
 		'	submitted_by: user.name, '
 		'	submitted_at: submitted.time, '
 		'	value: r.value, '
+		'	replicate: r.replicate, '
 		'	uploaded_value: value, '
 		'	uid: item.uid, '
 		'	feature: feature.name, '
-		'	`Time/Period`: coalesce('
-		'		CASE WHEN r.time <> False THEN r.time Else Null END,'
-		'		[r.start, r.end]'
-		'	), '
-		#'	time: r.time, '
-		#'	start: r.start, '
-		#'	end: r.end, '
+		'	`Time/Period`: CASE '
+		'		WHEN record_type = "trait" THEN r.time '
+		'		WHEN record_type = "condition" THEN [r.start, r.end] '
+		'		ELSE Null '
+		'		END, '
 		'	access: access.confirmed, '
 		'	partner: partner.name, '
 		'	timestamp: r.timestamp, '
@@ -705,6 +707,7 @@ class Cypher:
 		'	text_end_date: r.text_end_date, '
 		'	text_end_time: r.text_end_time '
 		' } '
+		'	ORDER BY feature.name_lower, field.uid, item.id, r.replicate '
 	)
 	# generic upload to handle mixed UID (multiple levels) in csv in database format
 	upload_fb_check = (
@@ -828,6 +831,12 @@ class Cypher:
 		'	csvLine, '
 		'	toInteger(csvLine.row_index) as row_index, '
 		'	split(trim(toUpper(csvLine.uid)), ".")[0] as uid, '
+		'	toInteger(split(trim(toUpper(csvLine.uid)), ".")[1]) as replicate, '
+		'	CASE '
+		'		WHEN "time" IN keys(csvLine) THEN "trait" '
+		'		WHEN "start time" IN keys(csvLine) THEN "condition" '
+		'		ELSE "property" '
+		'	END as record_type, '
 		# start time from start date and start time
 		'	apoc.date.parse( '
 		'		CASE '
@@ -936,12 +945,11 @@ class Cypher:
 		'				ELSE '
 		'					toUpper(uid) '
 		'				END '
-		'	}) '
+		' }) '
 		' UNWIND $features as feature_name '
 		'	OPTIONAL MATCH '
 		'		(:RecordType {'
-		'			name_lower: '
-		'				CASE WHEN time IS NOT NULL THEN "trait" ELSE "condition" END '
+		'			name_lower: record_type '
 		'		}) '
 		'		<-[:OF_TYPE]-(feature: Feature { '
 		'			name_lower: toLower(feature_name) '
@@ -960,11 +968,11 @@ class Cypher:
 		'		}) '
 		'	WITH '
 		'		row_index, '
-		'		item, feature, feature_name, time, start, end, '
+		'		item, replicate, feature, feature_name, time, start, end, '
 		'		csvLine[feature_name] as value WHERE trim(csvLine[feature_name]) <> ""'
 		'	OPTIONAL MATCH '
 		'		(item)<-[:FOR_ITEM]-(if: ItemFeature)-[:FOR_FEATURE*..2]->(feature), '
-		'		(if)<-[:RECORD_FOR]-(r: Record) '
+		'		(if)<-[:RECORD_FOR]-(r: Record {replicate: replicate}) '
 		'		<-[s: SUBMITTED]-(: UserFieldFeature) '
 		'		<-[: SUBMITTED]-(: Records) '
 		'		<-[: SUBMITTED]-(: Submissions) '
@@ -982,7 +990,7 @@ class Cypher:
 		'	WITH '
 		'		row_index, '
 		'		feature_name, '
-		'		item, feature, time, start, end, '
+		'		item, replicate, feature, time, start, end, '
 		+ upload_check_value +
 		'		AS value, '
 		'		CASE WHEN r.time <> False THEN r.time ELSE Null END AS existing_time, '
@@ -1019,7 +1027,6 @@ class Cypher:
 		#  - if existing record is condition then r.time is False so will always equate to False
 		'		r.time = time '
 		'	) OR ( '
-		# 
 		# for conditions these handle bound records
 		# 
 		# - any overlapping records
@@ -1080,7 +1087,7 @@ class Cypher:
 		'	)) '
 		' ) '
 		' WITH '
-		'	row_index, feature_name, item, feature, value, '
+		'	row_index, feature_name, item, replicate, feature, value, '
 		'	COLLECT(DISTINCT({ '
 		'		time: existing_time, '
 		'		start: existing_start, '
@@ -1094,6 +1101,7 @@ class Cypher:
 		'	row_index: row_index, '
 		'	input_feature: feature_name, '
 		'	UID: item.uid, '
+		'	replicate: replicate, '
 		'	feature: feature.name, '
 		'	format: feature.format, '
 		'	category_list: feature.category_list, '
@@ -1111,7 +1119,11 @@ class Cypher:
 		'	csvLine, '
 		'	trim(csvLine.person) as person, '
 		'	split(trim(toUpper(csvLine.uid)), ".")[0] as uid, '
-		'	split(trim(toUpper(csvLine.uid)), ".")[1] as replicate, '
+		'	toInteger(split(trim(toUpper(csvLine.uid)), ".")[1]) as replicate, '
+		'	CASE '
+		'		WHEN "time" IN keys(csvLine) THEN "trait" '
+		'		WHEN "start time" IN keys(csvLine) THEN "condition" '
+		'		ELSE "property" END as record_type, '
 		# time from date and time
 		'	apoc.date.parse( '
 		'		CASE '
@@ -1211,7 +1223,7 @@ class Cypher:
 		'				"24:00" '
 		'			END '
 		'		, "ms", "yyyy-MM-dd HH:mm") as end '		
-		# And identify the fields and traits assessed
+		# And identify the fields and features assessed
 		' MATCH  '
 		'	(field:Field { '
 		'		uid: toInteger(split(uid, "_")[0]) '
@@ -1228,8 +1240,7 @@ class Cypher:
 		' UNWIND $features as feature_name '
 		'	MATCH '
 		'		(:RecordType {'
-		'			name_lower: '
-		'				CASE WHEN time IS NOT NULL THEN "trait" ELSE "condition" END'
+		'			name_lower: record_type '
 		'		}) '
 		'		<-[:OF_TYPE]-(feature: Feature { '
 		'			name_lower: toLower(feature_name) '
@@ -1250,6 +1261,7 @@ class Cypher:
 		# all load_csv values are string so can just check size after trimming whitespace  
 		'	WHERE size(csvLine[feature_name]) > 0 '
 		'	WITH '
+		'		record_type, '
 		'		field, item, feature, item_level.name_lower as level, '
 		'		person, time, start, end, replicate, '
 		'		csvLine[feature_name] as value, '
@@ -1267,7 +1279,11 @@ class Cypher:
 		# for trait data if no time is set then drop the row 
 		# for condition data we allow null time but need to check is this type 
 		# by looking for one of the relevant fields e.g. `start date`
-		' 		WHERE (time IS NOT Null) OR (csvLine.`start date` IS NOT NULL) '
+		' 		WHERE '
+		'			CASE '
+		'			WHEN record_type = "trait" THEN time '
+		'			ELSE True END '
+		'			IS NOT NULL '
 		+ shared_upload_code
 	)
 

@@ -223,7 +223,7 @@ class Download:
 		if not self.id_list and self.item_level:
 			return False
 		if not self.features:
-			self.features = FeatureList(self.item_level, 'condition').get_features(feature_group="Registration")
+			self.features = FeatureList(self.item_level, 'property').get_features(feature_group="Registration")
 		self.set_item_fieldnames()
 		file_path = self.get_file_path(
 			'xlsx',
@@ -244,9 +244,11 @@ class Download:
 		# write header for context worksheet
 		for i, j in enumerate(self.item_fieldnames):
 			item_details_worksheet.write(row_number, i, j, header_format)
-		if record_type == 'trait':
+		if record_type == 'property':
+			core_template_fieldnames = ['UID', 'Person']
+		elif record_type == 'trait':
 			core_template_fieldnames = ['UID', 'Date', 'Time', 'Person']
-		else:
+		elif record_type == 'condition':
 			core_template_fieldnames = ['UID', 'Start Date', 'Start Time', 'End Date', 'End Time', 'Person']
 		feature_fieldnames = [feature['name'] for feature in self.features]
 		template_fieldnames = core_template_fieldnames + feature_fieldnames
@@ -258,13 +260,16 @@ class Download:
 			'details',
 			'category_list'
 		]
-		if record_type == 'trait':
 		# column < row < cell formatting in priority
+		if record_type == 'property':
+			template_worksheet.set_column(0, 0, None, cell_format=right_border)
+			template_worksheet.set_column(1, 1, None, cell_format=right_border)
+		elif record_type == 'trait':
 			template_worksheet.set_column(0, 0, None, cell_format=right_border)
 			template_worksheet.set_column(1, 1, None, cell_format=date_format)
 			template_worksheet.set_column(2, 2, None, cell_format=time_format)
 			template_worksheet.set_column(3, 3, None, cell_format=right_border)
-		else:
+		elif record_type == 'condition':
 			template_worksheet.set_column(0, 0, None, cell_format=right_border)
 			template_worksheet.set_column(1, 1, None, cell_format=date_format)
 			template_worksheet.set_column(2, 2, None, cell_format=time_format)
@@ -348,7 +353,11 @@ class Download:
 			column_number = feature_details_fieldnames.index(header)
 			feature_details_worksheet.write(row_number, column_number, header,  header_format)
 		# add notes about Date/Time/Person
-		if record_type == 'trait':
+		if record_type == 'property':
+			date_time_person_details = [
+				("person", "Optional: Person responsible for determining these values")
+			]
+		elif record_type == 'trait':
 			date_time_person_details = [
 				("date", "Required: Date these values were determined (YYYY-MM-DD, e.g. 2017-06-01)"),
 				("time", "Optional: Time these values were determined (24hr, e.g. 13:00. Defaults to 12:00"),
@@ -512,8 +521,9 @@ class Download:
 			'	-[: SUBMITTED]->(: UserFieldFeature) '
 			'	-[submitted: SUBMITTED]->(record: Record) '
 			'	-[:RECORD_FOR]->(item_feature:ItemFeature) '
-			'	-[:FOR_FEATURE*..2]->(feature:Feature) '
-			'	, (item_feature) '
+			'	-[:FOR_FEATURE*..2]->(feature:Feature), '
+			'	(feature)-[:OF_TYPE]->(record_type:RecordType), '
+			'	(item_feature) '
 			'	-[:FOR_ITEM]->(item:Item) '
 			'	-[:FROM | IS_IN *]->(farm: Farm) '
 			'	-[:IS_IN]->(region: Region) '
@@ -660,6 +670,7 @@ class Download:
 			' OPTIONAL MATCH (item)-[: IS_IN]->(: FieldBlocks) '
 			'	-[: IS_IN]->(block_field: Field) '
 			' WITH '
+			'	record_type.name_lower as record_type, '
 			'	feature.name as Feature, '
 			'	partner.name as Partner, '
 			'	user.name as `Submitted by`, '
@@ -694,6 +705,7 @@ class Download:
 		if data_format == 'db':
 			statement += (
 				'	submitted.time as `Submitted at`, '
+				'	record.replicate as Replicate, '
 				'	record.value as Value, '
 				'	record.time as Time, '
 				'	record.start as Start, '
@@ -705,12 +717,13 @@ class Download:
 				'	`Submitted by`: `Submitted by`, '
 				'	`Submitted at`: `Submitted at`, '
 				'	Value: Value, '
-				'	`Time/Period`: coalesce('
-				'		CASE WHEN Time <> False THEN Time Else Null END,'
-				'		[Start, End]'
-				'	), '
+				'	`Time/Period`: CASE '
+				'		WHEN record_type = "trait" THEN Time '
+				'		WHEN record_type = "condition" THEN [Start, End] '
+				'		ELSE Null END, '
 				'	`Recorded by`: `Recorded by`, '
 				'	UID: UID, '
+				'	Replicate: Replicate, '
 				'	`Source samples`: `Source samples`, '
 				'	`Source trees`: `Source trees`, '
 				'	Block: Block, '
@@ -728,7 +741,8 @@ class Download:
 				'	CASE '
 				'		WHEN result["Field UID"] IS NOT NULL THEN result["Field UID"] '
 				'		ELSE result["UID"] END, '
-				'	result["ID"] '
+				'	result["ID"], '
+				'	result["Replicate"] '
 				)
 		else:  # data_format == 'table'
 			statement += (
@@ -781,6 +795,7 @@ class Download:
 			'Source trees',
 			'Source samples',
 			'UID',
+			'Replicate'
 		]
 		if data_format == 'table':
 			features = [i['feature_name'] for i in first_result[0]['Records']]
@@ -829,19 +844,20 @@ class Download:
 					for key in record[0]:
 						if data_format == 'db':
 							if key == "Time/Period":
-								if isinstance(record[0][key], list):
-									if record[0][key][0]:
-										record[0][key][0] = datetime.utcfromtimestamp(record[0][key][0] / 1000).strftime("%Y-%m-%d %H:%M")
+								if record[0][key]:
+									if isinstance(record[0][key], list):
+										if record[0][key][0]:
+											record[0][key][0] = datetime.utcfromtimestamp(record[0][key][0] / 1000).strftime("%Y-%m-%d %H:%M")
+										else:
+											record[0][key][0] = 'Undefined'
+										if record[0][key][1]:
+											record[0][key][1] = datetime.utcfromtimestamp(record[0][key][1] / 1000).strftime("%Y-%m-%d %H:%M")
+										else:
+											record[0][key][1] = 'Undefined'
+										record[0][key] = ' - '.join(record[0][key])
 									else:
-										record[0][key][0] = 'Undefined'
-									if record[0][key][1]:
-										record[0][key][1] = datetime.utcfromtimestamp(record[0][key][1] / 1000).strftime("%Y-%m-%d %H:%M")
-									else:
-										record[0][key][1] = 'Undefined'
-									record[0][key] = ' - '.join(record[0][key])
-								else:
-									record[0][key] = datetime.utcfromtimestamp(record[0][key] / 1000).strftime(
-										"%Y-%m-%d %H:%M")
+										record[0][key] = datetime.utcfromtimestamp(record[0][key] / 1000).strftime(
+											"%Y-%m-%d %H:%M")
 							if key == 'Submitted at':
 								record[0][key] = datetime.utcfromtimestamp(record[0][key] / 1000).strftime("%Y-%m-%d %H:%M")
 						if isinstance(record[0][key], list):

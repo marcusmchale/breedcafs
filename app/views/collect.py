@@ -89,7 +89,7 @@ def register_samples():
 				):
 					download_object.item_level = "sample"
 					download_object.id_list_to_template(
-						"condition",
+						"property",
 						base_filename="Sample Registration Template",
 					)
 					file_list = download_object.file_list

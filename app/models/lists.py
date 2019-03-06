@@ -229,6 +229,38 @@ class SelectionList:
 		return [record[0] for record in result]
 
 	@staticmethod
+	def get_record_types():
+		statement = (
+			' MATCH '
+			'	(record_type: RecordType) '
+			' RETURN [record_type.name_lower, record_type.name] '
+			' ORDER BY record_type.name_lower '
+		)
+		with get_driver().session() as neo4j_session:
+			result = neo4j_session.read_transaction(
+				neo4j_query,
+				statement,
+				None
+			)
+		return [record[0] for record in result]
+
+	@staticmethod
+	def get_item_levels():
+		statement = (
+			' MATCH '
+			'	(item_level: ItemLevel) '
+			' RETURN [item_level.name_lower, item_level.name] '
+			' ORDER BY item_level.name_lower '
+		)
+		with get_driver().session() as neo4j_session:
+			result = neo4j_session.read_transaction(
+				neo4j_query,
+				statement,
+				None
+			)
+		return [record[0] for record in result]
+
+	@staticmethod
 	def get_trials(
 			country=None,
 			region=None,
@@ -469,7 +501,7 @@ class ItemList:
 		)
 		if parameters['item_level'] == 'field':
 			statement += (
-				' Field: item.name, '
+				' Field: item.name '
 			)
 		else:
 			statement += (

@@ -539,22 +539,14 @@ class UploadForm(FlaskForm):
 class DownloadForm(FlaskForm):
 	record_type = SelectField(
 		[Optional()],
-		description="Record Type",
-		choices=[
-			('', 'Any'),
-			('condition', 'Condition'),
-			('trait', 'Trait')
-		]
+		choices=[('', 'Any')] + SelectionList.get_record_types(),
+		description="Record Type"
 	)
 	item_level = SelectField(
 		'Item Level',
 		[Optional()],
-		choices = [
-			('', 'Any'),
-			('field', 'Field'),
-			('tree', 'Tree'),
-			('sample', 'Sample')
-			]
+		choices=[('', 'Any')] + SelectionList.get_item_levels(),
+		description="Item Level"
 	)
 	submission_date_from = DateField(
 		'Submission date start (YYYY-mm-dd): ',
@@ -637,23 +629,14 @@ class DownloadForm(FlaskForm):
 class RecordForm(FlaskForm):
 	record_type = SelectField(
 		[InputRequired()],
-		description="Record Type",
-		choices=[
-			('', 'Select data type'),
-			('condition', 'Condition'),
-			('trait', 'Trait')
-		]
+		choices=SelectionList.get_record_types(),
+		description="Record Type"
 	)
 	item_level = SelectField(
 		'Item Level',
 		[InputRequired()],
-		description="Item Level",
-		choices=[
-			('', 'Select level'),
-			('field', 'Field'),
-			('tree', 'Tree'),
-			('sample', 'Sample')
-		]
+		choices=SelectionList.get_item_levels(),
+		description="Item Level"
 	)
 	tree_id_list = StringField(
 		'Tree list',
@@ -808,7 +791,6 @@ class RecordForm(FlaskForm):
 					form.record_time.validators = [
 						InputRequired()
 					]
-
 			features_list = [(feature['name_lower'], feature['name']) for feature in features_details]
 			form.select_features.choices = features_list
 		return form

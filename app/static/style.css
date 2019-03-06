@@ -112,9 +112,15 @@ svg {
 					fill:black;
 					}
 
-.Country, .Region, .Farm, .Field, .Block{
+.Country, .Region, .Farm{
 					stroke: black;
 					fill: #996633 ;
+					fill-opacity:0.4
+					}
+
+.Field, .Block{
+					stroke: black;
+					fill: darkgreen ;
 					fill-opacity:0.4
 					}
 

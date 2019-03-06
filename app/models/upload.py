@@ -356,7 +356,7 @@ class ParseResult:
 				end
 			)
 		else:
-			unique_key = None
+			unique_key = parsed_uid
 		if unique_key not in self.unique_keys:
 			self.unique_keys.add(unique_key)
 		else:
@@ -452,19 +452,20 @@ class SubmissionRecord:
 			self,
 			record
 	):
-		if isinstance(record['Time/Period'], list):
-			if record['Time/Period'][0]:
-				record['Time/Period'][0] = datetime.utcfromtimestamp(record['Time/Period'][0] / 1000).strftime("%Y-%m-%d %H:%M")
+		if record['Time/Period']:
+			if isinstance(record['Time/Period'], list):
+				if record['Time/Period'][0]:
+					record['Time/Period'][0] = datetime.datetime.utcfromtimestamp(record['Time/Period'][0] / 1000).strftime("%Y-%m-%d %H:%M")
+				else:
+					record['Time/Period'][0] = 'Undefined'
+				if record['Time/Period'][1]:
+					record['Time/Period'][1] = datetime.datetime.utcfromtimestamp(record['Time/Period'][1] / 1000).strftime("%Y-%m-%d %H:%M")
+				else:
+					record['Time/Period'][1] = 'Undefined'
+				record['Time/Period'] = ' - '.join(record['Time/Period'])
 			else:
-				record['Time/Period'][0] = 'Undefined'
-			if record['Time/Period'][1]:
-				record['Time/Period'][1] = datetime.utcfromtimestamp(record['Time/Period'][1] / 1000).strftime("%Y-%m-%d %H:%M")
-			else:
-				record['Time/Period'][1] = 'Undefined'
-			record['Time/Period'] = ' - '.join(record['Time/Period'])
-		else:
-			record['Time/Period'] = datetime.utcfromtimestamp(record['Time/Period'] / 1000).strftime(
-				"%Y-%m-%d %H:%M")
+				record['Time/Period'] = datetime.datetime.utcfromtimestamp(record['Time/Period'] / 1000).strftime(
+					"%Y-%m-%d %H:%M")
 		record['submitted_at'] = datetime.datetime.utcfromtimestamp(int(record['submitted_at']) / 1000).strftime("%Y-%m-%d %H:%M:%S")
 		self.record = record
 
@@ -530,6 +531,7 @@ class SubmissionResult:
 			)
 			conflicts_fieldnames = [
 				"uid",
+				"replicate",
 				"feature",
 				"Time/Period",
 				"submitted_by",
@@ -575,6 +577,7 @@ class SubmissionResult:
 				resubmissions_filename)
 			resubmissions_fieldnames = [
 				"uid",
+				"replicate",
 				"feature",
 				"Time/Period",
 				"submitted_by",
@@ -616,6 +619,7 @@ class SubmissionResult:
 				submitted_filename)
 			submitted_fieldnames = [
 				"uid",
+				"replicate",
 				"feature",
 				"Time/Period",
 				"submitted_by",
@@ -728,26 +732,29 @@ class Upload:
 				('trait', {'date', 'time'}),
 				('condition',{'start date', 'start time', 'end date', 'end time'})
 			]
-			if not any(
-				other_set[1].issubset(fieldnames_lower) for other_set in other_required
-			):
-				return (
-						'The "Template" worksheet is missing required date/time fields.'
-						' For Trait data these are "date" and "time", for condition data these are '
-						' "start date", "start time", "end date", "end time".'
-				)
-			# check if more than one of the "other required" sets are found
-			elif sum(bool(other_set[1] & fieldnames_lower) for other_set in other_required) > 1:
-				return (
-					'If you are submitting Trait data then please just include "date" and "time". '
-					'If you are submitting Condition data then please just include '
-					'"start date", "start time", "end date", "end time". '
-					'Do not provide date/time elements from the other data type.'
-				)
-			else:
-				for other_set in other_required:
-					if other_set[1].issubset(fieldnames_lower):
-						self.record_type = other_set[0]
+			# now that we have a an empty set (properties) this check isn't useful or effective
+			# if not any(
+			# 	other_set[1].issubset(fieldnames_lower) for other_set in other_required
+			# ):
+			# 	return (
+			# 			'The "Template" worksheet is missing required date/time fields.'
+			# 			' For Trait data these are "date" and "time", for condition data these are '
+			# 			' "start date", "start time", "end date", "end time".'
+			# 	)
+			# # check if more than one of the "other required" sets are found
+			# elif sum(bool(other_set[1] & fieldnames_lower) for other_set in other_required) > 1:
+			# 	return (
+			# 		'If you are submitting Trait data then please just include "date" and "time". '
+			# 		'If you are submitting Condition data then please just include '
+			# 		'"start date", "start time", "end date", "end time". '
+			# 		'Do not provide date/time elements from the other data type.'
+			# 	)
+		# but we can still define our record type with this
+			for other_set in other_required:
+				if other_set[1].issubset(fieldnames_lower):
+					self.record_type = other_set[0]
+				else:
+					self.record_type = 'property'
 		else:
 			return None
 
@@ -999,24 +1006,24 @@ class Upload:
 		submission_result = self.submission_result
 		if submission_type == 'FB':
 			query = Cypher.upload_fb
-			result = [record[0] for record in tx.run(
+			result = tx.run(
 				query,
 				username=username,
 				filename=("file:///" + username + '/' + trimmed_filename),
 				submission_type=submission_type
-			)]
+			)
 		else:  # submission_type == 'table':
 			statement = Cypher.upload_table
-			result = [record[0] for record in tx.run(
+			result = tx.run(
 				statement,
 				username=username,
 				filename=urls.url_fix("file:///" + username + '/' + trimmed_filename),
 				submission_type=submission_type,
 				features=features
-			)]
+			)
 		# create a submission result
 		for record in result:
-			submission_result.parse_record(record)
+			submission_result.parse_record(record[0])
 		return submission_result
 
 	@celery.task(bind=True)
@@ -1092,6 +1099,7 @@ class Upload:
 						if not any([conflicts_file, resubmissions_file, submitted_file]):
 							response = 'No data submitted, please check that you uploaded a completed file'
 							return {
+								'status': 'SUBMITTED',
 								'result': response
 							}
 						# send result of merger in an email
