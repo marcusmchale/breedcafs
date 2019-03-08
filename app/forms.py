@@ -46,7 +46,7 @@ def range_list_check(form, field):
 	try:
 		Parsers.parse_range_list(field.data)
 	except ValueError:
-		raise ValidationError('Invalid range list')
+		raise ValidationError('List should be comma separated with hyphens for ranges, e.g. "1,2-5". ')
 
 
 # custom filters
@@ -430,7 +430,7 @@ class TrialForm(FlaskForm):
 		'Tree list',
 		[
 			Optional(),
-			Regexp("^[0-9,-]*$", message='List should be comma separated with hyphens for ranges'),
+			Regexp("^[0-9,-]*$", message='List should be comma separated with hyphens for ranges, e.g. "1,2-5"'),
 			range_list_check
 		],
 		description="List of tree IDs, e.g. '1, 2-5' "
@@ -495,7 +495,7 @@ class CollectForm(FlaskForm):
 		'Tree list',
 		[
 			Optional(),
-			Regexp("^[0-9,-]*$", message='List should be comma separated with hyphens for ranges'),
+			Regexp("^[0-9,-]*$", message='List should be comma separated with hyphens for ranges, e.g. "1,2-5"'),
 			range_list_check
 		],
 		description="List of tree IDs, e.g. '1, 2-5' "
@@ -504,7 +504,7 @@ class CollectForm(FlaskForm):
 		'Tree list',
 		[
 			Optional(),
-			Regexp("^[0-9,-]*$", message='List should be comma separated with hyphens for ranges'),
+			Regexp("^[0-9,-]*$", message='List should be comma separated with hyphens for ranges, e.g. "1,2-5"'),
 			range_list_check
 		],
 		description="List of sample IDs, e.g. '1, 2-5' "
@@ -576,7 +576,7 @@ class DownloadForm(FlaskForm):
 		'Tree list',
 		[
 			Optional(),
-			Regexp("^[0-9,-]*$", message='List should be comma separated with hyphens for ranges'),
+			Regexp("^[0-9,-]*$", message='List should be comma separated with hyphens for ranges, e.g. "1,2-5"'),
 			range_list_check
 		],
 		description="List of tree IDs, e.g. '1, 2-5' "
@@ -585,7 +585,7 @@ class DownloadForm(FlaskForm):
 		'Sample list',
 		[
 			Optional(),
-			Regexp("^[0-9,-]*$", message='List should be comma separated with hyphens for ranges'),
+			Regexp("^[0-9,-]*$", message='List should be comma separated with hyphens for ranges, e.g. "1,2-5"'),
 			range_list_check
 		],
 		description="List of sample IDs, e.g. '1, 2-5' "
@@ -642,7 +642,7 @@ class RecordForm(FlaskForm):
 		'Tree list',
 		[
 			Optional(),
-			Regexp("^[0-9,-]*$", message='List should be comma separated with hyphens for ranges'),
+			Regexp("^[0-9,-]*$", message='List should be comma separated with hyphens for ranges, e.g. "1,2-5"'),
 			range_list_check
 		],
 		description="List of tree IDs, e.g. '1, 2-5' "
@@ -651,7 +651,7 @@ class RecordForm(FlaskForm):
 		'Sample list',
 		[
 			Optional(),
-			Regexp("^[0-9,-]*$", message='List should be comma separated with hyphens for ranges'),
+			Regexp("^[0-9,-]*$", message='List should be comma separated with hyphens for ranges, e.g. "1,2-5"'),
 			range_list_check
 		],
 		description="List of sample IDs, e.g. '1, 2-5' "
@@ -695,102 +695,22 @@ class RecordForm(FlaskForm):
 	submit_records = SubmitField('Submit records')
 
 	@staticmethod
-	def update(web_form=False):
+	def update():
 		form = RecordForm()
 		item_level = form.item_level.data if form.item_level.data not in ['', 'None'] else None
 		record_type = form.record_type.data if form.record_type.data not in ['', 'None'] else None
 		if record_type:
 			form.feature_group.choices += SelectionList.get_feature_groups(item_level, record_type)
+			if record_type == 'trait':
+				form.record_time.validators = [
+					InputRequired()
+				]
 		selected_feature_group = form.feature_group.data if form.feature_group.data not in ['', 'None'] else None
 		if selected_feature_group:
 			features_details = FeatureList(
 				item_level,
 				record_type
 			).get_features(feature_group=selected_feature_group)
-
-			if web_form:
-				class FeatureFormDetailed(RecordForm):
-					@classmethod
-					def append_field(cls, name, field):
-						setattr(cls, name, field)
-						return cls
-
-				for feature in features_details:
-					if feature['name_lower'] in form.select_features.data:
-						if feature['format'] in ["numeric", "percent"]:
-							min_value = feature['minimum'] if 'minimum' in feature else None
-							max_value = feature['maximum'] if 'maximum' in feature else None
-							if all([min_value, max_value]):
-								validator_message = (
-									'Must be between ' +
-									min_value +
-									' and ' +
-									max_value
-								)
-							elif min_value:
-								validator_message = (
-										'Must be greater than ' +
-										min_value
-								)
-							elif max_value:
-								validator_message = (
-										'Must be less than ' +
-										max_value
-								)
-							else:
-								validator_message = "Number range error"
-							FeatureFormDetailed.append_field(
-								feature['name_lower'],
-								DecimalField(
-									[
-										InputRequired(),
-										NumberRange(
-											min=min_value,
-											max=max_value,
-											message=validator_message
-										)
-									],
-									description=feature['details']
-								)
-							)
-						elif feature['format'] == "categorical":
-							categories_list = [(category.lower(), category) for category in feature['category_list']]
-							FeatureFormDetailed.append_field(
-								feature['name_lower'],
-								SelectField(
-									[InputRequired()],
-									choices=categories_list,
-									description=feature['details']
-								)
-							)
-						elif feature['format'] == "boolean":
-							FeatureFormDetailed.append_field(
-								feature['name_lower'],
-								BooleanField(
-									[InputRequired()],
-									description=feature['details']
-								)
-							)
-						elif feature['format'] == "text":
-							validators = [InputRequired()]
-							if 'time' in feature['name_lower']:
-								validators.append(
-									Regexp("^([0-9]|0[0-9]|1[0-9]|2[0-3]):[0-5][0-9]$", message='Please use time format HH:mm e.g. 13:00 ')
-								)
-							if 'assign to' in feature['name_lower']:
-								validators.append(range_list_check)
-							FeatureFormDetailed.append_field(
-								feature['name_lower'],
-								StringField(
-									validators,
-									description=feature['details']
-								)
-							)
-				form = FeatureFormDetailed()
-				if record_type == 'trait':
-					form.record_time.validators = [
-						InputRequired()
-					]
 			features_list = [(feature['name_lower'], feature['name']) for feature in features_details]
 			form.select_features.choices = features_list
 		return form

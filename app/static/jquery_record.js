@@ -150,7 +150,7 @@ generate_form = function (response) {
             for (let j = 0; j < category_list.length; j++) {
                 const category = category_list[j];
                 category_options += (
-                    '<option value = "' + category.toLowerCase() + '">' +
+                    '<option value = "' + category + '">' +
                     category + '</option>'
                 )
             }

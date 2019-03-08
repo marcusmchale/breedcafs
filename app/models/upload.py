@@ -133,7 +133,7 @@ class RowParseResult:
 				row_string += '<td bgcolor = #FFFF00 title = "'
 				for error in self.errors[field]:
 					field_error_type = error['error_type']
-					field_feature_name = error['feature_name']
+					field_feature_name = error['feature_name'].lower()
 					field_feature_format = error['feature_format']
 					field_category_list = error['category_list']
 					field_conflicts = error['conflicts']
@@ -149,12 +149,16 @@ class RowParseResult:
 								row_string += 'Expected one of the following codes: \n'
 							elif field_feature_name == 'fertiliser n:p:k ratio':
 								row_string += 'Expected N:P:K ratio format, e.g. 1:1:1'
-							elif 'time' in field_feature_name:
-								row_string += 'Expected time format as HH:MM e.g. 13:01'
-							elif 'assign to' in field_feature_name:
+							elif field_feature_name ==  'assign to block':
+								row_string += (
+									'Expected an integer corresponding to the Block ID '
+								)
+							elif field_feature_name == 'assign to trees':
 								row_string += (
 									'Expected a comma separated list of integers corresponding to the ID within the field '
 								)
+							elif 'time' in field_feature_name:
+								row_string += 'Expected time format as HH:MM e.g. 13:01'
 							if field_category_list:
 								row_string += ", ".join([i for i in field_category_list])
 						elif field_error_type == 'conflict':

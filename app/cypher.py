@@ -340,7 +340,7 @@ class Cypher:
 		'			WHEN feature.name_lower = "assign to trees" '
 		'				THEN CASE '
 		'					WHEN size(split(value, "," )) = size(filter(x in split(value, ",") where toInteger(trim(x)) IS NOT NULL)) '
-		'					THEN split(value, "," ) '
+		'					THEN value '
 		'					ELSE Null '
 		'					END '
 		'			WHEN feature.name_lower = "assign to block" '
@@ -481,7 +481,7 @@ class Cypher:
 		# and update tree by uid
 		' OPTIONAL MATCH '
 		'	(tree_update: Tree)-[: IS_IN*2]->(field) '
-		'	WHERE tree_update.id in value '
+		'	WHERE tree_update.id in extract(x in split(toString(value), ",") | toInteger(trim(x))) '
 		# Sample source if sourced from another sample
 		' OPTIONAL MATCH '
 		'	(item)-[: FROM]->(source_sample: Sample)-[:FROM]->(:ItemSamples) '
@@ -560,6 +560,7 @@ class Cypher:
 		'	AND is_in_block_current IS NULL '
 		'	AND block_update IS NOT NULL '
 		'	THEN [1] ELSE [] END | '
+		'		CREATE (t:Test)'
 		'		MERGE '
 		'			(block_trees_update: BlockTrees)-[:IS_IN]-> '
 		'			(block_update) '
@@ -593,6 +594,7 @@ class Cypher:
 		'	AND feature.name_lower = "assign to trees" '
 		'	AND from_current IS NOT NULL '
 		'	AND tree_update IS NOT NULL '
+		# only allow setting source tree property on primary source sample
 		'	AND source_sample IS NULL '
 		'	THEN [1] ELSE [] END | '
 		'		DELETE from_current '
@@ -611,6 +613,8 @@ class Cypher:
 		'	WHEN r.value = value '
 		'	AND feature.name_lower contains "variety" '
 		'	AND variety_update IS NOT NULL '
+		# only allow setting variety properties on primary source sample
+		'	AND source_sample IS NULL '
 		'	THEN [1] ELSE [] END | '
 		'		DELETE of_variety_current '
 		'		MERGE '
@@ -624,7 +628,7 @@ class Cypher:
 		'			s1.user = $username '
 		' ) '
 		# - sample harvest time (stored as sample.time)
-		# Only allow setting harvest time on primary source sample
+		# Only allow setting harvest properties on primary source sample
 		' FOREACH (n IN CASE '
 		'	WHEN r.value = value '
 		'	AND r.value IS NOT NULL '

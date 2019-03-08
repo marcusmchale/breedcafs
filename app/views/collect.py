@@ -88,6 +88,24 @@ def register_samples():
 					per_item_count
 				):
 					download_object.item_level = "sample"
+					if level == 'field':
+						download_object.set_features(
+							'sample',
+							'property',
+							feature_group="Field Sample Registration"
+						)
+					elif level == 'tree':
+						download_object.set_features(
+							'sample',
+							'property',
+							feature_group="Tree Sample Registration"
+						)
+					elif level == 'sample':
+						download_object.set_features(
+							'sample',
+							'property',
+							feature_group="Registration"
+						)
 					download_object.id_list_to_template(
 						"property",
 						base_filename="Sample Registration Template",

@@ -459,6 +459,8 @@ class AddFieldItems:
 				' , block, block_tree_counter, block_trees '
 			)
 		statement += (
+			' OPTIONAL MATCH '
+			'	(field)-[:OF_VARIETY]->(:FieldVariety)-[:OF_VARIETY]->(variety:Variety) '
 			' UNWIND range(1, $tree_count) as tree_count '
 			'	SET '
 			'		field_tree_counter.count = field_tree_counter.count + 1 '
@@ -475,7 +477,7 @@ class AddFieldItems:
 		if block_uid:
 			statement += (
 				' CREATE '
-				'	(tree)-[:IS_IN {current: True}]-> '
+				'	(tree)-[:IS_IN]-> '
 				'	(block_trees) '
 				' SET block_tree_counter.count = block_tree_counter.count + 1 '
 				' SET block_tree_counter._LOCK_ = false '
@@ -494,7 +496,8 @@ class AddFieldItems:
 				'	`Block UID`: block.uid, '
 		)
 		statement += (
-			'	UID: tree.uid	'
+			'	UID: tree.uid,	'
+			'	Variety: variety.name '
 			' } '
 		)
 		with get_driver().session() as neo4j_session:
@@ -594,7 +597,7 @@ class AddFieldItems:
 		if level == 'field':
 			statement += (
 				' OPTIONAL MATCH (field) '
-				'	-[:OF_VARIETY | CONTAINS VARIETY *2]->(variety: Variety)'
+				'	-[:OF_VARIETY*2]->(variety: Variety)'
 				' WITH '
 				' field AS item, '
 				' user_samples, '
@@ -641,11 +644,13 @@ class AddFieldItems:
 						)
 					statement += (
 						' OPTIONAL MATCH (tree) '
-						'	-[:OF_VARIETY*2]->(variety: Variety)'
+						'	-[:OF_VARIETY*2]->(tree_variety: Variety)'
+						' OPTIONAL MATCH (field) '
+						'	-[:OF_VARIETY*2]->(field_variety: Variety)'
 						' WITH '
 						' tree AS item,  '
 						' user_samples, '
-						' COLLECT(DISTINCT(variety.name)) as varieties, '
+						' COLLECT(DISTINCT(COALESCE(tree_variety.name, field_variety.name))) as varieties, '
 						' country, region, farm, field, '
 						' block '
 					)
@@ -686,18 +691,21 @@ class AddFieldItems:
 					' OPTIONAL MATCH '
 					'	(sample)-[:FROM*]->(source_sample: Sample) '
 					' OPTIONAL MATCH '
-					'	(sample)-[:FROM | OF_VARIETY*]->(variety: Variety)'
+					'	(sample)-[:FROM*]->(:Field)-[OF_VARIETY*2]->(field_variety: Variety)'
+					' OPTIONAL MATCH '
+					'	(sample)-[:FROM*]->(:Tree)-[OF_VARIETY*2]->(tree_variety: Variety)'
 					' WITH DISTINCT '
 					' sample AS item, '
 					' sample as item_samples, '
 					' user_samples, '
 					' country, region, farm, field, '
-					' collect(DISTINCT block.uid) as block_uids, '
-					' collect(DISTINCT block.name) as block_names, '
-					' collect(DISTINCT tree.uid) as tree_uids, '
+					' collect(DISTINCT block.uid) as block_ids, '
+					' collect(DISTINCT block.name) as blocks, '
+					' collect(DISTINCT tree.id) as tree_ids, '
 					' collect(DISTINCT tree.custom_id) as tree_custom_ids, '
-					' collect(DISTINCT source_sample.id) as source_samples, '
-					' collect(DISTINCT(variety.name)) as varieties, '
+					' collect(DISTINCT source_sample.id) as source_sample_ids, '
+					' collect(DISTINCT source_sample.custom_id) as source_sample_custom_ids, '
+					' collect(DISTINCT(COALESCE(tree_variety.name, field_variety.name))) as varieties, '
 					# need to ensure these values are consistent in submission. taking first entry anyway
 					' collect(source_sample.tissue)[0] as sample_tissue, '
 					' collect(source_sample.time)[0] as sample_time '
@@ -763,11 +771,12 @@ class AddFieldItems:
 			statement += (
 				' WITH '
 				' country, region, farm, field, '
+				' block_ids, blocks, '
+				' tree_ids, tree_custom_ids, '
+				' source_sample_ids, '
+				' source_sample_custom_ids, '
 				' varieties, '
-				' block_uids, block_names, '
-				' tree_uids, tree_custom_ids, tree_varieties, '
-				' parent_sample_uids, '
-				' parent_sample_tissue, parent_sample_harvest_condition, parent_sample_harvest_time, '
+				' sample_tissue, sample_time, '
 				' item, item_samples, user_item_samples, '
 				' field_sample_counter '
 			)
@@ -817,23 +826,21 @@ class AddFieldItems:
 			if level == 'tree':
 				statement += (
 					' Block: block.name, '
-					' `Block UID` : block.uid, '
-					' `Tree UID`: item.uid, '
-					' `Tree Custom ID`: item.custom_id, '
-					' Variety: varieties '
+					' `Block ID` : block.id, '
+					' `Tree ID`: item.id, '
+					' `Tree Custom ID`: item.custom_id '
 					)
 			elif level == 'sample':
 				statement += (
-					' Block: block_names, '
-					' `Block UID` : block_uids, '
-					' `Tree UID`: tree_uids, '
-					' `Tree Custom ID`: tree_custom_ids, '
+					' Blocks: blocks, '
+					' `Block IDs` : block_ids, '
+					' `Tree IDs`: tree_ids, '
+					' `Tree Custom IDs`: tree_custom_ids, '
 					# first entry will be immediate parent sample value (item), subsequent are in no particular order
-					' `Parent Sample UID`: item.uid + parent_sample_uids, '
-					' `Storage Condition`: item.storage_condition + parent_sample_storage_conditions, '
-					' Tissue: coalesce(item.tissue, parent_sample_tissue), '
-					' `Harvest Condition`: coalesce(item.harvest_condition, parent_sample_harvest_condition), '
-					' `Harvest Time`: apoc.date.format(coalesce(item.harvest_time, parent_sample_harvest_time)) '
+					' `Source Sample IDs`: item.id + source_sample_ids, '
+					' `Source Sample Custom IDs`: item.custom_id + source_sample_ids, '
+					' Tissue: coalesce(item.tissue, sample_tissue), '
+					' `Harvest Time`: coalesce(item.harvest_time, sample_time) '
 				)
 		statement += (
 			' } '

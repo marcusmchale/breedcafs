@@ -4,6 +4,7 @@ from app import (
 	SecurityError
 )
 
+
 from flask import (
 	session,
 	flash,
@@ -14,16 +15,35 @@ from flask import (
 	request,
 )
 
+from wtforms import (
+	SelectField,
+	DateField,
+	IntegerField,
+	StringField,
+	BooleanField,
+	DecimalField,
+)
+
+from wtforms.validators import (
+	InputRequired,
+	NumberRange,
+	Length,
+	Regexp
+)
+
 from app.forms import (
 	LocationForm,
 	RecordForm,
+	range_list_check
 )
 
 from app.models import (
 	Record,
 	Parsers,
 	Download,
-	User
+	User,
+	FeatureList,
+	SelectionList
 )
 
 from app.emails import send_email
@@ -166,75 +186,221 @@ def submit_records():
 		flash('Please log in')
 		return redirect(url_for('login'))
 	else:
-		record_form = RecordForm.update(web_form=True)
+		record_form = RecordForm.update()
 		location_form = LocationForm.update(optional=True)
 		try:
 			if all([
 				record_form.validate_on_submit(),
 				location_form.validate_on_submit()
 			]):
-				username = session['username']
-				record_type = request.form['record_type'] if request.form['record_type'] != '' else None
-				item_level = request.form['item_level'] if request.form['item_level'] != '' else None
-				country = request.form['country'] if request.form['country'] != '' else None
-				region = request.form['region'] if request.form['region'] != '' else None
-				farm = request.form['farm'] if request.form['farm'] != '' else None
-				field_uid = int(request.form['field']) if request.form['field'].isdigit() else None
-				block_uid = request.form['block'] if request.form['block'] != '' else None
-				tree_id_list = (
-					Parsers.parse_range_list(request.form['tree_id_list']) if request.form['tree_id_list'] != '' else None
-				)
-				sample_id_list = (
-					Parsers.parse_range_list(request.form['sample_id_list']) if request.form['sample_id_list'] != '' else None
-				)
-				record_time = int(
-					(
-						datetime.strptime(request.form['record_time'], '%Y-%m-%d') +
-						timedelta(hours=12) -
-						datetime(1970, 1, 1)
-					).total_seconds() * 1000
-				) if request.form['record_time'] != '' else None
-				start_time = int(
-					(datetime.strptime(request.form['record_start'], '%Y-%m-%d') - datetime(1970, 1, 1)).total_seconds()
-					* 1000
-				) if request.form['record_start'] != '' else None
-				# end time defaults last millisecond of the day
-				end_time = int(
-					(
-						datetime.strptime(request.form['record_end'], '%Y-%m-%d') +
-						timedelta(days=1) -
-						datetime(1970, 1, 1)
-					).total_seconds() * 1000
-				) if request.form['record_end'] != '' else None
-				if all([record_type == 'condition', end_time, start_time >= end_time]):
-					return jsonify({
-						'submitted': 'Please make sure the start date is before the end date'
-					})
-				if 'select_features' in request.form:
-					selected_features = request.form.getlist('select_features')
+				class FeatureFormDetailed(RecordForm):
+					pass
+
+				item_level = record_form.item_level.data if record_form.item_level.data not in ['', 'None'] else None
+				record_type = record_form.record_type.data if record_form.record_type.data not in ['', 'None'] else None
+				features_details = FeatureList(
+					item_level,
+					record_type
+				).get_features(features=record_form['select_features'].data)
+				for feature in features_details:
+					if feature['format'] in ["numeric", "percent"]:
+						min_value = feature['minimum'] if 'minimum' in feature else None
+						max_value = feature['maximum'] if 'maximum' in feature else None
+						if all([min_value, max_value]):
+							validator_message = (
+									'Must be between ' +
+									min_value +
+									' and ' +
+									max_value
+							)
+						elif min_value:
+							validator_message = (
+									'Must be greater than ' +
+									min_value
+							)
+						elif max_value:
+							validator_message = (
+									'Must be less than ' +
+									max_value
+							)
+						else:
+							validator_message = "Number range error"
+						setattr(
+							FeatureFormDetailed,
+							feature['name_lower'],
+							DecimalField(
+								validators=[
+									InputRequired(),
+									NumberRange(
+										min=min_value,
+										max=max_value,
+										message=validator_message
+									)
+								],
+								description=feature['details']
+							)
+						)
+					elif feature['format'] == "date":
+						setattr(
+							FeatureFormDetailed,
+							feature['name_lower'],
+							DateField(
+								validators=[InputRequired()],
+								description=feature['details']
+							)
+						)
+					elif feature['format'] == "categorical":
+						categories_list = [
+							(category, category) for category in feature['category_list']
+						]
+						setattr(
+							FeatureFormDetailed,
+							feature['name_lower'],
+							SelectField(
+								validators=[InputRequired()],
+								choices=categories_list,
+								description=feature['details']
+							)
+						)
+					elif feature['format'] == "boolean":
+						setattr(
+							FeatureFormDetailed,
+							feature['name_lower'],
+							BooleanField(
+								validators=[InputRequired()],
+								description=feature['details']
+							)
+						)
+					elif feature['format'] == "text":
+						if 'time' in feature['name_lower']:
+							setattr(
+								FeatureFormDetailed,
+								feature['name_lower'],
+								StringField(
+									validators=[
+										InputRequired(),
+										Regexp(
+											"^([0-9]|0[0-9]|1[0-9]|2[0-3]):[0-5][0-9]$",
+											message='Please use time format HH:mm e.g. 13:00 '
+										)
+									],
+									description=feature['details']
+								)
+							)
+						elif feature['name_lower'] == 'assign to block':
+							setattr(
+								FeatureFormDetailed,
+								feature['name_lower'],
+								IntegerField(
+									validators=[
+										InputRequired()
+									],
+									description=feature['details']
+								)
+							)
+						elif feature['name_lower'] == 'assign to trees':
+							setattr(
+								FeatureFormDetailed,
+								feature['name_lower'],
+								StringField(
+									validators=[
+										InputRequired,
+										Regexp(
+											"^[0-9,-]*$",
+											message='List should be comma separated with hyphens for ranges, e.g. "1,2-5"'
+										),
+										range_list_check
+									],
+									description=feature['details']
+								)
+							)
+						else:
+							setattr(
+								FeatureFormDetailed,
+								feature['name_lower'],
+								StringField(
+									validators=[
+										InputRequired(),
+										Length(min=1, max=100, message='Maximum 100 characters')
+									],
+									description=feature['details']
+								)
+							)
+				record_form = FeatureFormDetailed()
+				record_form.feature_group.choices += SelectionList.get_feature_groups(item_level, record_type)
+				features_list = [(feature['name_lower'], feature['name']) for feature in features_details]
+				record_form.select_features.choices = features_list
+				if all([
+					record_form.validate_on_submit(),
+					location_form.validate_on_submit()
+				]):
+					username = session['username']
+					record_type = request.form['record_type'] if request.form['record_type'] != '' else None
+					item_level = request.form['item_level'] if request.form['item_level'] != '' else None
+					country = request.form['country'] if request.form['country'] != '' else None
+					region = request.form['region'] if request.form['region'] != '' else None
+					farm = request.form['farm'] if request.form['farm'] != '' else None
+					field_uid = int(request.form['field']) if request.form['field'].isdigit() else None
+					block_uid = request.form['block'] if request.form['block'] != '' else None
+					tree_id_list = (
+						Parsers.parse_range_list(request.form['tree_id_list']) if request.form['tree_id_list'] != '' else None
+					)
+					sample_id_list = (
+						Parsers.parse_range_list(request.form['sample_id_list']) if request.form['sample_id_list'] != '' else None
+					)
+					record_time = int(
+						(
+							datetime.strptime(request.form['record_time'], '%Y-%m-%d') +
+							timedelta(hours=12) -
+							datetime(1970, 1, 1)
+						).total_seconds() * 1000
+					) if request.form['record_time'] != '' else None
+					start_time = int(
+						(datetime.strptime(request.form['record_start'], '%Y-%m-%d') - datetime(1970, 1, 1)).total_seconds()
+						* 1000
+					) if request.form['record_start'] != '' else None
+					# end time defaults last millisecond of the day
+					end_time = int(
+						(
+							datetime.strptime(request.form['record_end'], '%Y-%m-%d') +
+							timedelta(days=1) -
+							datetime(1970, 1, 1)
+						).total_seconds() * 1000
+					) if request.form['record_end'] != '' else None
+					if all([record_type == 'condition', end_time, start_time >= end_time]):
+						return jsonify({
+							'submitted': 'Please make sure the start date is before the end date'
+						})
+					if 'select_features' in request.form:
+						selected_features = request.form.getlist('select_features')
+					else:
+						selected_features = None
+					features_dict = {}
+					for feature in selected_features:
+						features_dict[feature] = request.form[feature]
+					record_data = {
+						'record_type': record_type,
+						'item_level': item_level,
+						'country': country,
+						'region': region,
+						'farm': farm,
+						'field_uid': field_uid,
+						'block_uid': block_uid,
+						'tree_id_list': tree_id_list,
+						'sample_id_list': sample_id_list,
+						'record_time': record_time,
+						'start_time': start_time,
+						'end_time': end_time,
+						'selected_features': selected_features,
+						'features_dict': features_dict
+					}
+					result = Record(username).submit_records(record_data)
+					return result
 				else:
-					selected_features = None
-				features_dict = {}
-				for feature in selected_features:
-					features_dict[feature] = request.form[feature]
-				record_data = {
-					'record_type': record_type,
-					'item_level': item_level,
-					'country': country,
-					'region': region,
-					'farm': farm,
-					'field_uid': field_uid,
-					'block_uid': block_uid,
-					'tree_id_list': tree_id_list,
-					'sample_id_list': sample_id_list,
-					'record_time': record_time,
-					'start_time': start_time,
-					'end_time': end_time,
-					'selected_features': selected_features,
-					'features_dict': features_dict
-				}
-				result = Record(username).submit_records(record_data)
-				return result
+					errors = jsonify({
+						'errors': [record_form.errors, location_form.errors]
+					})
+					return errors
 			else:
 				errors = jsonify({
 					'errors': [record_form.errors, location_form.errors]

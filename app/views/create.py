@@ -216,6 +216,11 @@ def add_trees():
 						count
 				):
 					download_object.item_level = "tree"
+					download_object.set_features(
+						'tree',
+						'property',
+						feature_group="Registration"
+					)
 					download_object.id_list_to_template(
 						'property',
 						base_filename="Tree Registration Template",

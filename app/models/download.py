@@ -101,15 +101,19 @@ class Download:
 			'Field',
 			'Field UID',
 			'Block',
-			'Block UID',
-			'Tree UID',
+			'Blocks',
+			'Block ID',
+			'Block IDs',
+			'Tree ID',
+			'Tree IDs',
 			'Tree Custom ID',
-			'Sample Custom ID',
-			'Variety',
+			'Tree Custom IDs',
 			'Source Sample IDs',
+			'Source Sample Custom IDs',
+			'Sample Custom ID',
 			'Harvest Time',
-			'Harvest Condition',
 			'Tissue',
+			'Variety',
 			'UID'
 		]
 		self.item_fieldnames = [i for i in fieldnames_order if i in self.id_list.peek()[0].keys()]
@@ -192,6 +196,14 @@ class Download:
 				file_path = os.path.join(self.user_download_folder, filename)
 		return file_path
 
+	def set_features(self, item_level, record_type, feature_group=None, features=None):
+		self.features = FeatureList(
+			item_level,
+			record_type).get_features(
+			feature_group=feature_group,
+			features=features
+		)
+
 	def record_form_to_template(
 		self,
 		record_data
@@ -201,11 +213,11 @@ class Download:
 			return False
 		if record_data['record_type'] == 'trait' and record_data['replicates'] and record_data['replicates'] > 1:
 			self.replicates = record_data['replicates']
-		self.features = FeatureList(
+		self.set_features(
 			record_data['item_level'],
-			record_data['record_type']).get_features(
-				feature_group=record_data['feature_group'] if 'feature_group' in record_data else None,
-				features=record_data['selected_features'] if 'selected_features' in record_data else None
+			record_data['record_type'],
+			feature_group=record_data['feature_group'] if 'feature_group' in record_data else None,
+			features=record_data['selected_features'] if 'selected_features' in record_data else None
 		)
 		if not self.features:
 			return False
@@ -220,10 +232,8 @@ class Download:
 			record_type,
 			base_filename=None
 	):
-		if not self.id_list and self.item_level:
+		if not self.id_list and self.item_level and self.features:
 			return False
-		if not self.features:
-			self.features = FeatureList(self.item_level, 'property').get_features(feature_group="Registration")
 		self.set_item_fieldnames()
 		file_path = self.get_file_path(
 			'xlsx',
@@ -312,7 +322,7 @@ class Download:
 				#		item_details_worksheet.write(row_number, column_number, ", ".join(treatment['categories']))
 				#else:
 				if isinstance(value, list):
-					value = ", ".join(value)
+					value = ", ".join([str(i) for i in value])
 				column_number = self.item_fieldnames.index(key)
 				if self.replicates and self.replicates > 1:
 					item_number = ((row_number - 1) / self.replicates) + 1
@@ -505,8 +515,7 @@ class Download:
 	def collect_records(
 			self,
 			parameters,
-			data_format,
-			file_format='csv'
+			data_format
 	):
 		# TODO this statement could be optimised per level (or even just 'include sample or not')
 		statement = (
@@ -528,6 +537,19 @@ class Download:
 			'	-[:FROM | IS_IN *]->(farm: Farm) '
 			'	-[:IS_IN]->(region: Region) '
 			'	-[:IS_IN]->(country: Country) '
+			' OPTIONAL MATCH (item)-[: FROM*]->(sample_sample: Sample) '
+			' OPTIONAL MATCH (item)-[: FROM*]->(sample_tree: Tree) '
+			' OPTIONAL MATCH (sample_tree)-[:IS_IN]->(:BlockTrees) '
+			'	-[:IS_IN]->(sample_tree_block: Block) '
+			' OPTIONAL MATCH (sample_tree)-[:IS_IN]->(:FieldTrees) '
+			'	-[:IS_IN]->(sample_tree_field: Field) '
+			' OPTIONAL MATCH (item)-[: FROM*]->(sample_field: Field) '
+			' OPTIONAL MATCH (item)-[: IS_IN]->(: BlockTrees) '
+			'	-[: IS_IN]->(tree_block: Block) '
+			' OPTIONAL MATCH (item)-[: IS_IN]->(: FieldTrees) '
+			'	-[: IS_IN]->(tree_field: Field) '
+			' OPTIONAL MATCH (item)-[: IS_IN]->(: FieldBlocks) '
+			'	-[: IS_IN]->(block_field: Field) '
 		)
 		filters = []
 		if parameters['submission_start']:
@@ -619,7 +641,7 @@ class Download:
 		if parameters['block_uid']:
 			filters.append(
 				' ( '
-				'	sample_block.uid = $block_uid '
+				'	sample_tree_block.uid = $block_uid '
 				'	OR '
 				'	tree_block.uid = $block_uid '
 				'	OR '
@@ -656,19 +678,6 @@ class Download:
 			)
 			statement += ' AND '.join(filters)
 		statement += (
-			' OPTIONAL MATCH (item)-[: FROM*]->(sample_sample: Sample) '
-			' OPTIONAL MATCH (item)-[: FROM*]->(sample_tree: Tree) '
-			' OPTIONAL MATCH (sample_tree)-[:IS_IN]->(:BlockTrees) '
-			'	-[:IS_IN]->(sample_tree_block: Block) '
-			' OPTIONAL MATCH (sample_tree)-[:IS_IN]->(:FieldTrees) '
-			'	-[:IS_IN]->(sample_tree_field: Field) '
-			' OPTIONAL MATCH (item)-[: FROM*]->(sample_field: Field) '
-			' OPTIONAL MATCH (item)-[: IS_IN]->(: BlockTrees) '
-			'	-[: IS_IN]->(tree_block: Block) '
-			' OPTIONAL MATCH (item)-[: IS_IN]->(: FieldTrees) '
-			'	-[: IS_IN]->(tree_field: Field) '
-			' OPTIONAL MATCH (item)-[: IS_IN]->(: FieldBlocks) '
-			'	-[: IS_IN]->(block_field: Field) '
 			' WITH '
 			'	record_type.name_lower as record_type, '
 			'	feature.name as Feature, '
@@ -676,15 +685,16 @@ class Download:
 			'	user.name as `Submitted by`, '
 			'	item.uid as UID, '
 			'	item.id as ID, '
-			'	COLLECT(sample_sample.id) as `Source samples`, '
-			'	COLLECT(sample_tree.id) as `Source trees`, '
+			'	item.custom_id as `Custom ID`,'
+			'	COLLECT(DISTINCT sample_sample.id) as `Source samples`, '
+			'	COLLECT(DISTINCT sample_tree.id) as `Source trees`, '
 			'	COALESCE( '
 			'		tree_block.name, '
-			'		COLLECT(sample_tree_block.name) '
+			'		COLLECT(DISTINCT sample_tree_block.name) '
 			'	) as Block, '
 			'	COALESCE( '
 			'		tree_block.id, '
-			'		COLLECT(sample_tree_block.id) '
+			'		COLLECT(DISTINCT sample_tree_block.id) '
 			'	) as `Block ID`, '
 			'	COALESCE ( '
 			'		sample_tree_field.uid, '
@@ -723,6 +733,7 @@ class Download:
 				'		ELSE Null END, '
 				'	`Recorded by`: `Recorded by`, '
 				'	UID: UID, '
+				'	`Custom ID`: `Custom ID`,'
 				'	Replicate: Replicate, '
 				'	`Source samples`: `Source samples`, '
 				'	`Source trees`: `Source trees`, '
@@ -753,6 +764,7 @@ class Download:
 				'		values: Values '
 				'	}), '
 				'	UID: UID, '
+				'	`Custom ID`: `Custom ID`,'
 				'	`Source samples`: `Source samples`, '
 				'	`Source trees`: `Source trees`, '
 				'	Block: Block, '
@@ -784,7 +796,10 @@ class Download:
 				'status': 'SUCCESS',
 				'result': 'No data found to match your filters'
 			}
-		fieldnames = [
+		# prepare the file
+		time = datetime.utcnow().strftime('%Y%m%d-%H%M%S')
+		base_filename = 'records'
+		item_fieldnames = [
 			'Country',
 			'Region',
 			'Farm',
@@ -794,13 +809,56 @@ class Download:
 			'Block ID',
 			'Source trees',
 			'Source samples',
+			'Custom ID',
 			'UID',
 			'Replicate'
 		]
+		fieldnames = [i for i in item_fieldnames if i in first_result[0].keys()]
+		# TODO write the query details, i.e. filters and time of query into another worksheet for user reference
 		if data_format == 'table':
+			file_path = self.get_file_path(
+				'xlsx',
+				base_filename
+			)
 			features = [i['feature_name'] for i in first_result[0]['Records']]
 			fieldnames += features
-		else:  # data_format == 'db'
+			wb = Workbook(file_path)
+			worksheet = wb.add_worksheet('Records')
+			row_number = 0
+			for i, j in enumerate(fieldnames):
+				worksheet.write(row_number, i, j)
+			for record in result:
+				for feature in record[0]['Records']:
+					for value in feature['values']:
+						# flatten each value to string if it is a list
+						if isinstance(value, list):
+							record[0]['Records'][feature]['values'] = (
+									'['
+									+ ', '.join([i.encode() for i in value])
+									+ ']'
+							)
+					# then flatten the list of values to a string stored in the record dict
+					record[0][feature['feature_name']] = ', '.join(
+						[str(value).encode() for value in feature['values']]
+					)
+				for key in record[0]:
+					if isinstance(record[0][key], list):
+						if not record[0][key]:
+							record[0][key] = None
+						else:
+							record[0][key] = ', '.join([str(i).encode() for i in record[0][key]])
+				row_number += 1
+				col_number = 0
+				for field in fieldnames:
+					if field in record[0]:
+						worksheet.write(row_number, col_number, record[0][field])
+					col_number += 1
+			wb.close()
+		else:
+			file_path = self.get_file_path(
+				'csv',
+				base_filename
+			)
 			fieldnames += [
 				'Feature',
 				'Value',
@@ -810,14 +868,6 @@ class Download:
 				'Submitted by',
 				'Partner'
 			]
-		# prepare the file
-		time = datetime.utcnow().strftime('%Y%m%d-%H%M%S')
-		base_filename = time + '_records.csv'
-		file_path = self.get_file_path(
-			file_format,
-			base_filename
-		)
-		if file_format == 'csv':
 			with open(file_path, 'w') as csv_file:
 				writer = csv.DictWriter(
 					csv_file,
@@ -826,41 +876,26 @@ class Download:
 					extrasaction='ignore')
 				writer.writeheader()
 				for record in result:
-					if data_format == 'table':
-						for feature in record[0]['Records']:
-							for value in feature['values']:
-								# flatten each value to string if it is a list
-								if isinstance(value, list):
-									record[0]['Records'][feature]['values'] = (
-											'['
-											+ ', '.join([i.encode() for i in value])
-											+ ']'
-									)
-							# then flatten the list of values to a string stored in the record dict
-							record[0][feature['feature_name']] = ', '.join(
-								[str(value).encode() for value in feature['values']]
-							)
 					# any other values that need flattening, e.g. 'Source trees'
 					for key in record[0]:
-						if data_format == 'db':
-							if key == "Time/Period":
-								if record[0][key]:
-									if isinstance(record[0][key], list):
-										if record[0][key][0]:
-											record[0][key][0] = datetime.utcfromtimestamp(record[0][key][0] / 1000).strftime("%Y-%m-%d %H:%M")
-										else:
-											record[0][key][0] = 'Undefined'
-										if record[0][key][1]:
-											record[0][key][1] = datetime.utcfromtimestamp(record[0][key][1] / 1000).strftime("%Y-%m-%d %H:%M")
-										else:
-											record[0][key][1] = 'Undefined'
-										record[0][key] = ' - '.join(record[0][key])
+						if key == "Time/Period":
+							if record[0][key]:
+								if isinstance(record[0][key], list):
+									if record[0][key][0]:
+										record[0][key][0] = datetime.utcfromtimestamp(record[0][key][0] / 1000).strftime("%Y-%m-%d %H:%M")
 									else:
-										record[0][key] = datetime.utcfromtimestamp(record[0][key] / 1000).strftime(
-											"%Y-%m-%d %H:%M")
-							if key == 'Submitted at':
-								record[0][key] = datetime.utcfromtimestamp(record[0][key] / 1000).strftime("%Y-%m-%d %H:%M")
-						if isinstance(record[0][key], list):
+										record[0][key][0] = 'Undefined'
+									if record[0][key][1]:
+										record[0][key][1] = datetime.utcfromtimestamp(record[0][key][1] / 1000).strftime("%Y-%m-%d %H:%M")
+									else:
+										record[0][key][1] = 'Undefined'
+									record[0][key] = ' - '.join(record[0][key])
+								else:
+									record[0][key] = datetime.utcfromtimestamp(record[0][key] / 1000).strftime(
+										"%Y-%m-%d %H:%M")
+						elif key == 'Submitted at':
+							record[0][key] = datetime.utcfromtimestamp(record[0][key] / 1000).strftime("%Y-%m-%d %H:%M")
+						elif isinstance(record[0][key], list):
 							if not record[0][key]:
 								record[0][key] = None
 							else:

@@ -470,25 +470,21 @@ class ItemList:
 						' OPTIONAL MATCH '
 						'	(item)-[:FROM*]->(tree: Tree) '
 					)
-				if 'sample_id_list' not in parameters:
-					statement += (
-						' OPTIONAL MATCH '
-						'	(item)-[:FROM*]->(source_sample: Sample) '
-					)
 				statement += (
+					' OPTIONAL MATCH '
+					'	(item)-[:FROM*]->(source_sample: Sample) '
 					' WITH DISTINCT '
 					' item, '
 					' country, region, farm, field, '
 					' collect(DISTINCT variety.name) as varieties, '
-					' collect(DISTINCT block.uid) as block_uids, '
-					' collect(DISTINCT block.name) as block_names, '
-					' collect(DISTINCT tree.uid) as tree_uids, '
+					' collect(DISTINCT block.id) as block_ids, '
+					' collect(DISTINCT block.name) as blocks, '
+					' collect(DISTINCT tree.id) as tree_ids, '
 					' collect(DISTINCT tree.custom_id) as tree_custom_ids, '
 					' collect(DISTINCT source_sample.id) as source_sample_ids, '
 					' collect(DISTINCT source_sample.storage_condition) as source_sample_storage_conditions, '
 					# need to ensure these values are consistent in submission. taking first entry anyway
 					' collect(source_sample.tissue)[0] as source_sample_tissue, '
-					' collect(source_sample.harvest_condition)[0] as source_sample_harvest_condition, '
 					' collect(source_sample.harvest_time)[0] as source_sample_harvest_time '
 				)
 		statement += (
@@ -515,21 +511,20 @@ class ItemList:
 			elif parameters['item_level'] == 'tree':
 				statement += (
 					' Block: block.name, '
-					' `Block UID` : block.uid, '
-					' `Tree UID`: item.uid, '
+					' `Block ID` : block.id, '
+					' `Tree ID`: item.id, '
 					' `Tree Custom ID`: item.custom_id '
 				)
 			elif parameters['item_level'] == 'sample':
 				statement += (
-					' Block: block_names, '
-					' `Block UID` : block_uids, '
-					' `Tree UID`: tree_uids, '
+					' Block: blocks, '
+					' `Block ID` : block_ids, '
+					' `Tree ID`: tree_ids, '
 					' `Tree Custom ID`: tree_custom_ids, '
 					' `Sample Custom ID`: item.custom_id, '
 					# first entry will be immediate parent sample value (item), subsequent are in no particular order
 					' `Source Sample IDs`: source_sample_ids, '
 					' Tissue: coalesce(item.tissue, source_sample_tissue), '
-					' `Harvest Condition`: coalesce(item.harvest_condition, source_sample_harvest_condition), '
 					' `Harvest Time`: apoc.date.format(coalesce(item.harvest_time, source_sample_harvest_time)) '
 				)
 		statement += (
@@ -891,10 +886,10 @@ class ItemList:
 			' ORDER BY field.uid, tree.id '
 			' WITH { '
 			'	UID: sample.uid, '
-			'	`Tree UID`: collect(distinct tree.uid), '
+			'	`Tree ID`: collect(distinct tree.id), '
 			'	Variety: collect(distinct(tree.variety)), '
 			'	`Tree Custom ID`: collect(distinct(tree.custom_id)), '
-			'	`Block UID`: collect(distinct(block.uid)), '
+			'	`Block ID`: collect(distinct(block.id)), '
 			'	Block: collect(distinct(block.name)), '
 			'	`Field UID` : field.uid, '
 			'	Field: field.name, '
