@@ -493,7 +493,7 @@ class AddFieldItems:
 		if block_uid:
 			statement += (
 				'	Block: block.name, '
-				'	`Block UID`: block.uid, '
+				'	`Block ID`: block.uid, '
 		)
 		statement += (
 			'	UID: tree.uid,	'

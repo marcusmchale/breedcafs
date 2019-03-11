@@ -292,16 +292,17 @@ class Download:
 		for i, j in enumerate(template_fieldnames):
 			template_worksheet.write(row_number, i, j, header_format)
 		# set the formatting for the feature columns
-		numeric_format = wb.add_format({'num_format': '0.#'})
+		numeric_format = wb.add_format({'num_format': '#'})
 		date_format = wb.add_format({'num_format': 'yyyy-mm-dd'})
 		text_format = wb.add_format({'num_format': '@'})
-		percent_format = wb.add_format({'num_format': 9})
+		# This converts the percent to a number i.e. 10% to 0.1, prefer not to use it, just store the number
+		# percent_format = wb.add_format({'num_format': 9})
 		location_format = wb.add_format({'num_format': '0.0000; 0.0000'})
 		feature_formats = {
 			"numeric": numeric_format,
 			"date": date_format,
 			"text": text_format,
-			"percent": percent_format,
+			"percent": numeric_format,
 			"multicat": text_format,
 			"categorical": text_format,
 			"location": location_format,

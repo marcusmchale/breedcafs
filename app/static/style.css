@@ -23,6 +23,15 @@ svg {
 	overflow: auto;
 }
 
+
+#response_table {
+	max-height:500px;
+}
+#response_table_div {
+	max-height:400px;
+	overflow: auto;
+}
+
 .page				{
 					margin: 10%;
 					margin-top: 5%;

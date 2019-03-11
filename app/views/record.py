@@ -209,19 +209,19 @@ def submit_records():
 						if all([min_value, max_value]):
 							validator_message = (
 									'Must be between ' +
-									min_value +
+									str(min_value) +
 									' and ' +
-									max_value
+									str(max_value)
 							)
 						elif min_value:
 							validator_message = (
 									'Must be greater than ' +
-									min_value
+									str(min_value)
 							)
 						elif max_value:
 							validator_message = (
 									'Must be less than ' +
-									max_value
+									str(max_value)
 							)
 						else:
 							validator_message = "Number range error"

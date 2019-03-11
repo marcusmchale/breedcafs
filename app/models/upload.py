@@ -133,7 +133,7 @@ class RowParseResult:
 				row_string += '<td bgcolor = #FFFF00 title = "'
 				for error in self.errors[field]:
 					field_error_type = error['error_type']
-					field_feature_name = error['feature_name'].lower()
+					field_feature_name = error['feature_name'].lower() if error['feature_name'] else None
 					field_feature_format = error['feature_format']
 					field_category_list = error['category_list']
 					field_conflicts = error['conflicts']
@@ -318,7 +318,7 @@ class ParseResult:
 				if parsed_start_time and parsed_start_time is not True:
 					start = datetime.datetime.strptime(parsed_start_date + ' ' + parsed_start_time, '%Y-%m-%d %H:%M')
 				else:
-					start = datetime.datetime.strptime(parsed_start_date + ' ' + '00:00', '%Y-%m-%d %H-%M')
+					start = datetime.datetime.strptime(parsed_start_date + ' ' + '00:00', '%Y-%m-%d %H:%M')
 			else:
 				start = None
 			if parsed_end_date and parsed_end_date is not True:
@@ -439,7 +439,7 @@ class ParseResult:
 					return html_table
 				row_string = self.errors[item].html_row(self.fieldnames)
 				html_table += row_string
-			return '<table>' + html_table + '</table>'
+			return '<div id="response_table_div"><table>' + html_table + '</table></div>'
 		else:
 			return None
 

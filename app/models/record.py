@@ -1040,5 +1040,5 @@ class Record:
 					row_string += '</td><td>'
 			row_string += str(record['value']) + '</td></tr>'
 			header_string += row_string
-		return '<table>' + header_string + '<table>'
+		return '<div id="response_table_div"><table>' + header_string + '<table></div>'
 
