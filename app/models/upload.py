@@ -7,14 +7,13 @@ from flask import render_template, url_for
 from werkzeug import urls
 from user import User
 from config import ALLOWED_EXTENSIONS
-from neo4j_driver import get_driver
+from neo4j_driver import get_driver, bolt_result
 import unicodecsv as csv
 import datetime
 import itertools
 from werkzeug.utils import secure_filename
 from openpyxl import load_workbook
 from zipfile import BadZipfile
-
 
 
 class DictReaderInsensitive(csv.DictReader):
@@ -254,23 +253,27 @@ class ParseResult:
 		#		self.duplicate_keys[row['row_index']] = row
 		# Check time, and for trait duplicates in tables simply check for duplicate fields in header
 		#else:  # submission_type == "table":
-			# check for date time info.
-		if 'date' in row:
-			parsed_date = Parsers.date_format(row['date'])
-			# date required for trait data
-			if not parsed_date or parsed_date is True:
-				self.merge_error(
-					row,
-					"date",
-					"format"
-				)
-			parsed_time = Parsers.time_format(row['time'])
-			if not parsed_time:
-				self.merge_error(
-					row,
-					"time",
-					"format"
-				)
+		# check for date time info.
+		if self.record_type == 'property':
+			unique_key = parsed_uid
+		elif self.record_type == 'trait':
+			if 'date' in row:
+				parsed_date = Parsers.date_format(row['date'])
+				# date required for trait data
+				if not parsed_date or parsed_date is True:
+					self.merge_error(
+						row,
+						"date",
+						"format"
+					)
+			if 'time' in row:
+				parsed_time = Parsers.time_format(row['time'])
+				if not parsed_time:
+					self.merge_error(
+						row,
+						"time",
+						"format"
+					)
 			if parsed_date and parsed_time and parsed_time is not True:
 				time = datetime.datetime.strptime(parsed_date + ' ' + parsed_time, '%Y-%m-%d %H:%M')
 			elif parsed_date:
@@ -278,17 +281,18 @@ class ParseResult:
 			else:
 				time = None
 			unique_key = (parsed_uid, time)
-		elif 'start date' in row:
-			parsed_start_date = Parsers.date_format(row['start date'])
-			parsed_start_time = None
-			parsed_end_date = None
-			parsed_end_time = None
-			if not parsed_start_date:
-				self.merge_error(
-					row,
-					"start date",
-					"format"
-				)
+		elif self.record_type == 'condition':
+			if 'start date' in row:
+				parsed_start_date = Parsers.date_format(row['start date'])
+				parsed_start_time = None
+				parsed_end_date = None
+				parsed_end_time = None
+				if not parsed_start_date:
+					self.merge_error(
+						row,
+						"start date",
+						"format"
+					)
 			if 'start time' in row:
 				parsed_start_time = Parsers.time_format(row['start time'])
 				if not parsed_start_time:
@@ -297,7 +301,6 @@ class ParseResult:
 						"start time",
 						"format"
 					)
-
 			if 'end date' in row:
 				parsed_end_date = Parsers.date_format(row['end date'])
 				if not parsed_end_date:
@@ -359,8 +362,6 @@ class ParseResult:
 				start,
 				end
 			)
-		else:
-			unique_key = parsed_uid
 		if unique_key not in self.unique_keys:
 			self.unique_keys.add(unique_key)
 		else:
@@ -654,6 +655,7 @@ class Upload:
 		self.submission_type = submission_type
 		self.file_path = os.path.join(app.instance_path, app.config['UPLOAD_FOLDER'], username, self.filename)
 		self.record_type = None
+		self.required_fieldnames = None
 		self.trimmed_file_path = None
 		self.parse_result = None
 		self.submission_result = None
@@ -695,24 +697,13 @@ class Upload:
 		else:
 			return None
 
-	def check_headers(self):
+	def check_headers(self, tx):
 		if self.file_extension == 'csv':
 			with open(self.file_path) as uploaded_file:
 				file_dict = DictReaderInsensitive(uploaded_file)
 				self.fieldnames = file_dict.fieldnames
 				if len(self.fieldnames) > len(set(self.fieldnames)):
 					return "This file contains duplicated header fields. This is not supported"
-				fieldnames = set(self.fieldnames)
-				if self.submission_type == 'FB':
-					required = {'uid', 'trait', 'value', 'timestamp', 'person', 'location'}
-				else:  # submission_type == 'table'
-					required = {'uid', 'date', 'time', 'person'}
-				if not required.issubset(fieldnames):
-					missing_fieldnames = required - fieldnames
-					return (
-							'This file is missing the following headers: '
-							+ ', '.join([i for i in missing_fieldnames])
-					)
 		elif self.file_extension == 'xlsx':
 			try:
 				wb = load_workbook(self.file_path, read_only=True)
@@ -723,42 +714,82 @@ class Upload:
 			ws = wb['Template']
 			rows = ws.iter_rows(min_row=1, max_row=1)
 			first_row = next(rows)
-			self.fieldnames = [c.value.strip().lower() for c in first_row if c.value]
-			fieldnames_lower = {c.value.strip().lower() for c in first_row if c.value}
+			self.fieldnames = [str(c.value).encode().strip().lower() for c in first_row if c.value]
+		fieldnames_set = set(self.fieldnames)
+		if self.submission_type == 'FB':
+			required = {'uid', 'trait', 'value', 'timestamp', 'person', 'location'}
+			self.required_fieldnames = list(required)
+		else:
 			required = {'uid', 'person'}
-			if not required.issubset(fieldnames_lower):
-				missing_fieldnames = required - fieldnames_lower
-				return (
-						'The "Template" worksheet is missing the following fields: '
-						+ ', '.join([i for i in missing_fieldnames])
-				)
-			other_required = [
+		if not required.issubset(fieldnames_set):
+			missing_fieldnames = required - fieldnames_set
+			return (
+					'This file is missing the following fields: '
+					+ ', '.join([i for i in missing_fieldnames])
+			)
+		if self.submission_type == 'table':
+			record_type_sets = [
+				('condition', {'start date', 'start time', 'end date', 'end time'}),
 				('trait', {'date', 'time'}),
-				('condition',{'start date', 'start time', 'end date', 'end time'})
+				('property', set())
 			]
-			# now that we have a an empty set (properties) this check isn't useful or effective
-			# if not any(
-			# 	other_set[1].issubset(fieldnames_lower) for other_set in other_required
-			# ):
-			# 	return (
-			# 			'The "Template" worksheet is missing required date/time fields.'
-			# 			' For Trait data these are "date" and "time", for condition data these are '
-			# 			' "start date", "start time", "end date", "end time".'
-			# 	)
-			# # check if more than one of the "other required" sets are found
-			# elif sum(bool(other_set[1] & fieldnames_lower) for other_set in other_required) > 1:
-			# 	return (
-			# 		'If you are submitting Trait data then please just include "date" and "time". '
-			# 		'If you are submitting Condition data then please just include '
-			# 		'"start date", "start time", "end date", "end time". '
-			# 		'Do not provide date/time elements from the other data type.'
-			# 	)
-		# but we can still define our record type with this
-			for other_set in other_required:
-				if other_set[1].issubset(fieldnames_lower):
-					self.record_type = other_set[0]
-				else:
-					self.record_type = 'property'
+			# use this to define our record type
+			for record_type_set in record_type_sets:
+				if record_type_set[1].issubset(fieldnames_set):
+					self.record_type = record_type_set[0]
+					self.required_fieldnames = list(required) + list(record_type_set[1])
+					break
+			# now we strip back the fieldnames to keep only those that aren't in the required list
+			# these should now just be the features, but we check against db.
+			self.features = [i for i in self.fieldnames if i not in self.required_fieldnames]
+			statement = (
+				' UNWIND $fields AS field '
+				'	OPTIONAL MATCH '
+				'		(feature:Feature {name_lower: toLower(trim(toString(field)))}) '
+				'	OPTIONAL MATCH '
+				'		(feature)-[:OF_TYPE]->(record_type:RecordType) '
+				'	WITH '
+				'		field, record_type '
+				'	WHERE '
+				'		feature IS NULL '
+				'		OR '
+				'		record_type.name_lower <> $record_type '
+				'	RETURN '
+				'		field, record_type.name_lower '
+			)
+			field_errors = tx.run(
+				statement,
+				record_type=self.record_type,
+				fields=self.features
+			)
+			if field_errors.peek():
+				error_message = '<p>Fieldnames not recognised or not matching other required fieldnames.</p> \n'
+				for field in field_errors:
+					error_message += '<dt>' + field[0] + ':</dt> '
+					record_type = field[1]
+					if record_type:
+						error_message += (
+							' <dd> This file has the required fields for ' + self.record_type + ' records but'							
+							' this feature is a ' + record_type + '.'
+						)
+						if record_type == 'condition':
+							error_message += (
+								'. Condition records require "start date", "start time", "end date" and "end time" '
+								' in addition to the "UID" and "Person" fields.'
+							)
+						elif record_type == 'trait':
+							error_message += (
+								'. Trait records require "date" and "time" fields'
+								' in addition to the "UID" and "Person" fields.'
+							)
+						elif record_type == 'property':
+							error_message += '. Property records only require the "UID" and "Person" fields.'
+						error_message += (
+								'</dd>\n'
+						)
+					else:
+						error_message += '<dd>Unrecognised feature. Please check your spelling.</dd>\n'
+				return error_message
 		else:
 			return None
 
@@ -777,16 +808,17 @@ class Upload:
 				)
 				file_writer = csv.DictWriter(
 					trimmed_file,
-					fieldnames=file_dict.fieldnames,
+					fieldnames=['row_index'] + file_dict.fieldnames,
 					quoting=csv.QUOTE_ALL
 				)
 				file_writer.writeheader()
-				for j, row in file_dict:
+				for i, row in enumerate(file_dict):
 					# remove rows without entries
 					if any(field.strip() for field in row):
 						for field in file_dict.fieldnames:
 							if row[field]:
 								row[field] = row[field].strip()
+						row['row_index'] = i + 1
 						file_writer.writerow(row)
 		elif self.file_extension == 'xlsx':
 			wb = load_workbook(self.file_path, read_only=True)
@@ -798,7 +830,7 @@ class Upload:
 				)
 				rows = ws.iter_rows()
 				first_row = next(rows)
-				file_writer.writerow(['row_index'] + [cell.value.lower() for cell in first_row if cell.value])
+				file_writer.writerow(['row_index'] + [str(cell.value).encode().lower() for cell in first_row if cell.value])
 				# handle deleted columns in the middle of the worksheet
 				empty_headers = []
 				for i, cell in enumerate(first_row):
@@ -843,28 +875,12 @@ class Upload:
 			trimmed_dict = DictReaderInsensitive(trimmed_file)
 			for row in trimmed_dict:
 				# firstly, if a table check for feature data, if none then just skip
-				if self.submission_type == 'table':
-					# firstly check if feature data in the row and ignore if empty
-					record_properties = [
-						'date',
-						'start date',
-						'start time',
-						'end date',
-						'end time',
-						'time',
-						'person'
-					]
-					index_headers = [
-						'row_index',
-						'uid'
-					]
-					not_features = record_properties + index_headers
-					self.features = list(set(row.keys()).difference(set(not_features)))
+				if submission_type == 'table':
 					if [row[feature] for feature in self.features if row[feature]]:
 						parse_result.parse_row(row)
 					else:
 						pass
-				if submission_type == "FB":
+				elif submission_type == "FB":
 					row_index = int(row['row_index'])
 					parse_result.parse(row_index, row)
 				# if many errors already then return immediately
@@ -1034,6 +1050,15 @@ class Upload:
 	def async_submit(self, username, upload_object):
 		try:
 			with get_driver().session() as neo4j_session:
+				header_report = neo4j_session.read_transaction(
+					upload_object.check_headers
+				)
+				if header_report:
+					return {
+						'status': 'ERRORS',
+						'type': 'string',
+						'result': header_report
+					}
 				# clean up the file removing empty lines and whitespace, lower case headers for matching in db
 				upload_object.trim_file()
 				# parse this trimmed file for errors, sets parse_result attribute to upload_object
@@ -1041,11 +1066,13 @@ class Upload:
 				if parse_result.long_enough():
 					return {
 						'status': 'ERRORS',
+						'type': 'parse_object',
 						'result': parse_result
 					}
 				elif parse_result.duplicate_keys:
 					return {
 						'status': 'ERRORS',
+						'type': 'parse_object',
 						'result': parse_result
 					}
 				# if not too many errors continue to db check (reducing the number of client feedback loops)
@@ -1057,6 +1084,7 @@ class Upload:
 				if any([db_check_result.field_errors, db_check_result.errors]):
 					return {
 						'status': 'ERRORS',
+						'type': 'parse_object',
 						'result': db_check_result
 					}
 				else:

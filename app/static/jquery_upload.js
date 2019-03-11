@@ -64,7 +64,7 @@ $('#upload_submit').click( function(e) {
 							poll(task_id);
 						}
 						if (response.status === 'ERRORS') {
-							$('#upload_submit_flash').replaceWith("<div id='response' class='flash'></div>");
+							$('#upload_submit_flash').replaceWith("<div id='response' style='background:#f0b7e1' class='flash'></div>");
 							$('#response').append("<p>Errors were found in the uploaded file:</p>");
 							$('#response').append('<div>' + response.result + '</div>');
 							$('#upload_submit').prop('disabled', false);

@@ -833,11 +833,7 @@ class Download:
 					for value in feature['values']:
 						# flatten each value to string if it is a list
 						if isinstance(value, list):
-							record[0]['Records'][feature]['values'] = (
-									'['
-									+ ', '.join([i.encode() for i in value])
-									+ ']'
-							)
+							record[0]['Records'][feature]['values'] = ', '.join([i.encode() for i in value])
 					# then flatten the list of values to a string stored in the record dict
 					record[0][feature['feature_name']] = ', '.join(
 						[str(value).encode() for value in feature['values']]

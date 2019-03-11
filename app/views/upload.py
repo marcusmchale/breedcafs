@@ -45,11 +45,7 @@ def upload_submit():
 				return jsonify({
 					'submitted': file_format_errors
 				})
-			header_report = upload_object.check_headers()
-			if header_report:
-				return jsonify({
-					'submitted': header_report
-				})
+			# check for UID/person then time/date etc to set record_type
 			try:
 				# as an asynchronous function with celery
 				# result is stored in redis and accessible from the status/task_id endpoint
@@ -74,7 +70,9 @@ def task_status(task_id):
 	else:
 		result = task.get()
 		if result['status'] == 'ERRORS':
-			if result['result'].duplicate_keys:
+			if result['type'] == 'string':
+				error_table = result['result']
+			elif result['result'].duplicate_keys:
 				error_table = result['result'].duplicate_keys_table()
 			elif result['result'].errors:
 				error_table = result['result'].html_table()
