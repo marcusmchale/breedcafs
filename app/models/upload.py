@@ -897,6 +897,7 @@ class Upload:
 		trimmed_file_path = self.trimmed_file_path
 		trimmed_filename = os.path.basename(trimmed_file_path)
 		submission_type = self.submission_type
+		record_type = self.record_type
 		with open(trimmed_file_path, 'r') as trimmed_file:
 			#if submission_type == "FB":
 				#check_result = [record[0] for record in tx.run(
@@ -952,64 +953,72 @@ class Upload:
 				#					item['trait']
 				#				)
 			#else:
-			# need to check for condition conflicts and
-			# TODO also have to make sure that start < end, maybe do this earlier as doesn't need database
-			check_result = tx.run(
-				Cypher.upload_table_check,
-				username=username,
-				filename=urls.url_fix('file:///' + username + '/' + trimmed_filename ),
-				submission_type=submission_type,
-				features=self.features
-			)
-			trimmed_dict_reader = DictReaderInsensitive(trimmed_file)
-			row = trimmed_dict_reader.next()
-			# need to check_result sorted by file/dictreader row_index
-			for item in check_result:
-				record = item[0]
-				while record['row_index'] != int(row['row_index']):
-					row = trimmed_dict_reader.next()
-				if not record['UID']:
-					parse_result.merge_error(
-						row,
-						"uid",
-						"missing"
-					)
-				if not record['feature']:
-					parse_result.add_field_error(
-						record['input_feature'],
-						(
-							"This feature is not found. Please check your spelling. "
-							"This may also be because the feature is not available at the level of these items"
-						)
-					)
-				# we add found fields to a list to handle mixed items in input
-				# i.e. if found at level of one item but not another
+			if submission_type == 'table':
+				if record_type == 'property':
+					statement = Cypher.upload_table_property_check
+				elif record_type == 'trait':
+					statement = Cypher.upload_table_trait_check
+				elif record_type == 'condition':
+					# TODO handle condition conflicts within a file.
+					statement = Cypher.upload_table_condition_check
 				else:
-					parse_result.add_field_found(record['feature'])
-				if all([
-					record['UID'],
-					record['feature'],
-					not record['value']
-				]):
-					parse_result.merge_error(
-						row,
-						record['input_feature'],
-						"format",
-						feature_name=record['feature'],
-						feature_format=record['format'],
-						category_list=record['category_list']
-					)
-				# need to check an element of the list as all results
-				if record['conflicts'][0]['existing_value']:
-					parse_result.merge_error(
-						row,
-						record['input_feature'],
-						"conflict",
-						conflicts=record['conflicts']
-					)
-			if parse_result.field_found:
-				for field in parse_result.field_found:
-					parse_result.rem_field_error(field)
+					statement = None
+				check_result = tx.run(
+					statement,
+					username=username,
+					filename=urls.url_fix('file:///' + username + '/' + trimmed_filename ),
+					features=self.features,
+					record_type=record_type
+				)
+				trimmed_dict_reader = DictReaderInsensitive(trimmed_file)
+				row = trimmed_dict_reader.next()
+				# need to check_result sorted by file/dictreader row_index
+				for item in check_result:
+					record = item[0]
+					while record['row_index'] != int(row['row_index']):
+						row = trimmed_dict_reader.next()
+					if not record['UID']:
+						parse_result.merge_error(
+							row,
+							"uid",
+							"missing"
+						)
+					if not record['feature']:
+						parse_result.add_field_error(
+							record['input_feature'],
+							(
+								"This feature is not found. Please check your spelling. "
+								"This may also be because the feature is not available at the level of these items"
+							)
+						)
+					# we add found fields to a list to handle mixed items in input
+					# i.e. if found at level of one item but not another
+					else:
+						parse_result.add_field_found(record['feature'])
+					if all([
+						record['UID'],
+						record['feature'],
+						not record['value']
+					]):
+						parse_result.merge_error(
+							row,
+							record['input_feature'],
+							"format",
+							feature_name=record['feature'],
+							feature_format=record['format'],
+							category_list=record['category_list']
+						)
+					# need to check an element of the list as all results
+					if record['conflicts'][0]['existing_value']:
+						parse_result.merge_error(
+							row,
+							record['input_feature'],
+							"conflict",
+							conflicts=record['conflicts']
+						)
+				if parse_result.field_found:
+					for field in parse_result.field_found:
+						parse_result.rem_field_error(field)
 			return parse_result
 
 	def submit(
@@ -1024,23 +1033,43 @@ class Upload:
 		features = self.features
 		self.submission_result = SubmissionResult(username, filename, submission_type)
 		submission_result = self.submission_result
+		record_type = self.record_type
 		if submission_type == 'FB':
 			query = Cypher.upload_fb
 			result = tx.run(
 				query,
 				username=username,
-				filename=("file:///" + username + '/' + trimmed_filename),
-				submission_type=submission_type
+				filename=("file:///" + username + '/' + trimmed_filename)
 			)
 		else:  # submission_type == 'table':
-			statement = Cypher.upload_table
+			if record_type == 'property':
+				statement = Cypher.upload_table_property
+			elif record_type == 'trait':
+				statement = Cypher.upload_table_trait
+			elif record_type == 'condition':
+				# TODO handle conflicts within a file.
+				statement = Cypher.upload_table_condition
+			else:
+				statement = None
 			result = tx.run(
 				statement,
 				username=username,
 				filename=urls.url_fix("file:///" + username + '/' + trimmed_filename),
-				submission_type=submission_type,
-				features=features
+				features=features,
+				record_type=record_type
 			)
+			if record_type == 'property':
+				update_properties = [
+					'assign to block',
+					'assign to trees',
+					'variety name',
+					'variety code',
+					'tissue',
+					'harvest date',
+					'harvest time',
+
+				]
+				# todo continue from here to handle property updates.
 		# create a submission result
 		for record in result:
 			submission_result.parse_record(record[0])
@@ -1077,11 +1106,13 @@ class Upload:
 					}
 				# if not too many errors continue to db check (reducing the number of client feedback loops)
 				else:
-					db_check_result = neo4j_session.read_transaction(
+					tx = self.neo4j_session.begin_transaction()
+					db_check_result = tx.run(
 						upload_object.db_check,
 						parse_result
 					)
 				if any([db_check_result.field_errors, db_check_result.errors]):
+					tx.close()
 					return {
 						'status': 'ERRORS',
 						'type': 'parse_object',
@@ -1089,7 +1120,7 @@ class Upload:
 					}
 				else:
 					# submit data
-					submission_result = neo4j_session.write_transaction(
+					submission_result = tx.run(
 						upload_object.submit
 					)
 					# create summary dict
