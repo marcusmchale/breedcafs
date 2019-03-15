@@ -6,7 +6,7 @@ from app.cypher import Cypher
 
 from flask import jsonify
 
-from neo4j_driver import get_driver, neo4j_query
+from neo4j_driver import get_driver, neo4j_query, bolt_result
 
 import datetime
 
@@ -19,26 +19,24 @@ class Record:
 	def submit_records(self, record_data):
 		record_data['username'] = self.username
 		try:
+			tx = self.neo4j_session.begin_transaction()
 			if record_data['record_type'] == 'condition':
 				# for condition data we first query for conflicts since there are many types of conflict
 				# for traits we don't need this as it is simpler to perform during the merger
 				#    - traits can only have a single value at a single time
 				#    - so only conflict with different value at that time
 				conflicts_query = self.build_condition_conflicts_query(record_data)
-				conflicts = [
-					record[0] for record in self.neo4j_session.read_transaction(
-						neo4j_query,
+				conflicts = tx.run(
 						conflicts_query['statement'],
 						conflicts_query['parameters']
 					)
-				]
-				if conflicts:
-					html_table = self.result_table(conflicts, record_data['record_type'])
+				if conflicts.peek():
+					tx.close()
+					html_table = self.result_table(conflicts, record_data['record_type'])['table']
 					return jsonify({
 						'submitted': (
 								' Record not submitted. <br><br> '
-								' Either the value has been set by another partner and is not visible to you'
-								' or the value you are trying to submit conflicts with an existing entry: '
+								' A value you are trying to submit conflicts with an existing entry. '
 								+ html_table
 						),
 						'class': 'conflicts'
@@ -55,8 +53,6 @@ class Record:
 						'This record type is not yet defined, please contact an administrator'
 					)
 				})
-
-			tx = self.neo4j_session.begin_transaction()
 			# if any updates to perform:
 			if bool(
 					{
@@ -192,90 +188,44 @@ class Record:
 						'	END '
 					)
 					tx.run(update_custom_id_statement, update_custom_id_parameters)
-				# we only store the harvest time in the source sample, although tissue type can change
-				# e.g. splitting subsequent to harvest
-				if 'harvest time' in record_data['selected_features']:
+				if 'harvest date' in record_data['selected_features']:
 					update_harvest_time_statement = match_item_query[0] + ' WITH DISTINCT item '
 					update_harvest_time_parameters = match_item_query[1]
-					update_harvest_time_parameters['harvest_time'] = record_data['features_dict']['harvest time']
+					update_harvest_time_parameters['harvest_date'] = record_data['features_dict']['harvest date']
+					if 'harvest time' in record_data['selected_features']:
+						update_harvest_time_parameters['harvest_time'] = record_data['features_dict']['harvest time']
 					update_harvest_time_statement += (
-						' OPTIONAL MATCH '
-						'	(item)-[:FROM]->(source_sample:Sample) '
-						' WITH item WHERE source_sample IS NULL '
-						' SET item.`harvest time` = CASE '
-						'	WHEN item.`harvest time` IS NULL '
-						'	THEN $harvest_time '
-						'	ELSE item.`harvest time` '
-						'	END '
-						' SET item.time = CASE '
-						'	WHEN item.`harvest date` IS NULL '
-						'	THEN null '
-						'	ELSE CASE WHEN item.`harvest time` IS NULL '
-						'		THEN apoc.date.parse(value + " 12:00", "ms", "yyyy-MM-dd HH:mm") '
-						'		ELSE apoc.date.parse(value + " " + item.`harvest time`, "ms", "yyyy-MM-dd HH:mm") '
+						' MATCH '
+						'	(item)-[:FROM]->(:ItemSamples) '
+						'	WHERE '
+						'		item.time IS NULL  '
+						'	SET item.time = CASE '
+						'		WHEN harvest_time IS NOT NULL '
+						'		THEN apoc.date.parse(uid_date_time[1] + " " + uid_date_time[2], "ms", "yyyy-MM-dd HH:mm") '
+						'		ELSE apoc.date.parse(uid_date_time[1] + " 12:00, "ms", "yyyy-MM-dd HH:mm") '
 						'		END '
-						'	END '
 					)
 					tx.run(update_harvest_time_statement, update_harvest_time_parameters)
-				if 'harvest date' in record_data['selected_features']:
-					update_harvest_date_statement = match_item_query[0] + ' WITH DISTINCT item '
-					update_harvest_date_parameters = match_item_query[1]
-					update_harvest_date_parameters['harvest_date'] = record_data['features_dict']['harvest date']
-					update_harvest_date_statement += (
-						' OPTIONAL MATCH '
-						'	(item)-[:FROM]->(source_sample:Sample) '
-						' WITH item WHERE source_sample IS NULL '
-						' SET item.`harvest date` = CASE '
-						'	WHEN item.`harvest date` IS NULL '
-						'	THEN $harvest_date '
-						'	ELSE item.`harvest date` '
-						'	END '
-						' SET item.time = CASE '
-						'	WHEN item.`harvest date` IS NULL '
-						'	THEN null '
-						'	ELSE CASE '
-						'		WHEN item.`harvest time` IS NULL '
-						'		THEN apoc.date.parse(value + " 12:00", "ms", "yyyy-MM-dd HH:mm") '
-						'		ELSE apoc.date.parse(value + " " + item.`harvest time`, "ms", "yyyy-MM-dd HH:mm")'
-						'		END '
-						'	END'
-
-					)
-					tx.run(update_harvest_date_statement, update_harvest_date_parameters)
-			merged = [
-				record[0] for record in tx.run(merge_query['statement'], merge_query['parameters'])
-			]
-			if record_data['record_type'] in ['trait', 'property']:
-				conflicts = []
-				for record in merged:
-					if record['found']:
-						if not record['access']:
-							conflicts.append(record)
-						elif record['conflict']:
-							conflicts.append(record)
-				if conflicts:
-					tx.rollback()
-					html_table = self.result_table(conflicts, record_data['record_type'])
-					return jsonify({
-						'submitted': (
-							' Existing values found that are either in conflict with the submitted value '
-							' or are not accessible to you. Consider contacting this partner to request access. '
-							+ html_table
-						),
-						'class': 'conflicts'
-					})
-			tx.commit()
-			if merged:
-				html_table = self.result_table(merged, record_data['record_type'])
+			merged = tx.run(merge_query['statement'], merge_query['parameters'])
+			result_table = self.result_table(merged, record_data['record_type'])
+			if result_table['conflicts']:
+				tx.rollback()
+				html_table = result_table['table']
+				return jsonify({
+					'submitted': (
+						' Record not submitted. <br><br> '
+						' A value you are trying to submit conflicts with an existing entry. '
+						+ html_table
+					),
+					'class': 'conflicts'
+				})
+			else:
+				tx.commit()
+				html_table = result_table['table']
 				return jsonify({'submitted': (
 					' Records submitted or found (highlighted): '
 					+ html_table
 					)
-				})
-			else:
-				return jsonify({
-					'submitted': 'No records submitted, likely no items were found matching your filters',
-					'class': 'conflicts'
 				})
 		except (TransactionError, SecurityError, ServiceUnavailable):
 			return jsonify({
@@ -678,10 +628,21 @@ class Record:
 			'		(p)<-[: AFFILIATED {confirmed: true}]-(cu: User {username_lower: toLower($username)}) '
 			# set lock on ItemCondition node and only unlock after merge or result
 			# this is either rolled back or set to false on subsequent merger, 
-			# prevents conflicts (per item/feature) emerging from race condition 
+			# prevents conflicts (per item/feature) emerging from race conditions
 			' SET if._LOCK_ = True '
 			' WITH '
-			'	item, feature, if, r, s, u, p, cu, '
+			'	$end_time as end, '
+			'	$start_time as start, '
+			'	item,'
+			'	feature, '
+			'	if, '
+			'	r, '
+			'	CASE WHEN r.start <> False THEN r.start ELSE Null END as r_start, '
+			'	CASE WHEN r.end <> False THEN r.end ELSE Null END as r_end, '
+			'	s, '
+			'	u, '
+			'	p, '
+			'	cu, '
 			+ Cypher.upload_check_value +
 			' as value '
 		)
@@ -690,83 +651,71 @@ class Record:
 				', field '
 			)
 		statement += (
-			'	WHERE '
+			' WHERE '
 			# If don't have access or if have access and values don't match then potential conflict 
 			# time parsing to allow various degrees of specificity in the relevant time range is below
-			'		( '
-			'			cu IS NULL '
-			'			OR '
-			'			r.value <> value '
+			' ( '
+			'		cu IS NULL '
+			'		OR '
+			'		r.value <> value '
+			' ) AND ( '
+			'	( '
+			# handle fully bound records
+			# - any overlapping records
+			'		r_start < end '
+			'		AND '
+			'		r_end > start '
+			'	) OR ( '
+			# - a record that has a lower bound in the bound period 
+			'		r_start >= start '
+			'		AND '
+			'		r_start < end '
+			'	) OR ( '
+			# - a record that has an upper bound in the bound period
+			'		r_end > start '
+			'		AND '
+			'		r_end <= end '
+			'	) OR ( '
+			# now handle lower bound only records
+			'		end IS NULL '
+			'		AND ( '
+			# - existing bound period includes start
+			'			r_end > start '
+			'			AND '
+			'			r_start <= start '
+			# - record with same lower bound
+			'		) OR ( '
+			'			r_start = start '
+			# - record with upper bound only greater than this lower bound
+			'		) OR ( '
+			'			r_start IS NULL '
+			'			AND '
+			'			r_end > start '
 			'		) '
-		)
-		# allowing unbound time ranges but, where values don't match:
-		#   - bound cannot be set in overlapping range with existing bound
-		#   - lower/upper bounded cannot be set over existing bound
-		#   - Lower or upper bound cannot be set at same time as existing lower or upper bound, respectively.
-		# Lower bound is inclusive, upper bound is exclusive
-		# Unbound is stored as False instead of Null to facilitate specific mergers
-		if all([record_data['start_time'], record_data['end_time']]):
-			statement += (
-				' AND (( '
-				# - any overlapping records
-				'	CASE WHEN r.start <> False THEN r.start ELSE Null END < $end_time '
-				'	AND '
-				'	CASE WHEN r.end <> False THEN r.end ELSE Null END >= $start_time '
-				'	) OR ( '
-				# - OR a record that has a lower bound in the bound period and unbound upper
-				'	r.end = False'
-				'	AND '
-				'	CASE WHEN r.start <> False THEN r.start ELSE Null END >= $start_time '
-				'	AND '
-				'	CASE WHEN r.start <> False THEN r.start ELSE Null END < $end_time '
-				'	) OR ( '
-				# - OR a record that has an upper bound in the bound period and unbound lower
-				'	r.start = False '
-				'	AND '
-				'	CASE WHEN r.end <> False THEN r.end ELSE Null END > $start_time '
-				'	AND '
-				'	CASE WHEN r.end <> False THEN r.end ELSE Null END <= $end_time '
-				' )) '
-			)
-		# defined start conflicts if:
-		elif record_data['start_time']:
-			statement += (
-				# - defined start time is in existing bound period
-				' AND (( '
-				'	CASE WHEN r.end <> False THEN r.end ELSE Null END > $start_time '
-				'	AND '
-				'	CASE WHEN r.start <> False THEN r.start ELSE Null END <= $start_time '
-				# Or lower bound is the same as an existing record with no upper bound
-				'	) OR ( '
-				'	r.start = $start_time '
-				'	AND '
-				'	r.end = False '
-				' )) '
-			)
-		# defined start conflicts if:
-		elif record_data['end_time']:
-			statement += (
-				# - defined end time is in existing bound period
-				' AND (( '
-				'	CASE WHEN r.end <> False THEN r.end ELSE Null END >= $end_time '
-				'	AND '
-				'	CASE WHEN r.start <> False THEN r.start ELSE Null END < $end_time '
-				# Or end time is the same as an existing record with no start time
-				'	) OR ( '
-				'	r.end = $end_time '
-				'	AND '
-				'	r.start = False '
-				' )) '
-			)
-		# No defined start or end will only conflict with another record that has no-defined start or end
-		elif not any([record_data['start_time'], record_data['end_time']]):
-			statement += (
-				' AND '
-				'	r.start = False '
-				' AND '
-				'	r.end = False '
-			)
-		statement += (
+			'	) OR ( '
+			# now handle upper bound only records 
+			'		start IS NULL '
+			'		AND ( '
+			# - existing bound period includes end
+			'			r_end >= end '
+			'			AND '
+			'			r_start < end '
+			# - record with same upper bound
+			'		) OR ( '
+			'			r_end = end '
+			# - record with lower bound only less than this upper bound
+			'		) OR ( '
+			'			r_end IS NULL '
+			'			AND '
+			'			r_start < end '
+			'		) '
+			'	) OR ( '
+			# always conflict with unbound records
+			'		r_end IS NULL '
+			'		AND '
+			'		r_start IS NULL '
+			'	)'
+			' ) '
 			' WITH '
 			'	r, value, '
 			'	p.name as partner, '
@@ -784,8 +733,8 @@ class Record:
 		statement += (
 			' RETURN { '
 			'	UID: UID, '
-			'	start: CASE WHEN r.start <> False THEN r.start ELSE Null END, '
-			'	end: CASE WHEN r.end <> False THEN r.end ELSE Null END, '
+			'	start: r.start, '
+			'	end: r.end, '
 			'	feature: feature, '
 			'	value: CASE WHEN access THEN r.value ELSE "ACCESS DENIED" END, '
 			'	submitted_at: submitted_at, '
@@ -887,8 +836,8 @@ class Record:
 		statement += (
 			' MERGE '
 			'	(r: Record { '
-			'		start: COALESCE($start_time, False), '
-			'		end: COALESCE($end_time, False), '
+			'		start: CASE WHEN $start_time IS NOT NULL THEN $start_time ELSE False END, '
+			'		end: CASE WHEN $end_time IS NOT NULL THEN $end_time ELSE False END, '
 			'		value: value '
 			'	})-[:RECORD_FOR]->(if) '
 			' ON CREATE SET '
@@ -939,8 +888,8 @@ class Record:
 			'	<-[: SUBMITTED]-(u: User) '
 			' RETURN { '
 			'	UID: item_uid, '
-			'	start: CASE WHEN r.start <> False THEN r.start ELSE Null END,	'
-			'	end: CASE WHEN r.end <> False THEN r.end ELSE Null END, '
+			'	start: r.start,	'
+			'	end: r.end, '
 			'	feature: feature.name, '
 			'	value: r.value, '
 			'	found: r.found, '
@@ -963,7 +912,8 @@ class Record:
 		}
 
 	@staticmethod
-	def result_table(result_list, record_type):
+	def result_table(result, record_type):
+		conflicts_found = False
 		header_string = '<tr><th><p>'
 		if record_type == 'trait':
 			headers = ['UID', 'Feature', 'Time', 'Submitted by', 'Submitted at', 'Value']
@@ -973,7 +923,10 @@ class Record:
 			headers = ['UID', 'Feature', 'Submitted by', 'Submitted at', 'Value']
 		header_string += '</p></th><th><p>'.join(headers)
 		header_string += '</p></th></tr>'
-		for record in result_list:
+		for record in result:
+			record = record[0]
+			# iterate through the result, building the table.
+			# if we find a conflict we drop the existing table and start only including the conflicts to report
 			if record['submitted_at']:
 				submitted_at = datetime.datetime.utcfromtimestamp(int(record['submitted_at']) / 1000).strftime("%Y-%m-%d %H:%M")
 			else:
@@ -1024,6 +977,7 @@ class Record:
 					if 'conflict' in record and not record['conflict']:
 						row_string += '</td><td bgcolor = #00FF00>'
 					else:
+						conflicts_found = True
 						row_string += '</td><td bgcolor = #FF0000>'
 				else:
 					# found not returned in conflicts query (all records are "found")
@@ -1040,5 +994,8 @@ class Record:
 					row_string += '</td><td>'
 			row_string += str(record['value']) + '</td></tr>'
 			header_string += row_string
-		return '<div id="response_table_div"><table>' + header_string + '<table></div>'
+		return {
+			'conflicts': conflicts_found,
+			'table': '<div id="response_table_div"><table>' + header_string + '<table></div>'
+		}
 

@@ -167,21 +167,21 @@ class RowParseResult:
 							for conflict in itertools.islice(field_conflicts, 3):
 								row_string += '\n\n'
 								row_string += ''.join(['Existing value: ', conflict['existing_value'], '\n'])
-								if conflict['time']:
+								if 'time' in conflict and conflict['time']:
 									row_string += (
 										'Time: '
 										+ datetime.datetime.utcfromtimestamp(int(conflict['time']) / 1000).strftime(
 											"%Y-%m-%d %H:%M")
 										+ '\n'
 									)
-								if conflict['start']:
+								if 'start' in conflict and conflict['start']:
 									row_string += (
 										'Start: '
 										+ datetime.datetime.utcfromtimestamp(int(conflict['start']) / 1000).strftime(
 											"%Y-%m-%d %H:%M")
 										+ '\n'
 									)
-								if conflict['end']:
+								if 'end' in conflict and conflict['end']:
 									row_string += (
 										'End: '
 										+ datetime.datetime.utcfromtimestamp(int(conflict['end']) / 1000).strftime(
@@ -202,8 +202,9 @@ class RowParseResult:
 
 
 class ParseResult:
-	def __init__(self, submission_type, fieldnames):
+	def __init__(self, submission_type, record_type, fieldnames):
 		self.submission_type = submission_type
+		self.record_type = record_type
 		self.fieldnames = fieldnames
 		self.field_errors = {}
 		self.field_found = []
@@ -457,7 +458,7 @@ class SubmissionRecord:
 			self,
 			record
 	):
-		if record['Time/Period']:
+		if 'Time/Period' in record and record['Time/Period']:
 			if isinstance(record['Time/Period'], list):
 				if record['Time/Period'][0]:
 					record['Time/Period'][0] = datetime.datetime.utcfromtimestamp(record['Time/Period'][0] / 1000).strftime("%Y-%m-%d %H:%M")
@@ -491,29 +492,207 @@ class SubmissionRecord:
 
 
 class SubmissionResult:
-	def __init__(self, username, filename, submission_type):
+	def __init__(self, username, filename, submission_type, record_type):
 		self.username = username
 		self.filename = filename
 		self.submission_type = submission_type
+		self.record_type = record_type
 		self.conflicts = []
 		self.resubmissions = []
 		self.submitted = []
+		self.property_updates = {
+			'custom_id': [],
+			'assign_to_block': [],
+			'assign_to_trees': [],
+			'tissue': [],
+			'variety': {},
+			'harvest_time': {}
+		}
 
 	def summary(self):
 		return {
-			"conflicts": len(self.conflicts),
 			"resubmissions": len(self.resubmissions),
 			"submitted": len(self.submitted)
 		}
 
 	def parse_record(self, record):
 		submission_item = SubmissionRecord(record)
-		if not record['found']:
+		if record['conflicts']:
+			self.conflicts.append(submission_item)
+		elif not record['found']:
 			self.submitted.append(submission_item)
+			if self.record_type == 'property':
+				if record['feature'].lower() == 'custom id':
+					self.property_updates['custom_id'].append(
+						[record['uid'], record['value']]
+					)
+				if record['feature'].lower() == 'tissue':
+					self.property_updates['tissue'].append(
+						[record['uid'], record['value']]
+					)
+				if record['feature'].lower() == 'assign to block':
+					self.property_updates['assign_to_block'].append(
+						[record['uid'], record['value']]
+					)
+				if record['feature'].lower() == 'assign to trees':
+					self.property_updates['assign_to_trees'].append(
+						[record['uid'], record['value']]
+					)
+				if record['feature'].lower() == 'variety name':
+					if not record['uid'] in self.property_updates['variety']:
+						self.property_updates['variety'][record['uid']] = {}
+					self.property_updates['variety'][record['uid']]['name'] = record['value']
+				if record['feature'].lower() == 'variety code':
+					if not record['uid'] in self.property_updates['variety']:
+						self.property_updates['variety'][record['uid']] = {}
+					self.property_updates['variety'][record['uid']]['code'] = record['value']
+				if record['feature'].lower() == 'harvest date':
+					if not record['uid'] in self.property_updates['harvest_time']:
+						self.property_updates['harvest_time'][record['uid']] = {}
+					self.property_updates['harvest_time'][record['uid']]['date'] = record['value']
+				if record['feature'].lower() == 'harvest time':
+					if not record['uid'] in self.property_updates['harvest_time']:
+						self.property_updates['harvest_time'][record['uid']] = {}
+					self.property_updates['harvest_time'][record['uid']]['time'] = record['value']
 		elif submission_item.conflict():
 			self.conflicts.append(submission_item)
 		else:
 			self.resubmissions.append(submission_item)
+
+	def update_properties(self, tx):
+		if self.property_updates['custom_id']:
+			tx.run(
+				' UNWIND $custom_ids AS uid_value '
+				'	MATCH '
+				'		(item: Item {uid: uid_value[0]}) '
+				'	WHERE item.custom_id IS NULL '
+				'	SET item.custom_id = uid_value[1] ',
+				custom_ids=self.property_updates['custom_id']
+			)
+		if self.property_updates['tissue']:
+			tx.run(
+				' UNWIND $tissue AS uid_value '
+				'	MATCH '
+				'		(item: Sample {uid: uid_value[0]}) '
+				'	WHERE item.tissue IS NULL '
+				'	SET item.custom_id = uid_value[1] ',
+				tissue=self.property_updates['tissue']
+			)
+		if self.property_updates['assign_to_block']:
+			statement = (
+				' UNWIND $assign_to_block AS uid_value '
+				'	MATCH '
+				'		(tree: Tree {uid: uid_value[0]}) '
+				'		-[:IS_IN]->(: FieldTrees) '
+				'		-[:IS_IN]->(: Field) '
+				'		<-[:IS_IN]-(: FieldBlocks) '
+				'		<-[:IS_IN]-(block: Block {id: uid_value[1]}) '
+				'	OPTIONAL MATCH (tree)-[:IS_IN]->(existing:BlockTrees) '
+				'	WITH block, tree WHERE existing IS NULL '
+				'	MERGE '
+				'		(bt:BlockTrees)'
+				'		-[:IS_IN]->(block) '
+				'	MERGE '
+				'		(bt) '
+				'		<-[:FOR]-(c:Counter) '
+				'		ON CREATE SET '
+				'			c.count = 0, '
+				'			c.name = "tree", '
+				'			c.uid = (block.uid + "_tree") '
+				'	SET c._LOCK_ = True '
+				'	MERGE (tree)-[:IS_IN]->(bt) '
+				'	SET c.count = c.count + 1 '
+				'	REMOVE c._LOCK_ '
+			)
+			tx.run(statement, assign_to_block=self.property_updates['assign_to_block'])
+		if self.property_updates['assign_to_trees']:
+			tx.run(
+				' UNWIND $assign_to_trees AS uid_value '
+				'	MATCH '
+				'		(sample: Sample {uid: uid_value[0]}) '
+				'		-[from:FROM]->(: ItemSamples)'
+				'		-[:FROM]->(: Field) '
+				'		<-[:IS_IN]-(: FieldTrees) '
+				'		<-[:IS_IN]-(tree: Tree) '
+				'	WHERE tree.id IN  extract(x in split(toString(uid_value[1]), ",") | toInteger(trim(x))) '
+				'	MERGE '
+				'		(tree)<-[:FROM]-(is:ItemSamples) '
+				'	CREATE '
+				'		(sample)-[:FROM]>(is) '
+				'	REMOVE from ',
+				assign_to_trees=self.property_updates['assign_to_trees']
+			)
+		if self.property_updates['variety']:
+			variety = [
+				[
+					str(key),
+					value['name'] if 'name' in value else None,
+					value['code'] if 'code' in value else None
+				] for key, value in self.property_updates['variety'].iteritems()
+			]
+			statement = (
+				' UNWIND $variety AS uid_name_code '
+				'	WITH '
+				'		uid_name_code[0] as uid, '
+				'		uid_name_code[1] as name, '
+				'		uid_name_code[2] as code '
+				'	MATCH '
+				'		(item: Item {uid: uid}), '
+				'		(field: Field {uid: '
+				'			CASE '
+				'			WHEN size(split(uid, "_")) = 1 '
+				'				THEN toInteger(uid) '
+				'			ELSE '
+				'				toInteger(split(uid, "_")[0]) '
+				'			END '
+				'		}) '
+				'	OPTIONAL MATCH (item)-[:OF_VARIETY]->(existing:FieldVariety) '
+				'	OPTIONAL MATCH (var_name:Variety {name_lower: name}) '
+				'	OPTIONAL MATCH (var_code:Variety {code: code}) '
+				'	WITH '
+				'		item, '
+				'		field, '
+				'		coalesce(var_name, var_code) as variety '
+				'	WHERE existing IS NULL '
+				'	MERGE '
+				'		(field) '
+				'		-[: CONTAINS_VARIETY]->(fv:FieldVariety) '
+				'		-[: OF_VARIETY]->(variety) '
+				'	CREATE '
+				'		(item) '
+				'		-[: OF_VARIETY]->(fv) '
+			)
+			tx.run(statement, variety=variety)
+		if self.property_updates['harvest_time']:
+			harvest_time = [
+				[
+					str(key),
+					value['date'] if 'date' in value else None,
+					value['time'] if 'time' in value else None
+				] for key, value in self.property_updates['harvest_time']
+			]
+			statement = (
+				' UNWIND $harvest_time AS uid_date_time '
+				'	WITH '
+				'		uid_date_time[0] as uid, '
+				'		uid_date_time[1] as date, '
+				'		uid_date_time[2] as time '
+				'	MATCH '
+				'		(item: Sample { '
+				'			uid: uid '
+				'		})-[:FROM]->(:ItemSamples) '
+				# this match only finds primary samples, others inherit the harvest time from this node
+				'	WHERE '
+				'		item.time IS NULL  '
+				'		AND '
+				'		date IS NOT NULL '
+				'	SET item.time = CASE '
+				'		WHEN time IS NOT NULL '
+				'		THEN apoc.date.parse(date + " " + time, "ms", "yyyy-MM-dd HH:mm") '
+				'		ELSE apoc.date.parse(date + " 12:00, "ms", "yyyy-MM-dd HH:mm") '
+				'		END ',
+			)
+			tx.run(statement, harvest_time=harvest_time)
 
 	def conflicts_file(self):
 		username = self.username
@@ -869,7 +1048,8 @@ class Upload:
 	def parse_rows(self):
 		trimmed_file_path = self.trimmed_file_path
 		submission_type = self.submission_type
-		parse_result = ParseResult(submission_type, self.fieldnames)
+		record_type = self.record_type
+		parse_result = ParseResult(submission_type, record_type, self.fieldnames)
 		self.parse_result = parse_result
 		with open(trimmed_file_path, 'r') as trimmed_file:
 			trimmed_dict = DictReaderInsensitive(trimmed_file)
@@ -886,6 +1066,9 @@ class Upload:
 				# if many errors already then return immediately
 				if parse_result.long_enough():
 					return parse_result
+			#now check that there are no internal conflicts for conditions - overlaps with different values for same uid
+			if record_type == 'condition':
+				pass  # todo from here!!!
 		return parse_result
 
 	def db_check(
@@ -959,7 +1142,6 @@ class Upload:
 				elif record_type == 'trait':
 					statement = Cypher.upload_table_trait_check
 				elif record_type == 'condition':
-					# TODO handle condition conflicts within a file.
 					statement = Cypher.upload_table_condition_check
 				else:
 					statement = None
@@ -1031,7 +1213,7 @@ class Upload:
 		submission_type = self.submission_type
 		filename = self.filename
 		features = self.features
-		self.submission_result = SubmissionResult(username, filename, submission_type)
+		self.submission_result = SubmissionResult(username, filename, submission_type, self.record_type)
 		submission_result = self.submission_result
 		record_type = self.record_type
 		if submission_type == 'FB':
@@ -1058,19 +1240,7 @@ class Upload:
 				features=features,
 				record_type=record_type
 			)
-			if record_type == 'property':
-				update_properties = [
-					'assign to block',
-					'assign to trees',
-					'variety name',
-					'variety code',
-					'tissue',
-					'harvest date',
-					'harvest time',
-
-				]
-				# todo continue from here to handle property updates.
-		# create a submission result
+		# create a submission result and update properties from result
 		for record in result:
 			submission_result.parse_record(record[0])
 		return submission_result
@@ -1083,117 +1253,169 @@ class Upload:
 					upload_object.check_headers
 				)
 				if header_report:
+					with app.app_context():
+						response = header_report
+						html = render_template(
+							'emails/upload_report.html',
+							response=response
+						)
+						subject = "BreedCAFS upload rejected"
+						recipients = [User(username).find('')['email']]
+						response = "Submission rejected due to unrecognised or missing fields.\n "
+						body = response
+						send_email(subject, app.config['ADMINS'][0], recipients, body, html)
 					return {
 						'status': 'ERRORS',
-						'type': 'string',
 						'result': header_report
 					}
 				# clean up the file removing empty lines and whitespace, lower case headers for matching in db
 				upload_object.trim_file()
 				# parse this trimmed file for errors, sets parse_result attribute to upload_object
 				parse_result = upload_object.parse_rows()
-				if parse_result.long_enough():
-					return {
-						'status': 'ERRORS',
-						'type': 'parse_object',
-						'result': parse_result
-					}
-				elif parse_result.duplicate_keys:
-					return {
-						'status': 'ERRORS',
-						'type': 'parse_object',
-						'result': parse_result
-					}
-				# if not too many errors continue to db check (reducing the number of client feedback loops)
-				else:
-					tx = self.neo4j_session.begin_transaction()
-					db_check_result = tx.run(
-						upload_object.db_check,
-						parse_result
-					)
-				if any([db_check_result.field_errors, db_check_result.errors]):
-					tx.close()
-					return {
-						'status': 'ERRORS',
-						'type': 'parse_object',
-						'result': db_check_result
-					}
-				else:
-					# submit data
-					submission_result = tx.run(
-						upload_object.submit
-					)
-					# create summary dict
-					submission_summary = submission_result.summary()
-					# create files
-					conflicts_file = submission_result.conflicts_file()
-					resubmissions_file = submission_result.resubmissions_file()
-					submitted_file = submission_result.submitted_file()
-					# now need app context for the following (this is running asynchronously)
+				if parse_result.duplicate_keys:
+					response = parse_result.duplicate_keys_table()
 					with app.app_context():
-						# create urls
-						if conflicts_file:
-							conflicts_file_url = url_for(
-								'download_file',
-								username=username,
-								filename=conflicts_file,
-								_external=True
-							)
-						else:
-							conflicts_file_url = None
-						if resubmissions_file:
-							resubmissions_file_url = url_for(
-								'download_file',
-								username = username,
-								filename = resubmissions_file,
-								_external = True
-							)
-						else:
-							resubmissions_file_url = None
-						if submitted_file:
-							submitted_file_url = url_for(
-								'download_file',
-								username = username,
-								filename = submitted_file,
-								_external = True
-							)
-						else:
-							submitted_file_url = None
-						if not any([conflicts_file, resubmissions_file, submitted_file]):
-							response = 'No data submitted, please check that you uploaded a completed file'
-							return {
-								'status': 'SUBMITTED',
-								'result': response
-							}
-						# send result of merger in an email
-						subject = "BreedCAFS upload summary"
-						recipients = [User(username).find('')['email']]
-						response = "Submission report:\n "
-						if submission_summary['submitted']:
-							response += "<p> - <a href= " + str(submitted_file_url) + ">" + str(submission_summary['submitted']) \
-								+ "</a> new values were submitted to the database.\n </p>"
-						if submission_summary['resubmissions']:
-							response += "<p> - <a href= " + str(resubmissions_file_url) + ">" + str(submission_summary['resubmissions']) \
-								+ "</a> existing values were already found.\n</p>"
-						if submission_summary['conflicts']:
-							response += "<p> - <a href= " + str(conflicts_file_url) + ">" + str(submission_summary['conflicts']) \
-								+ "</a> conflicts with existing values were found and not submitted.\n</p>"
-						body = "Submission_report: \n"
-						body += " - " + str(submission_summary['submitted']) + 'new values were submitted to the database.\n'
-						body += "   These are available at the following url: " + str(submitted_file_url) + "\n"
-						body += " - " + str(submission_summary['resubmissions']) + 'existing values were already found.\n'
-						body += "   These are available at the following url: " + str(resubmissions_file_url) + "\n"
-						body += (
-							" - "
-							+ str(submission_summary['conflicts'])
-							+ 'conflicts with existing values were found and not submitted.\n'
-						)
-						body += "   These are available at the following url: " + str(conflicts_file_url) + "\n"
 						html = render_template(
 							'emails/upload_report.html',
 							response=response
 						)
+						subject = "BreedCAFS upload rejected"
+						recipients = [User(username).find('')['email']]
+						body = response
 						send_email(subject, app.config['ADMINS'][0], recipients, body, html)
+					return {
+						'status': 'ERRORS',
+						'type': 'parse_object',
+						'result': response
+					}
+				tx = neo4j_session.begin_transaction()
+				db_check_result = upload_object.db_check(tx, parse_result)
+				if any([db_check_result.field_errors, db_check_result.errors]):
+					tx.close()
+					if parse_result.errors:
+						response = parse_result.html_table()
+					if parse_result.field_errors:
+						prepend_response = (
+							'<p>The uploaded table includes the below unrecognised fields. '
+							'Please check the spelling of any traits '
+							'and ensure they are appropriate to the level of items included '
+							'in this file:</p>'
+						)
+						for i in db_check_result.field_errors:
+							prepend_response += '<p> - ' + i + '</p>\n'
+						response = prepend_response + '\n' + response
+					with app.app_context():
+						html = render_template(
+							'emails/upload_report.html',
+							response=response
+						)
+						subject = "BreedCAFS upload rejected"
+						recipients = [User(username).find('')['email']]
+						body = response
+						send_email(subject, app.config['ADMINS'][0], recipients, body, html)
+					return {
+						'status': 'ERRORS',
+						'type': 'parse_object',
+						'result': response
+					}
+				else:
+					# submit data
+					submission_result = upload_object.submit(tx)
+					# update properties where needed
+					submission_result.update_properties(tx)
+					if submission_result.conflicts:
+						tx.rollback
+						conflicts_file = submission_result.conflicts_file()
+						with app.app_context():
+							# create urls
+							if conflicts_file:
+								conflicts_file_url = url_for(
+									'download_file',
+									username=username,
+									filename=conflicts_file,
+									_external=True
+								)
+								response = (
+									'<p><a href= "'
+									+ str(conflicts_file_url)
+									+ '">'
+									+ str(len(submission_result.conflicts)) +
+									'conflicts were found. </a> '
+									'Typically a report on such conflicts is generated before merger, however '
+									'this situation can occur when conflicting records are submitted concurrently. '
+									'Your submission has been rejected. Please address the listed conflicts '
+									'before resubmitting. '
+									'</p> '
+								)
+								html = render_template(
+									'emails/upload_report.html',
+									response=response
+								)
+								# send result of merger in an email
+								subject = "BreedCAFS upload rejected"
+								recipients = [User(username).find('')['email']]
+								response = "Submission rejected:\n " + response
+								body = response
+								send_email(subject, app.config['ADMINS'][0], recipients, body, html)
+								return {
+									'status': 'ERRORS',
+									'type': 'string',
+									'result': response
+								}
+					else:
+						tx.commit()
+						# create summary dict
+						submission_summary = submission_result.summary()
+						# create files
+						resubmissions_file = submission_result.resubmissions_file()
+						submitted_file = submission_result.submitted_file()
+						# now need app context for the following (this is running asynchronously)
+						with app.app_context():
+							if resubmissions_file:
+								resubmissions_file_url = url_for(
+									'download_file',
+									username=username,
+									filename=resubmissions_file,
+									_external=True
+								)
+							else:
+								resubmissions_file_url = None
+							if submitted_file:
+								submitted_file_url = url_for(
+									'download_file',
+									username=username,
+									filename=submitted_file,
+									_external=True
+								)
+							else:
+								submitted_file_url = None
+							if not any([resubmissions_file, submitted_file]):
+								response = 'No data submitted, please check that you uploaded a completed file'
+								return {
+									'status': 'ERRORS',
+									'type': 'string',
+									'result': response
+								}
+							# send result of merger in an email
+							subject = "BreedCAFS upload summary"
+							recipients = [User(username).find('')['email']]
+							response = "Submission report:\n "
+							if submission_summary['submitted']:
+								response += "<p> - <a href= " + str(submitted_file_url) + ">" + str(submission_summary['submitted']) \
+									+ "</a> new values were submitted to the database.\n </p>"
+							if submission_summary['resubmissions']:
+								response += "<p> - <a href= " + str(resubmissions_file_url) + ">" + str(submission_summary['resubmissions']) \
+									+ "</a> existing values were already found.\n</p>"
+							body = "Submission_report: \n"
+							body += " - " + str(submission_summary['submitted']) + 'new values were submitted to the database.\n'
+							body += "   These are available at the following url: " + str(submitted_file_url) + "\n"
+							body += " - " + str(submission_summary['resubmissions']) + 'existing values were already found.\n'
+							body += "   These are available at the following url: " + str(resubmissions_file_url) + "\n"
+							html = render_template(
+								'emails/upload_report.html',
+								response=response
+							)
+							send_email(subject, app.config['ADMINS'][0], recipients, body, html)
 					return {
 						'status': 'SUCCESS',
 						'result': response

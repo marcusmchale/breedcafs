@@ -29,7 +29,11 @@ def get_driver():
 		connection_acquisition_timeout=5,
 		max_retry_time=5
 	)
-	# watch("neo4j.bolt", logging.INFO, open(app.config['NEO4J_DRIVER_LOG'], 'w+'))
+	neo4j_log = logging.getLogger("neobolt")
+	neo4j_log.setLevel(logging.DEBUG)
+	fh = logging.FileHandler(app.config['NEO4J_DRIVER_LOG'])
+	fh.setLevel(logging.DEBUG)
+	neo4j_log.addHandler(fh)
 	return DriverHolder.driver
 
 
