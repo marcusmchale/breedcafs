@@ -196,13 +196,17 @@ class Download:
 				file_path = os.path.join(self.user_download_folder, filename)
 		return file_path
 
-	def set_features(self, item_level, record_type, feature_group=None, features=None):
+	def set_features(self, item_level, record_type, feature_group=None, features=None, sample_level=None):
 		self.features = FeatureList(
 			item_level,
 			record_type).get_features(
 			feature_group=feature_group,
 			features=features
 		)
+		if item_level == 'sample' and feature_group == "Registration" and sample_level != 'field':
+			# drop "assign to trees and assign to samples"
+			not_used_features = ["assign to trees", "assign to samples"]
+			self.features = [i for i in self.features if i['name_lower'] not in not_used_features]
 
 	def record_form_to_template(
 		self,

@@ -327,6 +327,10 @@ def submit_records():
 								)
 							)
 				record_form = FeatureFormDetailed()
+				if record_type == 'trait':
+					record_form.record_time.validators = [
+						InputRequired()
+					]
 				record_form.feature_group.choices += SelectionList.get_feature_groups(item_level, record_type)
 				features_list = [(feature['name_lower'], feature['name']) for feature in features_details]
 				record_form.select_features.choices = features_list

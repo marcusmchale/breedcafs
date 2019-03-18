@@ -114,7 +114,10 @@ $(window).on('load', level_update);
 
 level_select.change(level_update);
 
-$(country_select, region_select, farm_select, field_select, block_select).change(update_item_count);
+$(region_select).change(update_item_count);
+$(farm_select).change(update_item_count);
+$(field_select).change(update_item_count);
+$(country_select).change(update_item_count);
 $(block_select).change(update_item_count);
 
 tree_id_list_box.keypress(function(e){

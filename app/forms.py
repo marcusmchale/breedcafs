@@ -701,10 +701,6 @@ class RecordForm(FlaskForm):
 		record_type = form.record_type.data if form.record_type.data not in ['', 'None'] else None
 		if record_type:
 			form.feature_group.choices += SelectionList.get_feature_groups(item_level, record_type)
-			if record_type == 'trait':
-				form.record_time.validators = [
-					InputRequired()
-				]
 		selected_feature_group = form.feature_group.data if form.feature_group.data not in ['', 'None'] else None
 		if selected_feature_group:
 			features_details = FeatureList(

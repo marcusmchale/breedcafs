@@ -22,9 +22,7 @@ class Record:
 			tx = self.neo4j_session.begin_transaction()
 			if record_data['record_type'] == 'condition':
 				# for condition data we first query for conflicts since there are many types of conflict
-				# for traits we don't need this as it is simpler to perform during the merger
-				#    - traits can only have a single value at a single time
-				#    - so only conflict with different value at that time
+				# for traits we don't do this as it is simpler to perform during the merger
 				conflicts_query = self.build_condition_conflicts_query(record_data)
 				conflicts = tx.run(
 						conflicts_query['statement'],
@@ -60,7 +58,8 @@ class Record:
 						'variety code',
 						'custom id',
 						'assign to block',
-						'assign to trees'
+						'assign to trees',
+						'assign to samples'
 					} & set(record_data['selected_features'])
 			):
 				match_item_query = ItemList.build_match_item_statement(record_data)
@@ -97,10 +96,9 @@ class Record:
 							' MERGE (field)-[:CONTAINS_VARIETY]->(fv:FieldVariety)-[:OF_VARIETY]->(update_variety) '
 						)
 					update_variety_statement += (
-						' MERGE (item)-[s1:OF_VARIETY]->(fv) '
-						'	ON CREATE SET '
-						'		s1.time = timestamp(), '
-						'		s1.username = $username '
+						' MERGE (item)-[:OF_VARIETY]->(fv) '
+						' RETURN '
+						'	'
 					)
 					tx.run(update_variety_statement, update_variety_parameters)
 				if 'assign to block' in record_data['selected_features']:
@@ -143,29 +141,52 @@ class Record:
 					update_trees_statement = match_item_query[0]
 					update_trees_parameters = match_item_query[1]
 					update_trees_parameters['username'] = record_data['username']
-					update_trees_parameters['assign_to_trees'] = int(record_data['features_dict']['assign to trees'])
+					update_trees_parameters['assign_to_trees'] = record_data['features_dict']['assign to trees']
 					update_trees_statement += (
 						' WITH DISTINCT item, field '
-						' OPTIONAL MATCH '
-						'	(item)-[:FROM]->(:ItemSamples)-[:FROM]->(assigned_tree:Tree) '
-						' OPTIONAL MATCH '
-						'	(item)-[:FROM]->(source_sample:Sample) '
-						' WITH item, field '
-						' WHERE assigned_tree IS NULL '
-						' AND source_sample IS NULL '
 						' MATCH '
-						'	(tree: Tree)-[:IS_IN]->(:FieldTrees)-[:IS_IN]->(field) '
-						' WHERE tree.id IN $assign_to_trees '
+						'	(item)'
+						'	-[: FROM]->(: ItemSamples) '
+						'	-[: FROM]->(field) '
+						'	<-[:IS_IN]-(: FieldTrees) '
+						'	<-[:IS_IN]-(tree: Tree) '
+						' WHERE tree.id IN extract(x in split($assign_to_trees, ",") | toInteger(trim(x))) '
 						' MERGE '
 						' 	(item_samples: ItemSamples)'
 						'	-[: FROM]->(tree) '
-						' MERGE '
-						' 	(item)-[s1: FROM]->(item_samples) '
-						' ON CREATE SET '
-						' 	s1.time = timestamp(), '
-						' 	s1.user = $username '
+						' CREATE '
+						' 	(item)-[:FROM]->(item_samples) '
 					)
 					tx.run(update_trees_statement, update_trees_parameters)
+				if 'assign_to_samples' in record_data['selected_features']:
+					update_samples_statement = match_item_query[0]
+					update_samples_parameters = match_item_query[1]
+					update_samples_parameters['username'] = record_data['username']
+					update_samples_parameters['assign_to_samples'] = record_data['features_dict']['assign to samples']
+					update_samples_statement += (
+						' WITH DISTINCT item, field '
+						' MATCH '
+						'	(item)'
+						'	-[from_field: FROM]->(: ItemSamples) '
+						'	-[: FROM]->(field) '
+						' MATCH '
+						'	(field)'
+						'	<-[:FROM | IS_IN*]-(sample: Sample) '
+						' WHERE sample.id IN extract(x in split($assign_to_samples, ",") | toInteger(trim(x))) '
+						' AND item.id <> sample.id '
+						' CREATE '
+						' 	(item)-[from_sample:FROM]->(sample) '
+						' WITH item, sample, from_field, from_sample '
+						# prevent cycles 
+						'	OPTIONAL MATCH cycle = (sample)-[: FROM *]->(sample) '
+						'	FOREACH (n IN CASE WHEN cycle IS NULL THEN [1] ELSE [] END | '
+						'		DELETE from_field '
+						'	) '
+						'	FOREACH (n IN CASE WHEN cycle IS NOT NULL THEN [1] ELSE [] END | '
+						'		DELETE from_sample '
+						'	) '
+					)
+					tx.run(update_samples_statement, update_samples_parameters)
 				if 'custom id' in record_data['selected_features']:
 					update_custom_id_statement = match_item_query[0] + ' WITH DISTINCT item '
 					update_custom_id_parameters = match_item_query[1]
@@ -357,7 +378,7 @@ class Record:
 			' OPTIONAL MATCH '
 			'	(u)-[: AFFILIATED {data_shared: True}]->(p: Partner) '
 			' OPTIONAL MATCH '
-			'	(p)<-[a: AFFILIATED]-(: User {username_lower: toLower($username)}) '
+			'	(p)<-[access: AFFILIATED]-(: User {username_lower: toLower($username)}) '
 			' RETURN { '
 			'	UID: item_uid, '
 			'	feature: feature.name, '
@@ -366,13 +387,13 @@ class Record:
 			# returning value if just submitted, regardless of access
 			'			WHEN r.found '
 			'			THEN CASE '
-			'				WHEN a.confirmed '
+			'				WHEN access.confirmed '
 			'				THEN r.value '
-			'				ELSE "ACCESS RESTRICTED" '
+			'				ELSE "ACCESS DENIED" '
 			'				END '
 			'			ELSE value '
 			'			END, '
-			'	access: a.confirmed, '
+			'	access: access.confirmed, '
 			'	conflict: '
 			'		CASE '
 			'			WHEN r.value = value '
@@ -382,7 +403,7 @@ class Record:
 			'	found: r.found, '
 			'	submitted_at: s.time, '
 			'	user: CASE '
-			'		WHEN a.confirmed = True '
+			'		WHEN access.confirmed = True '
 			'			THEN u.name '
 			'		ELSE '
 			'			p.name '
@@ -541,7 +562,7 @@ class Record:
 			'			THEN CASE '
 			'				WHEN a.confirmed '
 			'				THEN r.value '
-			'				ELSE "ACCESS RESTRICTED" '
+			'				ELSE "ACCESS DENIED" '
 			'				END '
 			'			ELSE r.value '
 			'			END, '
@@ -555,7 +576,7 @@ class Record:
 			'	found: r.found, '
 			'	submitted_at: s.time, '
 			'	user: CASE '
-			'		WHEN a.confirmed = True '
+			'		WHEN a.confirmed '
 			'			THEN u.name '
 			'		ELSE '
 			'			p.name '
@@ -739,7 +760,9 @@ class Record:
 			'	value: CASE WHEN access THEN r.value ELSE "ACCESS DENIED" END, '
 			'	submitted_at: submitted_at, '
 			'	user: CASE WHEN access THEN user ELSE partner END, '
-			'	access: access '
+			'	access: access, '
+			'	found: True, '
+			'	conflict: True '
 			' } '
 			' ORDER BY toLower(feature) '
 		)
@@ -886,15 +909,29 @@ class Record:
 			'	<-[: SUBMITTED]-(: Records) '
 			'	<-[: SUBMITTED]-(: Submissions) '
 			'	<-[: SUBMITTED]-(u: User) '
+			'	-[:AFFILIATED {data_shared: true}]->(p:Partner) '
+			'	OPTIONAL MATCH '
+			'		(p)<-[access: AFFILIATED]-(: User {username_lower: toLower($username)}) '
 			' RETURN { '
 			'	UID: item_uid, '
 			'	start: r.start,	'
 			'	end: r.end, '
 			'	feature: feature.name, '
-			'	value: r.value, '
+			'	value: '
+			'		CASE '
+			'			WHEN r.found '
+			'			THEN CASE '
+			'				WHEN access IS NOT NULL '
+			'				THEN r.value '
+			'				ELSE "ACCESS DENIED" '
+			'				END '
+			'			ELSE r.value '
+			'			END, '
 			'	found: r.found, '
 			'	submitted_at: s.time, '
-			'	user: u.name '
+			'	user: u.name, '
+			'	access: access.confirmed, '
+			'	conflict: False'
 			' } '
 			' ORDER BY feature.name_lower '
 		)
@@ -972,26 +1009,18 @@ class Record:
 			row_string += '</td><td>'.join(row_data)
 			# if existing record then we highlight it, colour depends on value
 			# only do the highlighting if have access to the data
-			if 'access' in record and record['access']:
-				if 'found' in record and record['found']:
-					if 'conflict' in record and not record['conflict']:
-						row_string += '</td><td bgcolor = #00FF00>'
-					else:
+			if record['found']:
+				if record['access']:
+					if 'conflict' in record and record['conflict']:
 						conflicts_found = True
 						row_string += '</td><td bgcolor = #FF0000>'
-				else:
-					# found not returned in conflicts query (all records are "found")
-					if 'found' not in record:
-						row_string += '</td><td bgcolor = #FF0000>'
 					else:
-						row_string += '</td><td>'
-			else:
-				# result of condition merger doesn't report access as all records are known to have access
-				# due to prior conflicts query, these
-				if 'access' not in record and record['found']:
-					row_string += '</td><td bgcolor = #00FF00>'
+						row_string += '</td><td bgcolor = #00FF00>'
 				else:
-					row_string += '</td><td>'
+					conflicts_found = True
+					row_string += '</td><td bgcolor = #FF0000>'
+			else:
+				row_string += '</td><td>'
 			row_string += str(record['value']) + '</td></tr>'
 			header_string += row_string
 		return {

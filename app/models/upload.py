@@ -504,6 +504,7 @@ class SubmissionResult:
 			'custom_id': [],
 			'assign_to_block': [],
 			'assign_to_trees': [],
+			'assign_to_samples': [],
 			'tissue': [],
 			'variety': {},
 			'harvest_time': {}
@@ -517,7 +518,7 @@ class SubmissionResult:
 
 	def parse_record(self, record):
 		submission_item = SubmissionRecord(record)
-		if record['conflicts']:
+		if 'conflicts' in record and record['conflicts']:
 			self.conflicts.append(submission_item)
 		elif not record['found']:
 			self.submitted.append(submission_item)
@@ -536,6 +537,10 @@ class SubmissionResult:
 					)
 				if record['feature'].lower() == 'assign to trees':
 					self.property_updates['assign_to_trees'].append(
+						[record['uid'], record['value']]
+					)
+				if record['feature'].lower() == 'assign to samples':
+					self.property_updates['assign_to_samples'].append(
 						[record['uid'], record['value']]
 					)
 				if record['feature'].lower() == 'variety name':
@@ -614,13 +619,39 @@ class SubmissionResult:
 				'		-[:FROM]->(: Field) '
 				'		<-[:IS_IN]-(: FieldTrees) '
 				'		<-[:IS_IN]-(tree: Tree) '
-				'	WHERE tree.id IN  extract(x in split(toString(uid_value[1]), ",") | toInteger(trim(x))) '
+				'	WHERE tree.id IN extract(x in split(uid_value[1], ",") | toInteger(trim(x))) '
 				'	MERGE '
 				'		(tree)<-[:FROM]-(is:ItemSamples) '
 				'	CREATE '
-				'		(sample)-[:FROM]>(is) '
-				'	REMOVE from ',
+				'		(sample)-[:FROM]->(is) '
+				'	DELETE from ',
 				assign_to_trees=self.property_updates['assign_to_trees']
+			)
+		if self.property_updates['assign_to_samples']:
+			tx.run(
+				' UNWIND $assign_to_samples AS uid_value '
+				'	MATCH '
+				'		(sample: Sample {uid: uid_value[0]}) '
+				'		-[from_field:FROM]->(: ItemSamples) '
+				'		-[:FROM]->(field: Field) '
+				'	MATCH '
+				'		(field)'
+				'		<-[: FROM | IS_IN *]-(source_sample: Sample) '
+				'	WHERE source_sample.id IN extract(x in split(uid_value[1], ",") | toInteger(trim(x))) '
+				# prevent self targeting
+				'	AND sample.id <> source_sample.id '
+				'	CREATE '
+				'		(sample)-[from_sample: FROM]->(source_sample) '
+				'	WITH sample, source_sample, from_field, from_sample '
+				# prevent cycles 
+				'	OPTIONAL MATCH cycle = (sample)-[: FROM *]->(sample) '
+				'	FOREACH (n IN CASE WHEN cycle IS NULL THEN [1] ELSE [] END | '
+				'		DELETE from_field '				
+				'	) '
+				'	FOREACH (n IN CASE WHEN cycle IS NOT NULL THEN [1] ELSE [] END | '
+				'		DELETE from_sample '				
+				'	) ',
+				assign_to_samples=self.property_updates['assign_to_samples']
 			)
 		if self.property_updates['variety']:
 			variety = [
@@ -633,26 +664,34 @@ class SubmissionResult:
 			statement = (
 				' UNWIND $variety AS uid_name_code '
 				'	WITH '
-				'		uid_name_code[0] as uid, '
+				'		CASE '
+				'			WHEN size(split(uid_name_code[0], "_")) = 1 '
+				'			THEN toInteger(uid_name_code[0]) '
+				'			ELSE uid_name_code[0] '
+				'			END as uid, '
 				'		uid_name_code[1] as name, '
 				'		uid_name_code[2] as code '
 				'	MATCH '
 				'		(item: Item {uid: uid}), '
 				'		(field: Field {uid: '
 				'			CASE '
-				'			WHEN size(split(uid, "_")) = 1 '
-				'				THEN toInteger(uid) '
+				'			WHEN toInteger(uid) IS NOT NULL '
+				'				THEN uid '
 				'			ELSE '
 				'				toInteger(split(uid, "_")[0]) '
 				'			END '
-				'		}) '
+				'		}), '
+				'		(variety: Variety) '
+				'		WHERE '
+				'			variety.name_lower = toLower(trim(name)) '
+				'			OR '
+				'			variety.code = toLower(trim(code)) '
 				'	OPTIONAL MATCH (item)-[:OF_VARIETY]->(existing:FieldVariety) '
-				'	OPTIONAL MATCH (var_name:Variety {name_lower: name}) '
-				'	OPTIONAL MATCH (var_code:Variety {code: code}) '
 				'	WITH '
 				'		item, '
 				'		field, '
-				'		coalesce(var_name, var_code) as variety '
+				'		collect(variety)[0] as variety, '
+				'		existing '
 				'	WHERE existing IS NULL '
 				'	MERGE '
 				'		(field) '
@@ -669,7 +708,7 @@ class SubmissionResult:
 					str(key),
 					value['date'] if 'date' in value else None,
 					value['time'] if 'time' in value else None
-				] for key, value in self.property_updates['harvest_time']
+				] for key, value in self.property_updates['harvest_time'].iteritems()
 			]
 			statement = (
 				' UNWIND $harvest_time AS uid_date_time '
@@ -689,8 +728,8 @@ class SubmissionResult:
 				'	SET item.time = CASE '
 				'		WHEN time IS NOT NULL '
 				'		THEN apoc.date.parse(date + " " + time, "ms", "yyyy-MM-dd HH:mm") '
-				'		ELSE apoc.date.parse(date + " 12:00, "ms", "yyyy-MM-dd HH:mm") '
-				'		END ',
+				'		ELSE apoc.date.parse(date + " 12:00", "ms", "yyyy-MM-dd HH:mm") '
+				'		END '
 			)
 			tx.run(statement, harvest_time=harvest_time)
 
@@ -1066,9 +1105,6 @@ class Upload:
 				# if many errors already then return immediately
 				if parse_result.long_enough():
 					return parse_result
-			#now check that there are no internal conflicts for conditions - overlaps with different values for same uid
-			if record_type == 'condition':
-				pass  # todo from here!!!
 		return parse_result
 
 	def db_check(
