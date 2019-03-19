@@ -107,6 +107,7 @@ def generate_file():
 				download_object = Download(username)
 				record_type = request.form['record_type'] if request.form['record_type'] != '' else None
 				data_format = request.form['data_format']
+				file_type = request.form['file_type']
 				# collect the filters into a dictionary to pass as parameters
 				submission_start = int(
 					(
@@ -136,11 +137,11 @@ def generate_file():
 				) if request.form['record_date_to'] != '' else None
 				# sanity check on start and end
 				if any([
-					submission_start and submission_start >= submission_end,
-					record_start and record_start >= record_end
+					((submission_start and submission_end) and (submission_start >= submission_end)),
+					((record_start and record_end) and (record_start >= record_end))
 				]):
 					return jsonify({
-						'submitted': 'Please make sure the start date is before the end date'
+						'result': 'Please make sure the start date is before the end date'
 					})
 				item_level = request.form['item_level'] if request.form['item_level'] != '' else None
 				country = request.form['country'] if request.form['country'] != '' else None
@@ -165,6 +166,7 @@ def generate_file():
 					'record_start': record_start,
 					'record_end': record_end,
 					'item_level': item_level,
+					'record_type': record_type,
 					'country': country,
 					'region': region,
 					'farm': farm,
@@ -174,7 +176,8 @@ def generate_file():
 					'sample_id_list': sample_id_list,
 					'selected_features': selected_features
 				}
-				return jsonify(download_object.collect_records(parameters, data_format))
+				records = download_object.collect_records(parameters, data_format)
+				return jsonify(download_object.records_to_file(records, data_format, file_type))
 			else:
 				errors = jsonify({
 					'errors':[location_form.errors, download_form.errors]

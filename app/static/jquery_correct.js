@@ -3,7 +3,8 @@ const item_level_select = $('#item_level');
 const feature_group_select = $('#feature_group');
 const feature_selection_div = $('#feature_selection');
 const feature_checkbox_div = $('#feature_checkbox_div');
-const submit_download_button = $('#submit_download');
+const submit_list_button = $('#list_records');
+const submit_delete_button = $('#delete_records');
 
 
 //Render a calendar in jquery-ui for date selection
@@ -87,18 +88,19 @@ features_update = function() {
     });
 };
 
-submit_download_button.click( function (e) {
+submit_list_button.click( function (e) {
     e.preventDefault();
     remove_flash();
     const wait_message = "Please wait for template to be generated";
     const flash_wait = "<div id='submit_flash' class='flash'>" + wait_message + "</div>";
-    submit_download_button.after(flash_wait);
+    submit_list_button.after(flash_wait);
     const data = $("form").serialize();
     $.ajax({
-        url: "/download/generate_file",
+        url: "/correct/list_records",
         data: data,
         type: 'POST',
         success: function(response) {
+            console.log(response);
             if (response.hasOwnProperty('result')) {
                 const flash_submitted = "<div id='submit_flash' class='flash'>" + response.result + "</div>";
                 $("#submit_flash").replaceWith(flash_submitted);
@@ -118,6 +120,49 @@ submit_download_button.click( function (e) {
             }
         },
         error: function(error) {
+            console.log(error);
+            const error_message = error.status === 500 ? 'An error has occurred. Please try again':
+                'An unknown error as occurred, please contact an administrator';
+            const flash_error = "<div id='submit_flash' class='flash'>" + error_message + "</div>";
+            $("#submit_flash").replaceWith(flash_error);
+		}
+    })
+});
+
+
+submit_delete_button.click( function (e) {
+    e.preventDefault();
+    remove_flash();
+    const wait_message = "Please wait for template to be generated";
+    const flash_wait = "<div id='submit_flash' class='flash'>" + wait_message + "</div>";
+    submit_delete_button.after(flash_wait);
+    const data = $("form").serialize();
+    $.ajax({
+        url: "/correct/delete_records",
+        data: data,
+        type: 'POST',
+        success: function(response) {
+            console.log(response);
+            if (response.hasOwnProperty('result')) {
+                const flash_submitted = "<div id='submit_flash' class='flash'>" + response.result + "</div>";
+                $("#submit_flash").replaceWith(flash_submitted);
+            } else {
+                $("#submit_flash").remove();
+                if (response.hasOwnProperty('errors')) {
+                    const errors= response['errors'];
+                    for (let i = 0; i < errors.length; i++) {
+                        for (const key in errors[i]) {
+                            if (errors[i].hasOwnProperty(key)) {
+                                const flash = "<div id='flash_" + key + "' class='flash'>" + errors[i][key][0] + "</div>";
+                                $('[id="' + key + '"').after(flash);
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        error: function(error) {
+            console.log(error);
             const error_message = error.status === 500 ? 'An error has occurred. Please try again':
                 'An unknown error as occurred, please contact an administrator';
             const flash_error = "<div id='submit_flash' class='flash'>" + error_message + "</div>";

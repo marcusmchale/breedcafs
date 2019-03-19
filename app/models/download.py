@@ -517,20 +517,15 @@ class Download:
 			with_timestamp=with_timestamp
 		)
 
-	def collect_records(
-			self,
+	@staticmethod
+	def user_record_query(
 			parameters,
-			data_format
+			data_format='db'
 	):
-		# TODO this statement could be optimised per level (or even just 'include sample or not')
+		# make sure you have a match for both "partner" and "user" before adding this statement
 		statement = (
 			' MATCH '
-			'	(: User {username_lower: toLower($username)}) '
-			'	-[: AFFILIATED {confirmed: True}]->(partner: Partner) '
-			' MATCH '
-			'	(partner)'
-			'	<-[: AFFILIATED {data_shared: True}]-(user: User) '
-			'	-[: SUBMITTED]->(: Submissions)'
+			'	(user)-[: SUBMITTED]->(: Submissions)'
 			'	-[: SUBMITTED]->(: Records) '
 			'	-[: SUBMITTED]->(: UserFieldFeature) '
 			'	-[submitted: SUBMITTED]->(record: Record) '
@@ -542,21 +537,12 @@ class Download:
 			'	-[:FROM | IS_IN *]->(farm: Farm) '
 			'	-[:IS_IN]->(region: Region) '
 			'	-[:IS_IN]->(country: Country) '
-			' OPTIONAL MATCH (item)-[: FROM*]->(sample_sample: Sample) '
-			' OPTIONAL MATCH (item)-[: FROM*]->(sample_tree: Tree) '
-			' OPTIONAL MATCH (sample_tree)-[:IS_IN]->(:BlockTrees) '
-			'	-[:IS_IN]->(sample_tree_block: Block) '
-			' OPTIONAL MATCH (sample_tree)-[:IS_IN]->(:FieldTrees) '
-			'	-[:IS_IN]->(sample_tree_field: Field) '
-			' OPTIONAL MATCH (item)-[: FROM*]->(sample_field: Field) '
-			' OPTIONAL MATCH (item)-[: IS_IN]->(: BlockTrees) '
-			'	-[: IS_IN]->(tree_block: Block) '
-			' OPTIONAL MATCH (item)-[: IS_IN]->(: FieldTrees) '
-			'	-[: IS_IN]->(tree_field: Field) '
-			' OPTIONAL MATCH (item)-[: IS_IN]->(: FieldBlocks) '
-			'	-[: IS_IN]->(block_field: Field) '
 		)
 		filters = []
+		if parameters['selected_features']:
+			filters.append(
+				' feature.name_lower IN $selected_features '
+			)
 		if parameters['submission_start']:
 			filters.append(' submitted.time >= $submission_start ')
 		if parameters['submission_end']:
@@ -568,46 +554,46 @@ class Download:
 			filters.append(
 				' ('
 				'	( '
-				'	CASE WHEN record.time THEN record.time ELSE Null END >= $record_start '
+				'	CASE WHEN record.time IS NOT NULL THEN record.time ELSE $record_start END >= $record_start '
 				'	AND '
-				'	CASE WHEN record.time THEN record.time ELSE Null END < $record_end '
+				'	CASE WHEN record.time IS NOT NULL THEN record.time ELSE $record_end END <= $record_end '
 				'	) OR ( '
-				'	CASE WHEN record.start THEN record.start ELSE Null END < $record_end '
+				'	CASE WHEN record.start <> False THEN record.start ELSE $record_end END <= $record_end '
 				'	AND '
-				'	CASE WHEN record.end THEN record.end ELSE Null END > $record_start '
+				'	CASE WHEN record.end <> False THEN record.end ELSE $record_start END >= $record_start '
 				'	) OR ( '
-				'	record.start IS FALSE '
+				'	record.start = False '
 				'	AND '
-				'	CASE WHEN record.end THEN record.end ELSE Null END > $record_start '
+				'	CASE WHEN record.end <> False THEN record.end ELSE $record_start END >= $record_start '
 				'	AND '
-				'	CASE WHEN record.end THEN record.end ELSE Null END <= $record_end'
+				'	CASE WHEN record.end <> False THEN record.end ELSE $record_end END <= $record_end'
 				'	) OR ( '
-				'	CASE WHEN record.start THEN record.start ELSE Null END < $record_end '
+				'	CASE WHEN record.start <> False THEN record.start ELSE $record_end END <= $record_end '
 				'	AND '
-				'	CASE WHEN record.start THEN record.start ELSE Null END >= $record_start '
+				'	CASE WHEN record.start <> False THEN record.start ELSE $record_start END >= $record_start '
 				'	AND '
-				'	record.end IS FALSE '
+				'	record.end = FALSE '
 				'	) '
 				') '
 			)
 		elif parameters['record_start']:
 			filters.append(
 				' ( '
-				'	CASE WHEN record.time THEN record.time ELSE Null END >= $record_start '
+				'	CASE WHEN record.time IS NOT NULL THEN record.time ELSE $record_start END >= $record_start '
 				'	OR '
-				'	CASE WHEN record.end THEN record.end ELSE Null END > $record_start '
+				'	CASE WHEN record.end <> False THEN record.end ELSE $record_start END >= $record_start '
 				'	OR '
-				'	CASE WHEN record.start THEN record.start ELSE Null END >= $record_start '
+				'	CASE WHEN record.start <> False THEN record.start ELSE $record_start END >= $record_start '
 				' ) '
 			)
 		elif parameters['record_end']:
 			filters.append(
 				' ( '
-				'	CASE WHEN record.time THEN record.time ELSE Null END < $record_end '
+				'	CASE WHEN record.time IS NOT NULL THEN record.time ELSE $record_end END < $record_end '
 				'	OR '
-				'	CASE WHEN record.end THEN record.end ELSE Null END <= $record_end '
+				'	CASE WHEN record.end <> False THEN record.end ELSE $record_end END <= $record_end '
 				'	OR '
-				'	CASE WHEN record.start THEN record.start ELSE Null END < $record_end '
+				'	CASE WHEN record.start <> False THEN record.start ELSE $record_end END < $record_end '
 				' ) '
 			)
 		if parameters['item_level']:
@@ -631,88 +617,60 @@ class Download:
 			filters.append(
 				' farm.name_lower = toLower(trim($farm)) '
 			)
-		if parameters['field_uid']:
-			filters.append(
-				' ( '
-				'	sample_field.uid = $field_uid '
-				'	OR '
-				'	tree_field.uid = $field_uid '
-				'	OR '
-				'	block_field.uid = $field_uid '
-				'	OR '
-				'	item.uid = $field_uid '
-				' ) '
-			)
-		if parameters['block_uid']:
-			filters.append(
-				' ( '
-				'	sample_tree_block.uid = $block_uid '
-				'	OR '
-				'	tree_block.uid = $block_uid '
-				'	OR '
-				'	item.uid = $block_uid '
-				' ) '
-			)
-		if parameters['tree_id_list']:
-			filters.append (
-				' ( '
-				'	sample_tree.id IN $tree_id_list '
-				'	OR '
-				'	(	'
-				'		item: Tree '
-				'		AND '
-				'		item.id IN $tree_id_list '
-				'	) '
-				' ) '
-			)
-		if parameters['sample_id_list']:
-			filters.append (
-				' (	'
-				'	item: Sample '
-				'	AND '
-				'	item.id IN $tree_id_list '
-				' ) '
-			)
-		if parameters['selected_features']:
-			filters.append(
-				' feature.name_lower in $selected_features '
-			)
 		if filters:
 			statement += (
 				' WHERE '
 			)
 			statement += ' AND '.join(filters)
 		statement += (
+			' OPTIONAL MATCH (item)-[: FROM*]->(sample_sample: Sample) '
+			' OPTIONAL MATCH (item)-[: FROM*]->(sample_tree: Tree) '
+			' OPTIONAL MATCH (sample_tree)-[:IS_IN]->(:BlockTrees) '
+			'	-[:IS_IN]->(sample_tree_block: Block) '
+			' OPTIONAL MATCH (sample_tree)-[:IS_IN]->(:FieldTrees) '
+			'	-[:IS_IN]->(sample_tree_field: Field) '
+			' OPTIONAL MATCH (item)-[: FROM*]->(sample_field: Field) '
+			' OPTIONAL MATCH (item)-[: IS_IN]->(: BlockTrees) '
+			'	-[: IS_IN]->(tree_block: Block) '
+			' OPTIONAL MATCH (item)-[: IS_IN]->(: FieldTrees) '
+			'	-[: IS_IN]->(tree_field: Field) '
+			' OPTIONAL MATCH (item)-[: IS_IN]->(: FieldBlocks) '
+			'	-[: IS_IN]->(block_field: Field) '
 			' WITH '
 			'	record_type.name_lower as record_type, '
 			'	feature.name as Feature, '
-			'	partner.name as Partner, ' 
+			'	partner.name as Partner, '
 			'	user.name as `Submitted by`, '
+			'	item, '
 			'	item.uid as UID, '
 			'	item.id as ID, '
 			'	item.custom_id as `Custom ID`,'
 			'	COLLECT(DISTINCT sample_sample.id) as `Source samples`, '
 			'	COLLECT(DISTINCT sample_tree.id) as `Source trees`, '
 			'	COALESCE( '
+			'		CASE WHEN item: Block THEN item.name ELSE Null END, '
 			'		tree_block.name, '
 			'		COLLECT(DISTINCT sample_tree_block.name) '
 			'	) as Block, '
 			'	COALESCE( '
+			'		CASE WHEN item: Block THEN item.id ELSE Null END, '
 			'		tree_block.id, '
 			'		COLLECT(DISTINCT sample_tree_block.id) '
 			'	) as `Block ID`, '
 			'	COALESCE ( '
-			'		sample_tree_field.uid, '
-			'		sample_field.uid, '
-			'		tree_field.uid, '
-			'		block_field.uid '
-			'	) as `Field UID`, '
-			'	COALESCE ( '
+			'		CASE WHEN item: Field THEN item.name ELSE Null END, '
 			'		sample_tree_field.name, '
 			'		sample_field.name, '
 			'		tree_field.name, '
 			'		block_field.name '
 			'	) as Field, '
+			'	COALESCE ( '
+			'		CASE WHEN item: Field THEN item.uid ELSE Null END, '
+			'		sample_tree_field.uid, '
+			'		sample_field.uid, '
+			'		tree_field.uid, '
+			'		block_field.uid '
+			'	) as `Field UID`, '
 			'	farm.name as Farm, '
 			'	region.name as Region, '
 			'	country.name as Country, '
@@ -726,6 +684,51 @@ class Download:
 				'	record.start as Start, '
 				'	record.end as End, '
 				'	record.person as `Recorded by` '
+			)
+		else:  # data_format == 'table'
+			statement += (
+				' COLLECT(DISTINCT(record.value)) as Values '
+			)
+		with_filters = []
+		if parameters['field_uid']:
+			with_filters.append(
+				' ( '
+				'	`Field UID` = $field_uid '
+				' ) '
+			)
+		if parameters['block_uid']:
+			with_filters.append(
+				' ( '
+				'	`Block UID` = $block_uid '
+				' ) '
+			)
+		if parameters['tree_id_list']:
+			with_filters.append(
+				' ( '
+				'	any(x IN `Source trees` WHERE x IN $tree_id_list) '
+				'	OR '
+				'	(	'
+				'		item: Tree '
+				'		AND '
+				'		item.id IN $tree_id_list '
+				'	) '
+				' ) '
+			)
+		if parameters['sample_id_list']:
+			with_filters.append(
+				' (	'
+				'	item: Sample '
+				'	AND '
+				'	item.id IN $sample_id_list '
+				' ) '
+			)
+		if with_filters:
+			statement += (
+				' WHERE '
+			)
+			statement += ' AND '.join(with_filters)
+		if data_format == 'db':
+			statement += (
 				' WITH { '
 				'	Feature: Feature, '
 				'	Partner: Partner, '
@@ -759,10 +762,9 @@ class Download:
 				'		ELSE result["UID"] END, '
 				'	result["ID"], '
 				'	result["Replicate"] '
-				)
-		else:  # data_format == 'table'
+			)
+		else:
 			statement += (
-				' COLLECT(DISTINCT(record.value)) as Values '
 				' WITH { '
 				'	Records: collect({'
 				'		feature_name: Feature, '
@@ -788,21 +790,79 @@ class Download:
 				'		ELSE result["UID"] END, '
 				'	result["ID"] '
 			)
+		return statement
+
+	def collect_records(
+			self,
+			parameters,
+			data_format
+	):
+		statement = (
+			' MATCH '
+			'	(: User {username_lower: toLower($username)}) '
+			'	-[: AFFILIATED {confirmed: True}]->(partner: Partner) '
+			' MATCH '
+			'	(partner)'
+			'	<-[: AFFILIATED {data_shared: True}]-(user: User) '
+		)
+		statement += self.user_record_query(parameters, data_format)
 		with get_driver().session() as neo4j_session:
 			result = neo4j_session.read_transaction(
 				bolt_result,
 				statement,
 				parameters
 			)
+		return result
+
+	@staticmethod
+	def format_record(record, data_format='db'):
+		if data_format == 'table':
+			for feature in record[0]['Records']:
+				for value in feature['values']:
+					# flatten each value to string if it is a list
+					if isinstance(value, list):
+						record[0]['Records'][feature]['values'] = ', '.join([i.encode() for i in value])
+					# then flatten the list of values to a string stored in the record dict
+					record[0][feature['feature_name']] = ', '.join(
+						[str(value).encode() for value in feature['values']]
+					)
+		else:  # data_format == 'db'
+			for key in record[0]:
+				if key == "Time/Period" and record[0][key]:
+					if isinstance(record[0][key], list):
+						if record[0][key][0]:
+							record[0][key][0] = datetime.utcfromtimestamp(record[0][key][0] / 1000).strftime(
+								"%Y-%m-%d %H:%M")
+						else:
+							record[0][key][0] = 'Undefined'
+						if record[0][key][1]:
+							record[0][key][1] = datetime.utcfromtimestamp(record[0][key][1] / 1000).strftime(
+								"%Y-%m-%d %H:%M")
+						else:
+							record[0][key][1] = 'Undefined'
+						record[0][key] = ' - '.join(record[0][key])
+					else:
+						record[0][key] = datetime.utcfromtimestamp(record[0][key] / 1000).strftime(
+							"%Y-%m-%d %H:%M")
+				elif key == 'Submitted at':
+					record[0][key] = datetime.utcfromtimestamp(record[0][key] / 1000).strftime("%Y-%m-%d %H:%M")
+		for key in record[0]:
+			if isinstance(record[0][key], list):
+				if not record[0][key]:
+					record[0][key] = None
+				else:
+					record[0][key] = ', '.join([str(i).encode() for i in record[0][key]])
+		return record
+
+	def records_to_file(self, result, data_format, file_type):
 		# check if any data found, if not return none
 		first_result = result.peek()
 		if not first_result:
 			return {
 				'status': 'SUCCESS',
-				'result': 'No data found to match your filters'
+				'result': 'No records found to match your filters'
 			}
 		# prepare the file
-		time = datetime.utcnow().strftime('%Y%m%d-%H%M%S')
 		base_filename = 'records'
 		item_fieldnames = [
 			'Country',
@@ -819,47 +879,10 @@ class Download:
 			'Replicate'
 		]
 		fieldnames = [i for i in item_fieldnames if i in first_result[0].keys()]
-		# TODO write the query details, i.e. filters and time of query into another worksheet for user reference
 		if data_format == 'table':
-			file_path = self.get_file_path(
-				'xlsx',
-				base_filename
-			)
 			features = [i['feature_name'] for i in first_result[0]['Records']]
 			fieldnames += features
-			wb = Workbook(file_path)
-			worksheet = wb.add_worksheet('Records')
-			row_number = 0
-			for i, j in enumerate(fieldnames):
-				worksheet.write(row_number, i, j)
-			for record in result:
-				for feature in record[0]['Records']:
-					for value in feature['values']:
-						# flatten each value to string if it is a list
-						if isinstance(value, list):
-							record[0]['Records'][feature]['values'] = ', '.join([i.encode() for i in value])
-					# then flatten the list of values to a string stored in the record dict
-					record[0][feature['feature_name']] = ', '.join(
-						[str(value).encode() for value in feature['values']]
-					)
-				for key in record[0]:
-					if isinstance(record[0][key], list):
-						if not record[0][key]:
-							record[0][key] = None
-						else:
-							record[0][key] = ', '.join([str(i).encode() for i in record[0][key]])
-				row_number += 1
-				col_number = 0
-				for field in fieldnames:
-					if field in record[0]:
-						worksheet.write(row_number, col_number, record[0][field])
-					col_number += 1
-			wb.close()
 		else:
-			file_path = self.get_file_path(
-				'csv',
-				base_filename
-			)
 			fieldnames += [
 				'Feature',
 				'Value',
@@ -869,6 +892,30 @@ class Download:
 				'Submitted by',
 				'Partner'
 			]
+		if file_type == 'xlsx':
+			file_path = self.get_file_path(
+				'xlsx',
+				base_filename
+			)
+			wb = Workbook(file_path)
+			worksheet = wb.add_worksheet('Records')
+			row_number = 0
+			for i, j in enumerate(fieldnames):
+				worksheet.write(row_number, i, j)
+			for record in result:
+				record = self.format_record(record, data_format)
+				row_number += 1
+				col_number = 0
+				for field in fieldnames:
+					if field in record[0]:
+						worksheet.write(row_number, col_number, record[0][field])
+					col_number += 1
+			wb.close()
+		else:  # file_type == 'csv':
+			file_path = self.get_file_path(
+				'csv',
+				base_filename
+			)
 			with open(file_path, 'w') as csv_file:
 				writer = csv.DictWriter(
 					csv_file,
@@ -877,30 +924,7 @@ class Download:
 					extrasaction='ignore')
 				writer.writeheader()
 				for record in result:
-					# any other values that need flattening, e.g. 'Source trees'
-					for key in record[0]:
-						if key == "Time/Period":
-							if record[0][key]:
-								if isinstance(record[0][key], list):
-									if record[0][key][0]:
-										record[0][key][0] = datetime.utcfromtimestamp(record[0][key][0] / 1000).strftime("%Y-%m-%d %H:%M")
-									else:
-										record[0][key][0] = 'Undefined'
-									if record[0][key][1]:
-										record[0][key][1] = datetime.utcfromtimestamp(record[0][key][1] / 1000).strftime("%Y-%m-%d %H:%M")
-									else:
-										record[0][key][1] = 'Undefined'
-									record[0][key] = ' - '.join(record[0][key])
-								else:
-									record[0][key] = datetime.utcfromtimestamp(record[0][key] / 1000).strftime(
-										"%Y-%m-%d %H:%M")
-						elif key == 'Submitted at':
-							record[0][key] = datetime.utcfromtimestamp(record[0][key] / 1000).strftime("%Y-%m-%d %H:%M")
-						elif isinstance(record[0][key], list):
-							if not record[0][key]:
-								record[0][key] = None
-							else:
-								record[0][key] = '[' + ', '.join([str(i).encode() for i in record[0][key]]) + ']'
+					record = self.format_record(record, data_format)
 					writer.writerow(record[0])
 		download_url = url_for(
 						"download_file",

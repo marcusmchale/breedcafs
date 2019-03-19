@@ -16,6 +16,7 @@ from collect import (
 	collect
 )
 
+from correct import correct
 from create import create
 from record import record
 from trials import trials
