@@ -36,6 +36,16 @@ class User:
 		for record in tx.run(Cypher.user_find, username=self.username, email=self.email):
 			return record['user']
 
+	def access(self):
+		with get_driver().session() as neo4j_session:
+			return neo4j_session.read_transaction.run(
+				' MATCH (u: User {'
+				'	username_lower: toLower($username) '
+				'	})'
+				' RETURN u.access ',
+				username=self.username
+			)[0]
+
 	def get_user_affiliations(self):
 		with get_driver().session() as neo4j_session:
 			parameters = {

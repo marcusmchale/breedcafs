@@ -193,7 +193,7 @@ class RowParseResult:
 									'Submitted at: ',
 									datetime.datetime.utcfromtimestamp(
 										int(conflict['submitted_at']) / 1000
-									).strftime("%Y-%m-%d %H:%M"),
+									).strftime("%Y-%m-%d %H:%M:%S"),
 									'\n'
 								])
 					row_string += '\n'
@@ -472,7 +472,7 @@ class SubmissionRecord:
 			else:
 				record['Time/Period'] = datetime.datetime.utcfromtimestamp(record['Time/Period'] / 1000).strftime(
 					"%Y-%m-%d %H:%M")
-		record['submitted_at'] = datetime.datetime.utcfromtimestamp(int(record['submitted_at']) / 1000).strftime("%Y-%m-%d %H:%M:%S")
+		record['submitted at'] = datetime.datetime.utcfromtimestamp(int(record['submitted at']) / 1000).strftime("%Y-%m-%d %H:%M:%S")
 		self.record = record
 
 	def conflict(self):
@@ -757,8 +757,8 @@ class SubmissionResult:
 				"replicate",
 				"feature",
 				"Time/Period",
-				"submitted_by",
-				"submitted_at",
+				"submitted by",
+				"submitted at",
 				"value",
 				"uploaded_value"
 			]
@@ -773,7 +773,7 @@ class SubmissionResult:
 				for row in self.conflicts:
 					if not row.record['access']:
 						row.record['value'] = 'ACCESS DENIED'
-						row.record['submitted_by'] = row.record['partner']
+						row.record['submitted by'] = row.record['partner']
 					for item in row.record:
 						if isinstance(row.record[item], list):
 							row.record[item] = str(':'.join([str(i).encode() for i in row.record[item]]))
@@ -803,8 +803,8 @@ class SubmissionResult:
 				"replicate",
 				"feature",
 				"Time/Period",
-				"submitted_by",
-				"submitted_at",
+				"submitted by",
+				"submitted at",
 				"value",
 				"uploaded_value"
 			]
@@ -845,8 +845,8 @@ class SubmissionResult:
 				"replicate",
 				"feature",
 				"Time/Period",
-				"submitted_by",
-				"submitted_at",
+				"submitted by",
+				"submitted at",
 				"value"
 			]
 			with open(submitted_file_path, 'w') as submitted_file:
@@ -881,6 +881,7 @@ class Upload:
 		self.file_extension = None
 		self.contains_data = None
 		self.features = None
+		self.row_count = None
 
 	def allowed_file(self):
 		if '.' in self.raw_filename:
@@ -910,53 +911,68 @@ class Upload:
 					return 'Please upload comma (,) separated file with quoted (") fields'
 		elif self.file_extension == 'xlsx':
 			wb = load_workbook(self.file_path, read_only=True)
-			if "Template" not in wb.sheetnames:
-				return 'This workbook does not contain a "Template" worksheet'
+			if self.submission_type == 'table' and "Template" not in wb.sheetnames:
+					return 'This workbook does not contain a "Template" worksheet'
 		else:
 			return None
 
-	def check_headers(self, tx):
+	def set_fieldnames(self):
 		if self.file_extension == 'csv':
 			with open(self.file_path) as uploaded_file:
 				file_dict = DictReaderInsensitive(uploaded_file)
 				self.fieldnames = file_dict.fieldnames
-				if len(self.fieldnames) > len(set(self.fieldnames)):
-					return "This file contains duplicated header fields. This is not supported"
-		elif self.file_extension == 'xlsx':
+				return None
+		else:  # self.file_extension == 'xlsx':
 			try:
 				wb = load_workbook(self.file_path, read_only=True)
 			except BadZipfile:
 				return 'This file does not appear to be a valid xlsx file'
-			if "Template" not in wb.sheetnames:
-				return 'This workbook does not contain the expected "Template" worksheet'
-			ws = wb['Template']
+			if "Template" in wb.sheetnames:
+				ws = wb['Template']
+			elif "Records" in wb.sheetnames:
+				ws = wb['Records']
+			else:
+				return 'Expecting either "Template" or "Records" worksheets in xlsx file.'
 			rows = ws.iter_rows(min_row=1, max_row=1)
 			first_row = next(rows)
 			self.fieldnames = [str(c.value).encode().strip().lower() for c in first_row if c.value]
-		fieldnames_set = set(self.fieldnames)
-		if self.submission_type == 'FB':
-			required = {'uid', 'trait', 'value', 'timestamp', 'person', 'location'}
-			self.required_fieldnames = list(required)
-		else:
+			return None
+
+	def set_required_fieldnames(self):
+		if self.submission_type == 'db':
+			# these are uploads for correct
+			# uid, replicate, feature and time/period are required to identify the unique record
+			# but to further confirm we only delete the intended record, e.g. if a record is later resubmitted
+			# we include the check for submission time.
+			required = ['uid', 'replicate', 'feature', 'time/period', 'submitted at']
+		elif self.submission_type == 'FB':
+			required = ['uid', 'trait', 'value', 'timestamp', 'person', 'location']
+		else:  # self.submission_type == 'table':
 			required = {'uid', 'person'}
-		if not required.issubset(fieldnames_set):
-			missing_fieldnames = required - fieldnames_set
-			return (
-					'This file is missing the following fields: '
-					+ ', '.join([i for i in missing_fieldnames])
-			)
-		if self.submission_type == 'table':
 			record_type_sets = [
 				('condition', {'start date', 'start time', 'end date', 'end time'}),
 				('trait', {'date', 'time'}),
 				('property', set())
 			]
-			# use this to define our record type
+			# use this to also define our record type
 			for record_type_set in record_type_sets:
-				if record_type_set[1].issubset(fieldnames_set):
+				if record_type_set[1].issubset(set(self.fieldnames)):
 					self.record_type = record_type_set[0]
-					self.required_fieldnames = list(required) + list(record_type_set[1])
+					required = list(required) + list(record_type_set[1])
 					break
+		self.required_fieldnames = required
+
+	def check_headers(self, tx):
+		fieldnames_set = set(self.fieldnames)
+		if len(self.fieldnames) > len(fieldnames_set):
+			return "This file contains duplicated header fields. This is not supported"
+		if not set(self.required_fieldnames).issubset(fieldnames_set):
+			missing_fieldnames = set(self.required_fieldnames) - fieldnames_set
+			return (
+					'This file is missing the following fields: '
+					+ ', '.join([i for i in missing_fieldnames])
+			)
+		if self.submission_type == 'table':
 			# now we strip back the fieldnames to keep only those that aren't in the required list
 			# these should now just be the features, but we check against db.
 			self.features = [i for i in self.fieldnames if i not in self.required_fieldnames]
@@ -1031,16 +1047,21 @@ class Upload:
 				)
 				file_writer.writeheader()
 				for i, row in enumerate(file_dict):
+					self.row_count = i + 1
 					# remove rows without entries
 					if any(field.strip() for field in row):
 						for field in file_dict.fieldnames:
 							if row[field]:
 								row[field] = row[field].strip()
-						row['row_index'] = i + 1
+						row['row_index'] = self.row_count
 						file_writer.writerow(row)
+
 		elif self.file_extension == 'xlsx':
 			wb = load_workbook(self.file_path, read_only=True)
-			ws = wb['Template']
+			if self.submission_type == 'db':
+				ws = wb['Records']
+			elif self.submission_type == 'table':
+				ws = wb['Template']
 			with open(trimmed_file_path, "wb") as trimmed_file:
 				file_writer = csv.writer(
 					trimmed_file,
@@ -1057,7 +1078,8 @@ class Upload:
 				for j, row in enumerate(rows):
 					# j+2 to store the "Line number" as index
 					# this is 0 based, and accounts for header
-					cell_values = [j+2] + [cell.value for cell in row]
+					self.row_count = j + 2
+					cell_values = [cell.value for cell in row]
 					# remove columns with empty header
 					for i in sorted(empty_headers, reverse=True):
 						del cell_values[i]
@@ -1082,6 +1104,7 @@ class Upload:
 							if isinstance(value, basestring):
 								cell_values[i] = value.strip()
 					if any(value for value in cell_values):
+						cell_values = [self.row_count] + cell_values
 						file_writer.writerow(cell_values)
 
 	def parse_rows(self):
@@ -1253,9 +1276,9 @@ class Upload:
 		submission_result = self.submission_result
 		record_type = self.record_type
 		if submission_type == 'FB':
-			query = Cypher.upload_fb
+			statement = Cypher.upload_fb
 			result = tx.run(
-				query,
+				statement,
 				username=username,
 				filename=("file:///" + username + '/' + trimmed_filename)
 			)
@@ -1285,6 +1308,14 @@ class Upload:
 	def async_submit(self, username, upload_object):
 		try:
 			with get_driver().session() as neo4j_session:
+				set_fieldnames = upload_object.set_fieldnames()
+				if set_fieldnames:
+					return {
+						'status': 'ERRORS',
+						'result': set_fieldnames
+					}
+				# the below function also assesses and sets self.record_type
+				upload_object.set_required_fieldnames()
 				header_report = neo4j_session.read_transaction(
 					upload_object.check_headers
 				)
@@ -1372,16 +1403,16 @@ class Upload:
 									_external=True
 								)
 								response = (
-									'<p><a href= "'
-									+ str(conflicts_file_url)
-									+ '">'
-									+ str(len(submission_result.conflicts)) +
-									'conflicts were found. </a> '
-									'Typically a report on such conflicts is generated before merger, however '
-									'this situation can occur when conflicting records are submitted concurrently. '
-									'Your submission has been rejected. Please address the listed conflicts '
-									'before resubmitting. '
-									'</p> '
+										'<p><a href= "'
+										+ str(conflicts_file_url)
+										+ '">'
+										+ str(len(submission_result.conflicts)) +
+										'conflicts were found. </a> '
+										'Typically a report on such conflicts is generated before merger, however '
+										'this situation can occur when conflicting records are submitted concurrently. '
+										'Your submission has been rejected. Please address the listed conflicts '
+										'before resubmitting. '
+										'</p> '
 								)
 								html = render_template(
 									'emails/upload_report.html',
@@ -1437,15 +1468,19 @@ class Upload:
 							recipients = [User(username).find('')['email']]
 							response = "Submission report:\n "
 							if submission_summary['submitted']:
-								response += "<p> - <a href= " + str(submitted_file_url) + ">" + str(submission_summary['submitted']) \
-									+ "</a> new values were submitted to the database.\n </p>"
+								response += "<p> - <a href= " + str(submitted_file_url) + ">" + str(
+									submission_summary['submitted']) \
+											+ "</a> new values were submitted to the database.\n </p>"
 							if submission_summary['resubmissions']:
-								response += "<p> - <a href= " + str(resubmissions_file_url) + ">" + str(submission_summary['resubmissions']) \
-									+ "</a> existing values were already found.\n</p>"
+								response += "<p> - <a href= " + str(resubmissions_file_url) + ">" + str(
+									submission_summary['resubmissions']) \
+											+ "</a> existing values were already found.\n</p>"
 							body = "Submission_report: \n"
-							body += " - " + str(submission_summary['submitted']) + 'new values were submitted to the database.\n'
+							body += " - " + str(
+								submission_summary['submitted']) + 'new values were submitted to the database.\n'
 							body += "   These are available at the following url: " + str(submitted_file_url) + "\n"
-							body += " - " + str(submission_summary['resubmissions']) + 'existing values were already found.\n'
+							body += " - " + str(
+								submission_summary['resubmissions']) + 'existing values were already found.\n'
 							body += "   These are available at the following url: " + str(resubmissions_file_url) + "\n"
 							html = render_template(
 								'emails/upload_report.html',
@@ -1455,6 +1490,451 @@ class Upload:
 					return {
 						'status': 'SUCCESS',
 						'result': response
-						}
+					}
+		except (ServiceUnavailable, SecurityError) as exc:
+			raise self.retry(exc=exc)
+
+	def correct(
+			self,
+			tx,
+			access
+	):
+		if access == 'global_admin':
+			statement = (
+				' MATCH '
+				'	(partner:Partner) '
+				'	<-[:AFFILIATED {data_shared:True})-(user:User) '
+				' MATCH '
+				'	(current_user: User { '
+				'		username_lower: toLower($username) '
+				'	}) '
+			)
+		elif access == 'partner_admin':
+			statement = (
+				' MATCH '
+				'	(current_user: User {'
+				'		username_lower: toLower($username)'
+				'	}) '
+				'	-[: AFFILIATED {admin: True}]->(partner: Partner) '
+				' MATCH '
+				'	(partner) '
+				'	<-[:AFFILIATED {data_shared:True}]-(user:User) '
+			)
+		else:
+			statement = (
+				' MATCH '
+				'	(partner: Partner) '
+				'	<-[:AFFILIATED {data_shared:True}]-(user: User {'
+				'		username_lower: toLower($username)'
+				'	}) '
+				' WITH '
+				'	partner, '
+				'	user as user, '
+				'	user as current_user '
+
+
+			)
+		statement += (
+			' LOAD CSV WITH HEADERS FROM $filename as csvLine '
+			'	WITH '
+			'	current_user, '
+			'	user, partner, '
+			'	toInteger(csvLine.row_index) as row_index, '
+			'	apoc.date.parse('
+			'		csvLine.`submitted at`,'
+			'		"ms", '
+			'		 "yyyy-MM-dd HH:mm:ss"'
+			'	) as `submitted at`, '
+			'	toLower(csvLine.feature) as feature_name, '
+			'	CASE '
+			'		WHEN toInteger(csvLine.uid) IS NOT NULL '
+			'		THEN toInteger(csvLine.uid) '
+			'		ELSE toUpper(csvLine.uid)'
+			'	END as uid, ' 
+			'	toInteger(csvLine.replicate) as replicate, '
+			'	CASE '
+			'		WHEN size(split(csvLine.`time/period`, " - ")) > 1 '
+			'		THEN CASE '
+			'			WHEN toLower(split(csvLine.`time/period`, " - ")[0]) = "undefined" '
+			'			THEN False '
+			'			ELSE apoc.date.parse('
+			'				split(csvLine.`time/period`, " - ")[0],'
+			'				"ms", '
+			'				 "yyyy-MM-dd HH:mm"'
+			'			) '
+			'		END '
+			'		ELSE Null '
+			'	END as start, '
+			'	CASE '
+			'		WHEN size(split(csvLine.`time/period`, " - ")) > 1 '
+			'		THEN CASE '
+			'			WHEN toLower(split(csvLine.`time/period`, " - ")[1]) = "undefined" '
+			'			THEN False '
+			'			ELSE apoc.date.parse('
+			'				split(csvLine.`time/period`, " - ")[1],'
+			'				"ms", '
+			'				 "yyyy-MM-dd HH:mm"'
+			'			) '
+			'		END '
+			'		ELSE Null '
+			'	END as end, '
+			'	CASE '
+			'		WHEN size(split(csvLine.`time/period`, " - ")) = 1 '
+			'		THEN CASE '
+			'			WHEN trim(csvLine.`time/period`) = "" '
+			'			THEN Null '
+			'			ELSE apoc.date.parse( '
+			'				csvLine.`time/period`, '
+			'				"ms", '
+			'				 "yyyy-MM-dd HH:mm" '
+			'			) '
+			'		END '
+			'		ELSE Null '
+			'	END as time '
+			' MATCH '
+			'	(user)'
+			'	-[:SUBMITTED]->(:Submissions)  '
+			'	-[:SUBMITTED]->(:Records) '
+			'	-[:SUBMITTED]->(uff:UserFieldFeature) '
+			'	-[submitted:SUBMITTED]->(record :Record) '
+			'	-[record_for:RECORD_FOR]->(if:ItemFeature) '
+			'	-[:FOR_ITEM]-(item:Item {'
+			'		uid: uid'
+			'	}), '
+			'	(if)'
+			'	-[FOR_FEATURE*..2]->(feature:Feature {'
+			'		name_lower:feature_name'
+			'	})-[:OF_TYPE]->(record_type:RecordType) '
+			' WHERE '
+			# account for rounding to nearest second for submitted at in output files
+			'	round(submitted.time / 1000) * 1000 = `submitted at` '
+			'	AND '
+			'	CASE '
+			'		WHEN record.time IS NULL '
+			'		THEN True '
+			'		ELSE record.time = time '
+			'	END '
+			'	AND '
+			'	CASE '
+			'		WHEN record.start IS NULL '
+			'		THEN True '
+			'		ELSE record.start = start '
+			'	END'
+			'	AND '
+			'	CASE '
+			'		WHEN record.end IS NULL '
+			'		THEN True '
+			'		ELSE record.end = end '
+			'	END '
+			'	AND '
+			'	CASE '
+			'		WHEN record.replicate IS NULL '
+			'		THEN True '
+			'		ELSE record.replicate = replicate '
+			'	END '
+			' MERGE '
+			'	(current_user)'
+			'	-[:DELETED]->(del:Deletions) '
+			' CREATE '
+			'	(del)-[:DELETED { '
+			'		`deleted at`: timestamp() '
+			'	}]->(record) '
+			' CREATE '
+			'	(record)-[:DELETED_FROM]->(if) '
+			' DELETE '
+			'	record_for '
+			' RETURN { '
+			'	uid: uid, '
+			'	feature: feature.name_lower, '
+			'	row_index: row_index '
+			' } '
+			' ORDER BY row_index '
+		)
+		trimmed_file_path = self.trimmed_file_path
+		trimmed_filename = os.path.basename(trimmed_file_path)
+		result = tx.run(
+				statement,
+				username=self.username,
+				access=access,
+				filename=("file:///" + self.username + '/' + trimmed_filename)
+			)
+		return result
+
+	@staticmethod
+	def remove_properties(tx, property_uid):
+		if property_uid['custom id']:
+			tx.run(
+				' UNWIND $uid_list as uid'
+				' MATCH '
+				'	(item: Item {uid: uid}) '
+				' REMOVE item.custom_id ',
+				uid_list=property_uid['custom id']
+			)
+		if property_uid['tissue']:
+			tx.run(
+				' UNWIND $uid_list as uid'
+				' MATCH '
+				'	(sample: Sample {uid: uid}) '
+				' REMOVE sample.tissue ',
+				uid_list=property_uid['tissue']
+			)
+		if property_uid['assign to block']:
+			tx.run(
+				' UNWIND $uid_list as uid '
+				' MATCH '
+				'	(tree: Tree {uid: uid}) '
+				'	-[is_in:IS_IN]->(bt:BlockTrees) '
+				'	<-[:FOR]-(c:Counter), '
+				'	(bt)-[:IS_IN]->(block:Block) '
+				' SET c._LOCK_ = True '
+				' DELETE is_in '
+				' SET c.count = c.count - 1 '
+				' REMOVE c._LOCK_ ',
+				uid_list=property_uid['assign to block']
+			)
+		if property_uid['assign to trees']:
+			tx.run(
+				' UNWIND $uid_list as uid '
+				' MATCH '
+				'	(sample: Sample {'
+				'		uid: uid'
+				'	})-[from_tree: FROM]->(: ItemSamples) '
+				'	-[: FROM]-(tree: Tree) '
+				'	-[: IS_IN]->(: FieldTrees) '
+				'	-[: IS_IN]->(field: Field) '
+				' DELETE from_tree '
+				' MERGE '
+				'	(fs: ItemSamples) '
+				'	-[:FROM]->(field) '
+				' MERGE '
+				'	(sample)-[:FROM]->(fs) ',
+				uid_list=property_uid['assign to trees']
+			)
+		if property_uid['assign to samples']:
+			tx.run(
+				' UNWIND $uid_list as uid '
+				' MATCH '
+				'	(sample: Sample {'
+				'		uid: uid'
+				'	})-[from_sample: FROM]->(: Sample) '
+				'	-[:FROM | IS_IN *]->(field: Field) '
+				' DELETE from_sample '
+				' MERGE '
+				'	(fs: ItemSamples) '
+				'	-[:FROM]->(field) '
+				' MERGE '
+				'	(sample)-[:FROM]->(fs) ',
+				uid_list=property_uid['assign to samples']
+			)
+		if property_uid['variety name']:
+			tx.run(
+				' UNWIND $uid_list as uid '
+				' MATCH '
+				'	(item: Item { '
+				'		uid: uid '
+				'	})-[of_variety:OF_VARIETY]->(fv:FieldVariety) '
+				'	-[contains_variety:CONTAINS_VARIETY]->(field:Field) '
+				' DELETE of_variety '
+				' WITH '
+				' item, fv, field, contains_variety '
+				' OPTIONAL MATCH '
+				' (:Item)-[of_variety:OF_VARIETY]->(fv) '
+				' FOREACH (n IN CASE WHEN of_variety IS NULL THEN [1] ELSE [] END | '
+				'	DELETE contains_variety '
+				' ) '	
+				' WITH item, field '
+				' MATCH '
+				'	(item) '
+				'	<-[:FOR_ITEM]-(if:ItemFeature) '
+				'	-[:FOR_FEATURE*..2]->(:Feature { '
+				'		name_lower: "variety code"'
+				'	}), '
+				'	(if)<-[:RECORD_FOR]-(record:Record) '
+				' MATCH '
+				'	(variety:Variety {code_lower: toLower(record.value)) '
+				' MERGE '
+				'	(field) '
+				'	<-[:CONTAINS_VARIETY]-(fv:FieldVariety) '
+				' MERGE '
+				'	(item) '
+				'	-[:OF_VARIETY]->(fv) ',
+				uid_list=property_uid['variety name']
+			)
+		if property_uid['variety code']:
+			tx.run(
+				' UNWIND $uid_list as uid '
+				' MATCH '
+				'	(item: Item { '
+				'		uid: uid '
+				'	})-[of_variety:OF_VARIETY]->(fv:FieldVariety) '
+				'	-[contains_variety:CONTAINS_VARIETY]->(field:Field) '
+				' DELETE of_variety '
+				' WITH '
+				' item, fv, field, contains_variety '
+				' OPTIONAL MATCH '
+				' (:Item)-[of_variety:OF_VARIETY]->(fv) '
+				' FOREACH (n IN CASE WHEN of_variety IS NULL THEN [1] ELSE [] END | '
+				'	DELETE contains_variety '
+				' ) '	
+				' WITH item, field '
+				' MATCH '
+				'	(item) '
+				'	<-[:FOR_ITEM]-(if:ItemFeature) '
+				'	-[:FOR_FEATURE*..2]->(:Feature { '
+				'		name_lower: "variety name"'
+				'	}), '
+				'	(if)<-[:RECORD_FOR]-(record:Record) '
+				' MATCH '
+				'	(variety:Variety {name_lower: toLower(record.value)}) '
+				' MERGE '
+				'	(field) '
+				'	<-[:CONTAINS_VARIETY]-(fv:FieldVariety) '
+				' MERGE '
+				'	(item) '
+				'	-[:OF_VARIETY]->(fv) ',
+				uid_list=property_uid['variety code']
+			)
+		if property_uid['harvest date']:
+			tx.run(
+				' UNWIND $uid_list as uid '
+				' MATCH (item: Item { '
+				'	uid: uid '
+				' }) '
+				' REMOVE item.time ',
+				uid_list=property_uid['harvest date']
+			)
+		if property_uid['harvest time']:
+			tx.run(
+				' UNWIND $uid_list as uid '
+				' MATCH (item: Item { '
+				'	uid: uid '
+				' }) '
+				' WHERE item.time IS NOT NULL '
+				' WITH '
+				'	item, '
+				# round time to the date then set to 12:00
+				'	datetime.truncate('
+				'		"day", '
+				'		date( '
+				'			datetime({epochmillis: item.time})'
+				'		)'
+				'	) + duration({ hours: 12 }) as time '
+				' SET item.time = time.epochMillis ',
+				uid_list=property_uid['harvest date']
+			)
+
+	@celery.task(bind=True)
+	def async_correct(self, username, access, upload_object):
+		try:
+			with get_driver().session() as neo4j_session:
+				set_fieldnames = upload_object.set_fieldnames()
+				if set_fieldnames:
+					return {
+						'status': 'ERRORS',
+						'result': set_fieldnames
+					}
+				# the below function also assesses and sets self.record_type
+				upload_object.set_required_fieldnames()
+				header_report = neo4j_session.read_transaction(
+					upload_object.check_headers
+				)
+				if header_report:
+					with app.app_context():
+						response = header_report
+						html = render_template(
+							'emails/upload_report.html',
+							response=response
+						)
+						subject = "BreedCAFS upload rejected"
+						recipients = [User(username).find('')['email']]
+						response = "Submission rejected due to unrecognised or missing fields.\n "
+						body = response
+						send_email(subject, app.config['ADMINS'][0], recipients, body, html)
+					return {
+						'status': 'ERRORS',
+						'result': header_report
+					}
+				# clean up the file removing empty lines and whitespace, lower case headers for matching in db
+				upload_object.trim_file()
+				print('Trimmed')
+				if not upload_object.row_count:
+					response = 'No data submitted, please check that you uploaded a completed file'
+					return {
+						'status': 'ERRORS',
+						'type': 'string',
+						'result': response
+					}
+				# from here we depart from the async_submit procedure,
+				# there should be no need to parse the rows and provide as much feedback here
+				# since the files being submitted should be derived from the db tools, we can just provide feedback
+				# based on which records were found and deleted.
+				tx = neo4j_session.begin_transaction()
+				deletion_result = upload_object.correct(tx, access)
+				# update properties where needed
+				property_uid = {
+					'custom id': [],
+					'assign to block': [],
+					'assign to trees': [],
+					'assign to samples': [],
+					'tissue': [],
+					'variety name': [],
+					'variety code': [],
+					'harvest date': [],
+					'harvest time': []
+				}
+				# just grab the UID where records are deleted and do the update from any remaining records
+				record_tally = {}
+				missing_row_indexes = []
+				expected_row_index = 1
+				if not deletion_result.peek():
+					missing_row_indexes += range(2, upload_object.row_count + 1)
+					tx.close()
+				else:
+					for record in deletion_result:
+						while expected_row_index != record[0]['row_index'] and expected_row_index <= upload_object.row_count:
+							expected_row_index += 1
+							if expected_row_index != record[0]['row_index']:
+								missing_row_indexes.append(expected_row_index)
+						if not record[0]['feature'] in record_tally:
+							record_tally[record[0]['feature']] = 0
+						record_tally[record[0]['feature']] += 1
+						if record[0]['feature'] in property_uid:
+							property_uid[record[0]['feature']].append(record[0]['uid'])
+					upload_object.remove_properties(tx, property_uid)
+					tx.commit()
+					if not expected_row_index == upload_object.row_count:
+							missing_row_indexes += range(expected_row_index, upload_object.row_count + 1)
+				if missing_row_indexes:
+					missing_row_ranges = (
+						list(x) for _, x in itertools.groupby(enumerate(missing_row_indexes), lambda (i, x): i-x)
+					)
+					missing_row_str = str(
+						",".join("-".join(map(str, (i[0][1], i[-1][1])[:len(i)])) for i in missing_row_ranges)
+					)
+					# create summary dict
+					# now need app context for the following (this is running asynchronously)
+				else:
+					missing_row_str = None
+				with app.app_context():
+					# send result of merger in an email
+					subject = 'BreedCAFS upload summary'
+					recipients = [User(username).find('')['email']]
+					response = 'Correction report:\n '
+					if missing_row_str:
+						response += '<p>Records from the following rows were not found: ' + missing_row_str + '\n</p>'
+					if record_tally:
+						response += '<p>The following records were deleted: \n</p>'
+						for key in record_tally:
+							response += '<p>' + str(record_tally[key]) + ' ' + str(key) + ' records deleted\n </p>'
+					body = response
+					html = render_template(
+						'emails/upload_report.html',
+						response=response
+					)
+					send_email(subject, app.config['ADMINS'][0], recipients, body, html)
+				return {
+					'status': 'SUCCESS',
+					'result': response
+					}
 		except (ServiceUnavailable, SecurityError) as exc:
 			raise self.retry(exc=exc)

@@ -215,13 +215,15 @@ class Record:
 					update_harvest_time_parameters['harvest_date'] = record_data['features_dict']['harvest date']
 					if 'harvest time' in record_data['selected_features']:
 						update_harvest_time_parameters['harvest_time'] = record_data['features_dict']['harvest time']
+					else:
+						update_harvest_time_parameters['harvest_time'] = None
 					update_harvest_time_statement += (
 						' MATCH '
 						'	(item)-[:FROM]->(:ItemSamples) '
 						'	WHERE '
 						'		item.time IS NULL  '
 						'	SET item.time = CASE '
-						'		WHEN harvest_time IS NOT NULL '
+						'		WHEN $harvest_time IS NOT NULL '
 						'		THEN apoc.date.parse(uid_date_time[1] + " " + uid_date_time[2], "ms", "yyyy-MM-dd HH:mm") '
 						'		ELSE apoc.date.parse(uid_date_time[1] + " 12:00, "ms", "yyyy-MM-dd HH:mm") '
 						'		END '

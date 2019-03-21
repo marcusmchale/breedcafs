@@ -593,6 +593,15 @@ class DownloadForm(FlaskForm):
 		],
 		description="List of sample IDs, e.g. '1, 2-5' "
 	)
+	replicate_id_list = StringField(
+		'Sample list',
+		[
+			Optional(),
+			Regexp("^[0-9,-]*$", message='List should be comma separated with hyphens for ranges, e.g. "1,2-5"'),
+			range_list_check
+		],
+		description="List of replicate IDs, e.g. '1, 2-5' "
+	)
 	feature_group = SelectField(
 		'Feature group',
 		[Optional()],
@@ -720,102 +729,19 @@ class RecordForm(FlaskForm):
 		return form
 
 
-# download
 class CorrectForm(FlaskForm):
-	record_type = SelectField(
-		[Optional()],
-		choices=[('', 'Any')] + SelectionList.get_record_types(),
-		description="Record Type"
-	)
-	item_level = SelectField(
-		'Item Level',
-		[Optional()],
-		choices=[('', 'Any')] + SelectionList.get_item_levels(),
-		description="Item Level"
-	)
-	submission_date_from = DateField(
-		'Submission date start (YYYY-mm-dd): ',
-		[Optional()],
-		format='%Y-%m-%d',
-		description='Submission start date'
-	)
-	submission_date_to = DateField(
-		'Submission date end (YYYY-mm-dd): ',
-		[Optional()],
-		format='%Y-%m-%d',
-		description='Submission end date'
-	)
-	record_date_from = DateField(
-		'Record date start (YYYY-mm-dd): ',
-		[Optional()],
-		format='%Y-%m-%d',
-		description='Record start date'
-	)
-	record_date_to = DateField(
-		'Record date end (YYYY-mm-dd): ',
-		[Optional()],
-		format='%Y-%m-%d',
-		description='Record end date'
-	)
-	tree_id_list = StringField(
-		'Tree list',
-		[
-			Optional(),
-			Regexp("^[0-9,-]*$", message='List should be comma separated with hyphens for ranges, e.g. "1,2-5"'),
-			range_list_check
-		],
-		description="List of tree IDs, e.g. '1, 2-5' "
-	)
-	sample_id_list = StringField(
-		'Sample list',
-		[
-			Optional(),
-			Regexp("^[0-9,-]*$", message='List should be comma separated with hyphens for ranges, e.g. "1,2-5"'),
-			range_list_check
-		],
-		description="List of sample IDs, e.g. '1, 2-5' "
-	)
-	replicate_id_list = StringField(
-		'Replicate list',
-		[
-			Optional(),
-			Regexp("^[0-9,-]*$", message='List should be comma separated with hyphens for ranges, e.g. "1,2-5"'),
-			range_list_check
-		],
-		description="List of replicate IDs, e.g. '1, 2-5' "
-	)
-	feature_group = SelectField(
-		'Feature group',
-		[Optional()],
-		description="Feature group to select fields for form/template",
-		choices=[("", "Select group")]
-	)
-	select_features = SelectMultipleField(
-		[Optional()],
-		coerce=unicode,
-		option_widget=widgets.CheckboxInput(),
-		widget=widgets.ListWidget(prefix_label=False),
-		choices=[]
-	)
-	file_type = SelectField(
-		'Data format',
+	id = "correct_form"
+	submission_type = SelectField(
+		'Submission type:',
 		[InputRequired()],
-		choices=[('', 'Select File Type'), ('xlsx', 'xlsx'), ('csv', 'csv')]
+		choices=[
+			('db', 'Database (xlsx/csv)')
+			# ('FB', 'Field Book (.csv)')
+		]
 	)
-	list_records = SubmitField('List records')
-	delete_records = SubmitField('Delete records')
+	file = FileField(
+		'Select a file:',
+		[FileRequired()]
+	)
+	correct_submit = SubmitField('Delete')
 
-	@staticmethod
-	def update():
-		form = CorrectForm()
-		item_level = form.item_level.data if form.item_level.data not in ['', 'None'] else None
-		record_type = form.record_type.data if form.record_type.data not in ['', 'None'] else None
-		form.feature_group.choices += SelectionList.get_feature_groups(item_level, record_type)
-		selected_feature_group = form.feature_group.data if form.feature_group.data not in ['', 'None'] else None
-		features_details = FeatureList(
-			item_level,
-			record_type
-		).get_features(feature_group=selected_feature_group)
-		features_list = [(feature['name_lower'], feature['name']) for feature in features_details]
-		form.select_features.choices = features_list
-		return form

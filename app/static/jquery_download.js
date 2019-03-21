@@ -4,6 +4,9 @@ const feature_group_select = $('#feature_group');
 const feature_selection_div = $('#feature_selection');
 const feature_checkbox_div = $('#feature_checkbox_div');
 const submit_download_button = $('#submit_download');
+const block_select_div = $('#block_div');
+const tree_selection_div = $('#tree_selection_div');
+const sample_selection_div = $('#sample_id_list');
 
 
 //Render a calendar in jquery-ui for date selection
@@ -11,6 +14,16 @@ $("#submission_date_from").datepicker({ dateFormat: 'yy-mm-dd'});
 $("#submission_date_to").datepicker({ dateFormat: 'yy-mm-dd'});
 $("#record_date_from").datepicker({ dateFormat: 'yy-mm-dd'});
 $("#record_date_to").datepicker({ dateFormat: 'yy-mm-dd'});
+
+items_update = function() {
+    const item_type = item_level_select.val();
+    if (item_type == 'field') {
+        block_select_div.hide();
+        tree_selection_div.hide();
+        sample_selection_div.hide();
+        replicate_selection_div.hide();
+    }
+};
 
 group_select_update = function() {
     const record_type = record_type_select.val();

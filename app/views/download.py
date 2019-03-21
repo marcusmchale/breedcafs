@@ -150,10 +150,19 @@ def generate_file():
 				field_uid = int(request.form['field']) if request.form['field'].isdigit() else None
 				block_uid = request.form['block'] if request.form['block'] != '' else None
 				tree_id_list = (
-					Parsers.parse_range_list(request.form['tree_id_list']) if request.form['tree_id_list'] != '' else None
+					Parsers.parse_range_list(
+						request.form['tree_id_list']
+					) if request.form['tree_id_list'] != '' else None
 				)
 				sample_id_list = (
-					Parsers.parse_range_list(request.form['sample_id_list']) if request.form['sample_id_list'] != '' else None
+					Parsers.parse_range_list(
+						request.form['sample_id_list']
+					) if request.form['sample_id_list'] != '' else None
+				)
+				replicate_id_list = (
+					Parsers.parse_range_list(
+						request.form['replicate_id_list']
+					) if request.form['replicate_id_list'] != '' else None
 				)
 				if 'select_features' in request.form:
 					selected_features = request.form.getlist('select_features')
@@ -174,6 +183,7 @@ def generate_file():
 					'block_uid': block_uid,
 					'tree_id_list': tree_id_list,
 					'sample_id_list': sample_id_list,
+					'replicate_id_list': replicate_id_list,
 					'selected_features': selected_features
 				}
 				records = download_object.collect_records(parameters, data_format)

@@ -617,6 +617,10 @@ class Download:
 			filters.append(
 				' farm.name_lower = toLower(trim($farm)) '
 			)
+		if parameters['replicate_id_list']:
+			filters.append(
+				' record.replicate IN $replicate_id_list '
+			)
 		if filters:
 			statement += (
 				' WHERE '
@@ -699,7 +703,7 @@ class Download:
 		if parameters['block_uid']:
 			with_filters.append(
 				' ( '
-				'	`Block UID` = $block_uid '
+				'	`Block ID` = toInteger(split($block_uid, "_")[1]) '
 				' ) '
 			)
 		if parameters['tree_id_list']:
@@ -845,7 +849,7 @@ class Download:
 						record[0][key] = datetime.utcfromtimestamp(record[0][key] / 1000).strftime(
 							"%Y-%m-%d %H:%M")
 				elif key == 'Submitted at':
-					record[0][key] = datetime.utcfromtimestamp(record[0][key] / 1000).strftime("%Y-%m-%d %H:%M")
+					record[0][key] = datetime.utcfromtimestamp(record[0][key] / 1000).strftime("%Y-%m-%d %H:%M:%S")
 		for key in record[0]:
 			if isinstance(record[0][key], list):
 				if not record[0][key]:
