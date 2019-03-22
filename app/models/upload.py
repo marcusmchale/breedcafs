@@ -1905,9 +1905,9 @@ class Upload:
 							'emails/upload_report.html',
 							response=response
 						)
-						subject = "BreedCAFS upload rejected"
+						subject = "BreedCAFS correction rejected"
 						recipients = [User(username).find('')['email']]
-						response = "Submission rejected due to unrecognised or missing fields.\n "
+						response = "Correction rejected due to unrecognised or missing fields.\n "
 						body = response
 						send_email(subject, app.config['ADMINS'][0], recipients, body, html)
 					return {
@@ -1918,7 +1918,17 @@ class Upload:
 				upload_object.trim_file()
 				print('Trimmed')
 				if not upload_object.row_count:
-					response = 'No data submitted, please check that you uploaded a completed file'
+					with app.app_context():
+						response = 'No data submitted, please check that you uploaded a completed file'
+						html = render_template(
+							'emails/upload_report.html',
+							response=response
+						)
+						subject = "BreedCAFS correction rejected"
+						recipients = [User(username).find('')['email']]
+						response = "Correction rejected because no data was found in the uploaded file\n "
+						body = response
+						send_email(subject, app.config['ADMINS'][0], recipients, body, html)
 					return {
 						'status': 'ERRORS',
 						'type': 'string',
@@ -1932,9 +1942,9 @@ class Upload:
 							'emails/upload_report.html',
 							response=response
 						)
-						subject = "BreedCAFS upload rejected"
+						subject = "BreedCAFS correction rejected"
 						recipients = [User(username).find('')['email']]
-						body = response
+						body = 'Duplicate keys were found in the uploaded file\n' + response
 						send_email(subject, app.config['ADMINS'][0], recipients, body, html)
 					return {
 						'status': 'ERRORS',
@@ -1943,6 +1953,15 @@ class Upload:
 					}
 				if parse_result.errors:
 					response = parse_result.html_table()
+					with app.app_context():
+						html = render_template(
+							'emails/upload_report.html',
+							response=response
+						)
+						subject = "BreedCAFS correction rejected"
+						recipients = [User(username).find('')['email']]
+						body = 'Errors were found in the uploaded file\n' + response
+						send_email(subject, app.config['ADMINS'][0], recipients, body, html)
 					return {
 						'status': 'ERRORS',
 						'type': 'parse_object',
@@ -1981,7 +2000,6 @@ class Upload:
 						if record[0]['feature'] in property_uid:
 							property_uid[record[0]['feature']].append(record[0]['uid'])
 					upload_object.remove_properties(tx, property_uid)
-					tx.commit()
 					if not expected_row_index == upload_object.row_count:
 							missing_row_indexes += range(expected_row_index, upload_object.row_count + 2)
 				if missing_row_indexes:
@@ -1991,17 +2009,34 @@ class Upload:
 					missing_row_str = str(
 						",".join("-".join(map(str, (i[0][1], i[-1][1])[:len(i)])) for i in missing_row_ranges)
 					)
-					# create summary dict
-					# now need app context for the following (this is running asynchronously)
-				else:
-					missing_row_str = None
+					tx.rollback()
+					with app.app_context():
+						# send result of merger in an email
+						subject = 'BreedCAFS upload summary'
+						recipients = [User(username).find('')['email']]
+						response = 'Correction rejected:\n '
+						if missing_row_str:
+							response += '<p>Records from the following rows of the uploaded file were not found: ' + missing_row_str + '\n</p>'
+						if record_tally:
+							response += '<p>The following records were deleted: \n</p>'
+							for key in record_tally:
+								response += '<p>' + str(record_tally[key]) + ' ' + str(key) + ' records deleted\n </p>'
+						body = response
+						html = render_template(
+							'emails/upload_report.html',
+							response=response
+						)
+						send_email(subject, app.config['ADMINS'][0], recipients, body, html)
+					return {
+						'status': 'ERRORS',
+						'result': response
+					}
+				tx.commit()
 				with app.app_context():
 					# send result of merger in an email
 					subject = 'BreedCAFS upload summary'
 					recipients = [User(username).find('')['email']]
 					response = 'Correction report:\n '
-					if missing_row_str:
-						response += '<p>Records from the following rows were not found: ' + missing_row_str + '\n</p>'
 					if record_tally:
 						response += '<p>The following records were deleted: \n</p>'
 						for key in record_tally:
