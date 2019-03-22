@@ -1400,7 +1400,7 @@ class Cypher:
 		'		WHEN level = "field" '
 		'			THEN [1] ELSE [] END | '
 		'				MERGE '
-		'					(item)<-[: FOR_ITEM]-(:ItemFeature)-[: FOR_FEATURE]->(feature) '
+		'					(item)<-[: FOR_ITEM]-(:ItemFeature :FieldFeature)-[: FOR_FEATURE]->(feature) '
 		'	) '
 		'	FOREACH (n in CASE '
 		'		WHEN level in ["block", "tree", "sample"] '
@@ -1430,9 +1430,12 @@ class Cypher:
 		'		(item) '
 		'		<-[: FOR_ITEM]-(item_feature: ItemFeature) '
 		'		-[ :FOR_FEATURE*..2]->(feature) '
-		'	OPTIONAL MATCH '
-		'		(field_feature: FieldFeature) '
-		'		<-[: FOR_FEATURE]-(item_feature) '
+		# and the field/feature node 
+		# todo consider the model here, this is an undirected match with two labels, not super happy with this one,
+		# todo would it be better to have a redundant ItemFeature node for fields?
+		'	MATCH (item) '
+		'		-[:FOR_ITEM | FOR_FEATURE*..2]-(field_feature: FieldFeature) '
+		'		-[:FOR_FEATURE]->(feature) '
 		'	MERGE '
 		'		(r: Record) '
 		'		-[: RECORD_FOR]->(item_feature) '
@@ -1597,7 +1600,7 @@ class Cypher:
 		'		WHEN level = "field" '
 		'			THEN [1] ELSE [] END | '
 		'				MERGE '
-		'					(item)<-[: FOR_ITEM]-(:ItemFeature)-[: FOR_FEATURE]->(feature) '
+		'					(item)<-[: FOR_ITEM]-(:ItemFeature :FieldFeature)-[: FOR_FEATURE]->(feature) '
 		'	) '
 		'	FOREACH (n in CASE '
 		'		WHEN level in ["block", "tree", "sample"] '
@@ -1631,9 +1634,12 @@ class Cypher:
 		'		(item) '
 		'		<-[: FOR_ITEM]-(item_feature: ItemFeature)'
 		'		-[ :FOR_FEATURE*..2]->(feature) '
-		'	OPTIONAL MATCH '
-		'		(field_feature: FieldFeature) '
-		'		<-[: FOR_FEATURE]-(item_feature) '
+		# and the field/feature node 
+		# todo consider the model here, this is an undirected match with two labels, not super happy with this one,
+		# todo would it be better to have a redundant ItemFeature node for fields?
+		'	MATCH (item) '
+		'		-[:FOR_ITEM | FOR_FEATURE*..2]-(field_feature: FieldFeature) '
+		'		-[:FOR_FEATURE]->(feature) '
 		'	MERGE '
 		'		(r: Record { '
 		'			time : time, '
@@ -1834,7 +1840,7 @@ class Cypher:
 		'		WHEN level = "field" '
 		'			THEN [1] ELSE [] END | '
 		'				MERGE '
-		'					(item)<-[: FOR_ITEM]-(:ItemFeature)-[: FOR_FEATURE]->(feature) '
+		'					(item)<-[: FOR_ITEM]-(:ItemFeature :FieldFeature)-[: FOR_FEATURE]->(feature) '
 		'	) '
 		'	FOREACH (n in CASE '
 		'		WHEN level in ["block", "tree", "sample"] '
@@ -1862,14 +1868,12 @@ class Cypher:
 		'		}) '
 		'		-[: SUBMITTED]->(: Submissions) '
 		'		-[: SUBMITTED]->(data_sub: Records) '
-		# and the item/feature node
-		'	MATCH '
-		'		(item) '
-		'		<-[: FOR_ITEM]-(item_feature: ItemFeature)'
-		'		-[ :FOR_FEATURE*..2]->(feature) '
-		'	OPTIONAL MATCH '
-		'		(field_feature: FieldFeature) '
-		'		<-[: FOR_FEATURE]-(item_feature) '
+		# and the field/feature node 
+		# todo consider the model here, this is an undirected match with two labels, not super happy with this one,
+		# todo would it be better to have a redundant ItemFeature node for fields?
+		'	MATCH (item) '
+		'		-[:FOR_ITEM | FOR_FEATURE*..2]-(field_feature: FieldFeature) '
+		'		-[:FOR_FEATURE]->(feature) '
 		'	MERGE '
 		'		(r: Record { '
 		'			start : CASE WHEN start IS NOT NULL THEN start ELSE False END, '

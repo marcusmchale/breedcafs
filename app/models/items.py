@@ -410,9 +410,15 @@ class AddFieldItems:
 				' MATCH (block: Block { '
 				'	uid: $block_uid'
 				' }) '
+				' MATCH '
+				'	(feature: Feature {name_lower: "assign to block"}) '
 				' MERGE '
-				'	(block_trees: BlockTrees)-[:IS_IN]-> '
-				'	(block) '
+				'	(feature) '
+				'	<-[: FOR_FEATURE]-(ff: FieldFeature) '
+				'	<-[: FROM_FIELD]->(field) '
+				' MERGE '
+				'	(block_trees: BlockTrees)'
+				'	-[:IS_IN]-> (block) '
 				' MERGE '
 				'	(block_tree_counter: Counter { '
 				'		name: "tree", '
@@ -435,11 +441,11 @@ class AddFieldItems:
 			'	(field_trees) '
 			'	ON CREATE SET field_tree_counter.count = 0 '
 			' MERGE '
-			'	(user)-[:SUBMITTED]->(us: Submissions) '
+			'	(user)-[: SUBMITTED]->(us: Submissions) '
 			' MERGE '
-			'	(us)-[:SUBMITTED]->(ui: Items) '
+			'	(us)-[: SUBMITTED]->(ui: Items) '
 			' MERGE '
-			'	(ui)-[:SUBMITTED]->(ut: Trees) '
+			'	(ui)-[: SUBMITTED]->(ut: Trees) '
 			# create per user per field trees node (UserFieldTrees) linking these
 			' MERGE '
 			'	(ut)-[:SUBMITTED]-> '
@@ -447,6 +453,16 @@ class AddFieldItems:
 			'	(field_trees) '
 			' SET '
 			'	field_tree_counter._LOCK_ = true '
+		)
+		if block_uid:
+			statement += (
+				' MERGE '
+				'	(us)-[: SUBMITTED]->(ur: Records) '
+				' MERGE '
+				'	(ur)-[: SUBMITTED]->(uff:UserFieldFeature) '
+				'	-[:CONTRIBUTED]->(ff) '
+			)
+		statement += (
 			' WITH '
 			'	country.name as country, '
 			'	region.name as region, '
@@ -456,7 +472,7 @@ class AddFieldItems:
 		)
 		if block_uid:
 			statement += (
-				' , block, block_tree_counter, block_trees '
+				' , block, block_tree_counter, block_trees, ff, uff '
 			)
 		statement += (
 			' OPTIONAL MATCH '
@@ -481,6 +497,19 @@ class AddFieldItems:
 				'	(block_trees) '
 				' SET block_tree_counter.count = block_tree_counter.count + 1 '
 				' SET block_tree_counter._LOCK_ = false '
+				' CREATE '
+				'	(ff) '
+				'	<-[:FOR_FEATURE]-(if: ItemFeature) '
+				'	-[:FOR_ITEM]->(tree) '
+				' CREATE '
+				'	(if) '
+				'	<-[:RECORD_FOR]-(r: Record { '
+				'		found: False, '
+				'		value: block.id, '
+				'		person: $username '
+				'	}) '
+				' CREATE '
+				'	(uff)-[:SUBMITTED {time: timestamp()}]->(r) '
 			)
 		statement += (
 			' RETURN { '

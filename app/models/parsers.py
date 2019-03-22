@@ -27,6 +27,26 @@ class Parsers:
 		return sorted(set(chain(*[Parsers.parse_range(range_string) for range_string in range_list.split(',')])))
 
 	@staticmethod
+	def time_period_format(time_period_string):
+		time_period_string = str(time_period_string).strip()
+		time_period_list = time_period_string.split(" - ")
+		for i in time_period_list:
+			try:
+				datetime.datetime.strptime(i[0:16], '%Y-%m-%d %H:%M')
+			except (ValueError, IndexError):
+				return False
+		return time_period_string
+
+	@staticmethod
+	def timestamp_db_submitted_at_format(timestamp_string):
+		timestamp = str(timestamp_string).strip()
+		try:
+			datetime.datetime.strptime(timestamp[0:19], '%Y-%m-%d %H:%M:%S')
+			return timestamp
+		except (ValueError, IndexError):
+			return False
+
+	@staticmethod
 	def timestamp_fb_format(timestamp_string):
 		timestamp = str(timestamp_string).strip()
 		try:

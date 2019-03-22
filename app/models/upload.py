@@ -66,6 +66,18 @@ class RowParseResult:
 				"format": "Time format does not match the required input (e.g. 13:00)",
 				"order": "Please be sure to start before you finish!"
 			},
+			"submitted at": {
+				"format": "Format does not match the required input (e.g. 2018-01-01 13:00:00)",
+			},
+			"replicate": {
+				"format": "Format does not match the required input, expected an integer value",
+			},
+			"time/period": {
+				"format": (
+					"Format does not match the required input, expected either a single date/time"
+					" (e.g. 2018-01-01 13:00) or a range  (e.g. 2018-01-01 13:00 - 2019-02-02 14:00)"
+				),
+			},
 			"uid": {
 				"format": "UID doesn't match BreedCAFS pattern: \n"
 				"  - Field UID should be an integers (e.g. '1')\n"
@@ -192,7 +204,7 @@ class RowParseResult:
 								row_string += ''.join([
 									'Submitted at: ',
 									datetime.datetime.utcfromtimestamp(
-										int(conflict['submitted_at']) / 1000
+										int(conflict['submitted at']) / 1000
 									).strftime("%Y-%m-%d %H:%M:%S"),
 									'\n'
 								])
@@ -226,9 +238,72 @@ class ParseResult:
 			if field in self.field_errors:
 				del self.field_errors[field]
 
-	def parse_row(self, row):
+	def parse_db_row(self, row):
+		# all rows with any data considered when db format
+		if any([i for i in row]):
+			self.contains_data = True
+		if row['submitted at']:
+			parsed_submitted_at = Parsers.timestamp_db_submitted_at_format(row['submitted at'])
+			if not parsed_submitted_at:
+				self.merge_error(
+					row,
+					"submitted at",
+					"format"
+				)
+		else:
+			parsed_submitted_at = None
+			self.merge_error(row, "submitted at", "format")
+		if row['time/period']:
+			parsed_time_period = Parsers.time_period_format(row['time/period'])
+			if not parsed_time_period:
+				self.merge_error(
+					row,
+					"time/period",
+					"format"
+				)
+		else:
+			parsed_time_period = None
+		if 'replicate' in row and row['replicate']:
+			try:
+				parsed_replicate = int(row['replicate'])
+			except ValueError:
+				parsed_replicate = None
+				self.merge_error(
+					row,
+					"replicate",
+					"format"
+				)
+		else:
+			parsed_replicate = None
+		parsed_uid = Parsers.uid_format(row['uid'])
+		unique_key = (parsed_uid, parsed_submitted_at, parsed_time_period, parsed_replicate, row['feature'])
+		if unique_key not in self.unique_keys:
+			self.unique_keys.add(unique_key)
+		else:
+			self.duplicate_keys[row['row_index']] = row
+
+	def parse_fb_row(self, row):
+		# check time formatting and for FB use trait in unique key.
+		if row['trait']:
+			self.contains_data = True
+		parsed_timestamp = Parsers.timestamp_fb_format(row['timestamp'])
+		parsed_uid = Parsers.uid_format(row['uid'])
+		if not parsed_timestamp:
+			self.merge_error(
+				row,
+				"timestamp",
+				"format"
+			)
+		unique_key = (parsed_uid, parsed_timestamp, row['trait'])
+		if unique_key not in self.unique_keys:
+			self.unique_keys.add(unique_key)
+		else:
+			self.duplicate_keys[row['row_index']] = row
+
+	def parse_table_row(self, row):
 		# submission_type = self.submission_type
 		# check uid formatting
+		# Check time, and for trait duplicates in tables simply check for duplicate fields in header
 		parsed_uid = Parsers.uid_format(row['uid'])
 		if not parsed_uid:
 			self.merge_error(
@@ -236,24 +311,6 @@ class ParseResult:
 				"uid",
 				"format"
 			)
-		# check time formatting and for FB use trait in unique key.
-		#if submission_type == "FB":
-		#	if row['trait']:
-		#		self.contains_data = True
-		#	parsed_timestamp = Parsers.timestamp_fb_format(row['timestamp'])
-		#	if not parsed_timestamp:
-		#		self.merge_error(
-		#			row,
-		#			"timestamp",
-		#			"format"
-		#		)
-		#	unique_key = (parsed_uid, parsed_timestamp, row['trait'])
-		#	if unique_key not in self.unique_keys:
-		#		self.unique_keys.add(unique_key)
-		#	else:
-		#		self.duplicate_keys[row['row_index']] = row
-		# Check time, and for trait duplicates in tables simply check for duplicate fields in header
-		#else:  # submission_type == "table":
 		# check for date time info.
 		if self.record_type == 'property':
 			unique_key = parsed_uid
@@ -1116,12 +1173,15 @@ class Upload:
 		with open(trimmed_file_path, 'r') as trimmed_file:
 			trimmed_dict = DictReaderInsensitive(trimmed_file)
 			for row in trimmed_dict:
-				# firstly, if a table check for feature data, if none then just skip
 				if submission_type == 'table':
+					# first check for feature data, if none then just skip this row
 					if [row[feature] for feature in self.features if row[feature]]:
-						parse_result.parse_row(row)
+						parse_result.parse_table_row(row)
 					else:
 						pass
+				elif submission_type == 'db':
+					parse_result.parse_db_row(row)
+				# todo re-write the parse function for FB files
 				elif submission_type == "FB":
 					row_index = int(row['row_index'])
 					parse_result.parse(row_index, row)
@@ -1751,7 +1811,7 @@ class Upload:
 				'	}), '
 				'	(if)<-[:RECORD_FOR]-(record:Record) '
 				' MATCH '
-				'	(variety:Variety {code_lower: toLower(record.value)) '
+				'	(variety:Variety {code_lower: toLower(record.value)}) '
 				' MERGE '
 				'	(field) '
 				'	<-[:CONTAINS_VARIETY]-(fv:FieldVariety) '
@@ -1864,10 +1924,30 @@ class Upload:
 						'type': 'string',
 						'result': response
 					}
-				# from here we depart from the async_submit procedure,
-				# there should be no need to parse the rows and provide as much feedback here
-				# since the files being submitted should be derived from the db tools, we can just provide feedback
-				# based on which records were found and deleted.
+				parse_result = upload_object.parse_rows()
+				if parse_result.duplicate_keys:
+					response = parse_result.duplicate_keys_table()
+					with app.app_context():
+						html = render_template(
+							'emails/upload_report.html',
+							response=response
+						)
+						subject = "BreedCAFS upload rejected"
+						recipients = [User(username).find('')['email']]
+						body = response
+						send_email(subject, app.config['ADMINS'][0], recipients, body, html)
+					return {
+						'status': 'ERRORS',
+						'type': 'parse_object',
+						'result': response
+					}
+				if parse_result.errors:
+					response = parse_result.html_table()
+					return {
+						'status': 'ERRORS',
+						'type': 'parse_object',
+						'result': response
+					}
 				tx = neo4j_session.begin_transaction()
 				deletion_result = upload_object.correct(tx, access)
 				# update properties where needed
@@ -1887,11 +1967,11 @@ class Upload:
 				missing_row_indexes = []
 				expected_row_index = 1
 				if not deletion_result.peek():
-					missing_row_indexes += range(2, upload_object.row_count + 1)
+					missing_row_indexes += range(2, upload_object.row_count + 2)
 					tx.close()
 				else:
 					for record in deletion_result:
-						while expected_row_index != record[0]['row_index'] and expected_row_index <= upload_object.row_count:
+						while expected_row_index != record[0]['row_index'] and expected_row_index <= upload_object.row_count + 2:
 							expected_row_index += 1
 							if expected_row_index != record[0]['row_index']:
 								missing_row_indexes.append(expected_row_index)
@@ -1903,7 +1983,7 @@ class Upload:
 					upload_object.remove_properties(tx, property_uid)
 					tx.commit()
 					if not expected_row_index == upload_object.row_count:
-							missing_row_indexes += range(expected_row_index, upload_object.row_count + 1)
+							missing_row_indexes += range(expected_row_index, upload_object.row_count + 2)
 				if missing_row_indexes:
 					missing_row_ranges = (
 						list(x) for _, x in itertools.groupby(enumerate(missing_row_indexes), lambda (i, x): i-x)
