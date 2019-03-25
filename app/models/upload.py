@@ -1987,7 +1987,6 @@ class Upload:
 				expected_row_index = 1
 				if not deletion_result.peek():
 					missing_row_indexes += range(2, upload_object.row_count + 2)
-					tx.close()
 				else:
 					for record in deletion_result:
 						while expected_row_index != record[0]['row_index'] and expected_row_index <= upload_object.row_count + 2:
@@ -2012,7 +2011,7 @@ class Upload:
 					tx.rollback()
 					with app.app_context():
 						# send result of merger in an email
-						subject = 'BreedCAFS upload summary'
+						subject = 'BreedCAFS correction rejected'
 						recipients = [User(username).find('')['email']]
 						response = 'Correction rejected:\n '
 						if missing_row_str:
@@ -2034,7 +2033,7 @@ class Upload:
 				tx.commit()
 				with app.app_context():
 					# send result of merger in an email
-					subject = 'BreedCAFS upload summary'
+					subject = 'BreedCAFS correction summary'
 					recipients = [User(username).find('')['email']]
 					response = 'Correction report:\n '
 					if record_tally:

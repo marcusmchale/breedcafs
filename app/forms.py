@@ -743,5 +743,5 @@ class CorrectForm(FlaskForm):
 		'Select a file:',
 		[FileRequired()]
 	)
-	correct_submit = SubmitField('Delete')
+	correct_submit = SubmitField('Delete Records')
 

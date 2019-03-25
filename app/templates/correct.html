@@ -3,6 +3,19 @@
 <div class="text_body">
 {% from "_formhelpers.html" import render_field %}
 	<h2>Delete Records</h2>
+        <p>To delete records you need a file containing the specific records you want to delete.</p>
+        <p>If you just uploaded the records and you want to delete the entire submission
+            then the submission report file is suitable. Otherwise generate a "database" format file on the download page using appropriate filters
+            to include only the records you want to delete. You may also manually remove rows from this generated file
+            if you can't find all the appropriate filters. With this file now describing the records you want to delete, simply upload the file here.
+        </p><br>
+        <p>Partner admins are able to delete records (and revert property changes)
+            submitted by all members of their institute. Other users are only be able
+            to delete their own records. If your report implies that the records cannot
+            be found despite you being able to access these records through the download page
+            then you may need to contact the relevant partner admin to have these records deleted.
+        </p>
+    <p></p>
 		<form action="{{ url_for('correct') }}" method="post" enctype=multipart/form-data>
 		{{ correct_form.csrf_token }}
 			<dl>
