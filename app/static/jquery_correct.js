@@ -43,7 +43,7 @@ correct_submit.click( function(e) {
 			console.log(error);
 			correct_submit.attr("enabled", "enabled")
 		}
-	})
+	});
 	//button was hidden, reveal again.
 	correct_submit.show();
 	//poll for result of submission

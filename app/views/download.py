@@ -90,6 +90,61 @@ def download():
 			return redirect(url_for('index'))
 
 
+@app.route('/download/files/', methods=['GET'])
+def download_files():
+	if 'username' not in session:
+		flash('Please log in')
+		return redirect(url_for('login'))
+	else:
+		try:
+			return render_template(
+				'download_files.html',
+				title='Download Files'
+			)
+		except (ServiceUnavailable, SecurityError):
+			flash("Database unavailable")
+			return redirect(url_for('index'))
+
+
+@app.route('/download/files/list', methods=['GET', 'POST'])
+def download_files_list():
+	if 'username' not in session:
+		flash('Please log in')
+		return redirect(url_for('login'))
+	else:
+		try:
+			path = os.path.join(app.instance_path, app.config['DOWNLOAD_FOLDER'], session['username'])
+			file_list = os.listdir(path)
+			file_list.sort(key=lambda x: os.path.getmtime(os.path.join(path, x)), reverse=True)
+			html_file_table = (
+				'<table>'
+				+ '	<tr>'
+				+ '		<th>Database generated files</th> '
+				+ '	</tr> '
+			)
+			for i in file_list:
+				html_file_table += (
+					'<tr>'
+					+ '<td><a href=" '
+					+ url_for(
+						"download_file",
+						username=session['username'],
+						filename=i,
+						_external=True
+					)
+					+ '">'
+					+ str(i) + '</a></td>'
+					+ '</tr> '
+				)
+			html_file_table += '</table>'
+			return jsonify(
+				html_file_table
+			)
+		except (ServiceUnavailable, SecurityError):
+			flash("Database unavailable")
+			return redirect(url_for('index'))
+
+
 @app.route('/download/generate_file', methods=['POST'])
 def generate_file():
 	if 'username' not in session:

@@ -2,6 +2,9 @@
 {% block body %}
     {% from "_formhelpers_record.html" import render_field %}
 <div class="text_body">
+    <div>
+        <a href="{{  url_for('download_files') }}">Download existing files</a> or create a new file below.
+    </div>
 		<form action="{{ url_for('download') }}" id="download" method="post">
             <h2>Filter Records</h2>
                 <h3>Date</h3>

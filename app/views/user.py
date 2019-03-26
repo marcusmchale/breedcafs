@@ -191,8 +191,8 @@ def confirm_password_reset(token):
 			return redirect(url_for('login'))
 		return render_template(
 			'confirm_password_reset.html',
-			form = form,
-			token = token
+			form=form,
+			token=token
 		)
 	except (ServiceUnavailable, SecurityError):
 		flash("Database unavailable")

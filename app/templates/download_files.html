@@ -1,0 +1,12 @@
+{% extends "layout.html" %}
+{% block body %}
+    {% from "_formhelpers_record.html" import render_field %}
+<div class="text_body">
+    The below files will not be archived for long, they are simply here for your convenience.
+		<div id="file_table"></div>
+</div>
+{% endblock %}
+{% block chart %}
+<script src="{{ url_for('static', filename='jquery_1.8.3_min.js') }}"></script>
+<script src="{{ url_for('static', filename='jquery_download_files.js') }}"></script>
+{% endblock %}

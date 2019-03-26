@@ -196,7 +196,14 @@ class Download:
 				file_path = os.path.join(self.user_download_folder, filename)
 		return file_path
 
-	def set_features(self, item_level, record_type, feature_group=None, features=None, sample_level=None):
+	def set_features(
+			self,
+			item_level,
+			record_type,
+			feature_group=None,
+			features=None,
+			sample_level=None
+	):
 		self.features = FeatureList(
 			item_level,
 			record_type).get_features(
