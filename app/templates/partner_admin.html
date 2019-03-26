@@ -7,14 +7,14 @@
 			{{ form.csrf_token }}
 			<div id = 'admin'>
 				<table>
-					<tr><th></th><th>Name</th><th>Institute</th></tr>
+					<tr><th>Name</th><th>Institute</th></tr>
 					{{ render_field(form.partner_admins) }}
 				</table>
 			</div>
 			<br><br>
 			<div id = 'non-admin'>
 				<table>
-					<tr><th></th><th>Name</th><th>Institute</th></tr>
+					<tr><th>Name</th><th>Institute</th></tr>
 					{{ render_field(form.not_partner_admins) }}
 				</table>
 			</div>
