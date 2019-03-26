@@ -4,7 +4,7 @@
 	{% elif field.type in ['StringField'] %}
 		{{ field(placeholder=field.description)|safe }}
 	{% elif field.type in ['SubmitField'] %}
-		{{ field(**kwargs)|safe }}</dd>
+		{{ field(**kwargs)|safe }} </dd>
 	{% else %}
 	<h3 id="{{ field.name }} title">{{ field.label }}</h3>
 		{% if field.errors %}

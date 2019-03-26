@@ -398,7 +398,7 @@ def partner_admin():
 
 
 # endpoint to get lists of users in html table format to populate the form on user_admin page
-@app.route('/admin/users', methods = ['GET'])
+@app.route('/admin/users', methods=['GET'])
 def admin_users():
 	if 'username' not in session:
 		flash('Please log in')
@@ -415,8 +415,8 @@ def admin_users():
 		for user in enumerate(users):
 			if user[1]['Confirmed']:
 				row = (
-					'<tr><th><label for="confirmed_users-'
-					+ str(user[0]) + '"></label></th><td>'
+					'<tr><label for="confirmed_users-'
+					+ str(user[0]) + '"></label><td>'
 					+ user[1]['Name'] + '</td><td>'
 					+ user[1]['Partner'] + '</td><td><input id="confirmed_users-'
 					+ str(user[0]) + '" name="confirmed_users" value=\'{"username":"' + user[1]['Username'] 
@@ -426,8 +426,8 @@ def admin_users():
 				user_lists['confirmed'].append(row)
 			else:
 				row = (
-					'<tr><th><label for="unconfirmed_users-'
-					+ str(user[0]) + '"></label></th><td>'
+					'<tr><label for="unconfirmed_users-'
+					+ str(user[0]) + '"></th><td>'
 					+ user[1]['Name'] + '</td><td>'
 					+ user[1]['Partner'] + '</td><td><input id="unconfirmed_users-'
 					+ str(user[0]) + '" name="unconfirmed_users" value=\'{"username":"' 
@@ -492,8 +492,8 @@ def admin_partner_admins():
 		for user in enumerate(users):
 			if user[1]['Confirmed']:
 				row = (
-					'<tr><th><label for="partner_admins-'
-					+ str(user[0]) + '"></label></th><td>'
+					'<tr><label for="partner_admins-'
+					+ str(user[0]) + '"></label><td>'
 					+ user[1]['Name'] + '</td><td>'
 					+ user[1]['Partner'] + '</td><td><input id="partner_admins-'
 					+ str(user[0]) + '" name="partner_admins" value=\'{"username":"' + user[1]['Username'] 
@@ -503,8 +503,8 @@ def admin_partner_admins():
 				user_lists['partner_admins'].append(row)
 			else:
 				row = (
-					'<tr><th><label for="not_partner_admins-'
-					+ str(user[0]) + '"></label></th><td>'
+					'<tr><label for="not_partner_admins-'
+					+ str(user[0]) + '"></label><td>'
 					+ user[1]['Name'] + '</td><td>'
 					+ user[1]['Partner'] + '</td><td><input id="not_partner_admins-'
 					+ str(user[0]) + '" name="not_partner_admins" value=\'{"username":"' 
