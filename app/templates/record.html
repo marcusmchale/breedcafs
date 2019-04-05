@@ -40,7 +40,10 @@
                                 <dd>{{  render_field (record_form.feature_group) }}</dd>
                                 <div id="feature_checkbox_div"></div>
                             <br><br>
-                            <input id="generate_template" name="generate_template" type="submit" value="Generate template">
+                            <div id="generate_template_div">
+                                {{  render_field (record_form.template_format) }}
+                                <input id="generate_template" name="generate_template" type="submit" value="Generate template">
+                            </div>
                         </div>
                         <div id="web_form_div">
                         <h3>Web Form</h3>

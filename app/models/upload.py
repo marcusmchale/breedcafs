@@ -87,10 +87,20 @@ class RowParseResult:
 				"missing": "This UID is not found in the database. "
 			},
 			"feature": {
-				"missing": "This feature is not found in the database. "
-				"Please check the spelling and "
-				"that this feature is found among those supported by BreedCAFS "
-				"for the level of data you are submitting."
+				"missing": (
+					"This feature is not found in the database. "
+					"Please check the spelling and "
+					"that this feature is found among those supported by BreedCAFS "
+					"for the level of data you are submitting."
+				)
+			},
+			"trait": {
+				"missing": (
+					"This feature is not found in the database. "
+					"Please check the spelling and "
+					"that this feature is found among those supported by BreedCAFS "
+					"for the level of data you are submitting."
+				)
 			},
 			"other": {
 				"format": {
@@ -1002,7 +1012,7 @@ class Upload:
 			# but to further confirm we only delete the intended record, e.g. if a record is later resubmitted
 			# we include the check for submission time.
 			required = ['uid', 'replicate', 'feature', 'time/period', 'submitted at']
-		elif self.submission_type == 'FB':
+		elif self.submission_type == 'fb':
 			required = ['uid', 'trait', 'value', 'timestamp', 'person', 'location']
 		else:  # self.submission_type == 'table':
 			required = {'uid', 'person'}
@@ -1181,10 +1191,8 @@ class Upload:
 						pass
 				elif submission_type == 'db':
 					parse_result.parse_db_row(row)
-				# todo re-write the parse function for FB files
-				elif submission_type == "FB":
-					row_index = int(row['row_index'])
-					parse_result.parse(row_index, row)
+				elif submission_type == "fb":
+					parse_result.parse_fb_row(row)
 				# if many errors already then return immediately
 				if parse_result.long_enough():
 					return parse_result
@@ -1201,61 +1209,53 @@ class Upload:
 		submission_type = self.submission_type
 		record_type = self.record_type
 		with open(trimmed_file_path, 'r') as trimmed_file:
-			#if submission_type == "FB":
-				#check_result = [record[0] for record in tx.run(
-				#	Cypher.upload_fb_check,
-				#	username=username,
-				#	filename=("file:///" + username + '/' + trimmed_filename),
-				#	submission_type=submission_type
-				#)]
-				#for row_data in trimmed_dict:
-				#	row_index = int(row_data['row_index'])
-				#	item = check_result[row_index]
-				#	if not item['uid']:
-				#		parse_result.merge_error(
-				#			row_index,
-				#			row_data,
-				#			"uid",
-				#			"missing"
-				#		)
-				#	if not item['trait']:
-				#		parse_result.merge_error(
-				#			row_index,
-				#			row_data,
-				#			"trait",
-				#			"missing"
-				#		)
-				#	if not item['value']:
-				#		if all([item['trait'], item['uid']]):
-				#			if 'category_list' in item:
-				#				parse_result.merge_error(
-				#					row_index,
-				#					row_data,
-				#					"value",
-				#					"format",
-				#					item['trait'],
-				#					item['format'],
-				#					item['category_list']
-				#				)
-				#			elif 'format' in item:
-				#				parse_result.merge_error(
-				#					row_index,
-				#					row_data,
-				#					"value",
-				#					"format",
-				#					item['trait'],
-				#					item['format']
-				#				)
-				#			else:
-				#				parse_result.merge_error(
-				#					row_index,
-				#					row_data,
-				#					"value",
-				#					"format",
-				#					item['trait']
-				#				)
-			#else:
-			if submission_type == 'table':
+			if submission_type == "fb":
+				check_result = tx.run(
+					Cypher.upload_fb_check,
+					username=username,
+					filename=("file:///" + username + '/' + trimmed_filename),
+					submission_type=submission_type
+				)
+				trimmed_dict_reader = DictReaderInsensitive(trimmed_file)
+				row = trimmed_dict_reader.next()
+				for item in check_result:
+					record = item[0]
+					while record['row_index'] != int(row['row_index']):
+						row = trimmed_dict_reader.next()
+					if not record['UID']:
+						parse_result.merge_error(
+							row,
+							"uid",
+							"missing"
+						)
+					if not record['feature']:
+						parse_result.merge_error(
+							row,
+							"trait",
+							"missing"
+						)
+					if all([
+						record['UID'],
+						record['feature'],
+						not record['value']
+					]):
+						parse_result.merge_error(
+							row,
+							"value",
+							"format",
+							feature_name=record['feature'],
+							feature_format=record['format'],
+							category_list=record['category_list']
+						)
+					# need to check an element of the list as all results
+					if record['conflicts'][0]['existing_value']:
+						parse_result.merge_error(
+							row,
+							"value",
+							"conflict",
+							conflicts=record['conflicts']
+						)
+			elif submission_type == 'table':
 				if record_type == 'property':
 					statement = Cypher.upload_table_property_check
 				elif record_type == 'trait':
@@ -1335,7 +1335,7 @@ class Upload:
 		self.submission_result = SubmissionResult(username, filename, submission_type, self.record_type)
 		submission_result = self.submission_result
 		record_type = self.record_type
-		if submission_type == 'FB':
+		if submission_type == 'fb':
 			statement = Cypher.upload_fb
 			result = tx.run(
 				statement,
@@ -1348,7 +1348,6 @@ class Upload:
 			elif record_type == 'trait':
 				statement = Cypher.upload_table_trait
 			elif record_type == 'condition':
-				# TODO handle conflicts within a file.
 				statement = Cypher.upload_table_condition
 			else:
 				statement = None
@@ -1361,6 +1360,8 @@ class Upload:
 			)
 		# create a submission result and update properties from result
 		for record in result:
+			# todo: rewrite this so writing files directly for each record, instead of storing in memory
+			# todo: will have to catch, rollback and dump some files if conflicts
 			submission_result.parse_record(record[0])
 		return submission_result
 
@@ -1451,7 +1452,7 @@ class Upload:
 					# update properties where needed
 					submission_result.update_properties(tx)
 					if submission_result.conflicts:
-						tx.rollback
+						tx.rollback()
 						conflicts_file = submission_result.conflicts_file()
 						with app.app_context():
 							# create urls

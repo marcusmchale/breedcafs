@@ -10,6 +10,7 @@ const dynamic_form_div = $('#dynamic_form_div');
 const location_div = $('#location');
 const feature_div = $('#feature_selection');
 const generate_template_button = $('#generate_template');
+const generate_template_div = $('#generate_template_div');
 const submit_records_button = $('#submit_records');
 const replicates_div = $('#replicates_div')
 
@@ -37,6 +38,13 @@ record_type_update = function() {
         feature_div.hide();
         replicates_div.hide();
     }
+    if (record_type === "trait") {
+        $('#template_format').append('<option value="fb">Field Book (csv)</option>');
+    }
+    else {
+        $('#template_format option[value="fb"]').remove();
+    }
+
     level_update();
     suppress_input();
 };
@@ -263,7 +271,7 @@ update_submit_fields = function () {
     if (count_checked > 0){
         $('#web_form_div').show();
         submit_records_button.show();
-        generate_template_button.show();
+        generate_template_div.show();
         if (record_type === 'trait') {
             record_period_div.hide();
             record_time_div.show();
@@ -284,7 +292,7 @@ update_submit_fields = function () {
         $('#select_all_features').prop('checked', false);
         $('#web_form_div').hide();
         submit_records_button.hide();
-        generate_template_button.hide();
+        generate_template_div.hide();
     }
 };
 

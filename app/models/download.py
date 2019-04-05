@@ -232,13 +232,16 @@ class Download:
 		)
 		if not self.features:
 			return False
-		self.id_list_to_template(
-			record_data['record_type'],
-			base_filename=record_data['item_level']
-		)
+		if record_data['template_format'] == 'fb':
+			self.make_fb_template()
+		else:
+			self.id_list_to_xlsx_template(
+				record_data['record_type'],
+				base_filename=record_data['item_level']
+			)
 		return True
 
-	def id_list_to_template(
+	def id_list_to_xlsx_template(
 			self,
 			record_type,
 			base_filename=None
@@ -435,12 +438,21 @@ class Download:
 				extrasaction='ignore'
 			)
 			writer.writeheader()
-			for row in id_list:
-				for item in row:
-					if isinstance(row[item], list):
-						row[item] = ", ".join([i for i in row[item]])
-				# for key, value in row:
-				writer.writerow(row)
+			# We hand this function either query results (bolt iterable or lists, we need to distinguish them
+			if isinstance(id_list, list):
+				for row in id_list:
+					for item in row:
+						if isinstance(row[item], list):
+							row[item] = ", ".join([i for i in row[item]])
+					# for key, value in row:
+					writer.writerow(row)
+			else:
+				for row in id_list:
+					for item in row[0]:
+						if isinstance(row[0][item], list):
+							row[0][item] = ", ".join([i for i in row[0][item]])
+					# for key, value in row:
+					writer.writerow(row[0])
 			# file_size = csv_file.tell()
 		# return file details
 		self.file_list.append({
@@ -457,15 +469,13 @@ class Download:
 
 	def make_fb_template(
 			self,
-			fieldnames,
-			id_list,
-			features,
 			base_filename=None,
 			with_timestamp=True
 	):
+		self.set_item_fieldnames()
 		self.make_csv_file(
-			fieldnames,
-			id_list,
+			self.item_fieldnames,
+			self.id_list,
 			base_filename=base_filename,
 			with_timestamp=with_timestamp
 		)
@@ -480,12 +490,12 @@ class Download:
 			'isVisible',
 			'realPosition'
 		]
-		for i, feature in enumerate(features):
+		for i, feature in enumerate(self.features):
 			feature['realPosition'] = str(i + 1)
 			feature['isVisible'] = 'True'
 		self.make_csv_file(
 			feature_fieldnames,
-			features,
+			self.features,
 			base_filename=base_filename,
 			with_timestamp=with_timestamp,
 			file_extension='trt'

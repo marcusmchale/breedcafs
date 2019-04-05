@@ -36,7 +36,7 @@ def create():
 		return redirect(url_for('login'))
 	else:
 		try:
-			location_form = LocationForm.update()
+			location_form=LocationForm.update()
 			add_country_form = AddCountry()
 			add_region_form = AddRegion()
 			add_farm_form = AddFarm()
@@ -45,14 +45,14 @@ def create():
 			add_trees_form = AddTreesForm()
 			return render_template(
 				'create.html',
-				location_form = location_form,
-				add_country_form = add_country_form,
-				add_region_form = add_region_form,
-				add_farm_form = add_farm_form,
-				add_field_form = add_field_form,
-				add_block_form = add_block_form,
-				add_trees_form = add_trees_form,
-				title = 'Register fields and submit details'
+				location_form=location_form,
+				add_country_form=add_country_form,
+				add_region_form=add_region_form,
+				add_farm_form=add_farm_form,
+				add_field_form=add_field_form,
+				add_block_form=add_block_form,
+				add_trees_form=add_trees_form,
+				title='Register fields and submit details'
 			)
 		except (ServiceUnavailable, SecurityError):
 				flash("Database unavailable")
@@ -221,7 +221,7 @@ def add_trees():
 						'property',
 						feature_group="Registration"
 					)
-					download_object.id_list_to_template(
+					download_object.id_list_to_xlsx_template(
 						'property',
 						base_filename="Tree Registration Template",
 					)

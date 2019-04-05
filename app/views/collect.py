@@ -96,7 +96,7 @@ def register_samples():
 					)
 					download_object
 					# drop some items from the self.features list to avoid confusion when they aren't relevant
-					download_object.id_list_to_template(
+					download_object.id_list_to_xlsx_template(
 						"property",
 						base_filename="Sample Registration Template",
 					)

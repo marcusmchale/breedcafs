@@ -18,7 +18,7 @@ class DriverHolder:
 def get_driver():
 	if DriverHolder.driver:
 		return DriverHolder.driver
-	uri = "bolt://localhost:7687"
+	uri = app.config['BOLT_URI']
 	DriverHolder.driver = GraphDatabase.driver(
 		uri,
 		auth=(

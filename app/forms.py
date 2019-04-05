@@ -107,8 +107,8 @@ class RegistrationForm(FlaskForm):
 			Length(min=1, max=20, message='Maximum 20 characters'),
 			Regexp("([^\x00-\x7F]|\w|\s)+$", message='Username contains illegal characters')
 		],
-		filters = [strip_filter],
-		description = "Enter a username"
+		filters=[strip_filter],
+		description="Enter a username"
 	)
 	email = StringField(
 		'Email Address:',
@@ -117,8 +117,8 @@ class RegistrationForm(FlaskForm):
 			Email(),
 			Length(min=1, max=254, message='Maximum 100 characters')
 		],
-		filters = [strip_filter],
-		description = "Enter your email address"
+		filters=[strip_filter],
+		description="Enter your email address"
 	)
 	name = StringField(
 		'Full Name:',
@@ -126,8 +126,8 @@ class RegistrationForm(FlaskForm):
 			InputRequired(),
 			Length(min=1, max=100, message='Maximum 100 characters')
 		],
-		filters = [strip_filter],
-		description = "Enter your full name"
+		filters=[strip_filter],
+		description="Enter your full name"
 	)
 	password = PasswordField(
 		'New Password:',
@@ -136,7 +136,7 @@ class RegistrationForm(FlaskForm):
 			Length(min=8, max=100, message='Passwords must be at least 8 characters'),
 			safe_password_check
 		],
-		description = "Please choose a secure password for this site"
+		description="Please choose a secure password for this site"
 	)
 
 	@staticmethod
@@ -152,13 +152,13 @@ class AffiliationForm(FlaskForm):
 		'Pending confirmation',
 		[Optional()],
 		option_widget = widgets.CheckboxInput(), 
-		widget = widgets.ListWidget(prefix_label=False)
+		widget=widgets.ListWidget(prefix_label=False)
 	)
 	other = SelectMultipleField(
 		'Other partners',
 		[Optional()],
-		option_widget = widgets.CheckboxInput(), 
-		widget = widgets.ListWidget(prefix_label=False)
+		option_widget=widgets.CheckboxInput(),
+		widget=widgets.ListWidget(prefix_label=False)
 	)
 	submit_affiliations = SubmitField('Add/remove affiliations')
 
@@ -226,7 +226,9 @@ class UserAdminForm(FlaskForm):
 	):
 		form = UserAdminForm()
 		form.confirmed_users.choices = []
+		form.confirmed_users.checked = False
 		form.unconfirmed_users.choices = []
+		form.unconfirmed_users.checked = True
 		users = [record[0] for record in User(user).get_users_for_admin(access)]
 		for user in users:
 			user_table = "<td>" + user['Name'] + "</td><td>" + user['Partner'] + "</td>"
@@ -259,7 +261,9 @@ class PartnerAdminForm(FlaskForm):
 	def update():
 		form = PartnerAdminForm()
 		form.partner_admins.choices = []
+		form.partner_admins.checked = False
 		form.not_partner_admins.choices = []
+		form.not_partner_admins.checked = False
 		users = [record[0] for record in User.admin_get_partner_admins()]
 		for user in users:
 			user_table = "<td>" + user['Name'] + "</td><td>" + user['Partner'] + "</td>"
@@ -570,8 +574,8 @@ class UploadForm(FlaskForm):
 		'Submission type:',
 		[InputRequired()],
 		choices=[
-			('table', 'Table (xlsx, csv)')
-			#('FB', 'Field Book (.csv)')
+			('table', 'Table (xlsx, csv)'),
+			('fb', 'Field Book (.csv)')
 		]
 	)
 	file = FileField(
@@ -752,6 +756,14 @@ class RecordForm(FlaskForm):
 		[Optional()],
 		description='End of period'
 	)
+	template_format = SelectField(
+		'Template format',
+		[Optional()],
+		choices=[
+			('xlsx', 'Table (xlsx)')
+		],
+		description="Type of template file/s to generate"
+	)
 	submit_records = SubmitField('Submit records')
 
 	@staticmethod
@@ -761,6 +773,8 @@ class RecordForm(FlaskForm):
 		record_type = form.record_type.data if form.record_type.data not in ['', 'None'] else None
 		if record_type:
 			form.feature_group.choices += SelectionList.get_feature_groups(item_level, record_type)
+			if record_type == 'trait':
+				form.template_format.choices.append(('fb', 'Field Book'))
 		selected_feature_group = form.feature_group.data if form.feature_group.data not in ['', 'None'] else None
 		if selected_feature_group:
 			features_details = FeatureList(

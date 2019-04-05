@@ -59,10 +59,10 @@ def register():
 			try:
 				ts = URLSafeTimedSerializer(app.config['SECRET_KEY'])
 				User(username).register(password, email, name, partner)
-				token = ts.dumps(email, salt = app.config['CONFIRM_EMAIL_SALT'])
+				token = ts.dumps(email, salt=app.config['CONFIRM_EMAIL_SALT'])
 				subject = "BreedCAFS database confirmation."
 				recipients = [email]
-				confirm_url = url_for('confirm', token = token, _external = True)
+				confirm_url = url_for('confirm', token=token, _external = True)
 				body = (
 					"Your account on the BreedCAFS server was successfully created. Your username is" + username +
 					" Please visit the following link to activate your account:" + confirm_url
@@ -492,26 +492,22 @@ def admin_partner_admins():
 		for user in enumerate(users):
 			if user[1]['Confirmed']:
 				row = (
-					'<tr><label for="partner_admins-'
-					+ str(user[0]) + '"></label><td>'
-					+ user[1]['Name'] + '</td><td>'
-					+ user[1]['Partner'] + '</td><td><input id="partner_admins-'
-					+ str(user[0]) + '" name="partner_admins" value=\'{"username":"' + user[1]['Username'] 
-					+ '", "partner":"' + user[1]["Partner"]
-					+ '"}\' type="checkbox"></td></tr>'
+					'<tr><label for="partner_admins-%s"></label><td>%s</td><td>%s</td><td><input id="partner_admins-'
+					'%s" name="partner_admins" value=\'{"username":"%s", "partner":"%s"}\' type="checkbox"></td></tr>'
+					% (
+						str(user[0]), user[1]['Name'], user[1]['Partner'],  str(user[0]), user[1]['Username'],
+						user[1]["Partner"]
+					)
 				)
 				user_lists['partner_admins'].append(row)
 			else:
 				row = (
-					'<tr><label for="not_partner_admins-'
-					+ str(user[0]) + '"></label><td>'
-					+ user[1]['Name'] + '</td><td>'
-					+ user[1]['Partner'] + '</td><td><input id="not_partner_admins-'
-					+ str(user[0]) + '" name="not_partner_admins" value=\'{"username":"' 
-					+ user[1]['Username'] 
-					+ '", "partner":"' 
-					+ user[1]["Partner"]
-					+ '"}\' type="checkbox"></td></tr>'
+					'<tr><label for="not_partner_admins-%s"></label><td>%s</td><td>%s</td><td><input id="not_partner_admins-'
+					'%s" name="not_partner_admins" value=\'{"username":"%s", "partner":"%s"}\' type="checkbox"></td></tr>'
+					% (
+						str(user[0]), user[1]['Name'], user[1]['Partner'], str(user[0]), user[1]['Username'],
+						user[1]["Partner"]
+					)
 				)
 				user_lists['not_partner_admins'].append(row)
 		return jsonify(user_lists)

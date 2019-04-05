@@ -107,6 +107,7 @@ def generate_template():
 				else:
 					selected_features = None
 				features_dict = {}
+				template_format = request.form['template_format']
 				for feature in selected_features:
 					features_dict[feature] = request.form[feature]
 				record_data = {
@@ -121,7 +122,8 @@ def generate_template():
 					'tree_id_list': tree_id_list,
 					'sample_id_list': sample_id_list,
 					'selected_features': selected_features,
-					'features_dict': features_dict
+					'features_dict': features_dict,
+					'template_format': template_format
 				}
 				download_object = Download(username)
 				if download_object.record_form_to_template(record_data):
