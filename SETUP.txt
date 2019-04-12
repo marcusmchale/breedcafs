@@ -53,6 +53,8 @@ Add the instance folder:
 	mkdir breedcafs/instance
 	cp /path/to/file/config.py breedcafs/instance/config.py
 	mkdir instance/import
+	mkdir instance/export
+
 
 Set up virtual environment:
 	Install:
@@ -71,7 +73,8 @@ Set up virtual environment:
 Set permissions:
 	chgrp -R www-data /var/www/breedcafs
 	chmod 755 /var/www/breedcafs
-	chmod g+w /var/www/breedcafs/instance/import
+	chmod 2775 /var/www/breedcafs/instance/import
+	chmod 2775 /var/www/breedcafs/instance/export
 
 Configure apache2:
 

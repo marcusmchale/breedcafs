@@ -4,6 +4,7 @@ from wtforms import (
 	StringField,
 	PasswordField,
 	DecimalField,
+	HiddenField,
 	BooleanField, 
 	SelectField, 
 	SelectMultipleField, 
@@ -32,6 +33,8 @@ from app.models import (
 )
 # from collections import defaultdict
 from safe import check
+
+from werkzeug.utils import secure_filename
 
 
 from wtforms.widgets import (
@@ -90,6 +93,14 @@ def range_list_check(form, field):
 		Parsers.parse_range_list(field.data)
 	except ValueError:
 		raise ValidationError('List should be comma separated with hyphens for ranges, e.g. "1,2-5". ')
+
+
+def secure_filename_check(form, field):
+	if not field.data == secure_filename(field.data):
+		raise ValueError(
+			'This filename is not safe for the system. '
+			'Please remove any special characters from the filename. '
+		)
 
 
 # custom filters
@@ -578,24 +589,28 @@ class UploadForm(FlaskForm):
 			('fb', 'Field Book (.csv)')
 		]
 	)
-	file = FileField(
-		'Select a file:',
-		[FileRequired()]
+	filename = HiddenField(
+		'filename',
+		[
+			InputRequired(),
+			Length(min=1, max=200, message='Maximum 200 characters in filename')
+			#secure_filename_check
+		],
+		description="filename hidden field"
 	)
-	upload_submit = SubmitField('Upload')
 
 
 # download
 class DownloadForm(FlaskForm):
 	record_type = SelectField(
 		[Optional()],
-		choices=[('', 'Any')] + SelectionList.get_record_types(),
+		choices=[('', 'Any')],
 		description="Record Type"
 	)
 	item_level = SelectField(
 		'Item Level',
 		[Optional()],
-		choices=[('', 'Any')] + SelectionList.get_item_levels(),
+		choices=[('', 'Any')],
 		description="Item Level"
 	)
 	submission_date_from = DateField(
@@ -677,6 +692,8 @@ class DownloadForm(FlaskForm):
 	@staticmethod
 	def update():
 		form = DownloadForm()
+		form.record_type.choices += SelectionList.get_record_types()
+		form.record_type.item_level += + SelectionList.get_item_levels()
 		item_level = form.item_level.data if form.item_level.data not in ['', 'None'] else None
 		record_type = form.record_type.data if form.record_type.data not in ['', 'None'] else None
 		form.feature_group.choices += SelectionList.get_feature_groups(item_level, record_type)
@@ -693,13 +710,13 @@ class DownloadForm(FlaskForm):
 class RecordForm(FlaskForm):
 	record_type = SelectField(
 		[InputRequired()],
-		choices=SelectionList.get_record_types(),
+		choices=[],
 		description="Record Type"
 	)
 	item_level = SelectField(
 		'Item Level',
 		[InputRequired()],
-		choices=SelectionList.get_item_levels(),
+		choices=[],
 		description="Item Level"
 	)
 	tree_id_list = StringField(
@@ -769,6 +786,8 @@ class RecordForm(FlaskForm):
 	@staticmethod
 	def update():
 		form = RecordForm()
+		form.record_type.choices += SelectionList.get_record_types()
+		form.item_level.choices += SelectionList.get_item_levels()
 		item_level = form.item_level.data if form.item_level.data not in ['', 'None'] else None
 		record_type = form.record_type.data if form.record_type.data not in ['', 'None'] else None
 		if record_type:

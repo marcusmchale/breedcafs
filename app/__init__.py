@@ -31,7 +31,7 @@ celery.conf.update(
 )
 
 # and also use redis (not just with celery) for basic local data store like login attempts and caching
-redis_store = StrictRedis(host='localhost', port=6379, db=0)
+redis_store = StrictRedis(host='localhost', port=app.config['REDIS_PORT'], db=0)
 redis_exceptions = exceptions
 
 from neo4j import GraphDatabase, ServiceUnavailable, TransactionError

@@ -1,5 +1,5 @@
 from user import User
-from upload import Upload
+from upload import Upload, Resumable
 from lists import (
 	FeatureList,
 	ItemList,

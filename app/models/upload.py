@@ -1,4 +1,4 @@
-from app import app, os, celery, ServiceUnavailable, SecurityError
+from app import app, os, celery, ServiceUnavailable, SecurityError, logging
 import grp
 from app.cypher import Cypher
 from app.emails import send_email
@@ -6,7 +6,6 @@ from app.models.parsers import Parsers
 from flask import render_template, url_for
 from werkzeug import urls
 from user import User
-from config import ALLOWED_EXTENSIONS
 from neo4j_driver import get_driver, bolt_result
 import unicodecsv as csv
 import datetime
@@ -811,7 +810,7 @@ class SubmissionResult:
 				os.mkdir(download_path)
 				gid = grp.getgrnam(app.config['CELERYGRPNAME']).gr_gid
 				os.chown(download_path, -1, gid)
-				os.chmod(download_path, 0775)
+				os.chmod(download_path, 02775)
 			conflicts_filename = os.path.splitext(filename)[0] + '_conflicts.csv'
 			conflicts_file_path = os.path.join(
 				app.instance_path,
@@ -858,7 +857,7 @@ class SubmissionResult:
 				os.mkdir(download_path)
 				gid = grp.getgrnam(app.config['CELERYGRPNAME']).gr_gid
 				os.chown(download_path, -1, gid)
-				os.chmod(download_path, 0775)
+				os.chmod(download_path, 02775)
 			resubmissions_filename = os.path.splitext(filename)[0] + '_resubmissions.csv'
 			resubmissions_file_path = os.path.join(
 				app.instance_path,
@@ -900,7 +899,7 @@ class SubmissionResult:
 				os.mkdir(download_path)
 				gid = grp.getgrnam(app.config['CELERYGRPNAME']).gr_gid
 				os.chown(download_path, -1, gid)
-				os.chmod(download_path, 0775)
+				os.chmod(download_path, 02775)
 			submitted_filename = os.path.splitext(filename)[0] + '_submitted.csv'
 			submitted_file_path = os.path.join(
 				app.instance_path,
@@ -933,10 +932,9 @@ class SubmissionResult:
 
 class Upload:
 	def __init__(self, username, submission_type, raw_filename):
-		time = datetime.datetime.utcnow().strftime('_%Y%m%d-%H%M%S_')
 		self.username = username
 		self.raw_filename = raw_filename
-		self.filename = secure_filename(time + '_' + raw_filename)
+		self.filename = secure_filename(raw_filename)
 		self.submission_type = submission_type
 		self.file_path = os.path.join(app.instance_path, app.config['UPLOAD_FOLDER'], username, self.filename)
 		self.record_type = None
@@ -953,7 +951,7 @@ class Upload:
 	def allowed_file(self):
 		if '.' in self.raw_filename:
 			self.file_extension = self.raw_filename.rsplit('.', 1)[1].lower()
-			if self.file_extension in ALLOWED_EXTENSIONS:
+			if self.file_extension in app.config['ALLOWED_EXTENSIONS']:
 				return True
 		else:
 			return False
@@ -965,7 +963,7 @@ class Upload:
 			os.mkdir(upload_path)
 			gid = grp.getgrnam(app.config['CELERYGRPNAME']).gr_gid
 			os.chown(upload_path, -1, gid)
-			os.chmod(upload_path, 0775)
+			os.chmod(upload_path, 02775)
 		file_data.save(self.file_path)
 
 	def file_format_errors(self):
@@ -1122,8 +1120,7 @@ class Upload:
 								row[field] = row[field].strip()
 						row['row_index'] = self.row_count
 						file_writer.writerow(row)
-
-		elif self.file_extension == 'xlsx':
+		else:  # self.file_extension == 'xlsx':
 			wb = load_workbook(self.file_path, read_only=True)
 			if self.submission_type == 'db':
 				ws = wb['Records']
@@ -1396,161 +1393,167 @@ class Upload:
 						'status': 'ERRORS',
 						'result': header_report
 					}
-				# clean up the file removing empty lines and whitespace, lower case headers for matching in db
-				upload_object.trim_file()
-				# parse this trimmed file for errors, sets parse_result attribute to upload_object
-				parse_result = upload_object.parse_rows()
-				if parse_result.duplicate_keys:
-					response = parse_result.duplicate_keys_table()
-					with app.app_context():
-						html = render_template(
-							'emails/upload_report.html',
-							response=response
-						)
-						subject = "BreedCAFS upload rejected"
-						recipients = [User(username).find('')['email']]
-						body = response
-						send_email(subject, app.config['ADMINS'][0], recipients, body, html)
-					return {
-						'status': 'ERRORS',
-						'type': 'parse_object',
-						'result': response
-					}
-				tx = neo4j_session.begin_transaction()
-				db_check_result = upload_object.db_check(tx, parse_result)
-				if any([db_check_result.field_errors, db_check_result.errors]):
-					tx.close()
-					if parse_result.errors:
-						response = parse_result.html_table()
-					if parse_result.field_errors:
-						prepend_response = (
-							'<p>The uploaded table includes the below unrecognised fields. '
-							'Please check the spelling of any traits '
-							'and ensure they are appropriate to the level of items included '
-							'in this file:</p>'
-						)
-						for i in db_check_result.field_errors:
-							prepend_response += '<p> - ' + i + '</p>\n'
-						response = prepend_response + '\n' + response
-					with app.app_context():
-						html = render_template(
-							'emails/upload_report.html',
-							response=response
-						)
-						subject = "BreedCAFS upload rejected"
-						recipients = [User(username).find('')['email']]
-						body = response
-						send_email(subject, app.config['ADMINS'][0], recipients, body, html)
-					return {
-						'status': 'ERRORS',
-						'type': 'parse_object',
-						'result': response
-					}
-				else:
-					# submit data
-					submission_result = upload_object.submit(tx)
-					# update properties where needed
-					submission_result.update_properties(tx)
-					if submission_result.conflicts:
-						tx.rollback()
-						conflicts_file = submission_result.conflicts_file()
+				if upload_object.file_extension in ['csv', 'xlsx']:
+					# clean up the file removing empty lines and whitespace, lower case headers for matching in db
+					upload_object.trim_file()
+					# parse this trimmed file for errors, sets parse_result attribute to upload_object
+					parse_result = upload_object.parse_rows()
+					if parse_result.duplicate_keys:
+						response = parse_result.duplicate_keys_table()
 						with app.app_context():
-							# create urls
-							if conflicts_file:
-								conflicts_file_url = url_for(
-									'download_file',
-									username=username,
-									filename=conflicts_file,
-									_external=True
-								)
-								response = (
-										'<p><a href= "'
-										+ str(conflicts_file_url)
-										+ '">'
-										+ str(len(submission_result.conflicts)) +
-										'conflicts were found. </a> '
-										'Typically a report on such conflicts is generated before merger, however '
-										'this situation can occur when conflicting records are submitted concurrently. '
-										'Your submission has been rejected. Please address the listed conflicts '
-										'before resubmitting. '
-										'</p> '
-								)
-								html = render_template(
-									'emails/upload_report.html',
-									response=response
-								)
-								# send result of merger in an email
-								subject = "BreedCAFS upload rejected"
-								recipients = [User(username).find('')['email']]
-								response = "Submission rejected:\n " + response
-								body = response
-								send_email(subject, app.config['ADMINS'][0], recipients, body, html)
-								return {
-									'status': 'ERRORS',
-									'type': 'string',
-									'result': response
-								}
-					else:
-						tx.commit()
-						# create summary dict
-						submission_summary = submission_result.summary()
-						# create files
-						resubmissions_file = submission_result.resubmissions_file()
-						submitted_file = submission_result.submitted_file()
-						# now need app context for the following (this is running asynchronously)
-						with app.app_context():
-							if resubmissions_file:
-								resubmissions_file_url = url_for(
-									'download_file',
-									username=username,
-									filename=resubmissions_file,
-									_external=True
-								)
-							else:
-								resubmissions_file_url = None
-							if submitted_file:
-								submitted_file_url = url_for(
-									'download_file',
-									username=username,
-									filename=submitted_file,
-									_external=True
-								)
-							else:
-								submitted_file_url = None
-							if not any([resubmissions_file, submitted_file]):
-								response = 'No data submitted, please check that you uploaded a completed file'
-								return {
-									'status': 'ERRORS',
-									'type': 'string',
-									'result': response
-								}
-							# send result of merger in an email
-							subject = "BreedCAFS upload summary"
-							recipients = [User(username).find('')['email']]
-							response = "Submission report:\n "
-							if submission_summary['submitted']:
-								response += "<p> - <a href= " + str(submitted_file_url) + ">" + str(
-									submission_summary['submitted']) \
-											+ "</a> new values were submitted to the database.\n </p>"
-							if submission_summary['resubmissions']:
-								response += "<p> - <a href= " + str(resubmissions_file_url) + ">" + str(
-									submission_summary['resubmissions']) \
-											+ "</a> existing values were already found.\n</p>"
-							body = "Submission_report: \n"
-							body += " - " + str(
-								submission_summary['submitted']) + 'new values were submitted to the database.\n'
-							body += "   These are available at the following url: " + str(submitted_file_url) + "\n"
-							body += " - " + str(
-								submission_summary['resubmissions']) + 'existing values were already found.\n'
-							body += "   These are available at the following url: " + str(resubmissions_file_url) + "\n"
 							html = render_template(
 								'emails/upload_report.html',
 								response=response
 							)
+							subject = "BreedCAFS upload rejected"
+							recipients = [User(username).find('')['email']]
+							body = response
 							send_email(subject, app.config['ADMINS'][0], recipients, body, html)
+						return {
+							'status': 'ERRORS',
+							'type': 'parse_object',
+							'result': response
+						}
+					tx = neo4j_session.begin_transaction()
+					db_check_result = upload_object.db_check(tx, parse_result)
+					if any([db_check_result.field_errors, db_check_result.errors]):
+						tx.close()
+						if parse_result.errors:
+							response = parse_result.html_table()
+						if parse_result.field_errors:
+							prepend_response = (
+								'<p>The uploaded table includes the below unrecognised fields. '
+								'Please check the spelling of any traits '
+								'and ensure they are appropriate to the level of items included '
+								'in this file:</p>'
+							)
+							for i in db_check_result.field_errors:
+								prepend_response += '<p> - ' + i + '</p>\n'
+							response = prepend_response + '\n' + response
+						with app.app_context():
+							html = render_template(
+								'emails/upload_report.html',
+								response=response
+							)
+							subject = "BreedCAFS upload rejected"
+							recipients = [User(username).find('')['email']]
+							body = response
+							send_email(subject, app.config['ADMINS'][0], recipients, body, html)
+						return {
+							'status': 'ERRORS',
+							'type': 'parse_object',
+							'result': response
+						}
+					else:
+						# submit data
+						submission_result = upload_object.submit(tx)
+						# update properties where needed
+						submission_result.update_properties(tx)
+						if submission_result.conflicts:
+							tx.rollback()
+							conflicts_file = submission_result.conflicts_file()
+							with app.app_context():
+								# create urls
+								if conflicts_file:
+									conflicts_file_url = url_for(
+										'download_file',
+										username=username,
+										filename=conflicts_file,
+										_external=True
+									)
+									response = (
+											'<p><a href= "'
+											+ str(conflicts_file_url)
+											+ '">'
+											+ str(len(submission_result.conflicts)) +
+											'conflicts were found. </a> '
+											'Typically a report on such conflicts is generated before merger, however '
+											'this situation can occur when conflicting records are submitted concurrently. '
+											'Your submission has been rejected. Please address the listed conflicts '
+											'before resubmitting. '
+											'</p> '
+									)
+									html = render_template(
+										'emails/upload_report.html',
+										response=response
+									)
+									# send result of merger in an email
+									subject = "BreedCAFS upload rejected"
+									recipients = [User(username).find('')['email']]
+									response = "Submission rejected:\n " + response
+									body = response
+									send_email(subject, app.config['ADMINS'][0], recipients, body, html)
+									return {
+										'status': 'ERRORS',
+										'type': 'string',
+										'result': response
+									}
+						else:
+							tx.commit()
+							# create summary dict
+							submission_summary = submission_result.summary()
+							# create files
+							resubmissions_file = submission_result.resubmissions_file()
+							submitted_file = submission_result.submitted_file()
+							# now need app context for the following (this is running asynchronously)
+							with app.app_context():
+								if resubmissions_file:
+									resubmissions_file_url = url_for(
+										'download_file',
+										username=username,
+										filename=resubmissions_file,
+										_external=True
+									)
+								else:
+									resubmissions_file_url = None
+								if submitted_file:
+									submitted_file_url = url_for(
+										'download_file',
+										username=username,
+										filename=submitted_file,
+										_external=True
+									)
+								else:
+									submitted_file_url = None
+								if not any([resubmissions_file, submitted_file]):
+									response = 'No data submitted, please check that you uploaded a completed file'
+									return {
+										'status': 'ERRORS',
+										'type': 'string',
+										'result': response
+									}
+								# send result of merger in an email
+								subject = "BreedCAFS upload summary"
+								recipients = [User(username).find('')['email']]
+								response = "Submission report:\n "
+								if submission_summary['submitted']:
+									response += "<p> - <a href= " + str(submitted_file_url) + ">" + str(
+										submission_summary['submitted']) \
+												+ "</a> new values were submitted to the database.\n </p>"
+								if submission_summary['resubmissions']:
+									response += "<p> - <a href= " + str(resubmissions_file_url) + ">" + str(
+										submission_summary['resubmissions']) \
+												+ "</a> existing values were already found.\n</p>"
+								body = "Submission_report: \n"
+								body += " - " + str(
+									submission_summary['submitted']) + 'new values were submitted to the database.\n'
+								body += "   These are available at the following url: " + str(submitted_file_url) + "\n"
+								body += " - " + str(
+									submission_summary['resubmissions']) + 'existing values were already found.\n'
+								body += "   These are available at the following url: " + str(resubmissions_file_url) + "\n"
+								html = render_template(
+									'emails/upload_report.html',
+									response=response
+								)
+								send_email(subject, app.config['ADMINS'][0], recipients, body, html)
+						return {
+							'status': 'SUCCESS',
+							'result': response
+						}
+				else:
 					return {
 						'status': 'SUCCESS',
-						'result': response
+						'result': "Nothing done with the file"
 					}
 		except (ServiceUnavailable, SecurityError) as exc:
 			raise self.retry(exc=exc)
@@ -2053,3 +2056,98 @@ class Upload:
 					}
 		except (ServiceUnavailable, SecurityError) as exc:
 			raise self.retry(exc=exc)
+
+
+class Resumable:
+	def __init__(self, username, raw_filename, resumable_id):
+		self.username = username
+		self.resumable_id = resumable_id
+		self.chunk_paths = None
+		user_upload_dir = os.path.join(
+			app.instance_path,
+			app.config['UPLOAD_FOLDER'],
+			self.username
+		)
+		if not os.path.isdir(user_upload_dir):
+			os.mkdir(user_upload_dir)
+			# gid = grp.getgrnam(app.config['CELERYGRPNAME']).gr_gid
+			# os.chown(user_upload_dir, -1, gid)
+			os.chmod(user_upload_dir, 02775)
+		self.temp_dir = os.path.join(
+			app.instance_path,
+			app.config['UPLOAD_FOLDER'],
+			self.username,
+			self.resumable_id
+		)
+		if not os.path.isdir(self.temp_dir):
+			os.mkdir(self.temp_dir)
+			# gid = grp.getgrnam(app.config['CELERYGRPNAME']).gr_gid
+			# os.chown(self.temp_dir, -1, gid)
+			os.chmod(self.temp_dir, 02775)
+		self.filename = secure_filename(raw_filename)
+		self.file_path = os.path.join(
+			app.instance_path,
+			app.config['UPLOAD_FOLDER'],
+			self.username,
+			self.filename
+		)
+
+	@staticmethod
+	def allowed_file(raw_filename):
+		if '.' in raw_filename:
+			file_extension = raw_filename.rsplit('.', 1)[1].lower()
+			if file_extension in  app.config['ALLOWED_EXTENSIONS']:
+				return True
+		else:
+			return False
+
+	def get_chunk_name(self, chunk_number):
+		return self.filename + "_part%03d" % chunk_number
+
+	def check_for_chunk(self, resumable_id, chunk_number):
+		temp_dir = os.path.join(
+			app.instance_path,
+			app.config['UPLOAD_FOLDER'],
+			self.username,
+			resumable_id
+		)
+		chunk_file = os.path.join(
+			temp_dir,
+			self.get_chunk_name(chunk_number)
+		)
+		logging.debug('Getting chunk: %s', chunk_file)
+		if os.path.isfile(chunk_file):
+			return True
+		else:
+			return False
+
+	def save_chunk(self, chunk_data, chunk_number):
+		chunk_name = self.get_chunk_name(chunk_number)
+		chunk_file = os.path.join(self.temp_dir, chunk_name)
+		chunk_data.save(chunk_file)
+		logging.debug('Saved chunk: %s', chunk_file)
+
+	def complete(self, total_chunks):
+		self.chunk_paths = [
+			os.path.join(self.temp_dir, self.get_chunk_name(x))
+			for x in range(1, total_chunks + 1)
+		]
+		return all([
+			os.path.exists(p) for p in self.chunk_paths
+		])
+
+	def assemble(self, size):
+		# replace file if same name already found
+		if os.path.isfile(self.file_path):
+			os.unlink(self.file_path)
+		with open(self.file_path, "ab") as target_file:
+			for p in self.chunk_paths:
+				stored_chunk_filename = p
+				stored_chunk_file = open(stored_chunk_filename, 'rb')
+				target_file.write(stored_chunk_file.read())
+				stored_chunk_file.close()
+				os.unlink(stored_chunk_filename)
+			target_file.close()
+			os.rmdir(self.temp_dir)
+			logging.debug('File saved to: %s', self.file_path)
+		return os.path.getsize(self.file_path) == size
