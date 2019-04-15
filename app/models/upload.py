@@ -810,7 +810,7 @@ class SubmissionResult:
 				os.mkdir(download_path)
 				gid = grp.getgrnam(app.config['CELERYGRPNAME']).gr_gid
 				os.chown(download_path, -1, gid)
-				os.chmod(download_path, 02775)
+				os.chmod(download_path, app.config['IMPORT_FOLDER_PERMISSIONS'])
 			conflicts_filename = os.path.splitext(filename)[0] + '_conflicts.csv'
 			conflicts_file_path = os.path.join(
 				app.instance_path,
@@ -857,7 +857,7 @@ class SubmissionResult:
 				os.mkdir(download_path)
 				gid = grp.getgrnam(app.config['CELERYGRPNAME']).gr_gid
 				os.chown(download_path, -1, gid)
-				os.chmod(download_path, 02775)
+				os.chmod(download_path, app.config['IMPORT_FOLDER_PERMISSIONS'])
 			resubmissions_filename = os.path.splitext(filename)[0] + '_resubmissions.csv'
 			resubmissions_file_path = os.path.join(
 				app.instance_path,
@@ -899,7 +899,7 @@ class SubmissionResult:
 				os.mkdir(download_path)
 				gid = grp.getgrnam(app.config['CELERYGRPNAME']).gr_gid
 				os.chown(download_path, -1, gid)
-				os.chmod(download_path, 02775)
+				os.chmod(download_path, app.config['IMPORT_FOLDER_PERMISSIONS'])
 			submitted_filename = os.path.splitext(filename)[0] + '_submitted.csv'
 			submitted_file_path = os.path.join(
 				app.instance_path,
@@ -963,7 +963,7 @@ class Upload:
 			os.mkdir(upload_path)
 			gid = grp.getgrnam(app.config['CELERYGRPNAME']).gr_gid
 			os.chown(upload_path, -1, gid)
-			os.chmod(upload_path, 02775)
+			os.chmod(upload_path, app.config['IMPORT_FOLDER_PERMISSIONS'])
 		file_data.save(self.file_path)
 
 	def file_format_errors(self):
@@ -2072,7 +2072,7 @@ class Resumable:
 			os.mkdir(user_upload_dir)
 			# gid = grp.getgrnam(app.config['CELERYGRPNAME']).gr_gid
 			# os.chown(user_upload_dir, -1, gid)
-			os.chmod(user_upload_dir, 02775)
+			os.chmod(user_upload_dir, app.config['IMPORT_FOLDER_PERMISSIONS'])
 		self.temp_dir = os.path.join(
 			app.instance_path,
 			app.config['UPLOAD_FOLDER'],
@@ -2083,7 +2083,7 @@ class Resumable:
 			os.mkdir(self.temp_dir)
 			# gid = grp.getgrnam(app.config['CELERYGRPNAME']).gr_gid
 			# os.chown(self.temp_dir, -1, gid)
-			os.chmod(self.temp_dir, 02775)
+			os.chmod(self.temp_dir, app.config['IMPORT_FOLDER_PERMISSIONS'])
 		self.filename = secure_filename(raw_filename)
 		self.file_path = os.path.join(
 			app.instance_path,
