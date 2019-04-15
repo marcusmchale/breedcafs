@@ -11,7 +11,7 @@ Flask-Mail==0.9.1
 Flask-WTF==0.14.2
 itsdangerous==0.24
 jdcal==1.4
-Jinja2==2.10
+Jinja2==2.10.1
 kombu==4.1.0
 lml==0.0.4
 MarkupSafe==1.0
@@ -20,6 +20,7 @@ neobolt==1.7.3
 neotime==1.7.4
 openpyxl==2.5.7
 passlib==1.7.1
+pkg-resources==0.0.0
 pycparser==2.18
 pyexcel-io==0.5.9.1
 pyexcel-xls==0.5.8

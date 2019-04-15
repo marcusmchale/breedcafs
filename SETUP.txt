@@ -8,6 +8,9 @@ An instance folder is required but not available in the github repo, this should
 		DOWNLOAD-FOLDER
 		MAIL-SERVER (and associated values)
 
+Set the setgid bit on the UPLOAD-FOLDER (and make sure the group includes the webserver user and the celery user) 
+e.g.  chmod 2775 UPLOAD-FOLDER
+
 SETUP:
 
 Set up neo4j:
