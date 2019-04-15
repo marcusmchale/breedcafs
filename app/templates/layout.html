@@ -9,6 +9,9 @@
 	</head>
 <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='style.css') }}">
 <body>
+    {% if config['TEST'] %}
+        <a>DEVELOPMENT SITE ONLY - DATA HERE WILL NOT BE PRESERVED</a>
+    {% endif %}
 	<div class="page">
         <a href="/index"><img src="/static/logo.png"></a>
 		<a href="/index"><h1>BreedCAFS <br> database tools</h1></a>

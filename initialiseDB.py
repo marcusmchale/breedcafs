@@ -8,7 +8,7 @@ from instance import config, varieties
 from neo4j.v1 import GraphDatabase
 
 # neo4j config
-uri = "bolt://localhost:7687"
+uri = config.BOLT_URI
 auth = (os.environ['NEO4J_USERNAME'], os.environ['NEO4J_PASSWORD'])
 driver = GraphDatabase.driver(uri, auth=auth)
 

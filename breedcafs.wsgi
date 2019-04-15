@@ -1,7 +1,11 @@
 import sys, os
-sys.path.insert (0, '/var/www/breedcafs')
 
-activate_this = '/var/www/breedcafs/venv/bin/activate_this.py'
+from instance import config
+
+
+sys.path.insert (0, config.INSTALL_PATH)
+
+activate_this = os.path.join(config.INSTALL_PATH, 'venv/bin/activate_this.py')
 execfile(activate_this, dict(__file__=activate_this))
 
 def application(environ, start_response):
