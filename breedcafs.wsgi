@@ -1,11 +1,9 @@
 import sys, os
 
-from instance import config
+CWD = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert (0, CWD)
 
-
-sys.path.insert (0, config.INSTALL_PATH)
-
-activate_this = os.path.join(config.INSTALL_PATH, 'venv/bin/activate_this.py')
+activate_this = os.path.join(CWD, 'venv/bin/activate_this.py')
 execfile(activate_this, dict(__file__=activate_this))
 
 def application(environ, start_response):
