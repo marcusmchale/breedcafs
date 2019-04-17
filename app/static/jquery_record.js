@@ -29,7 +29,7 @@ remove_flash = function() {
 record_type_update = function() {
     const record_type = record_type_select.val();
     const item_level = item_level_select.val();
-    if (record_type === "" || item_level === "") {
+    if (item_level === "") {
         location_div.hide();
         block_div.hide();
         tree_div.hide();
@@ -44,7 +44,6 @@ record_type_update = function() {
     else {
         $('#template_format option[value="fb"]').remove();
     }
-
     level_update();
     suppress_input();
 };
@@ -56,62 +55,54 @@ level_update = function() {
     feature_group_select.append(
         '<option value="">Select group</option>'
     );
-    if (item_level === "" || record_type === "") {
-        location_div.hide();
+    location_div.show();
+    item_count_div.show();
+    if (item_level === "field") {
         block_div.hide();
         tree_div.hide();
         sample_div.hide();
-        item_count_div.hide();
-    } else {
-        location_div.show();
-        item_count_div.show();
-        if (item_level === "field") {
-            block_div.hide();
-            tree_div.hide();
-            sample_div.hide();
-        }
-        else if (item_level === "block") {
-            block_div.show();
-            tree_div.hide();
-            sample_div.hide();
-        }
-        else if (item_level === 'tree') {
-            block_div.show();
-            tree_div.show();
-            sample_div.hide();
-        }
-        else if (item_level === 'sample') {
-            block_div.show();
-            tree_div.show();
-            sample_div.show();
-        }
-        if (record_type === 'trait' && item_level !== '') {
-        replicates_div.show();
-        }
-        else {
-            replicates_div.hide();
-        }
-        $.ajax({
-            url: (
-                "/feature_groups"
-                + "?record_type=" + record_type
-                + "&item_level=" + item_level
-            ),
-            type: 'GET',
-            success: function (response) {
-                const feature_groups = response;
-                for (let i = 0; i < feature_groups.length; i++) {
-                    feature_group_select.append(
-                        $("<option></option>").attr(
-                            "value", feature_groups[i][0]).text(feature_groups[i][1])
-                    );
-                }
-            },
-            error: function (error) {
-                console.log(error);
-            }
-        });
     }
+    else if (item_level === "block") {
+        block_div.show();
+        tree_div.hide();
+        sample_div.hide();
+    }
+    else if (item_level === 'tree') {
+        block_div.show();
+        tree_div.show();
+        sample_div.hide();
+    }
+    else if (item_level === 'sample') {
+        block_div.show();
+        tree_div.show();
+        sample_div.show();
+    }
+    //if (record_type === 'trait' && item_level !== '') {
+    //replicates_div.show();
+    //}
+    //else {
+    //    replicates_div.hide();
+    //}
+    $.ajax({
+        url: (
+            "/feature_groups"
+            + "?record_type=" + record_type
+            + "&item_level=" + item_level
+        ),
+        type: 'GET',
+        success: function (response) {
+            const feature_groups = response;
+            for (let i = 0; i < feature_groups.length; i++) {
+                feature_group_select.append(
+                    $("<option></option>").attr(
+                        "value", feature_groups[i][0]).text(feature_groups[i][1])
+                );
+            }
+        },
+        error: function (error) {
+            console.log(error);
+        }
+    });
     group_update();
     update_item_count();
     remove_flash();
@@ -269,7 +260,9 @@ update_submit_fields = function () {
     const count_checkboxes = checkboxes.length;
     const count_checked = checkboxes.filter(":checked").length;
     if (count_checked > 0){
-        $('#web_form_div').show();
+        if (record_type !== ''){
+                $('#web_form_div').show();
+        };
         submit_records_button.show();
         generate_template_div.show();
         if (record_type === 'trait') {
@@ -403,7 +396,7 @@ submit_records_button.click( function (e) {
     remove_flash();
     const wait_message = "Please wait for submission to complete";
     const flash_wait = "<div id='records_flash' class='flash'>" + wait_message + "</div>";
-    $(this).parent().after(flash_wait);
+    $(this).after(flash_wait);
     const data = $("form").serialize();
     $.ajax({
         url: "/record/submit_records",

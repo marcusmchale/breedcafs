@@ -4,10 +4,11 @@
 {% from "_formhelpers.html" import render_field %}
 	<h2>Upload Data</h2>
 		<form action="{{ url_for('upload') }}" method="post" enctype=multipart/form-data>
+            <div>
 			<dl>
 				{{ render_field(form.submission_type) }}
 			</dl>
-
+            </div>
             <br><br>
             <p>Drag and drop or click below</p>
             <img id='upload_button' width=200 src="{{ url_for('static', filename='upload.svg') }}"></a>

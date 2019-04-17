@@ -23,7 +23,7 @@ import unicodecsv as csv
 
 from datetime import datetime
 
-from xlsxwriter import Workbook
+from xlsxwriter import Workbook, utility
 
 
 # User class related (all uploads are tied to a user) yet more specifically regarding uploads
@@ -35,7 +35,12 @@ class Download:
 		self.replicates = None
 		self.item_fieldnames = None
 		self.item_level = None
-		self.features = None
+		self.features = {
+			'property': [],
+			'trait': [],
+			'condition': []
+		}
+
 		self.file_list = []
 		# create user download path if not found
 		self.user_download_folder = os.path.join(app.instance_path, app.config['DOWNLOAD_FOLDER'], username)
@@ -204,16 +209,33 @@ class Download:
 			features=None,
 			sample_level=None
 	):
-		self.features = FeatureList(
-			item_level,
-			record_type).get_features(
-			feature_group=feature_group,
-			features=features
-		)
-		if item_level == 'sample' and feature_group == "Registration" and sample_level != 'field':
-			# drop "assign to trees and assign to samples"
-			not_used_features = ["assign to trees", "assign to samples"]
-			self.features = [i for i in self.features if i['name_lower'] not in not_used_features]
+		if not record_type or record_type == 'property':
+			self.features['property'] = FeatureList(
+				item_level,
+				'property').get_features(
+				feature_group=feature_group,
+				features=features
+			)
+			if item_level == 'sample' and feature_group == "Registration" and sample_level != 'field':
+				# drop "assign to trees and assign to samples"
+				not_used_features = ["assign to trees", "assign to samples"]
+				self.features['properties'] = [
+					i for i in self.features['properties'] if i['name_lower'] not in not_used_features
+				]
+		if not record_type or record_type == 'trait':
+			self.features['trait'] = FeatureList(
+				item_level,
+				'trait').get_features(
+				feature_group=feature_group,
+				features=features
+			)
+		if not record_type or record_type == 'condition':
+			self.features['condition'] = FeatureList(
+				item_level,
+				'condition').get_features(
+				feature_group=feature_group,
+				features=features
+			)
 
 	def record_form_to_template(
 		self,
@@ -222,7 +244,7 @@ class Download:
 		self.id_list = ItemList().generate_id_list(record_data)
 		if not self.id_list:
 			return False
-		if record_data['record_type'] == 'trait' and record_data['replicates'] and record_data['replicates'] > 1:
+		if record_data['replicates'] and record_data['replicates'] > 1:
 			self.replicates = record_data['replicates']
 		self.set_features(
 			record_data['item_level'],
@@ -230,23 +252,21 @@ class Download:
 			feature_group=record_data['feature_group'] if 'feature_group' in record_data else None,
 			features=record_data['selected_features'] if 'selected_features' in record_data else None
 		)
-		if not self.features:
+		if not any(self.features.values()):
 			return False
 		if record_data['template_format'] == 'fb':
 			self.make_fb_template()
 		else:
 			self.id_list_to_xlsx_template(
-				record_data['record_type'],
 				base_filename=record_data['item_level']
 			)
 		return True
 
 	def id_list_to_xlsx_template(
 			self,
-			record_type,
 			base_filename=None
 	):
-		if not self.id_list and self.item_level and self.features:
+		if not self.id_list and self.item_level and any(self.features.values()):
 			return False
 		self.set_item_fieldnames()
 		file_path = self.get_file_path(
@@ -255,56 +275,11 @@ class Download:
 			with_timestamp=False
 		)
 		wb = Workbook(file_path)
-		template_worksheet = wb.add_worksheet("Template")
-		item_details_worksheet = wb.add_worksheet("Item Details")
-		feature_details_worksheet = wb.add_worksheet("Feature Details")
-		hidden_worksheet = wb.add_worksheet("hidden")
-		hidden_worksheet.hide()
-		date_format = wb.add_format({'num_format': 'yyyy-mm-dd', 'left': 1})
+		# column < row < cell formatting in priority
+		date_lb_format = wb.add_format({'num_format': 'yyyy-mm-dd', 'left': 1})
 		time_format = wb.add_format({'num_format': 'hh:mm', 'right': 1})
 		right_border = wb.add_format({'right': 1})
 		header_format = wb.add_format({'bottom': 1})
-		row_number = 0
-		# write header for context worksheet
-		for i, j in enumerate(self.item_fieldnames):
-			item_details_worksheet.write(row_number, i, j, header_format)
-		if record_type == 'property':
-			core_template_fieldnames = ['UID', 'Person']
-		elif record_type == 'trait':
-			core_template_fieldnames = ['UID', 'Date', 'Time', 'Person']
-		elif record_type == 'condition':
-			core_template_fieldnames = ['UID', 'Start Date', 'Start Time', 'End Date', 'End Time', 'Person']
-		feature_fieldnames = [feature['name'] for feature in self.features]
-		template_fieldnames = core_template_fieldnames + feature_fieldnames
-		feature_details_fieldnames = [
-			'name',
-			'format',
-			'minimum',
-			'maximum',
-			'details',
-			'category_list'
-		]
-		# column < row < cell formatting in priority
-		if record_type == 'property':
-			template_worksheet.set_column(0, 0, None, cell_format=right_border)
-			template_worksheet.set_column(1, 1, None, cell_format=right_border)
-		elif record_type == 'trait':
-			template_worksheet.set_column(0, 0, None, cell_format=right_border)
-			template_worksheet.set_column(1, 1, None, cell_format=date_format)
-			template_worksheet.set_column(2, 2, None, cell_format=time_format)
-			template_worksheet.set_column(3, 3, None, cell_format=right_border)
-		elif record_type == 'condition':
-			template_worksheet.set_column(0, 0, None, cell_format=right_border)
-			template_worksheet.set_column(1, 1, None, cell_format=date_format)
-			template_worksheet.set_column(2, 2, None, cell_format=time_format)
-			template_worksheet.set_column(3, 3, None, cell_format=date_format)
-			template_worksheet.set_column(4, 4, None, cell_format=time_format)
-			template_worksheet.set_column(5, 5, None, cell_format=right_border)
-		template_worksheet.set_column(len(template_fieldnames)-1, len(template_fieldnames)-1, None, cell_format=right_border)
-		row_number = 0
-		# write header for template worksheet
-		for i, j in enumerate(template_fieldnames):
-			template_worksheet.write(row_number, i, j, header_format)
 		# set the formatting for the feature columns
 		numeric_format = wb.add_format({'num_format': '#'})
 		date_format = wb.add_format({'num_format': 'yyyy-mm-dd'})
@@ -322,93 +297,161 @@ class Download:
 			"location": location_format,
 			"boolean": text_format
 		}
-		# write the id_list
-		for record in self.id_list:
-			for key, value in record[0].iteritems():
-				# if there is a list (or nested lists) stored in this item
-				# make sure it is printed as a list of strings
-				#if key == 'Treatments':
-				#	for treatment in value:
-				#		if treatment['name'] not in self.item_fieldnames:
-				#			self.item_fieldnames.append(treatment['name'])
-				#			column_number = self.item_fieldnames.index(treatment['name'])
-				#			item_details_worksheet.write(0, column_number, treatment['name'], header_format)
-				#		column_number = self.item_fieldnames.index(treatment['name'])
-				#		item_details_worksheet.write(row_number, column_number, ", ".join(treatment['categories']))
-				#else:
-				if isinstance(value, list):
-					value = ", ".join([str(i) for i in value])
-				column_number = self.item_fieldnames.index(key)
-				if self.replicates and self.replicates > 1:
-					item_number = ((row_number - 1) / self.replicates) + 1
-					item_details_worksheet.write(item_number + 1, column_number, value)
-				else:
-					item_details_worksheet.write(row_number + 1, column_number, value)
-			if self.replicates and self.replicates > 1:
-				replicate_ids = [str(i) for i in range(1, self.replicates + 1)]
-				for rep in replicate_ids:
-					row_number += 1
-					template_worksheet.write(row_number, 0, str(record[0]['UID']) + '.' + str(rep))
-			else:
-				row_number += 1
-				template_worksheet.write(row_number, 0, str(record[0]['UID']))
-		for i, feature in enumerate(self.features):
-			column_number = len(core_template_fieldnames) + i
-			template_worksheet.set_column(
-				column_number,
-				column_number,
-				None,
-				cell_format=feature_formats[feature['format']]
-			)
-			# store categories in hidden worksheet
-			if 'category_list' in feature:
-				column_letter = chr(65 + i)
-				category_row_number = 0
-				hidden_worksheet.write(row_number, i, feature['name_lower'])
-				for j, category in enumerate(feature['category_list']):
-					category_row_number += 1
-					hidden_worksheet.write(category_row_number, i, category)
-				template_worksheet.data_validation(1, column_number, row_number, column_number, {
-					'validate': 'list',
-					'source': '=hidden!$' + column_letter + '$2:$' + column_letter + '$' + str(j + 2)
-				})
-		# create the details worksheet
-		row_number = 0
+		# core field name and format tuple in dictionary by record type
+		core_fields_formats = {
+			'property': [
+				('UID', right_border),
+				('Person', right_border)
+				],
+			'trait': [
+				('UID', right_border),
+				('Date', date_lb_format),
+				('Time', time_format),
+				('Person', right_border)
+			],
+			'condition': [
+				('UID', right_border),
+				('Start Date', date_lb_format),
+				('Start Time', time_format),
+				('End Date', date_lb_format),
+				('End Time', time_format),
+				('Person', right_border)
+			]
+		}
+		# Create worksheets
+		# Write headers and set formatting on columns
+		# Store worksheet in a dict by record type to later write values when iterating through id_list
+		ws_dict = {
+			'property': None,
+			'trait': None,
+			'condition': None,
+			'item_details': wb.add_worksheet("Item Details (Reference)"),
+			'feature_details': wb.add_worksheet("Feature Details (Reference)"),
+			'hidden': wb.add_worksheet("hidden")
+		}
+		# write the item_details header
+		for i, j in enumerate(self.item_fieldnames):
+			ws_dict['item_details'].write(0, i, j, header_format)
+		feature_details_fieldnames = [
+			'type',
+			'name',
+			'format',
+			'minimum',
+			'maximum',
+			'details',
+			'category_list'
+		]
+		# write the feature_details header
 		for header in feature_details_fieldnames:
 			column_number = feature_details_fieldnames.index(header)
-			feature_details_worksheet.write(row_number, column_number, header,  header_format)
-		# add notes about Date/Time/Person
-		if record_type == 'property':
-			date_time_person_details = [
-				("person", "Optional: Person responsible for determining these values")
-			]
-		elif record_type == 'trait':
-			date_time_person_details = [
+			ws_dict['feature_details'].write(0, column_number, header, header_format)
+		# write the core fields to the feature details page
+		feature_details_row_num = 0
+		core_fields_details = [
+			("person", "Optional: Person responsible for determining these values")
+		]
+		if self.features['trait']:
+			core_fields_details += [
 				("date", "Required: Date these values were determined (YYYY-MM-DD, e.g. 2017-06-01)"),
-				("time", "Optional: Time these values were determined (24hr, e.g. 13:00. Defaults to 12:00"),
-				("person", "Optional: Person responsible for determining these values")
+				("time", "Optional: Time these values were determined (24hr, e.g. 13:00. Defaults to 12:00")
 			]
-		else:  # record_type == 'condition'
-			date_time_person_details = [
+		if self.features['condition']:
+			core_fields_details += [
 				("start date", "Optional: Date this condition started (YYYY-MM-DD, e.g. 2017-06-01)"),
 				("start time", "Optional: Time this condition started (24hr, e.g. 13:00. Defaults to 00:00"),
 				("end date", "Optional: Date this condition ended (YYYY-MM-DD, e.g. 2017-06-01)"),
-				("end time", "Optional: Time this condition ended (24hr, e.g. 13:00. Defaults to 00:00 of the following day"),
-				("person", "Optional: Person responsible for establishing this condition")
+				(
+					"end time",
+					"Optional: Time this condition ended (24hr, e.g. 13:00. Defaults to 00:00 of the following day"
+				)
 			]
-		for i in date_time_person_details:
-			row_number += 1
-			feature_details_worksheet.write(row_number, 0, i[0])
-			feature_details_worksheet.write(row_number, 4, i[1])
+		for field, details in core_fields_details:
+			feature_details_row_num += 1
+			ws_dict['feature_details'].write(feature_details_row_num, 1, field)
+			ws_dict['feature_details'].write(feature_details_row_num, 5, details)
 		# empty row to separate date/time/person from features
-		row_number += 1
-		for feature in self.features:
-			row_number += 1
-			for i, feature_header in enumerate(feature_details_fieldnames):
-				if feature_header in feature:
-					if isinstance(feature[feature_header], list):
-						feature[feature_header] = ", ".join(value for value in feature[feature_header])
-					feature_details_worksheet.write(row_number, i, feature[feature_header])
+		categorical_features_count = 0
+		for record_type in self.features.keys():
+			if self.features[record_type]:
+				# create record type specific worksheet
+				ws_dict[record_type] = wb.add_worksheet(app.config['WORKSHEET_NAMES'][record_type])
+				# write headers:
+				# - add the core fields (e.g. person, date, time)
+				for i, field in enumerate(core_fields_formats[record_type]):
+					ws_dict[record_type].set_column(i, i, None, cell_format=field[1])
+				# - add the feature field names
+				fieldnames = (
+						[field[0] for field in core_fields_formats[record_type]]
+						+ [feature['name'] for feature in self.features[record_type]]
+				)
+				for i, fieldname in enumerate(fieldnames):
+					ws_dict[record_type].write(0, i, fieldname, header_format)
+				# - set right border formatting on the last collumn of record type specific worksheet
+				ws_dict[record_type].set_column(
+					len(fieldnames) - 1, len(fieldnames) - 1, None, cell_format=right_border
+				)
+				# write feature details into feature details sheet
+				for feature in self.features[record_type]:
+					feature['type'] = str(record_type)
+					feature_details_row_num += 1
+					for j, field in enumerate(feature_details_fieldnames):
+						if field in feature:
+							if isinstance(feature[field], list):
+									value = ", ".join(value for value in feature[field])
+									ws_dict['feature_details'].write(feature_details_row_num, j, value)
+							else:
+								ws_dict['feature_details'].write(feature_details_row_num, j, feature[field])
+		# iterate through id_list and write to worksheets
+		item_num = 0
+		for record in self.id_list:
+			item_num += 1
+			# if there is a list (or nested lists) stored in this item
+			# make sure it is returned as a list of strings
+			for key, value in record[0].iteritems():
+				if isinstance(value, list):
+					value = ", ".join([str(i) for i in value])
+				item_details_column_number = self.item_fieldnames.index(key)
+				ws_dict['item_details'].write(item_num, item_details_column_number, value)
+			for record_type in self.features.keys():
+				if self.features[record_type]:
+					if all([
+						record_type == 'trait',
+						self.replicates > 1
+					]):
+						replicate_ids = [str(i) for i in range(1, self.replicates + 1)]
+						for i, rep in enumerate(replicate_ids):
+							replicates_row_number = ((item_num - 1) * self.replicates) + 1 + i
+							ws_dict[record_type].write(
+								replicates_row_number, 0, '.'.join([record[0]['UID'], str(rep)])
+							)
+					else:
+						ws_dict[record_type].write(item_num, 0, str(record[0]['UID']))
+		# now that we know the item_num we can add the validation
+		for record_type in self.features.keys():
+			if self.features[record_type]:
+				if record_type == 'trait' and self.replicates > 1:
+					row_count = (item_num - 1) * self.replicates + 1
+				else:
+					row_count = item_num
+				for i, field in enumerate(self.features[record_type]):
+					col_num = len(core_fields_formats[record_type]) + i
+					ws_dict[record_type].set_column(
+						col_num, col_num, None, cell_format=feature_formats[field['format']]
+					)
+					if 'category_list' in field:
+						categorical_features_count += 1
+						ws_dict['hidden'].write((categorical_features_count - 1), 0, field['name_lower'])
+						for j, category in enumerate(field['category_list']):
+							ws_dict['hidden'].write((categorical_features_count -1), j + 1 , category)
+						ws_dict[record_type].data_validation(1, col_num, row_count, col_num, {
+							'validate': 'list',
+							'source': (
+								'=hidden!$B$' + str(categorical_features_count)
+								+ ':$' + utility.xl_col_to_name(len(field['category_list']) + 1)
+								+ '$' + str(categorical_features_count)
+							)
+						})
+		ws_dict['hidden'].hide()
 		wb.close()
 		# add file to file_list
 		self.file_list.append({
@@ -490,12 +533,12 @@ class Download:
 			'isVisible',
 			'realPosition'
 		]
-		for i, feature in enumerate(self.features):
+		for i, feature in enumerate(self.features['trait']):
 			feature['realPosition'] = str(i + 1)
 			feature['isVisible'] = 'True'
 		self.make_csv_file(
 			feature_fieldnames,
-			self.features,
+			self.features['trait'],
 			base_filename=base_filename,
 			with_timestamp=with_timestamp,
 			file_extension='trt'

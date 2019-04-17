@@ -222,7 +222,6 @@ def add_trees():
 						feature_group="Registration"
 					)
 					download_object.id_list_to_xlsx_template(
-						'property',
 						base_filename="Tree Registration Template",
 					)
 					file_list = download_object.file_list

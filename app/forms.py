@@ -786,14 +786,13 @@ class RecordForm(FlaskForm):
 	@staticmethod
 	def update():
 		form = RecordForm()
-		form.record_type.choices += SelectionList.get_record_types()
-		form.item_level.choices += SelectionList.get_item_levels()
+		form.record_type.choices = [('', 'Any')] + SelectionList.get_record_types()
+		form.item_level.choices = SelectionList.get_item_levels()
 		item_level = form.item_level.data if form.item_level.data not in ['', 'None'] else None
 		record_type = form.record_type.data if form.record_type.data not in ['', 'None'] else None
-		if record_type:
-			form.feature_group.choices += SelectionList.get_feature_groups(item_level, record_type)
-			if record_type == 'trait':
-				form.template_format.choices.append(('fb', 'Field Book'))
+		form.feature_group.choices += SelectionList.get_feature_groups(item_level, record_type)
+		if record_type == 'trait':
+			form.template_format.choices.append(('fb', 'Field Book'))
 		selected_feature_group = form.feature_group.data if form.feature_group.data not in ['', 'None'] else None
 		if selected_feature_group:
 			features_details = FeatureList(

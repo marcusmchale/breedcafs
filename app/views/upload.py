@@ -32,8 +32,6 @@ def resumable():
 	username = session['username']
 	raw_filename = request.args.get('resumableFilename', default='error', type=str)
 	if not Resumable.allowed_file(raw_filename):
-		import pdb;
-		pdb.set_trace()
 		print('In resumable get')
 		abort(415, 'File type not supported')
 	chunk_number = request.args.get('resumableChunkNumber', default=1, type=int)
@@ -59,7 +57,6 @@ def resumable_post():
 		return redirect(url_for('login'))
 	raw_filename = request.form.get('resumableFilename', default='error', type=str)
 	if not Resumable.allowed_file(raw_filename):
-		import pdb; pdb.set_trace()
 		print('In resumable post')
 		abort(415, 'File type not supported')
 	chunk_number = request.form.get('resumableChunkNumber', default=1, type=int)
@@ -109,9 +106,6 @@ def upload_submit():
 			upload_object = Upload(username, submission_type, raw_filename)
 			if not upload_object.allowed_file():
 				abort(415, 'File type not supported')
-			# this should be done by resumable
-			# file_data = form.file.data
-			# upload_object.file_save(file_data)
 			file_format_errors = upload_object.file_format_errors()
 			if file_format_errors:
 				return jsonify({

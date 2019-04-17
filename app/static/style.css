@@ -29,7 +29,6 @@ svg {
 	padding: 10px;
 }
 
-
 #feature_selection {
 	max-height:500px;
 }
@@ -87,19 +86,38 @@ svg {
 					display: flex;
 					flex-wrap: wrap;
 					justify-content: space-evenly;
-
 					padding: 2%;
-					}	
+					}
+
+.inner_main			{
+					padding: 0.8em;
+					display: flex;
+					flex-wrap: wrap;
+					justify-content: space-between;
+					padding: 2%;
+					}
+
 .text_body			{
 					display: flex;
 					flex-direction: column;
-					flex: 1;
-					padding: 0.8em; 
+					/*flex: 1;*/
+					padding: 0.8em;
 					}
 
 .chart				{
-					padding: 0.8em; 
+					/*flex: 0 0 65%;*/
+					padding: 0.8em;
+					/*flex-direction: column;*/
 					}
+
+.side_form				{
+					display: flex;
+					width: 40%;
+					padding: 0.8em;
+					border: 1px solid #627138;
+					flex-direction: column;
+					}
+
 .flash				{
 					flex: 0 1 95%;
 					margin: 1%;

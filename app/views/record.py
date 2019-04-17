@@ -86,7 +86,7 @@ def generate_template():
 			]):
 				username = session['username']
 				record_type = request.form['record_type'] if request.form['record_type'] != '' else None
-				if record_type == 'trait':
+				if record_type in [None, 'trait']:
 					replicates = int(request.form['replicates']) if request.form['replicates'] != '' else None
 				else:
 					replicates = None
@@ -328,16 +328,31 @@ def submit_records():
 									description=feature['details']
 								)
 							)
-				record_form = FeatureFormDetailed()
+				detailed_record_form = FeatureFormDetailed()
+				detailed_record_form.record_type.choices = [('', 'Any')] + SelectionList.get_record_types()
+				detailed_record_form.item_level.choices = SelectionList.get_item_levels()
+				item_level = record_form.item_level.data if record_form.item_level.data not in ['', 'None'] else None
+				record_type = record_form.record_type.data if record_form.record_type.data not in ['', 'None'] else None
+				detailed_record_form.feature_group.choices += SelectionList.get_feature_groups(item_level, record_type)
 				if record_type == 'trait':
-					record_form.record_time.validators = [
-						InputRequired()
-					]
-				record_form.feature_group.choices += SelectionList.get_feature_groups(item_level, record_type)
+					detailed_record_form.template_format.choices.append(('fb', 'Field Book'))
+					detailed_record_form.record_time.validators = [InputRequired()]
+				selected_feature_group = (
+					record_form.feature_group.data if record_form.feature_group.data not in [
+						'',	'None'
+					] else None
+				)
+				if selected_feature_group:
+					features_details = FeatureList(
+						item_level,
+						record_type
+					).get_features(feature_group=selected_feature_group)
+					features_list = [(feature['name_lower'], feature['name']) for feature in features_details]
+					detailed_record_form.select_features.choices = features_list
 				features_list = [(feature['name_lower'], feature['name']) for feature in features_details]
-				record_form.select_features.choices = features_list
+				detailed_record_form.select_features.choices = features_list
 				if all([
-					record_form.validate_on_submit(),
+					detailed_record_form.validate_on_submit(),
 					location_form.validate_on_submit()
 				]):
 					username = session['username']
@@ -404,7 +419,7 @@ def submit_records():
 					return result
 				else:
 					errors = jsonify({
-						'errors': [record_form.errors, location_form.errors]
+						'errors': [detailed_record_form.errors, location_form.errors]
 					})
 					return errors
 			else:

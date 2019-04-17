@@ -250,7 +250,6 @@ class SelectionList:
 			' MATCH '
 			'	(item_level: ItemLevel) '
 			' RETURN [item_level.name_lower, item_level.name] '
-			' ORDER BY item_level.name_lower '
 		)
 		with get_driver().session() as neo4j_session:
 			result = neo4j_session.read_transaction(
@@ -258,7 +257,8 @@ class SelectionList:
 				statement,
 				None
 			)
-		return [record[0] for record in result]
+		result = [record[0] for record in result]
+		return sorted(result, key=lambda x: ["field", "block", "tree", "sample"].index(x[0]))
 
 	@staticmethod
 	def get_trials(

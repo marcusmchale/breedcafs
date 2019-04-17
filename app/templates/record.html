@@ -1,82 +1,84 @@
 {% extends "layout.html" %}
 {% block body %}
-<div class="text_body">
-	<h2>Record</h2>
-        {% from "_formhelpers_record.html" import render_field %}
-			<div>
-                <form>
-                    <dl>
-                        <h3>Select the type of record</h3>
-                        <dd>{{  record_form.record_type }}</dd>
-                        <h3>Select the type of items</h3>
-                        <dd>{{  record_form.item_level }}</dd>
-                        <div id="location">
-                            <h3>Filter to select specific item/s</h3>
-                            <dd>{{ render_field (location_form.country) }}</dd>
-                            <dd>{{ render_field (location_form.region) }}</dd>
-                            <dd>{{ render_field (location_form.farm) }}</dd>
-                            <dd>{{ render_field (location_form.field) }}</dd>
-                        </div>
-                        <div id="block_div">
-                            <dd>{{ render_field (location_form.block) }}</dd>
-                        </div>
-                        <div id = 'tree_selection_div' title="List of tree IDs, e.g. '1,2-5'. ID is the integer from the end of a UID, e.g. from 1_T2 the ID is 2">
-                            <dd>{{ render_field (record_form.tree_id_list) }}</dd>
-                        </div>
-                        <div id = 'sample_selection_div' title="List of sample IDs, e.g. '1,2-5'.ID is the integer from the end of a UID, e.g. from 1_S2 the ID is 2">
-                            <dd>{{ render_field (record_form.sample_id_list) }}</dd>
-                        </div>
-                        <div id="item_count_div">
-                            <h3>Selection</h3>
-                            <p><a>0</a> <a>items</a></p>
-                        </div>
-                        <div id="replicates_div" title="Number of replicated measures per item">
-                            <h3>Replicates</h3>
-                            <p>Supports multiple entries per time-point (in templates only).</p>
-                            {{  render_field (record_form.replicates) }}
-                        </div>
-                        <div id='feature_selection'>
-                            <h3>Select features to record</h3>
-                                <dd>{{  render_field (record_form.feature_group) }}</dd>
-                                <div id="feature_checkbox_div"></div>
-                            <br><br>
-                            <div id="generate_template_div">
-                                {{  render_field (record_form.template_format) }}
-                                <input id="generate_template" name="generate_template" type="submit" value="Generate template">
-                            </div>
-                        </div>
-                        <div id="web_form_div">
-                        <h3>Web Form</h3>
-                            <div id="record_period_div">
-                                <dt>Record period</dt>
-                                <dd>
-                                    {{ render_field (record_form.record_start) }}
-                                    {{ render_field (record_form.record_end) }}
-                                    <p>
-                                        This web form defaults to the start of the first day through end of the last,
-                                        for more detailed submissions use a template
-                                    </p>
-                                </dd>
-                            </div>
-                            <div id="record_time_div">
-                                <dt>Date determined</dt>
-                                <dd>
-                                    {{ render_field (record_form.record_time) }}
-                                    <p>
-                                        This web form defaults to midday on the selected date,
-                                        for more detailed submissions use a template
-                                    </p>
-                                </dd>
-                            </div>
-                            <div id="dynamic_form_div"></div>
-                            {{  render_field (record_form.submit_records) }}
-                        </div>
-                    </dl>
-                    {{ record_form.csrf_token }}
-                </form>
-			</div>
-</div>
-
+    {% from "_formhelpers_record.html" import render_field %}
+    <form>
+    <h2>Record</h2>
+        <div class="inner_main">
+            <div class="text_body">
+                <h3>Select the type of items</h3>
+                <dd>{{  record_form.item_level }}</dd>
+                <div id="location">
+                    <h3>Filter to select specific item/s</h3>
+                    <dd>{{ render_field (location_form.country) }}</dd>
+                    <dd>{{ render_field (location_form.region) }}</dd>
+                    <dd>{{ render_field (location_form.farm) }}</dd>
+                    <dd>{{ render_field (location_form.field) }}</dd>
+                </div>
+                <div id="block_div">
+                    <dd>{{ render_field (location_form.block) }}</dd>
+                </div>
+                <div id = 'tree_selection_div' title="List of tree IDs, e.g. '1,2-5'. ID is the integer from the end of a UID, e.g. from 1_T2 the ID is 2">
+                    <dd>{{ render_field (record_form.tree_id_list) }}</dd>
+                </div>
+                <div id = 'sample_selection_div' title="List of sample IDs, e.g. '1,2-5'. ID is the integer from the end of a UID, e.g. from 1_S2 the ID is 2">
+                    <dd>{{ render_field (record_form.sample_id_list) }}</dd>
+                </div>
+                <div id="item_count_div">
+                    <h3>Selection</h3>
+                    <p><a>0</a> <a>items</a></p>
+                </div>
+                <h3>Filter features by type</h3>
+                <p>Optional for templates</p>
+                <dd>{{  record_form.record_type }}</dd>
+                <div id='feature_selection'>
+                    <h3>Select features</h3>
+                        <dd>{{  render_field (record_form.feature_group) }}</dd>
+                        <div id="feature_checkbox_div"></div>
+                    <br><br>
+                </div>
+                <div id="replicates_div" title="Number of replicated measures per item">
+                    <h3>Replicates</h3>
+                    <p>For trait templates only</p>
+                    {{  render_field (record_form.replicates) }}
+                </div>
+                <div id="generate_template_div">
+                    {{  render_field (record_form.template_format) }}
+                    <input id="generate_template" name="generate_template" type="submit" value="Generate template">
+                </div>
+                {{ record_form.csrf_token }}
+            </div>
+            <div id="web_form_div" class="side_form">
+                <h3>Direct Submission</h3>
+                    <p>
+                        This form is provided to allow direct submission of simple values for the selected items,
+                        please use templates for more complex or detailed submissions.
+                    </p>
+                    <div id="record_period_div">
+                        <dt>Record period</dt>
+                        <dd>
+                            {{ render_field (record_form.record_start) }}
+                            {{ render_field (record_form.record_end) }}
+                            <p>
+                                This web form defaults to the start of the first day through end of the last,
+                                for more detailed submissions use a template
+                            </p>
+                        </dd>
+                    </div>
+                    <div id="record_time_div">
+                        <dt>Date determined</dt>
+                        <dd>
+                            {{ render_field (record_form.record_time) }}
+                            <p>
+                                This web form defaults to midday on the selected date,
+                                for more detailed submissions use a template
+                            </p>
+                        </dd>
+                    </div>
+                    <div id="dynamic_form_div"></div>
+                    {{  render_field (record_form.submit_records) }}
+            </div>
+        </div>
+   </form>
 <script src="{{ url_for('static', filename='jquery_1.8.3_min.js') }}"></script>
 <script src="{{ url_for('static', filename='jquery_location.js') }}"></script>
 <script src="{{ url_for('static', filename='jquery-ui-1.12.1.custom/jquery-ui.js') }}"></script>

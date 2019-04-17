@@ -976,8 +976,12 @@ class Upload:
 					return 'Please upload comma (,) separated file with quoted (") fields'
 		elif self.file_extension == 'xlsx':
 			wb = load_workbook(self.file_path, read_only=True)
-			if self.submission_type == 'table' and "Template" not in wb.sheetnames:
-					return 'This workbook does not contain a "Template" worksheet'
+			if self.submission_type == 'table':
+				if not set(app.config.worksheet_names.values()) & set(wb.sheetnames):
+					return (
+						'This workbook does not contain any of the following accepted worksheets: '
+						+ '<br>  - '.join([str(i) for i in app.config['WORKSHEET_NAMES'].values()])
+					)
 		else:
 			return None
 

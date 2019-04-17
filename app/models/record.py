@@ -97,8 +97,6 @@ class Record:
 						)
 					update_variety_statement += (
 						' MERGE (item)-[:OF_VARIETY]->(fv) '
-						' RETURN '
-						'	'
 					)
 					tx.run(update_variety_statement, update_variety_parameters)
 				if 'assign to block' in record_data['selected_features']:
