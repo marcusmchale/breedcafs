@@ -937,16 +937,16 @@ class Upload:
 		self.filename = secure_filename(raw_filename)
 		self.submission_type = submission_type
 		self.file_path = os.path.join(app.instance_path, app.config['UPLOAD_FOLDER'], username, self.filename)
-		self.record_type = None
-		self.required_fieldnames = None
-		self.trimmed_file_path = None
-		self.parse_result = None
+		self.record_types = []
+		self.required_fieldnames = dict()
+		self.trimmed_file_paths = dict()
+		self.parse_result = dict()
 		self.submission_result = None
-		self.fieldnames = None
+		self.fieldnames = dict()
 		self.file_extension = None
 		self.contains_data = None
-		self.features = None
-		self.row_count = None
+		self.features = dict()
+		self.row_count = dict()
 
 	def allowed_file(self):
 		if '.' in self.raw_filename:
@@ -975,135 +975,186 @@ class Upload:
 				if not all((dialect.delimiter == ',', dialect.quotechar == '"')):
 					return 'Please upload comma (,) separated file with quoted (") fields'
 		elif self.file_extension == 'xlsx':
-			wb = load_workbook(self.file_path, read_only=True)
-			if self.submission_type == 'table':
-				if not set(app.config.worksheet_names.values()) & set(wb.sheetnames):
-					return (
-						'This workbook does not contain any of the following accepted worksheets: '
-						+ '<br>  - '.join([str(i) for i in app.config['WORKSHEET_NAMES'].values()])
-					)
+			try:
+				wb = load_workbook(self.file_path, read_only=True)
+			except BadZipfile:
+				logging.info(
+					'Bad zip file submitted: \n'
+					+ 'username: ' + self.username
+					+ 'filename: ' + self.file_path
+				)
+				return 'This file does not appear to be a valid xlsx file'
+			if not set(app.config.worksheet_names.values()) & set(wb.sheetnames):
+				return (
+					'This workbook does not appear to contain any of the following accepted worksheets: '
+					+ '<br>  - '.join([str(i) for i in app.config['WORKSHEET_NAMES'].values()])
+				)
 		else:
 			return None
 
 	def set_fieldnames(self):
+		record_type_sets = {
+			'property': {'uid', 'person'},
+			'trait': {'uid', 'person', 'date', 'time'},
+			'condition': {'uid', 'person', 'start date', 'start time', 'end date', 'end time'}
+		}
 		if self.file_extension == 'csv':
 			with open(self.file_path) as uploaded_file:
 				file_dict = DictReaderInsensitive(uploaded_file)
-				self.fieldnames = file_dict.fieldnames
-				return None
-		else:  # self.file_extension == 'xlsx':
+				if self.submission_type == 'db':
+					# 'Correct' submissions have mixed record types
+					# these are uploads for correct
+					# uid, replicate, feature and time/period are required to identify the unique record
+					# but to further confirm we only delete the intended record, e.g. if a record is later resubmitted
+					# we include the check for submission time.
+					self.record_types = ['mixed']
+					self.required_fieldnames = {'mixed': ['uid', 'replicate', 'feature', 'time/period', 'submitted at']}
+					self.fieldnames = {'mixed': file_dict.fieldnames}
+				elif self.submission_type == 'fb':
+					# Field Book csv exports
+					self.record_types = ['trait']
+					self.required_fieldnames = {'trait': ['uid', 'trait', 'value', 'timestamp', 'person', 'location']}
+					self.fieldnames = {'trait': file_dict.fieldnames}
+				elif self.submission_type == 'table':
+					# All record types will match the requirements for property
+					# as such we check the length of the required list before updating,
+					# and only update if longer than existing
+					self.required_fieldnames = set()
+					for record_type, required_set in record_type_sets:
+						if record_type_sets[record_type].issubset(set(file_dict.fieldnames)):
+							if len(required_set) > len(self.required_fieldnames):
+								self.required_fieldnames = {record_type: required_set}
+								self.record_types = [record_type]
+								self.fieldnames = {record_type: file_dict.fieldnames}
+					if not self.fieldnames:
+						return (
+								'This table does not appear to contain a full set of required fieldnames: '
+								+ ' <br> Property records require: ' + ', '.join([str(i) for i in record_type_sets['property']])
+								+ ' <br> Trait records require: ' + ', '.join([str(i) for i in record_type_sets['trait']])
+								+ ' <br> Condition records require: ' + ', '.join([str(i) for i in record_type_sets['condition']])
+						)
+		elif self.file_extension == 'xlsx':
 			try:
 				wb = load_workbook(self.file_path, read_only=True)
 			except BadZipfile:
+				logging.info(
+					'Bad zip file submitted: \n'
+					+ 'username: ' + self.username
+					+ 'filename: ' + self.file_path
+				)
 				return 'This file does not appear to be a valid xlsx file'
-			if "Template" in wb.sheetnames:
-				ws = wb['Template']
-			elif "Records" in wb.sheetnames:
-				ws = wb['Records']
-			else:
-				return 'Expecting either "Template" or "Records" worksheets in xlsx file.'
-			rows = ws.iter_rows(min_row=1, max_row=1)
-			first_row = next(rows)
-			self.fieldnames = [str(c.value).encode().strip().lower() for c in first_row if c.value]
-			return None
-
-	def set_required_fieldnames(self):
-		if self.submission_type == 'db':
-			# these are uploads for correct
-			# uid, replicate, feature and time/period are required to identify the unique record
-			# but to further confirm we only delete the intended record, e.g. if a record is later resubmitted
-			# we include the check for submission time.
-			required = ['uid', 'replicate', 'feature', 'time/period', 'submitted at']
-		elif self.submission_type == 'fb':
-			required = ['uid', 'trait', 'value', 'timestamp', 'person', 'location']
-		else:  # self.submission_type == 'table':
-			required = {'uid', 'person'}
-			record_type_sets = [
-				('condition', {'start date', 'start time', 'end date', 'end time'}),
-				('trait', {'date', 'time'}),
-				('property', set())
-			]
-			# use this to also define our record type
-			for record_type_set in record_type_sets:
-				if record_type_set[1].issubset(set(self.fieldnames)):
-					self.record_type = record_type_set[0]
-					required = list(required) + list(record_type_set[1])
-					break
-		self.required_fieldnames = required
+			self.record_types = []
+			for record_type, sheetname in app.config['WORKSHEET_NAMES'].items():
+				if sheetname in wb.sheetnames:
+					self.record_types.append(record_type)
+					ws = wb[sheetname]
+					rows = ws.iter_rows(min_row=1, max_row=1)
+					first_row = next(rows)
+					self.fieldnames[record_type] = [str(c.value).encode().strip().lower() for c in first_row if c.value]
+					self.required_fieldnames[record_type] = record_type_sets[record_type]
+			if not self.fieldnames:
+				return (
+						'This workbook does not appear to contain any of the following accepted worksheets: '
+						+ '<br>  - '.join([str(i) for i in app.config['WORKSHEET_NAMES'].values()])
+					)
+		else:
+			return 'Only csv and xlsx file formats are supported for data submissions'
 
 	def check_headers(self, tx):
-		fieldnames_set = set(self.fieldnames)
-		if len(self.fieldnames) > len(fieldnames_set):
-			return "This file contains duplicated header fields. This is not supported"
-		if not set(self.required_fieldnames).issubset(fieldnames_set):
-			missing_fieldnames = set(self.required_fieldnames) - fieldnames_set
-			return (
-					'This file is missing the following fields: '
-					+ ', '.join([i for i in missing_fieldnames])
-			)
-		if self.submission_type == 'table':
-			# now we strip back the fieldnames to keep only those that aren't in the required list
-			# these should now just be the features, but we check against db.
-			self.features = [i for i in self.fieldnames if i not in self.required_fieldnames]
-			statement = (
-				' UNWIND $fields AS field '
-				'	OPTIONAL MATCH '
-				'		(feature:Feature {name_lower: toLower(trim(toString(field)))}) '
-				'	OPTIONAL MATCH '
-				'		(feature)-[:OF_TYPE]->(record_type:RecordType) '
-				'	WITH '
-				'		field, record_type '
-				'	WHERE '
-				'		feature IS NULL '
-				'		OR '
-				'		record_type.name_lower <> $record_type '
-				'	RETURN '
-				'		field, record_type.name_lower '
-			)
-			field_errors = tx.run(
-				statement,
-				record_type=self.record_type,
-				fields=self.features
-			)
-			if field_errors.peek():
-				error_message = '<p>Fieldnames not recognised or not matching other required fieldnames.</p> \n'
-				for field in field_errors:
-					error_message += '<dt>' + field[0] + ':</dt> '
-					record_type = field[1]
-					if record_type:
-						error_message += (
-							' <dd> This file has the required fields for ' + self.record_type + ' records but'							
-							' this feature is a ' + record_type + '.'
-						)
-						if record_type == 'condition':
-							error_message += (
-								'. Condition records require "start date", "start time", "end date" and "end time" '
-								' in addition to the "UID" and "Person" fields.'
-							)
-						elif record_type == 'trait':
-							error_message += (
-								'. Trait records require "date" and "time" fields'
-								' in addition to the "UID" and "Person" fields.'
-							)
-						elif record_type == 'property':
-							error_message += '. Property records only require the "UID" and "Person" fields.'
-						error_message += (
-								'</dd>\n'
-						)
+		errors = []
+		for record_type in self.record_types:
+			fieldnames_set = set(self.fieldnames[record_type])
+			if len(self.fieldnames[record_type]) > len(fieldnames_set):
+				if self.file_extension == 'xlsx':
+					error_message = '<p>' + app.config['WORKSHEET_NAMES'][record_type] + ' worksheet '
+				else:
+					error_message = '<p>This file '
+				errors.append(error_message + 'contains duplicate column names. This is not supported.</p>')
+			if not set(self.required_fieldnames[record_type]).issubset(fieldnames_set):
+				missing_fieldnames = set(self.required_fieldnames[record_type]) - fieldnames_set
+				if self.file_extension == 'xlsx':
+					error_message = '<p>' + app.config['WORKSHEET_NAMES'][record_type] + ' worksheet '
+				else:
+					error_message = '<p>This file '
+				error_message += (
+						' is missing the following required fields: '
+						+ ', '.join([i for i in missing_fieldnames])
+						+ '</p>'
+				)
+				errors.append(error_message)
+			if self.submission_type == 'table':
+				# now we strip back the fieldnames to keep only those that aren't in the required list
+				# these should now just be the features which we confirm are found in the db.
+				self.features[record_type] = [
+					i for i in self.fieldnames[record_type] if i not in self.required_fieldnames[record_type]
+				]
+				statement = (
+					' UNWIND $fields AS field '
+					'	OPTIONAL MATCH '
+					'		(feature:Feature {name_lower: toLower(trim(toString(field)))}) '
+					'	OPTIONAL MATCH '
+					'		(feature)-[:OF_TYPE]->(record_type: RecordType) '
+					'	WITH '
+					'		field, record_type '
+					'	WHERE '
+					'		feature IS NULL '
+					'		OR '
+					'		record_type.name_lower <> $record_type '
+					'	RETURN '
+					'		field, record_type.name_lower '
+				)
+				field_errors = tx.run(
+					statement,
+					record_type=record_type,
+					fields=self.features[record_type]
+				)
+				if field_errors.peek():
+					if self.file_extension == 'xlsx':
+						error_message = '<p>' + app.config['WORKSHEET_NAMES'][record_type] + ' worksheet '
 					else:
-						error_message += '<dd>Unrecognised feature. Please check your spelling.</dd>\n'
-				return error_message
-		else:
-			return None
+						error_message = '<p>This file '
+					error_message += (
+						'contains column headers that are not recognised as features or required details: </p>'
+					)
+					for field in field_errors:
+						error_message += '<dt>' + field[0] + ':</dt> '
+						feature_record_type = field[1]
+						if feature_record_type:
+							error_message += (
+								' <dd> Required fields present for ' + record_type + ' records but'							
+								' this feature is a ' + feature_record_type + '.'
+							)
+							if feature_record_type == 'condition':
+								error_message += (
+									'. Condition records require "start date", "start time", "end date" and "end time" '
+									' in addition to the "UID" and "Person" fields.'
+								)
+							elif feature_record_type == 'trait':
+								error_message += (
+									'. Trait records require "date" and "time" fields'
+									' in addition to the "UID" and "Person" fields.'
+								)
+							elif feature_record_type == 'property':
+								error_message += '. Property records require the "UID" and "Person" fields.'
+							error_message += (
+									'</dd>\n'
+							)
+						else:
+							error_message += '<dd>Unrecognised feature. Please check your spelling.</dd>\n'
+					errors.append(error_message)
+		header_report = '<br>'.join(errors)
+		return header_report
 
 	# clean up the csv by passing through dict reader and rewriting
-	# consider writing the xls to a csv here...
-	def trim_file(self):
-		file_path = self.file_path
-		trimmed_file_path = os.path.splitext(file_path)[0] + '_trimmed.csv'
-		self.trimmed_file_path = trimmed_file_path
+	def trim_file(self, record_type):
+		trimmed_file_path = '_'.join([
+			os.path.splitext(self.file_path)[0],
+			record_type,
+			'trimmed.csv'
+		])
+		self.trimmed_file_paths[record_type] = trimmed_file_path
 		if self.file_extension == 'csv':
-			with open(file_path, 'r') as uploaded_file, open(trimmed_file_path, "w") as trimmed_file:
+			with open(self.file_path, 'r') as uploaded_file, open(trimmed_file_path, "w") as trimmed_file:
 				# this dict reader lowers case and trims whitespace on all headers
 				file_dict = DictReaderInsensitive(
 					uploaded_file,
@@ -1124,8 +1175,16 @@ class Upload:
 								row[field] = row[field].strip()
 						row['row_index'] = self.row_count
 						file_writer.writerow(row)
-		else:  # self.file_extension == 'xlsx':
-			wb = load_workbook(self.file_path, read_only=True)
+		elif self.file_extension == 'xlsx':
+			try:
+				wb = load_workbook(self.file_path, read_only=True)
+			except BadZipfile:
+				logging.info(
+					'Bad zip file submitted: \n'
+					+ 'username: ' + self.username
+					+ 'filename: ' + self.file_path
+				)
+				return 'Unexpected error with submitted file, please try again'
 			if self.submission_type == 'db':
 				ws = wb['Records']
 			elif self.submission_type == 'table':
@@ -1175,18 +1234,17 @@ class Upload:
 						cell_values = [self.row_count] + cell_values
 						file_writer.writerow(cell_values)
 
-	def parse_rows(self):
-		trimmed_file_path = self.trimmed_file_path
+	def parse_rows(self, record_type):
+		trimmed_file_path = self.trimmed_file_paths[record_type]
 		submission_type = self.submission_type
-		record_type = self.record_type
-		parse_result = ParseResult(submission_type, record_type, self.fieldnames)
-		self.parse_result = parse_result
+		parse_result = ParseResult(submission_type, record_type, self.fieldnames[record_type])
+		self.parse_result[record_type] = parse_result
 		with open(trimmed_file_path, 'r') as trimmed_file:
 			trimmed_dict = DictReaderInsensitive(trimmed_file)
 			for row in trimmed_dict:
 				if submission_type == 'table':
 					# first check for feature data, if none then just skip this row
-					if [row[feature] for feature in self.features if row[feature]]:
+					if [row[feature] for feature in self.features[record_type] if row[feature]]:
 						parse_result.parse_table_row(row)
 					else:
 						pass
@@ -1205,7 +1263,7 @@ class Upload:
 		parse_result
 	):
 		username = self.username
-		trimmed_file_path = self.trimmed_file_path
+		trimmed_file_path = self.trimmed_file_path[record_type]
 		trimmed_filename = os.path.basename(trimmed_file_path)
 		submission_type = self.submission_type
 		record_type = self.record_type
@@ -1369,28 +1427,35 @@ class Upload:
 	@celery.task(bind=True)
 	def async_submit(self, username, upload_object):
 		try:
+			fieldname_errors = upload_object.set_fieldnames()
+			if fieldname_errors:
+				with app.app_context():
+					html = render_template(
+						'emails/upload_report.html',
+						response=fieldname_errors
+					)
+					subject = "BreedCAFS upload rejected"
+					recipients = [User(username).find('')['email']]
+					response = "Submission rejected due to invalid file:\n " + fieldname_errors
+					body = response
+					send_email(subject, app.config['ADMINS'][0], recipients, body, html)
+				return {
+					'status': 'ERRORS',
+					'result': fieldname_errors
+				}
 			with get_driver().session() as neo4j_session:
-				set_fieldnames = upload_object.set_fieldnames()
-				if set_fieldnames:
-					return {
-						'status': 'ERRORS',
-						'result': set_fieldnames
-					}
-				# the below function also assesses and sets self.record_type
-				upload_object.set_required_fieldnames()
 				header_report = neo4j_session.read_transaction(
 					upload_object.check_headers
 				)
 				if header_report:
 					with app.app_context():
-						response = header_report
 						html = render_template(
 							'emails/upload_report.html',
-							response=response
+							response=header_report
 						)
 						subject = "BreedCAFS upload rejected"
 						recipients = [User(username).find('')['email']]
-						response = "Submission rejected due to unrecognised or missing fields.\n "
+						response = "Submission rejected due to unrecognised or missing fields:\n " + header_report
 						body = response
 						send_email(subject, app.config['ADMINS'][0], recipients, body, html)
 					return {
@@ -1398,42 +1463,41 @@ class Upload:
 						'result': header_report
 					}
 				if upload_object.file_extension in ['csv', 'xlsx']:
-					# clean up the file removing empty lines and whitespace, lower case headers for matching in db
-					upload_object.trim_file()
-					# parse this trimmed file for errors, sets parse_result attribute to upload_object
-					parse_result = upload_object.parse_rows()
-					if parse_result.duplicate_keys:
-						response = parse_result.duplicate_keys_table()
-						with app.app_context():
-							html = render_template(
-								'emails/upload_report.html',
-								response=response
-							)
-							subject = "BreedCAFS upload rejected"
-							recipients = [User(username).find('')['email']]
-							body = response
-							send_email(subject, app.config['ADMINS'][0], recipients, body, html)
-						return {
-							'status': 'ERRORS',
-							'type': 'parse_object',
-							'result': response
-						}
 					tx = neo4j_session.begin_transaction()
-					db_check_result = upload_object.db_check(tx, parse_result)
-					if any([db_check_result.field_errors, db_check_result.errors]):
-						tx.close()
-						if parse_result.errors:
-							response = parse_result.html_table()
-						if parse_result.field_errors:
-							prepend_response = (
-								'<p>The uploaded table includes the below unrecognised fields. '
-								'Please check the spelling of any traits '
-								'and ensure they are appropriate to the level of items included '
-								'in this file:</p>'
-							)
-							for i in db_check_result.field_errors:
-								prepend_response += '<p> - ' + i + '</p>\n'
-							response = prepend_response + '\n' + response
+					errors = []
+					for record_type in upload_object.record_types:
+						# clean up the file removing empty lines and whitespace, lower case headers for matching in db
+						trim_error_report = upload_object.trim_file(record_type)
+						if trim_error_report:
+							with app.app_context():
+								html = render_template(
+									'emails/upload_report.html',
+									response=trim_error_report
+								)
+								subject = "BreedCAFS upload rejected"
+								recipients = [User(username).find('')['email']]
+								response = "Submission failed due to unexpected error, please try again"
+								body = response
+								send_email(subject, app.config['ADMINS'][0], recipients, body, html)
+							return {
+								'status': 'ERRORS',
+								'result': trim_error_report
+							}
+						# parse the trimmed file/worksheet for errors,
+						# also adds parse_result to upload_object.parse_result dict (by record_type)
+						parse_result = upload_object.parse_rows(record_type)
+						if parse_result.duplicate_keys:
+							if self.file_extension != 'xlsx':
+								errors.append(('parse_object',parse_result.duplicate_keys_table()))
+							else:
+								errors.append((
+									'parse_object',
+									'<p>' + app.config['WORKSHEET_NAMES'][record_type]
+									+ 'worksheet contains errors:</p>'
+									+ parse_result.duplicate_keys_table()
+								))
+					if errors:
+						response = '<br>'.join(errors)
 						with app.app_context():
 							html = render_template(
 								'emails/upload_report.html',
@@ -1448,112 +1512,147 @@ class Upload:
 							'type': 'parse_object',
 							'result': response
 						}
-					else:
-						# submit data
-						submission_result = upload_object.submit(tx)
-						# update properties where needed
-						submission_result.update_properties(tx)
-						if submission_result.conflicts:
-							tx.rollback()
-							conflicts_file = submission_result.conflicts_file()
+
+						
+					for record_type in upload_object.record_types:
+
+
+
+						db_check_result = upload_object.db_check(tx, parse_result)
+						if any([db_check_result.field_errors, db_check_result.errors]):
+							tx.close()
+							if parse_result.errors:
+								response = parse_result.html_table()
+							if parse_result.field_errors:
+								prepend_response = (
+									'<p>The uploaded table includes the below unrecognised fields. '
+									'Please check the spelling of any traits '
+									'and ensure they are appropriate to the level of items included '
+									'in this file:</p>'
+								)
+								for i in db_check_result.field_errors:
+									prepend_response += '<p> - ' + i + '</p>\n'
+								response = prepend_response + '\n' + response
 							with app.app_context():
-								# create urls
-								if conflicts_file:
-									conflicts_file_url = url_for(
-										'download_file',
-										username=username,
-										filename=conflicts_file,
-										_external=True
-									)
-									response = (
-											'<p><a href= "'
-											+ str(conflicts_file_url)
-											+ '">'
-											+ str(len(submission_result.conflicts)) +
-											'conflicts were found. </a> '
-											'Typically a report on such conflicts is generated before merger, however '
-											'this situation can occur when conflicting records are submitted concurrently. '
-											'Your submission has been rejected. Please address the listed conflicts '
-											'before resubmitting. '
-											'</p> '
-									)
-									html = render_template(
-										'emails/upload_report.html',
-										response=response
-									)
-									# send result of merger in an email
-									subject = "BreedCAFS upload rejected"
-									recipients = [User(username).find('')['email']]
-									response = "Submission rejected:\n " + response
-									body = response
-									send_email(subject, app.config['ADMINS'][0], recipients, body, html)
-									return {
-										'status': 'ERRORS',
-										'type': 'string',
-										'result': response
-									}
-						else:
-							tx.commit()
-							# create summary dict
-							submission_summary = submission_result.summary()
-							# create files
-							resubmissions_file = submission_result.resubmissions_file()
-							submitted_file = submission_result.submitted_file()
-							# now need app context for the following (this is running asynchronously)
-							with app.app_context():
-								if resubmissions_file:
-									resubmissions_file_url = url_for(
-										'download_file',
-										username=username,
-										filename=resubmissions_file,
-										_external=True
-									)
-								else:
-									resubmissions_file_url = None
-								if submitted_file:
-									submitted_file_url = url_for(
-										'download_file',
-										username=username,
-										filename=submitted_file,
-										_external=True
-									)
-								else:
-									submitted_file_url = None
-								if not any([resubmissions_file, submitted_file]):
-									response = 'No data submitted, please check that you uploaded a completed file'
-									return {
-										'status': 'ERRORS',
-										'type': 'string',
-										'result': response
-									}
-								# send result of merger in an email
-								subject = "BreedCAFS upload summary"
-								recipients = [User(username).find('')['email']]
-								response = "Submission report:\n "
-								if submission_summary['submitted']:
-									response += "<p> - <a href= " + str(submitted_file_url) + ">" + str(
-										submission_summary['submitted']) \
-												+ "</a> new values were submitted to the database.\n </p>"
-								if submission_summary['resubmissions']:
-									response += "<p> - <a href= " + str(resubmissions_file_url) + ">" + str(
-										submission_summary['resubmissions']) \
-												+ "</a> existing values were already found.\n</p>"
-								body = "Submission_report: \n"
-								body += " - " + str(
-									submission_summary['submitted']) + 'new values were submitted to the database.\n'
-								body += "   These are available at the following url: " + str(submitted_file_url) + "\n"
-								body += " - " + str(
-									submission_summary['resubmissions']) + 'existing values were already found.\n'
-								body += "   These are available at the following url: " + str(resubmissions_file_url) + "\n"
 								html = render_template(
 									'emails/upload_report.html',
 									response=response
 								)
+								subject = "BreedCAFS upload rejected"
+								recipients = [User(username).find('')['email']]
+								body = response
 								send_email(subject, app.config['ADMINS'][0], recipients, body, html)
-						return {
-							'status': 'SUCCESS',
-							'result': response
-						}
+							return {
+								'status': 'ERRORS',
+								'type': 'parse_object',
+								'result': response
+							}
+						else:
+							# submit data
+							submission_result = upload_object.submit(tx)
+							# update properties where needed
+							submission_result.update_properties(tx)
+							if submission_result.conflicts:
+								tx.rollback()
+								conflicts_file = submission_result.conflicts_file()
+								with app.app_context():
+									# create urls
+									if conflicts_file:
+										conflicts_file_url = url_for(
+											'download_file',
+											username=username,
+											filename=conflicts_file,
+											_external=True
+										)
+										response = (
+												'<p><a href= "'
+												+ str(conflicts_file_url)
+												+ '">'
+												+ str(len(submission_result.conflicts)) +
+												'conflicts were found. </a> '
+												'Typically a report on such conflicts is generated before merger, however '
+												'this situation can occur when conflicting records are submitted concurrently. '
+												'Your submission has been rejected. Please address the listed conflicts '
+												'before resubmitting. '
+												'</p> '
+										)
+										html = render_template(
+											'emails/upload_report.html',
+											response=response
+										)
+										# send result of merger in an email
+										subject = "BreedCAFS upload rejected"
+										recipients = [User(username).find('')['email']]
+										response = "Submission rejected:\n " + response
+										body = response
+										send_email(subject, app.config['ADMINS'][0], recipients, body, html)
+										return {
+											'status': 'ERRORS',
+											'type': 'string',
+											'result': response
+										}
+							else:
+								tx.commit()
+								# create summary dict
+								submission_summary = submission_result.summary()
+								# create files
+								resubmissions_file = submission_result.resubmissions_file()
+								submitted_file = submission_result.submitted_file()
+								# now need app context for the following (this is running asynchronously)
+								with app.app_context():
+									if resubmissions_file:
+										resubmissions_file_url = url_for(
+											'download_file',
+											username=username,
+											filename=resubmissions_file,
+											_external=True
+										)
+									else:
+										resubmissions_file_url = None
+									if submitted_file:
+										submitted_file_url = url_for(
+											'download_file',
+											username=username,
+											filename=submitted_file,
+											_external=True
+										)
+									else:
+										submitted_file_url = None
+									if not any([resubmissions_file, submitted_file]):
+										response = 'No data submitted, please check that you uploaded a completed file'
+										return {
+											'status': 'ERRORS',
+											'type': 'string',
+											'result': response
+										}
+									# send result of merger in an email
+									subject = "BreedCAFS upload summary"
+									recipients = [User(username).find('')['email']]
+									response = "Submission report:\n "
+									if submission_summary['submitted']:
+										response += "<p> - <a href= " + str(submitted_file_url) + ">" + str(
+											submission_summary['submitted']) \
+													+ "</a> new values were submitted to the database.\n </p>"
+									if submission_summary['resubmissions']:
+										response += "<p> - <a href= " + str(resubmissions_file_url) + ">" + str(
+											submission_summary['resubmissions']) \
+													+ "</a> existing values were already found.\n</p>"
+									body = "Submission_report: \n"
+									body += " - " + str(
+										submission_summary['submitted']) + 'new values were submitted to the database.\n'
+									body += "   These are available at the following url: " + str(submitted_file_url) + "\n"
+									body += " - " + str(
+										submission_summary['resubmissions']) + 'existing values were already found.\n'
+									body += "   These are available at the following url: " + str(resubmissions_file_url) + "\n"
+									html = render_template(
+										'emails/upload_report.html',
+										response=response
+									)
+									send_email(subject, app.config['ADMINS'][0], recipients, body, html)
+							return {
+								'status': 'SUCCESS',
+								'result': response
+							}
 				else:
 					return {
 						'status': 'SUCCESS',
