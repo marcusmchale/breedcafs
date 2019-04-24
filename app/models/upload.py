@@ -10,6 +10,7 @@ from neo4j_driver import get_driver, bolt_result
 import unicodecsv as csv
 import datetime
 import itertools
+import contextlib
 from werkzeug.utils import secure_filename
 from openpyxl import load_workbook
 from zipfile import BadZipfile
@@ -86,14 +87,6 @@ class RowParseResult:
 				"missing": "This UID is not found in the database. "
 			},
 			"feature": {
-				"missing": (
-					"This feature is not found in the database. "
-					"Please check the spelling and "
-					"that this feature is found among those supported by BreedCAFS "
-					"for the level of data you are submitting."
-				)
-			},
-			"trait": {
 				"missing": (
 					"This feature is not found in the database. "
 					"Please check the spelling and "
@@ -524,31 +517,33 @@ class SubmissionRecord:
 			self,
 			record
 	):
-		if 'Time/Period' in record and record['Time/Period']:
-			if isinstance(record['Time/Period'], list):
-				if record['Time/Period'][0]:
-					record['Time/Period'][0] = datetime.datetime.utcfromtimestamp(record['Time/Period'][0] / 1000).strftime("%Y-%m-%d %H:%M")
-				else:
-					record['Time/Period'][0] = 'Undefined'
-				if record['Time/Period'][1]:
-					record['Time/Period'][1] = datetime.datetime.utcfromtimestamp(record['Time/Period'][1] / 1000).strftime("%Y-%m-%d %H:%M")
-				else:
-					record['Time/Period'][1] = 'Undefined'
-				record['Time/Period'] = ' - '.join(record['Time/Period'])
+		if 'Time' in record and record['Time']:
+			record['Time'] = datetime.datetime.utcfromtimestamp(record['Time'] / 1000).strftime(
+				"%Y-%m-%d %H:%M")
+		if 'Period' in record and record['Period']:
+			if record['Period'][0]:
+				record['Period'][0] = datetime.datetime.utcfromtimestamp(record['Period'][0] / 1000).strftime("%Y-%m-%d %H:%M")
 			else:
-				record['Time/Period'] = datetime.datetime.utcfromtimestamp(record['Time/Period'] / 1000).strftime(
-					"%Y-%m-%d %H:%M")
-		record['submitted at'] = datetime.datetime.utcfromtimestamp(int(record['submitted at']) / 1000).strftime("%Y-%m-%d %H:%M:%S")
+				record['Period'][0] = 'Undefined'
+			if record['Period'][1]:
+				record['Period'][1] = datetime.datetime.utcfromtimestamp(record['Period'][1] / 1000).strftime("%Y-%m-%d %H:%M")
+			else:
+				record['Time/Period'][1] = 'Undefined'
+			record['Time/Period'] = ' - '.join(record['Time/Period'])
+		record['Submitted at'] = datetime.datetime.utcfromtimestamp(int(record['Submitted at']) / 1000).strftime("%Y-%m-%d %H:%M:%S")
 		self.record = record
 
 	def conflict(self):
-		if self.record['access']:
-			if self.record['value'] == self.record['uploaded_value']:
+		if 'conflicts' in self.record and not self.record['conflicts']:
+			return False
+		if 'Access' in self.record and self.record['Access']:
+			if self.record['Value'] == self.record['Uploaded value']:
 				return False
 			else:
-				if isinstance(self.record['value'], list):
-					if isinstance(self.record['uploaded_value'], list):
-						if set(self.record['uploaded_value']) == set(self.record['value']):
+				# Handle where a list submission is subset of existing list, this is not a conflict
+				if isinstance(self.record['Value'], list):
+					if isinstance(self.record['Uploaded value'], list):
+						if set(self.record['Uploaded value']) == set(self.record['Value']):
 							return False
 					elif set([i.lower() for i in self.record['uploaded_value'].split(":")]) == set([y.lower() for y in self.record['value']]):
 						return False
@@ -556,16 +551,80 @@ class SubmissionRecord:
 		else:
 			return True
 
+	# have to do this after conflict comparison so can compare list subsets
+	def lists_to_strings(self):
+		for item in self.record:
+			if isinstance(self.record[item], list):
+				self.record[item] = str(', '.join([str(i).encode() for i in self.record[item]]))
+
 
 class SubmissionResult:
 	def __init__(self, username, filename, submission_type, record_type):
-		self.username = username
-		self.filename = filename
+		download_path = os.path.join(app.instance_path, app.config['DOWNLOAD_FOLDER'], username)
+		if not os.path.isdir(download_path):
+			os.mkdir(download_path)
+			gid = grp.getgrnam(app.config['CELERYGRPNAME']).gr_gid
+			os.chown(download_path, -1, gid)
+			os.chmod(download_path, app.config['IMPORT_FOLDER_PERMISSIONS'])
+		if os.path.splitext(filename)[1] == 'xlsx':
+			conflicts_filename =  '_'.join([
+				os.path.splitext(filename)[0],
+				record_type,
+				'conflicts.csv'
+				])
+			submissions_filename = '_'.join([
+				os.path.splitext(filename)[0],
+				record_type,
+				'submitted.csv'
+			])
+		else:
+			conflicts_filename = '_'.join([
+				os.path.splitext(filename)[0],
+				'conflicts.csv'
+			])
+			submissions_filename = '_'.join([
+				os.path.splitext(filename)[0],
+				'submission_report.csv'
+			])
+		fieldnames = [
+			"UID",
+			"Feature",
+			"Value"
+			"Submitted by",
+			"Submitted at",
+		]
+		if record_type == 'trait':
+			fieldnames.insert(1, "Replicate")
+			fieldnames.insert(2, "Time")
+		if record_type == 'condition':
+			fieldnames.insert(1, "Period")
+		submissions_fieldnames = fieldnames
+		conflicts_fieldnames = fieldnames
+		conflicts_fieldnames.insert(-1, "Uploaded value")
+		self.conflicts_file_path = os.path.join(download_path, conflicts_filename)
+		self.submissions_file_path = os.path.join(download_path, submissions_filename)
+		self.conflicts_file = open(self.conflicts_file_path, 'w+')
+		self.submissions_file = open(self.submissions_file_path, 'w+')
+		self.conflicts_writer = csv.DictWriter(
+					self.conflicts_file,
+					fieldnames=conflicts_fieldnames,
+					quoting=csv.QUOTE_ALL,
+					extrasaction='ignore'
+				)
+		self.submissions_writer = csv.DictWriter(
+			self.submissions_file,
+			fieldnames=submissions_fieldnames,
+			quoting=csv.QUOTE_ALL,
+			extrasaction='ignore'
+		)
+		self.conflicts_writer.writeheader()
+		self.submissions_writer.writeheader()
 		self.submission_type = submission_type
 		self.record_type = record_type
-		self.conflicts = []
-		self.resubmissions = []
-		self.submitted = []
+		self.conflicts_found = False
+		self.submission_count = 0
+		self.resubmission_count = 0
+		# todo rewrite property updates to happen during result consumption rather than storing in memory
 		self.property_updates = {
 			'custom_id': [],
 			'assign_to_block': [],
@@ -576,59 +635,70 @@ class SubmissionResult:
 			'harvest_time': {}
 		}
 
+	def close(self):
+		self.conflicts_file.close()
+		self.submissions_file.close()
+
 	def summary(self):
 		return {
-			"resubmissions": len(self.resubmissions),
-			"submitted": len(self.submitted)
+			"resubmissions": self.resubmission_count,
+			"submitted": self.submission_count
 		}
 
 	def parse_record(self, record):
 		submission_item = SubmissionRecord(record)
-		if 'conflicts' in record and record['conflicts']:
-			self.conflicts.append(submission_item)
-		elif not record['found']:
-			self.submitted.append(submission_item)
-			if self.record_type == 'property':
-				if record['feature'].lower() == 'custom id':
-					self.property_updates['custom_id'].append(
-						[record['uid'], record['value']]
-					)
-				if record['feature'].lower() == 'tissue':
-					self.property_updates['tissue'].append(
-						[record['uid'], record['value']]
-					)
-				if record['feature'].lower() == 'assign to block':
-					self.property_updates['assign_to_block'].append(
-						[record['uid'], record['value']]
-					)
-				if record['feature'].lower() == 'assign to trees':
-					self.property_updates['assign_to_trees'].append(
-						[record['uid'], record['value']]
-					)
-				if record['feature'].lower() == 'assign to samples':
-					self.property_updates['assign_to_samples'].append(
-						[record['uid'], record['value']]
-					)
-				if record['feature'].lower() == 'variety name':
-					if not record['uid'] in self.property_updates['variety']:
-						self.property_updates['variety'][record['uid']] = {}
-					self.property_updates['variety'][record['uid']]['name'] = record['value']
-				if record['feature'].lower() == 'variety code':
-					if not record['uid'] in self.property_updates['variety']:
-						self.property_updates['variety'][record['uid']] = {}
-					self.property_updates['variety'][record['uid']]['code'] = record['value']
-				if record['feature'].lower() == 'harvest date':
-					if not record['uid'] in self.property_updates['harvest_time']:
-						self.property_updates['harvest_time'][record['uid']] = {}
-					self.property_updates['harvest_time'][record['uid']]['date'] = record['value']
-				if record['feature'].lower() == 'harvest time':
-					if not record['uid'] in self.property_updates['harvest_time']:
-						self.property_updates['harvest_time'][record['uid']] = {}
-					self.property_updates['harvest_time'][record['uid']]['time'] = record['value']
-		elif submission_item.conflict():
-			self.conflicts.append(submission_item)
+		if submission_item.conflict():
+			self.conflicts_found = True
+			submission_item.lists_to_strings()
+			self.conflicts_writer.writerow(submission_item.record)
 		else:
-			self.resubmissions.append(submission_item)
+			if self.conflicts_found:
+				# don't bother parsing and preparing results from submission with conflicts
+				# just continue gathering the list of conflicts
+				return
+			submission_item.lists_to_strings()
+			self.submissions_writer.writerow(submission_item.record)
+			if submission_item.record['Found']:
+				self.resubmission_count += 1
+			else:
+				self.submission_count += 1
+				if self.record_type == 'property':
+					if submission_item.record['Feature'].lower() == 'custom id':
+						self.property_updates['custom_id'].append(
+							[record['UID'], record['Value']]
+						)
+					if submission_item.record['Feature'].lower() == 'tissue':
+						self.property_updates['tissue'].append(
+							[record['UID'], record['Value']]
+						)
+					if submission_item.record['Feature'].lower() == 'assign to block':
+						self.property_updates['assign_to_block'].append(
+							[record['UID'], record['Value']]
+						)
+					if submission_item.record['Feature'].lower() == 'assign to trees':
+						self.property_updates['assign_to_trees'].append(
+							[record['UID'], record['Value']]
+						)
+					if submission_item.record['Feature'].lower() == 'assign to samples':
+						self.property_updates['assign_to_samples'].append(
+							[record['UID'], record['Value']]
+						)
+					if submission_item.record['Feature'].lower() == 'variety name':
+						if not record['UID'] in self.property_updates['variety']:
+							self.property_updates['variety'][record['UID']] = {}
+						self.property_updates['variety'][record['UID']]['name'] = record['Value']
+					if submission_item.record['Feature'].lower() == 'variety code':
+						if not record['UID'] in self.property_updates['variety']:
+							self.property_updates['variety'][record['UID']] = {}
+						self.property_updates['variety'][record['UID']]['code'] = record['Value']
+					if submission_item.record['Feature'].lower() == 'harvest date':
+						if not record['UID'] in self.property_updates['harvest_time']:
+							self.property_updates['harvest_time'][record['UID']] = {}
+						self.property_updates['harvest_time'][record['UID']]['date'] = record['Value']
+					if submission_item.record['Feature'].lower() == 'harvest time':
+						if not record['UID'] in self.property_updates['harvest_time']:
+							self.property_updates['harvest_time'][record['UID']] = {}
+						self.property_updates['harvest_time'][record['UID']]['time'] = record['Value']
 
 	def update_properties(self, tx):
 		if self.property_updates['custom_id']:
@@ -799,136 +869,6 @@ class SubmissionResult:
 			)
 			tx.run(statement, harvest_time=harvest_time)
 
-	def conflicts_file(self):
-		username = self.username
-		filename = self.filename
-		if len(self.conflicts) == 0:
-			return None
-		else:
-			download_path = os.path.join(app.instance_path, app.config['DOWNLOAD_FOLDER'], self.username)
-			if not os.path.isdir(download_path):
-				os.mkdir(download_path)
-				gid = grp.getgrnam(app.config['CELERYGRPNAME']).gr_gid
-				os.chown(download_path, -1, gid)
-				os.chmod(download_path, app.config['IMPORT_FOLDER_PERMISSIONS'])
-			conflicts_filename = os.path.splitext(filename)[0] + '_conflicts.csv'
-			conflicts_file_path = os.path.join(
-				app.instance_path,
-				app.config['DOWNLOAD_FOLDER'],
-				username,
-				conflicts_filename
-			)
-			conflicts_fieldnames = [
-				"uid",
-				"replicate",
-				"feature",
-				"Time/Period",
-				"submitted by",
-				"submitted at",
-				"value",
-				"uploaded_value"
-			]
-			with open(conflicts_file_path, 'w') as conflicts_file:
-				writer = csv.DictWriter(
-					conflicts_file,
-					fieldnames=conflicts_fieldnames,
-					quoting=csv.QUOTE_ALL,
-					extrasaction='ignore'
-				)
-				writer.writeheader()
-				for row in self.conflicts:
-					if not row.record['access']:
-						row.record['value'] = 'ACCESS DENIED'
-						row.record['submitted by'] = row.record['partner']
-					for item in row.record:
-						if isinstance(row.record[item], list):
-							row.record[item] = str(':'.join([str(i).encode() for i in row.record[item]]))
-					writer.writerow(row.record)
-		return conflicts_filename
-
-	def resubmissions_file(self):
-		username = self.username
-		filename = self.filename
-		if len(self.resubmissions) == 0:
-			return None
-		else:
-			download_path = os.path.join(app.instance_path, app.config['DOWNLOAD_FOLDER'], self.username)
-			if not os.path.isdir(download_path):
-				os.mkdir(download_path)
-				gid = grp.getgrnam(app.config['CELERYGRPNAME']).gr_gid
-				os.chown(download_path, -1, gid)
-				os.chmod(download_path, app.config['IMPORT_FOLDER_PERMISSIONS'])
-			resubmissions_filename = os.path.splitext(filename)[0] + '_resubmissions.csv'
-			resubmissions_file_path = os.path.join(
-				app.instance_path,
-				app.config['DOWNLOAD_FOLDER'],
-				username,
-				resubmissions_filename)
-			resubmissions_fieldnames = [
-				"uid",
-				"replicate",
-				"feature",
-				"Time/Period",
-				"submitted by",
-				"submitted at",
-				"value",
-				"uploaded_value"
-			]
-			with open(resubmissions_file_path, 'w') as resubmissions_file:
-				writer = csv.DictWriter(
-					resubmissions_file,
-					fieldnames=resubmissions_fieldnames,
-					quoting=csv.QUOTE_ALL,
-					extrasaction='ignore')
-				writer.writeheader()
-				for row in self.resubmissions:
-					for item in row.record:
-						if isinstance(row.record[item], list):
-							row.record[item] = str(':'.join([str(i).encode() for i in row.record[item]]))
-					writer.writerow(row.record)
-		return resubmissions_filename
-
-	def submitted_file(self):
-		username = self.username
-		filename = self.filename
-		if len(self.submitted) == 0:
-			return None
-		else:
-			download_path = os.path.join(app.instance_path, app.config['DOWNLOAD_FOLDER'], self.username)
-			if not os.path.isdir(download_path):
-				os.mkdir(download_path)
-				gid = grp.getgrnam(app.config['CELERYGRPNAME']).gr_gid
-				os.chown(download_path, -1, gid)
-				os.chmod(download_path, app.config['IMPORT_FOLDER_PERMISSIONS'])
-			submitted_filename = os.path.splitext(filename)[0] + '_submitted.csv'
-			submitted_file_path = os.path.join(
-				app.instance_path,
-				app.config['DOWNLOAD_FOLDER'],
-				username,
-				submitted_filename)
-			submitted_fieldnames = [
-				"uid",
-				"replicate",
-				"feature",
-				"Time/Period",
-				"submitted by",
-				"submitted at",
-				"value"
-			]
-			with open(submitted_file_path, 'w') as submitted_file:
-				writer = csv.DictWriter(
-					submitted_file,
-					fieldnames = submitted_fieldnames,
-					quoting = csv.QUOTE_ALL,
-					extrasaction = 'ignore')
-				writer.writeheader()
-				for row in self.submitted:
-					for item in row.record:
-						if isinstance(row.record[item], list):
-							row.record[item] = str(':'.join([str(i).encode() for i in row.record[item]]))
-					writer.writerow(row.record)
-		return submitted_filename
-
 
 class Upload:
 	def __init__(self, username, submission_type, raw_filename):
@@ -940,13 +880,14 @@ class Upload:
 		self.record_types = []
 		self.required_fieldnames = dict()
 		self.trimmed_file_paths = dict()
-		self.parse_result = dict()
-		self.submission_result = None
+		self.parse_results = dict()
+		self.submission_results = dict()
 		self.fieldnames = dict()
 		self.file_extension = None
 		self.contains_data = None
 		self.features = dict()
 		self.row_count = dict()
+		self.error_messages = []
 
 	def allowed_file(self):
 		if '.' in self.raw_filename:
@@ -984,9 +925,9 @@ class Upload:
 					+ 'filename: ' + self.file_path
 				)
 				return 'This file does not appear to be a valid xlsx file'
-			if not set(app.config.worksheet_names.values()) & set(wb.sheetnames):
+			if not set(app.config['WORKSHEET_NAMES'].values()) & set(wb.sheetnames):
 				return (
-					'This workbook does not appear to contain any of the following accepted worksheets: '
+					'This workbook does not appear to contain any of the following accepted worksheets: <br> - '
 					+ '<br>  - '.join([str(i) for i in app.config['WORKSHEET_NAMES'].values()])
 				)
 		else:
@@ -1033,6 +974,8 @@ class Upload:
 								+ ' <br> Trait records require: ' + ', '.join([str(i) for i in record_type_sets['trait']])
 								+ ' <br> Condition records require: ' + ', '.join([str(i) for i in record_type_sets['condition']])
 						)
+				else:
+					return 'Submission type not recognised'
 		elif self.file_extension == 'xlsx':
 			try:
 				wb = load_workbook(self.file_path, read_only=True)
@@ -1176,19 +1119,11 @@ class Upload:
 						row['row_index'] = self.row_count
 						file_writer.writerow(row)
 		elif self.file_extension == 'xlsx':
-			try:
-				wb = load_workbook(self.file_path, read_only=True)
-			except BadZipfile:
-				logging.info(
-					'Bad zip file submitted: \n'
-					+ 'username: ' + self.username
-					+ 'filename: ' + self.file_path
-				)
-				return 'Unexpected error with submitted file, please try again'
+			wb = load_workbook(self.file_path, read_only=True)
 			if self.submission_type == 'db':
 				ws = wb['Records']
 			elif self.submission_type == 'table':
-				ws = wb['Template']
+				ws = wb[app.config['WORKSHEET_NAMES'][record_type]]
 			with open(trimmed_file_path, "wb") as trimmed_file:
 				file_writer = csv.writer(
 					trimmed_file,
@@ -1238,7 +1173,7 @@ class Upload:
 		trimmed_file_path = self.trimmed_file_paths[record_type]
 		submission_type = self.submission_type
 		parse_result = ParseResult(submission_type, record_type, self.fieldnames[record_type])
-		self.parse_result[record_type] = parse_result
+		self.parse_results[record_type] = parse_result
 		with open(trimmed_file_path, 'r') as trimmed_file:
 			trimmed_dict = DictReaderInsensitive(trimmed_file)
 			for row in trimmed_dict:
@@ -1252,21 +1187,32 @@ class Upload:
 					parse_result.parse_db_row(row)
 				elif submission_type == "fb":
 					parse_result.parse_fb_row(row)
-				# if many errors already then return immediately
-				if parse_result.long_enough():
-					return parse_result
-		return parse_result
+		if parse_result.duplicate_keys:
+			if self.file_extension != 'xlsx':
+				self.error_messages.append(
+					'<p> This file contains duplicate keys: </p>' +
+					parse_result.duplicate_keys_table()
+				)
+			else:
+				self.error_messages.append(
+					'<p>' + app.config['WORKSHEET_NAMES'][record_type]
+					+ 'worksheet contains duplicate keys:</p>'
+					+ parse_result.duplicate_keys_table()
+				)
 
 	def db_check(
 		self,
 		tx,
-		parse_result
+		record_type
 	):
+		# todo it seems like the field errors here should not occur
+		# todo we are handling this check before we parse the rows
+		# todo so we could remove this check here to simplify
 		username = self.username
-		trimmed_file_path = self.trimmed_file_path[record_type]
+		trimmed_file_path = self.trimmed_file_paths[record_type]
 		trimmed_filename = os.path.basename(trimmed_file_path)
 		submission_type = self.submission_type
-		record_type = self.record_type
+		parse_result = self.parse_results[record_type]
 		with open(trimmed_file_path, 'r') as trimmed_file:
 			if submission_type == "fb":
 				check_result = tx.run(
@@ -1287,27 +1233,27 @@ class Upload:
 							"uid",
 							"missing"
 						)
-					if not record['feature']:
+					if not record['Feature']:
 						parse_result.merge_error(
 							row,
-							"trait",
+							"feature",
 							"missing"
 						)
 					if all([
 						record['UID'],
-						record['feature'],
-						not record['value']
+						record['Feature'],
+						not record['Value']
 					]):
 						parse_result.merge_error(
 							row,
 							"value",
 							"format",
-							feature_name=record['feature'],
-							feature_format=record['format'],
-							category_list=record['category_list']
+							feature_name=record['Feature'],
+							feature_format=record['Format'],
+							category_list=record['Category list']
 						)
 					# need to check an element of the list as all results
-					if record['conflicts'][0]['existing_value']:
+					if record['Conflicts'][0]['existing_value']:
 						parse_result.merge_error(
 							row,
 							"value",
@@ -1327,7 +1273,7 @@ class Upload:
 					statement,
 					username=username,
 					filename=urls.url_fix('file:///' + username + '/' + trimmed_filename ),
-					features=self.features,
+					features=self.features[record_type],
 					record_type=record_type
 				)
 				trimmed_dict_reader = DictReaderInsensitive(trimmed_file)
@@ -1343,9 +1289,9 @@ class Upload:
 							"uid",
 							"missing"
 						)
-					if not record['feature']:
+					if not record['Feature']:
 						parse_result.add_field_error(
-							record['input_feature'],
+							record['Input feature'],
 							(
 								"This feature is not found. Please check your spelling. "
 								"This may also be because the feature is not available at the level of these items"
@@ -1354,75 +1300,99 @@ class Upload:
 					# we add found fields to a list to handle mixed items in input
 					# i.e. if found at level of one item but not another
 					else:
-						parse_result.add_field_found(record['feature'])
+						parse_result.add_field_found(record['Feature'])
 					if all([
 						record['UID'],
-						record['feature'],
-						not record['value']
+						record['Feature'],
+						not record['Value']
 					]):
 						parse_result.merge_error(
 							row,
-							record['input_feature'],
+							record['Input feature'],
 							"format",
-							feature_name=record['feature'],
-							feature_format=record['format'],
-							category_list=record['category_list']
+							feature_name=record['Feature'],
+							feature_format=record['Format'],
+							category_list=record['Category list']
 						)
 					# need to check an element of the list as all results
-					if record['conflicts'][0]['existing_value']:
+					if record['Conflicts'][0]['existing_value']:
 						parse_result.merge_error(
 							row,
-							record['input_feature'],
+							record['Input feature'],
 							"conflict",
-							conflicts=record['conflicts']
+							conflicts=record['Conflicts']
 						)
 				if parse_result.field_found:
 					for field in parse_result.field_found:
 						parse_result.rem_field_error(field)
-			return parse_result
+		if parse_result.field_errors:
+			if self.file_extension != 'xlsx':
+				self.error_messages.append(
+					'<p> This file contains unrecognised column labels: </p><ul><li>'
+					+ '</li><li>'.join(parse_result.field_errors)
+					+ '</li></ul>'
+				)
+			else:
+				self.error_messages.append(
+					'<p>' + app.config['WORKSHEET_NAMES'][record_type]
+					+ ' worksheet contains unrecognised column labels: </p><ul><li>'
+					+ '</li><li>'.join(parse_result.field_errors)
+					+ '</li></ul>'
+				)
+		if parse_result.errors:
+			if self.file_extension != 'xlsx':
+				self.error_messages.append(
+					'<p> This file contains errors: </p>'
+					+ parse_result.html_table()
+				)
+			else:
+				self.error_messages.append(
+					'<p>' + app.config['WORKSHEET_NAMES'][record_type]
+					+ ' worksheet contains errors: '
+					+ parse_result.html_table()
+				)
 
 	def submit(
 			self,
-			tx
+			tx,
+			record_type
 	):
 		username = self.username
-		trimmed_file_path = self.trimmed_file_path
+		trimmed_file_path = self.trimmed_file_paths[record_type]
 		trimmed_filename = os.path.basename(trimmed_file_path)
 		submission_type = self.submission_type
 		filename = self.filename
 		features = self.features
-		self.submission_result = SubmissionResult(username, filename, submission_type, self.record_type)
-		submission_result = self.submission_result
-		record_type = self.record_type
-		if submission_type == 'fb':
-			statement = Cypher.upload_fb
-			result = tx.run(
-				statement,
-				username=username,
-				filename=("file:///" + username + '/' + trimmed_filename)
-			)
-		else:  # submission_type == 'table':
-			if record_type == 'property':
-				statement = Cypher.upload_table_property
-			elif record_type == 'trait':
-				statement = Cypher.upload_table_trait
-			elif record_type == 'condition':
-				statement = Cypher.upload_table_condition
-			else:
-				statement = None
-			result = tx.run(
-				statement,
-				username=username,
-				filename=urls.url_fix("file:///" + username + '/' + trimmed_filename),
-				features=features,
-				record_type=record_type
-			)
-		# create a submission result and update properties from result
-		for record in result:
-			# todo: rewrite this so writing files directly for each record, instead of storing in memory
-			# todo: will have to catch, rollback and dump some files if conflicts
-			submission_result.parse_record(record[0])
-		return submission_result
+		with contextlib.closing(SubmissionResult(username, filename, submission_type, record_type)) as submission_result:
+			self.submission_results[record_type] = submission_result
+			if submission_type == 'fb':
+				statement = Cypher.upload_fb
+				result = tx.run(
+					statement,
+					username=username,
+					filename=("file:///" + username + '/' + trimmed_filename)
+				)
+			else:  # submission_type == 'table':
+				if record_type == 'property':
+					statement = Cypher.upload_table_property
+				elif record_type == 'trait':
+					statement = Cypher.upload_table_trait
+				elif record_type == 'condition':
+					statement = Cypher.upload_table_condition
+				else:
+					statement = None
+				result = tx.run(
+					statement,
+					username=username,
+					filename=urls.url_fix("file:///" + username + '/' + trimmed_filename),
+					features=features,
+					record_type=record_type
+				)
+			# create a submission result and update properties from result
+			for record in result:
+				# todo: rewrite this so writing files directly for each record, instead of storing in memory
+				# todo: will have to catch, rollback and dump some files if conflicts
+				submission_result.parse_record(record[0])
 
 	@celery.task(bind=True)
 	def async_submit(self, username, upload_object):
@@ -1463,196 +1433,119 @@ class Upload:
 						'result': header_report
 					}
 				if upload_object.file_extension in ['csv', 'xlsx']:
-					tx = neo4j_session.begin_transaction()
-					errors = []
-					for record_type in upload_object.record_types:
-						# clean up the file removing empty lines and whitespace, lower case headers for matching in db
-						trim_error_report = upload_object.trim_file(record_type)
-						if trim_error_report:
+					with neo4j_session.begin_transaction() as tx:
+						for record_type in upload_object.record_types:
+							# clean up the file removing empty lines and whitespace, lower case headers for matching in db
+							upload_object.trim_file(record_type)
+							# parse the trimmed file/worksheet for errors
+							# also adds parse_result to upload_object.parse_result dict (by record_type)
+							upload_object.parse_rows(record_type)
+							# with string parsing performed, now we check against the database for UID, feature, value
+							upload_object.db_check(tx, record_type)
+						if upload_object.error_messages:
+							error_messages = '<br>'.join(upload_object.error_messages)
 							with app.app_context():
 								html = render_template(
 									'emails/upload_report.html',
-									response=trim_error_report
+									response=error_messages
 								)
 								subject = "BreedCAFS upload rejected"
 								recipients = [User(username).find('')['email']]
-								response = "Submission failed due to unexpected error, please try again"
-								body = response
+								body = error_messages
 								send_email(subject, app.config['ADMINS'][0], recipients, body, html)
 							return {
 								'status': 'ERRORS',
-								'result': trim_error_report
+								'result': error_messages
 							}
-						# parse the trimmed file/worksheet for errors,
-						# also adds parse_result to upload_object.parse_result dict (by record_type)
-						parse_result = upload_object.parse_rows(record_type)
-						if parse_result.duplicate_keys:
-							if self.file_extension != 'xlsx':
-								errors.append(('parse_object',parse_result.duplicate_keys_table()))
-							else:
-								errors.append((
-									'parse_object',
-									'<p>' + app.config['WORKSHEET_NAMES'][record_type]
-									+ 'worksheet contains errors:</p>'
-									+ parse_result.duplicate_keys_table()
-								))
-					if errors:
-						response = '<br>'.join(errors)
-						with app.app_context():
-							html = render_template(
-								'emails/upload_report.html',
-								response=response
-							)
-							subject = "BreedCAFS upload rejected"
-							recipients = [User(username).find('')['email']]
-							body = response
-							send_email(subject, app.config['ADMINS'][0], recipients, body, html)
-						return {
-							'status': 'ERRORS',
-							'type': 'parse_object',
-							'result': response
-						}
-
-						
-					for record_type in upload_object.record_types:
-
-
-
-						db_check_result = upload_object.db_check(tx, parse_result)
-						if any([db_check_result.field_errors, db_check_result.errors]):
-							tx.close()
-							if parse_result.errors:
-								response = parse_result.html_table()
-							if parse_result.field_errors:
-								prepend_response = (
-									'<p>The uploaded table includes the below unrecognised fields. '
-									'Please check the spelling of any traits '
-									'and ensure they are appropriate to the level of items included '
-									'in this file:</p>'
-								)
-								for i in db_check_result.field_errors:
-									prepend_response += '<p> - ' + i + '</p>\n'
-								response = prepend_response + '\n' + response
-							with app.app_context():
-								html = render_template(
-									'emails/upload_report.html',
-									response=response
-								)
-								subject = "BreedCAFS upload rejected"
-								recipients = [User(username).find('')['email']]
-								body = response
-								send_email(subject, app.config['ADMINS'][0], recipients, body, html)
-							return {
-								'status': 'ERRORS',
-								'type': 'parse_object',
-								'result': response
-							}
-						else:
+						conflicts_files = []
+						submissions = []
+						for record_type in upload_object.record_types:
 							# submit data
-							submission_result = upload_object.submit(tx)
-							# update properties where needed
-							submission_result.update_properties(tx)
-							if submission_result.conflicts:
-								tx.rollback()
-								conflicts_file = submission_result.conflicts_file()
-								with app.app_context():
-									# create urls
-									if conflicts_file:
-										conflicts_file_url = url_for(
+							upload_object.submit(tx, record_type)
+							submission_result = upload_object.submission_results[record_type]
+							if submission_result.conflicts_found:
+								conflicts_files.append(submission_result.conflicts_file_path)
+							else:
+								if submission_result.submissions_file_path:
+									submissions.append((
+										record_type,
+										submission_result.summary(),
+										submission_result.submissions_file_path
+									))
+						if conflicts_files:
+							# These should only be generated due to concurrent conflicting submissions
+							# or internal conflicts in the submitted file
+							tx.rollback()
+							with app.app_context():
+								response = (
+									'<p>Conflicting records were either submitted concurrently '
+									'or are found within in the submitted file. '
+									'Your submission has been rejected. Please address the conflicts listed '
+									'in the following files before resubmitting. '
+									'\n'
+								)
+								for conflicts_file in conflicts_files:
+									response += ' - '
+									response += (
+										url_for(
 											'download_file',
 											username=username,
 											filename=conflicts_file,
 											_external=True
 										)
-										response = (
-												'<p><a href= "'
-												+ str(conflicts_file_url)
-												+ '">'
-												+ str(len(submission_result.conflicts)) +
-												'conflicts were found. </a> '
-												'Typically a report on such conflicts is generated before merger, however '
-												'this situation can occur when conflicting records are submitted concurrently. '
-												'Your submission has been rejected. Please address the listed conflicts '
-												'before resubmitting. '
-												'</p> '
-										)
-										html = render_template(
-											'emails/upload_report.html',
-											response=response
-										)
-										# send result of merger in an email
-										subject = "BreedCAFS upload rejected"
-										recipients = [User(username).find('')['email']]
-										response = "Submission rejected:\n " + response
-										body = response
-										send_email(subject, app.config['ADMINS'][0], recipients, body, html)
-										return {
-											'status': 'ERRORS',
-											'type': 'string',
-											'result': response
-										}
-							else:
-								tx.commit()
-								# create summary dict
-								submission_summary = submission_result.summary()
-								# create files
-								resubmissions_file = submission_result.resubmissions_file()
-								submitted_file = submission_result.submitted_file()
-								# now need app context for the following (this is running asynchronously)
-								with app.app_context():
-									if resubmissions_file:
-										resubmissions_file_url = url_for(
-											'download_file',
-											username=username,
-											filename=resubmissions_file,
-											_external=True
-										)
-									else:
-										resubmissions_file_url = None
-									if submitted_file:
-										submitted_file_url = url_for(
-											'download_file',
-											username=username,
-											filename=submitted_file,
-											_external=True
-										)
-									else:
-										submitted_file_url = None
-									if not any([resubmissions_file, submitted_file]):
-										response = 'No data submitted, please check that you uploaded a completed file'
-										return {
-											'status': 'ERRORS',
-											'type': 'string',
-											'result': response
-										}
-									# send result of merger in an email
-									subject = "BreedCAFS upload summary"
-									recipients = [User(username).find('')['email']]
-									response = "Submission report:\n "
-									if submission_summary['submitted']:
-										response += "<p> - <a href= " + str(submitted_file_url) + ">" + str(
-											submission_summary['submitted']) \
-													+ "</a> new values were submitted to the database.\n </p>"
-									if submission_summary['resubmissions']:
-										response += "<p> - <a href= " + str(resubmissions_file_url) + ">" + str(
-											submission_summary['resubmissions']) \
-													+ "</a> existing values were already found.\n</p>"
-									body = "Submission_report: \n"
-									body += " - " + str(
-										submission_summary['submitted']) + 'new values were submitted to the database.\n'
-									body += "   These are available at the following url: " + str(submitted_file_url) + "\n"
-									body += " - " + str(
-										submission_summary['resubmissions']) + 'existing values were already found.\n'
-									body += "   These are available at the following url: " + str(resubmissions_file_url) + "\n"
-									html = render_template(
-										'emails/upload_report.html',
-										response=response
 									)
-									send_email(subject, app.config['ADMINS'][0], recipients, body, html)
-							return {
-								'status': 'SUCCESS',
-								'result': response
-							}
+									response += '\n'
+								response += '</p>'
+								html = render_template(
+									'emails/upload_report.html',
+									response=response
+								)
+								# send result of merger in an email
+								subject = "BreedCAFS upload rejected"
+								recipients = [User(username).find('')['email']]
+								body = response
+								send_email(subject, app.config['ADMINS'][0], recipients, body, html)
+								return {
+									'status': 'ERRORS',
+									'result': response
+								}
+						# update properties where needed,
+						# todo should probably be handled when consuming the result rather than storing
+						# todo :and later updating, consider why I did it this way, likely just an artifact
+						# todo :of my early failure to consume results properly.
+						for record_type in upload_object.record_types:
+							upload_object.submission_results[record_type].update_properties(tx)
+						tx.commit()
+						# now need app context for the following (this is running asynchronously)
+						with app.app_context():
+							if not submissions:
+								response = 'No data submitted, please check that you uploaded a completed file'
+								return {
+									'status': 'ERRORS',
+									'result': response
+								}
+							else:
+								response = "<p> Submission report:\n "
+								for submission in submissions:
+									response += (
+										+ ' - <a href= ' + submission[2] + '>'
+										+ app.config['WORKSHEET_NAMES'][submission[0]]
+										+ ' contained ' + str(submission[1]['submitted']) + 'new records '
+										+ ' and ' + str(submission[1]['resubmissions']) + 'existing records. \n'
+									)
+								html = render_template(
+									'emails/upload_report.html',
+									response=response
+								)
+								# send result of merger in an email
+								subject = "BreedCAFS upload summary"
+								recipients = [User(username).find('')['email']]
+								body = response
+								send_email(subject, app.config['ADMINS'][0], recipients, body, html)
+								return {
+									'status': 'SUCCESS',
+									'result': response
+								}
 				else:
 					return {
 						'status': 'SUCCESS',

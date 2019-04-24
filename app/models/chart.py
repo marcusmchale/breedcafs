@@ -46,18 +46,7 @@ class Chart:
 						'target': record['r_end']
 					}
 				)
-			# connect counters to block/field
-			for node in nodes:
-				if str(node['id']).endswith('_count_node'):
-					rels.append(
-						{
-							'source': node['id'],
-							'type': 'FROM_COUNTER',
-							'id': (node['id'] + '_' + node['id'].split('_')[0]),
-							'target': int(node['id'].split('_')[0])
-						}
-					)
-			# then uniquify
+			# uniquify
 			nodes = {node['id']: node for node in nodes}.values()
 			rels = {rel['id']: rel for rel in rels}.values()
 			# and create the d3 input

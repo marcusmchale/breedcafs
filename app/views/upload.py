@@ -143,13 +143,7 @@ def task_status(task_id):
 		return jsonify({'status': task.status})
 	else:
 		result = task.get()
-		if result['status'] == 'ERRORS':
-			return jsonify({
-				'status': 'ERRORS',
-				'result': result['result']
-			})
-		else:
-			return jsonify({
-				'status': task.status,
-				'result': result
-			})
+		return jsonify({
+			'status': task.status,
+			'result': result
+		})
