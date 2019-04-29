@@ -123,42 +123,6 @@ class Download:
 		]
 		self.item_fieldnames = [i for i in fieldnames_order if i in self.id_list.peek()[0].keys()]
 
-	def id_list_to_xlsx(
-			self
-	):
-		if not self.id_list:
-			return False
-		base_filename = ' '
-		file_path = self.get_file_path(
-			'xlsx',
-			base_filename
-		)
-		wb = Workbook(file_path)
-		worksheet = wb.add_worksheet("UID List")
-		row_number = 0
-		for i, j in enumerate(self.item_fieldnames):
-			worksheet.write(row_number, i, j)
-		for record in self.id_list:
-			row_number += 1
-			col_number = 0
-			for field in self.item_fieldnames:
-				if isinstance(record[0][field], list):
-					record[0][field] = ", ".join(record[0][field])
-				worksheet.write(row_number, col_number, record[0][field])
-				col_number += 1
-		wb.close()
-		self.file_list.append({
-			"filename": os.path.basename(file_path),
-			"file_path": file_path,
-			"file_size": os.path.getsize(file_path),
-			"url": url_for(
-				"download_file",
-				username=self.username,
-				filename= os.path.basename(file_path),
-				_external=True
-			)
-		})
-
 	def get_file_list_html(self):
 		if not self.file_list:
 			return None
@@ -219,8 +183,8 @@ class Download:
 			if item_level == 'sample' and feature_group == "Registration" and sample_level != 'field':
 				# drop "assign to trees and assign to samples"
 				not_used_features = ["assign to trees", "assign to samples"]
-				self.features['properties'] = [
-					i for i in self.features['properties'] if i['name_lower'] not in not_used_features
+				self.features['property'] = [
+					i for i in self.features['property'] if i['name_lower'] not in not_used_features
 				]
 		if not record_type or record_type == 'trait':
 			self.features['trait'] = FeatureList(
@@ -590,8 +554,8 @@ class Download:
 			'	-[: SUBMITTED]->(: UserFieldFeature) '
 			'	-[submitted: SUBMITTED]->(record: Record) '
 			'	-[:RECORD_FOR]->(item_feature:ItemFeature) '
-			'	-[:FOR_FEATURE*..2]->(feature:Feature), '
-			'	(feature)-[:OF_TYPE]->(record_type:RecordType), '
+			'	-[:FOR_FEATURE*..2]->(feature:Feature)'
+			'	-[:OF_TYPE]->(record_type:RecordType), '
 			'	(item_feature) '
 			'	-[:FOR_ITEM]->(item:Item) '
 			'	-[:FROM | IS_IN *]->(farm: Farm) '
@@ -794,15 +758,14 @@ class Download:
 		if data_format == 'db':
 			statement += (
 				' WITH { '
+				'	record_type: record_type, '
 				'	Feature: Feature, '
 				'	Partner: Partner, '
 				'	`Submitted by`: `Submitted by`, '
 				'	`Submitted at`: `Submitted at`, '
 				'	Value: Value, '
-				'	`Time/Period`: CASE '
-				'		WHEN record_type = "trait" THEN Time '
-				'		WHEN record_type = "condition" THEN [Start, End] '
-				'		ELSE Null END, '
+				'	Time: Time, '
+				'	Period: [Start, End], '
 				'	`Recorded by`: `Recorded by`, '
 				'	UID: UID, '
 				'	`Custom ID`: `Custom ID`,'
@@ -832,6 +795,7 @@ class Download:
 				' WITH { '
 				'	Records: collect({'
 				'		feature_name: Feature, '
+				'		record_type: record_type, '
 				'		values: Values '
 				'	}), '
 				'	UID: UID, '
@@ -892,8 +856,10 @@ class Download:
 					)
 		else:  # data_format == 'db'
 			for key in record[0]:
-				if key == "Time/Period" and record[0][key]:
-					if isinstance(record[0][key], list):
+				if key == "Period":
+					if record[0]['record_type'] != 'condition':
+						record[0][key] = None
+					if record[0][key]:
 						if record[0][key][0]:
 							record[0][key][0] = datetime.utcfromtimestamp(record[0][key][0] / 1000).strftime(
 								"%Y-%m-%d %H:%M")
@@ -905,9 +871,8 @@ class Download:
 						else:
 							record[0][key][1] = 'Undefined'
 						record[0][key] = ' - '.join(record[0][key])
-					else:
-						record[0][key] = datetime.utcfromtimestamp(record[0][key] / 1000).strftime(
-							"%Y-%m-%d %H:%M")
+				elif key == 'Time' and record[0][key]:
+					record[0][key] = datetime.utcfromtimestamp(record[0][key] / 1000).strftime("%Y-%m-%d %H:%M")
 				elif key == 'Submitted at':
 					record[0][key] = datetime.utcfromtimestamp(record[0][key] / 1000).strftime("%Y-%m-%d %H:%M:%S")
 		for key in record[0]:
@@ -950,7 +915,8 @@ class Download:
 			fieldnames += [
 				'Feature',
 				'Value',
-				'Time/Period',
+				'Time',
+				'Period',
 				'Recorded by',
 				'Submitted at',
 				'Submitted by',

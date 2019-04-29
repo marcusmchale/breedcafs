@@ -39,6 +39,7 @@ class RowParseResult:
 		self.row = row
 		self.conflicts = {}
 		self.errors = {}
+		# todo store these on the interpreter side (html_table function) not in the result object
 		self.error_comments = {
 			"timestamp": {
 				"format": "Timestamp doesn't match Field Book generated pattern (e.g. 2018-01-01 13:00:00+0100)"
@@ -55,7 +56,9 @@ class RowParseResult:
 				"order": "Please be sure to start before you finish!"
 			},
 			"time": {
-				"format": "Time format does not match the required input (e.g. 13:00)"
+				"format": "Time format does not match the required input (e.g. 13:00)",
+				"db_format": "Format does not match the required input (e.g. 2018-01-01 13:00)"
+
 			},
 			"start time": {
 				"format": "Time format does not match the required input (e.g. 13:00)",
@@ -72,10 +75,10 @@ class RowParseResult:
 			"replicate": {
 				"format": "Format does not match the required input, expected an integer value",
 			},
-			"time/period": {
+			"period": {
 				"format": (
-					"Format does not match the required input, expected either a single date/time"
-					" (e.g. 2018-01-01 13:00) or a range  (e.g. 2018-01-01 13:00 - 2019-02-02 14:00)"
+					"Format does not match the required input, expected a range of dates with times "
+					"(e.g. 2018-01-01 13:00 - 2019-02-02 14:00)"
 				),
 			},
 			"uid": {
@@ -255,16 +258,26 @@ class ParseResult:
 		else:
 			parsed_submitted_at = None
 			self.merge_error(row, "submitted at", "format")
-		if row['time/period']:
-			parsed_time_period = Parsers.time_period_format(row['time/period'])
-			if not parsed_time_period:
+		if 'time' in row and row['time']:
+			parsed_time = Parsers.db_time_format(row['time'])
+			if not parsed_time:
 				self.merge_error(
 					row,
-					"time/period",
+					"time",
+					"db_format",
+				)
+		else:
+			parsed_time = None
+		if 'period' in row and row['period']:
+			parsed_period = Parsers.period_format(row['period'])
+			if not parsed_period:
+				self.merge_error(
+					row,
+					"period",
 					"format"
 				)
 		else:
-			parsed_time_period = None
+			parsed_period = None
 		if 'replicate' in row and row['replicate']:
 			try:
 				parsed_replicate = int(row['replicate'])
@@ -278,7 +291,7 @@ class ParseResult:
 		else:
 			parsed_replicate = None
 		parsed_uid = Parsers.uid_format(row['uid'])
-		unique_key = (parsed_uid, parsed_submitted_at, parsed_time_period, parsed_replicate, row['feature'])
+		unique_key = (parsed_uid, parsed_submitted_at, parsed_time, parsed_period, parsed_replicate, row['feature'])
 		if unique_key not in self.unique_keys:
 			self.unique_keys.add(unique_key)
 		else:
@@ -528,12 +541,14 @@ class SubmissionRecord:
 			if record['Period'][1]:
 				record['Period'][1] = datetime.datetime.utcfromtimestamp(record['Period'][1] / 1000).strftime("%Y-%m-%d %H:%M")
 			else:
-				record['Time/Period'][1] = 'Undefined'
-			record['Time/Period'] = ' - '.join(record['Time/Period'])
+				record['Period'][1] = 'Undefined'
+			record['Period'] = ' - '.join(record['Period'])
 		record['Submitted at'] = datetime.datetime.utcfromtimestamp(int(record['Submitted at']) / 1000).strftime("%Y-%m-%d %H:%M:%S")
 		self.record = record
 
 	def conflict(self):
+		if 'Found' in self.record and not self.record['Found']:
+			return False
 		if 'conflicts' in self.record and not self.record['conflicts']:
 			return False
 		if 'Access' in self.record and self.record['Access']:
@@ -566,7 +581,7 @@ class SubmissionResult:
 			gid = grp.getgrnam(app.config['CELERYGRPNAME']).gr_gid
 			os.chown(download_path, -1, gid)
 			os.chmod(download_path, app.config['IMPORT_FOLDER_PERMISSIONS'])
-		if os.path.splitext(filename)[1] == 'xlsx':
+		if os.path.splitext(filename)[1] == '.xlsx':
 			conflicts_filename =  '_'.join([
 				os.path.splitext(filename)[0],
 				record_type,
@@ -575,7 +590,7 @@ class SubmissionResult:
 			submissions_filename = '_'.join([
 				os.path.splitext(filename)[0],
 				record_type,
-				'submitted.csv'
+				'submission_report.csv'
 			])
 		else:
 			conflicts_filename = '_'.join([
@@ -589,7 +604,7 @@ class SubmissionResult:
 		fieldnames = [
 			"UID",
 			"Feature",
-			"Value"
+			"Value",
 			"Submitted by",
 			"Submitted at",
 		]
@@ -600,7 +615,7 @@ class SubmissionResult:
 			fieldnames.insert(1, "Period")
 		submissions_fieldnames = fieldnames
 		conflicts_fieldnames = fieldnames
-		conflicts_fieldnames.insert(-1, "Uploaded value")
+		conflicts_fieldnames.insert(-2, "Uploaded value")
 		self.conflicts_file_path = os.path.join(download_path, conflicts_filename)
 		self.submissions_file_path = os.path.join(download_path, submissions_filename)
 		self.conflicts_file = open(self.conflicts_file_path, 'w+')
@@ -935,6 +950,7 @@ class Upload:
 
 	def set_fieldnames(self):
 		record_type_sets = {
+			'mixed': {'uid'},
 			'property': {'uid', 'person'},
 			'trait': {'uid', 'person', 'date', 'time'},
 			'condition': {'uid', 'person', 'start date', 'start time', 'end date', 'end time'}
@@ -945,11 +961,17 @@ class Upload:
 				if self.submission_type == 'db':
 					# 'Correct' submissions have mixed record types
 					# these are uploads for correct
-					# uid, replicate, feature and time/period are required to identify the unique record
+					# uid, replicate, feature (and for traits or properties the time (and replicate) or period respectively)
+					# are required to identify the unique record
 					# but to further confirm we only delete the intended record, e.g. if a record is later resubmitted
 					# we include the check for submission time.
+					# todo We need to check later for the types of records in the file
+					# todo and then ensure the corresponding fields are present,
+					# todo this can be done during a db_check as we iterate through the file
+					# todo just y collecting the "Feature" field entries as a set
+					# todo then finally check the types from this set.
 					self.record_types = ['mixed']
-					self.required_fieldnames = {'mixed': ['uid', 'replicate', 'feature', 'time/period', 'submitted at']}
+					self.required_fieldnames = {'mixed': ['uid', 'feature', 'submitted at']}
 					self.fieldnames = {'mixed': file_dict.fieldnames}
 				elif self.submission_type == 'fb':
 					# Field Book csv exports
@@ -1012,7 +1034,7 @@ class Upload:
 					error_message = '<p>' + app.config['WORKSHEET_NAMES'][record_type] + ' worksheet '
 				else:
 					error_message = '<p>This file '
-				errors.append(error_message + 'contains duplicate column names. This is not supported.</p>')
+				errors.append(error_message + 'contains duplicate column labels. This is not supported.</p>')
 			if not set(self.required_fieldnames[record_type]).issubset(fieldnames_set):
 				missing_fieldnames = set(self.required_fieldnames[record_type]) - fieldnames_set
 				if self.file_extension == 'xlsx':
@@ -1110,13 +1132,13 @@ class Upload:
 				)
 				file_writer.writeheader()
 				for i, row in enumerate(file_dict):
-					self.row_count = i + 1
+					self.row_count[record_type] = i + 1
 					# remove rows without entries
 					if any(field.strip() for field in row):
 						for field in file_dict.fieldnames:
 							if row[field]:
 								row[field] = row[field].strip()
-						row['row_index'] = self.row_count
+						row['row_index'] = self.row_count[record_type]
 						file_writer.writerow(row)
 		elif self.file_extension == 'xlsx':
 			wb = load_workbook(self.file_path, read_only=True)
@@ -1140,7 +1162,7 @@ class Upload:
 				for j, row in enumerate(rows):
 					# j+2 to store the "Line number" as index
 					# this is 0 based, and accounts for header
-					self.row_count = j + 2
+					self.row_count[record_type] = j + 2
 					cell_values = [cell.value for cell in row]
 					# remove columns with empty header
 					for i in sorted(empty_headers, reverse=True):
@@ -1166,7 +1188,7 @@ class Upload:
 							if isinstance(value, basestring):
 								cell_values[i] = value.strip()
 					if any(value for value in cell_values):
-						cell_values = [self.row_count] + cell_values
+						cell_values = [self.row_count[record_type]] + cell_values
 						file_writer.writerow(cell_values)
 
 	def parse_rows(self, record_type):
@@ -1180,6 +1202,7 @@ class Upload:
 				if submission_type == 'table':
 					# first check for feature data, if none then just skip this row
 					if [row[feature] for feature in self.features[record_type] if row[feature]]:
+						parse_result.contains_data = True
 						parse_result.parse_table_row(row)
 					else:
 						pass
@@ -1187,6 +1210,8 @@ class Upload:
 					parse_result.parse_db_row(row)
 				elif submission_type == "fb":
 					parse_result.parse_fb_row(row)
+		if parse_result.contains_data:
+			self.contains_data = True
 		if parse_result.duplicate_keys:
 			if self.file_extension != 'xlsx':
 				self.error_messages.append(
@@ -1207,14 +1232,52 @@ class Upload:
 	):
 		# todo it seems like the field errors here should not occur
 		# todo we are handling this check before we parse the rows
-		# todo so we could remove this check here to simplify
+		# todo so we could remove this check for features from  here to simplify
 		username = self.username
 		trimmed_file_path = self.trimmed_file_paths[record_type]
 		trimmed_filename = os.path.basename(trimmed_file_path)
 		submission_type = self.submission_type
 		parse_result = self.parse_results[record_type]
 		with open(trimmed_file_path, 'r') as trimmed_file:
-			if submission_type == "fb":
+			if submission_type == 'db':
+				trimmed_dict_reader = DictReaderInsensitive(trimmed_file)
+				features_set = set()
+				# todo move this to the parse procedure where we iterate through the file already
+				for row in trimmed_dict_reader:
+					features_set.add(row['feature'].lower())
+				record_types = tx.run(
+					' UNWIND $features as feature_name'
+					'	MATCH '
+					'	(f:Feature { '
+					'		name_lower: feature_name'
+					'	})-[:OF_TYPE]->(record_type: RecordType) '
+					' RETURN distinct(record_type.name_lower) ',
+					features=list(features_set)
+				).value()
+				# traits require additional time and replicate
+				if 'trait' in record_types:
+					self.required_fieldnames['mixed'].update([
+						'time',
+						'replicate'
+					])
+				# conditions require period
+				if 'condition' in record_types:
+					self.required_fieldnames['mixed'].add(
+						'period'
+					)
+				if not set(self.required_fieldnames[record_type]).issubset(set(self.fieldnames[record_type])):
+					missing_fieldnames = set(self.required_fieldnames[record_type]) - set(self.fieldnames[record_type])
+					if self.file_extension == 'xlsx':
+						error_message = '<p>' + app.config['WORKSHEET_NAMES'][record_type] + ' worksheet '
+					else:
+						error_message = '<p>This file '
+					error_message += (
+							' is missing the following required fields: '
+							+ ', '.join([i for i in missing_fieldnames])
+							+ '</p>'
+					)
+					self.error_messages.append(error_message)
+			elif submission_type == "fb":
 				check_result = tx.run(
 					Cypher.upload_fb_check,
 					username=username,
@@ -1362,7 +1425,7 @@ class Upload:
 		trimmed_filename = os.path.basename(trimmed_file_path)
 		submission_type = self.submission_type
 		filename = self.filename
-		features = self.features
+		features = self.features[record_type]
 		with contextlib.closing(SubmissionResult(username, filename, submission_type, record_type)) as submission_result:
 			self.submission_results[record_type] = submission_result
 			if submission_type == 'fb':
@@ -1390,8 +1453,6 @@ class Upload:
 				)
 			# create a submission result and update properties from result
 			for record in result:
-				# todo: rewrite this so writing files directly for each record, instead of storing in memory
-				# todo: will have to catch, rollback and dump some files if conflicts
 				submission_result.parse_record(record[0])
 
 	@celery.task(bind=True)
@@ -1435,6 +1496,7 @@ class Upload:
 				if upload_object.file_extension in ['csv', 'xlsx']:
 					with neo4j_session.begin_transaction() as tx:
 						for record_type in upload_object.record_types:
+							# todo Stop trimming before parsing, this should be done in one pass of the file
 							# clean up the file removing empty lines and whitespace, lower case headers for matching in db
 							upload_object.trim_file(record_type)
 							# parse the trimmed file/worksheet for errors
@@ -1442,6 +1504,12 @@ class Upload:
 							upload_object.parse_rows(record_type)
 							# with string parsing performed, now we check against the database for UID, feature, value
 							upload_object.db_check(tx, record_type)
+						if not upload_object.contains_data:
+							upload_object.error_messages.append(
+								'The uploaded file ('
+								+ upload_object.raw_filename
+								+ ') appears to contain no input values. '
+							)
 						if upload_object.error_messages:
 							error_messages = '<br>'.join(upload_object.error_messages)
 							with app.app_context():
@@ -1457,22 +1525,24 @@ class Upload:
 								'status': 'ERRORS',
 								'result': error_messages
 							}
-						conflicts_files = []
+						conflict_files = []
 						submissions = []
 						for record_type in upload_object.record_types:
 							# submit data
 							upload_object.submit(tx, record_type)
 							submission_result = upload_object.submission_results[record_type]
 							if submission_result.conflicts_found:
-								conflicts_files.append(submission_result.conflicts_file_path)
+								conflict_files.append(submission_result.conflicts_file_path)
+								os.unlink(submission_result.submissions_file_path)
 							else:
+								os.unlink(submission_result.conflicts_file_path)
 								if submission_result.submissions_file_path:
 									submissions.append((
 										record_type,
 										submission_result.summary(),
 										submission_result.submissions_file_path
 									))
-						if conflicts_files:
+						if conflict_files:
 							# These should only be generated due to concurrent conflicting submissions
 							# or internal conflicts in the submitted file
 							tx.rollback()
@@ -1484,13 +1554,13 @@ class Upload:
 									'in the following files before resubmitting. '
 									'\n'
 								)
-								for conflicts_file in conflicts_files:
+								for conflict_file in conflict_files:
 									response += ' - '
 									response += (
 										url_for(
 											'download_file',
 											username=username,
-											filename=conflicts_file,
+											filename=os.path.basename(conflict_file),
 											_external=True
 										)
 									)
@@ -1527,12 +1597,21 @@ class Upload:
 							else:
 								response = "<p> Submission report:\n "
 								for submission in submissions:
-									response += (
-										+ ' - <a href= ' + submission[2] + '>'
-										+ app.config['WORKSHEET_NAMES'][submission[0]]
-										+ ' contained ' + str(submission[1]['submitted']) + 'new records '
-										+ ' and ' + str(submission[1]['resubmissions']) + 'existing records. \n'
+									submission_url = url_for(
+										'download_file',
+										username=username,
+										filename=os.path.basename(submission[2]),
+										_external=True,
+										# adding a parameter here to stop browser from accessing cached version of file
+										date=datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S-%f')
 									)
+									response += (
+										' <br> - <a href= ' + submission_url + '>'
+										+ str(app.config['WORKSHEET_NAMES'][submission[0]])
+										+ '</a> contained ' + str(submission[1]['submitted']) + ' new '
+										+ ' and ' + str(submission[1]['resubmissions']) + ' existing records.'
+									)
+								response += '</p>'
 								html = render_template(
 									'emails/upload_report.html',
 									response=response
@@ -1557,7 +1636,8 @@ class Upload:
 	def correct(
 			self,
 			tx,
-			access
+			access,
+			record_type
 	):
 		if access == 'global_admin':
 			statement = (
@@ -1568,6 +1648,7 @@ class Upload:
 				'	(current_user: User { '
 				'		username_lower: toLower($username) '
 				'	}) '
+				' WHERE "global_admin" IN current_user.access '
 			)
 		elif access == 'partner_admin':
 			statement = (
@@ -1576,6 +1657,7 @@ class Upload:
 				'		username_lower: toLower($username)'
 				'	}) '
 				'	-[: AFFILIATED {admin: True}]->(partner: Partner) '
+				' WHERE "partner_admin" IN current_user.access '
 				' MATCH '
 				'	(partner) '
 				'	<-[:AFFILIATED {data_shared:True}]-(user:User) '
@@ -1591,8 +1673,6 @@ class Upload:
 				'	partner, '
 				'	user as user, '
 				'	user as current_user '
-
-
 			)
 		statement += (
 			' LOAD CSV WITH HEADERS FROM $filename as csvLine '
@@ -1613,44 +1693,40 @@ class Upload:
 			'	END as uid, ' 
 			'	toInteger(csvLine.replicate) as replicate, '
 			'	CASE '
-			'		WHEN size(split(csvLine.`time/period`, " - ")) > 1 '
+			'		WHEN csvLine.time <> "" '
+			'		THEN apoc.date.parse( '
+			'			csvLine.time, '
+			'			"ms", '
+			'			 "yyyy-MM-dd HH:mm" '
+			'			) '
+			'		ELSE Null '
+			'	END as time, '
+			'	CASE '
+			'		WHEN size(split(csvLine.period, " - ")) > 1 '
 			'		THEN CASE '
-			'			WHEN toLower(split(csvLine.`time/period`, " - ")[0]) = "undefined" '
+			'			WHEN toLower(split(csvLine.period, " - ")[0]) = "undefined" '
 			'			THEN False '
 			'			ELSE apoc.date.parse('
-			'				split(csvLine.`time/period`, " - ")[0],'
-			'				"ms", '
-			'				 "yyyy-MM-dd HH:mm"'
-			'			) '
-			'		END '
-			'		ELSE Null '
-			'	END as start, '
-			'	CASE '
-			'		WHEN size(split(csvLine.`time/period`, " - ")) > 1 '
-			'		THEN CASE '
-			'			WHEN toLower(split(csvLine.`time/period`, " - ")[1]) = "undefined" '
-			'			THEN False '
-			'			ELSE apoc.date.parse('
-			'				split(csvLine.`time/period`, " - ")[1],'
-			'				"ms", '
-			'				 "yyyy-MM-dd HH:mm"'
-			'			) '
-			'		END '
-			'		ELSE Null '
-			'	END as end, '
-			'	CASE '
-			'		WHEN size(split(csvLine.`time/period`, " - ")) = 1 '
-			'		THEN CASE '
-			'			WHEN trim(csvLine.`time/period`) = "" '
-			'			THEN Null '
-			'			ELSE apoc.date.parse( '
-			'				csvLine.`time/period`, '
+			'				split(csvLine.period, " - ")[0],'
 			'				"ms", '
 			'				 "yyyy-MM-dd HH:mm" '
 			'			) '
 			'		END '
 			'		ELSE Null '
-			'	END as time '
+			'	END as start, '
+			'	CASE '
+			'		WHEN size(split(csvLine.period, " - ")) > 1 '
+			'		THEN CASE '
+			'			WHEN toLower(split(csvLine.period, " - ")[1]) = "undefined" '
+			'			THEN False '
+			'			ELSE apoc.date.parse('
+			'				split(csvLine.period, " - ")[1],'
+			'				"ms", '
+			'				 "yyyy-MM-dd HH:mm"'
+			'			) '
+			'		END '
+			'		ELSE Null '
+			'	END as end '
 			' MATCH '
 			'	(user)'
 			'	-[:SUBMITTED]->(:Submissions)  '
@@ -1704,13 +1780,15 @@ class Upload:
 			' DELETE '
 			'	record_for '
 			' RETURN { '
+			'	time: time, '
+			'	record_time: record.time, '
 			'	uid: uid, '
 			'	feature: feature.name_lower, '
 			'	row_index: row_index '
 			' } '
 			' ORDER BY row_index '
 		)
-		trimmed_file_path = self.trimmed_file_path
+		trimmed_file_path = self.trimmed_file_paths[record_type]
 		trimmed_filename = os.path.basename(trimmed_file_path)
 		result = tx.run(
 				statement,
@@ -1886,15 +1964,23 @@ class Upload:
 	@celery.task(bind=True)
 	def async_correct(self, username, access, upload_object):
 		try:
+			fieldname_errors = upload_object.set_fieldnames()
+			if fieldname_errors:
+				with app.app_context():
+					html = render_template(
+						'emails/upload_report.html',
+						response=fieldname_errors
+					)
+					subject = "BreedCAFS upload rejected"
+					recipients = [User(username).find('')['email']]
+					response = "Submission rejected due to invalid file:\n " + fieldname_errors
+					body = response
+					send_email(subject, app.config['ADMINS'][0], recipients, body, html)
+				return {
+					'status': 'ERRORS',
+					'result': fieldname_errors
+				}
 			with get_driver().session() as neo4j_session:
-				set_fieldnames = upload_object.set_fieldnames()
-				if set_fieldnames:
-					return {
-						'status': 'ERRORS',
-						'result': set_fieldnames
-					}
-				# the below function also assesses and sets self.record_type
-				upload_object.set_required_fieldnames()
 				header_report = neo4j_session.read_transaction(
 					upload_object.check_headers
 				)
@@ -1914,112 +2000,109 @@ class Upload:
 						'status': 'ERRORS',
 						'result': header_report
 					}
-				# clean up the file removing empty lines and whitespace, lower case headers for matching in db
-				upload_object.trim_file()
-				print('Trimmed')
-				if not upload_object.row_count:
-					with app.app_context():
-						response = 'No data submitted, please check that you uploaded a completed file'
-						html = render_template(
-							'emails/upload_report.html',
-							response=response
+				with neo4j_session.begin_transaction() as tx:
+					# there should only be one record type here, "mixed", so no need to iterate
+					record_type = upload_object.record_types[0]
+					# todo Stop trimming before parsing, this should be done in one pass of the file
+					upload_object.trim_file(record_type)
+					if not upload_object.row_count[record_type]:
+						upload_object.error_messages.append('No records found to delete')
+					upload_object.parse_rows(record_type)
+					if upload_object.parse_results[record_type].errors:
+						upload_object.error_messages.append(
+							upload_object.parse_results[record_type].html_table()
 						)
-						subject = "BreedCAFS correction rejected"
-						recipients = [User(username).find('')['email']]
-						response = "Correction rejected because no data was found in the uploaded file\n "
-						body = response
-						send_email(subject, app.config['ADMINS'][0], recipients, body, html)
-					return {
-						'status': 'ERRORS',
-						'type': 'string',
-						'result': response
+					upload_object.db_check(tx, record_type)
+					if upload_object.error_messages:
+						error_messages = '<br>'.join(upload_object.error_messages)
+						with app.app_context():
+							html = render_template(
+								'emails/upload_report.html',
+								response=error_messages
+							)
+							subject = "BreedCAFS correction rejected"
+							recipients = [User(username).find('')['email']]
+							body = error_messages
+							send_email(subject, app.config['ADMINS'][0], recipients, body, html)
+						return {
+							'status': 'ERRORS',
+							'result': error_messages
+						}
+					deletion_result = upload_object.correct(tx, access, record_type)
+					# update properties where needed
+					property_uid = {
+						'custom id': [],
+						'assign to block': [],
+						'assign to trees': [],
+						'assign to samples': [],
+						'tissue': [],
+						'variety name': [],
+						'variety code': [],
+						'harvest date': [],
+						'harvest time': []
 					}
-				parse_result = upload_object.parse_rows()
-				if parse_result.duplicate_keys:
-					response = parse_result.duplicate_keys_table()
-					with app.app_context():
-						html = render_template(
-							'emails/upload_report.html',
-							response=response
+					# just grab the UID where records are deleted and do the update from any remaining records
+					record_tally = {}
+					missing_row_indexes = []
+					expected_row_index = 1
+					if not deletion_result.peek():
+						missing_row_indexes += range(2, upload_object.row_count[record_type] + 2)
+					else:
+						for record in deletion_result:
+							while (
+									expected_row_index != record[0]['row_index']
+									and expected_row_index <= upload_object.row_count[record_type] + 2
+							):
+								expected_row_index += 1
+								if expected_row_index != record[0]['row_index']:
+									missing_row_indexes.append(expected_row_index)
+							if not record[0]['feature'] in record_tally:
+								record_tally[record[0]['feature']] = 0
+							record_tally[record[0]['feature']] += 1
+							if record[0]['feature'] in property_uid:
+								property_uid[record[0]['feature']].append(record[0]['uid'])
+						upload_object.remove_properties(tx, property_uid)
+						if not expected_row_index == upload_object.row_count[record_type]:
+							missing_row_indexes += range(expected_row_index, upload_object.row_count[record_type] + 2)
+					if missing_row_indexes:
+						missing_row_ranges = (
+							list(x) for _, x in itertools.groupby(enumerate(missing_row_indexes), lambda (i, x): i-x)
 						)
-						subject = "BreedCAFS correction rejected"
-						recipients = [User(username).find('')['email']]
-						body = 'Duplicate keys were found in the uploaded file\n' + response
-						send_email(subject, app.config['ADMINS'][0], recipients, body, html)
-					return {
-						'status': 'ERRORS',
-						'type': 'parse_object',
-						'result': response
-					}
-				if parse_result.errors:
-					response = parse_result.html_table()
-					with app.app_context():
-						html = render_template(
-							'emails/upload_report.html',
-							response=response
+						missing_row_str = str(
+							",".join("-".join(map(str, (i[0][1], i[-1][1])[:len(i)])) for i in missing_row_ranges)
 						)
-						subject = "BreedCAFS correction rejected"
-						recipients = [User(username).find('')['email']]
-						body = 'Errors were found in the uploaded file\n' + response
-						send_email(subject, app.config['ADMINS'][0], recipients, body, html)
-					return {
-						'status': 'ERRORS',
-						'type': 'parse_object',
-						'result': response
-					}
-				tx = neo4j_session.begin_transaction()
-				deletion_result = upload_object.correct(tx, access)
-				# update properties where needed
-				property_uid = {
-					'custom id': [],
-					'assign to block': [],
-					'assign to trees': [],
-					'assign to samples': [],
-					'tissue': [],
-					'variety name': [],
-					'variety code': [],
-					'harvest date': [],
-					'harvest time': []
-				}
-				# just grab the UID where records are deleted and do the update from any remaining records
-				record_tally = {}
-				missing_row_indexes = []
-				expected_row_index = 1
-				if not deletion_result.peek():
-					missing_row_indexes += range(2, upload_object.row_count + 2)
-				else:
-					for record in deletion_result:
-						while expected_row_index != record[0]['row_index'] and expected_row_index <= upload_object.row_count + 2:
-							expected_row_index += 1
-							if expected_row_index != record[0]['row_index']:
-								missing_row_indexes.append(expected_row_index)
-						if not record[0]['feature'] in record_tally:
-							record_tally[record[0]['feature']] = 0
-						record_tally[record[0]['feature']] += 1
-						if record[0]['feature'] in property_uid:
-							property_uid[record[0]['feature']].append(record[0]['uid'])
-					upload_object.remove_properties(tx, property_uid)
-					if not expected_row_index == upload_object.row_count:
-							missing_row_indexes += range(expected_row_index, upload_object.row_count + 2)
-				if missing_row_indexes:
-					missing_row_ranges = (
-						list(x) for _, x in itertools.groupby(enumerate(missing_row_indexes), lambda (i, x): i-x)
-					)
-					missing_row_str = str(
-						",".join("-".join(map(str, (i[0][1], i[-1][1])[:len(i)])) for i in missing_row_ranges)
-					)
-					tx.rollback()
+						tx.rollback()
+						with app.app_context():
+							# send result of merger in an email
+							subject = 'BreedCAFS correction rejected'
+							recipients = [User(username).find('')['email']]
+							response = 'Correction rejected:\n '
+							if missing_row_str:
+								response += (
+									'<p>Records from the following rows of the uploaded file were not found: '
+									+ missing_row_str
+									+ '\n</p>'
+								)
+							body = response
+							html = render_template(
+								'emails/upload_report.html',
+								response=response
+							)
+							send_email(subject, app.config['ADMINS'][0], recipients, body, html)
+						return {
+							'status': 'ERRORS',
+							'result': response
+						}
+					tx.commit()
 					with app.app_context():
 						# send result of merger in an email
-						subject = 'BreedCAFS correction rejected'
+						subject = 'BreedCAFS correction summary'
 						recipients = [User(username).find('')['email']]
-						response = 'Correction rejected:\n '
-						if missing_row_str:
-							response += '<p>Records from the following rows of the uploaded file were not found: ' + missing_row_str + '\n</p>'
+						response = 'Correction report:\n '
 						if record_tally:
 							response += '<p>The following records were deleted: \n</p>'
 							for key in record_tally:
-								response += '<p>' + str(record_tally[key]) + ' ' + str(key) + ' records deleted\n </p>'
+								response += '<p>  -' + str(record_tally[key]) + ' ' + str(key) + ' records deleted\n </p>'
 						body = response
 						html = render_template(
 							'emails/upload_report.html',
@@ -2027,29 +2110,9 @@ class Upload:
 						)
 						send_email(subject, app.config['ADMINS'][0], recipients, body, html)
 					return {
-						'status': 'ERRORS',
+						'status': 'SUCCESS',
 						'result': response
-					}
-				tx.commit()
-				with app.app_context():
-					# send result of merger in an email
-					subject = 'BreedCAFS correction summary'
-					recipients = [User(username).find('')['email']]
-					response = 'Correction report:\n '
-					if record_tally:
-						response += '<p>The following records were deleted: \n</p>'
-						for key in record_tally:
-							response += '<p>' + str(record_tally[key]) + ' ' + str(key) + ' records deleted\n </p>'
-					body = response
-					html = render_template(
-						'emails/upload_report.html',
-						response=response
-					)
-					send_email(subject, app.config['ADMINS'][0], recipients, body, html)
-				return {
-					'status': 'SUCCESS',
-					'result': response
-					}
+						}
 		except (ServiceUnavailable, SecurityError) as exc:
 			raise self.retry(exc=exc)
 

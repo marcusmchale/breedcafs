@@ -869,7 +869,7 @@ class AddFieldItems:
 					' `Source Sample IDs`: item.id + source_sample_ids, '
 					' `Source Sample Custom IDs`: item.custom_id + source_sample_ids, '
 					' Tissue: coalesce(item.tissue, sample_tissue), '
-					' `Harvest Time`: coalesce(item.harvest_time, sample_time) '
+					' `Harvest Time`: apoc.date.format(coalesce(item.harvest_time, sample_time), "ms", "yyyy-MM-dd HH:mm") '
 				)
 		statement += (
 			' } '

@@ -71,8 +71,8 @@ var update = function(links, nodes){
 		.on("tick", ticked);
 
 	simulation.force("link")
-		.links(links);
-
+		.links(links)
+		.tick();
 };
 
 var ticked = function() {

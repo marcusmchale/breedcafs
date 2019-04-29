@@ -505,6 +505,7 @@ class Record:
 		statement += (
 			' ON CREATE SET '
 			'	r.found = False, '
+			'	r.replicate = 1, '
 			'	r.value = value, '
 			'	r.person = $username '
 			' ON MATCH SET '

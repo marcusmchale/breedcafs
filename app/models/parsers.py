@@ -27,6 +27,28 @@ class Parsers:
 		return sorted(set(chain(*[Parsers.parse_range(range_string) for range_string in range_list.split(',')])))
 
 	@staticmethod
+	def db_time_format(time_string):
+		time_string = str(time_string).strip()
+		try:
+			datetime.datetime.strptime(time_string[0:16], '%Y-%m-%d %H:%M')
+			return time_string
+		except (ValueError, IndexError):
+			return False
+
+	@staticmethod
+	def db_period_format(period_string):
+		period_string = str(period_string).strip()
+		period_list = period_string.split(" - ")
+		if len(period_list) > 2:
+			return False
+		for i in period_list:
+			try:
+				datetime.datetime.strptime(i[0:16], '%Y-%m-%d %H:%M')
+			except (ValueError, IndexError):
+				return False
+		return period_string
+
+	@staticmethod
 	def time_period_format(time_period_string):
 		time_period_string = str(time_period_string).strip()
 		time_period_list = time_period_string.split(" - ")

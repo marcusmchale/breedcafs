@@ -258,7 +258,7 @@ class Cypher:
 		'		u.username_lower = toLower(trim(confirm["username"])) '
 		' 	SET '
 		'		a.confirmed = NOT a.confirmed, '
-		'		a.confirm_timestamp = a.confirm_timestamp + timestamp() '
+		'		a.confirm_timestamp = a.confirm_timestamp +  timestamp() '
 		' 	RETURN u.name '
 	)
 	global_confirm_users = ( 
@@ -274,7 +274,7 @@ class Cypher:
 		'	u.username_lower = toLower(trim(confirm["username"])) '
 		' SET '
 		'	a.confirmed = NOT a.confirmed, '
-		'	a.confirm_timestamp = a.confirm_timestamp + timestamp() '
+		'	a.confirm_timestamp = a.confirm_timestamp +  timestamp() '
 		' RETURN u.name '
 	)
 	partner_admins = (
@@ -959,7 +959,7 @@ class Cypher:
 			'			MERGE '
 			'				(uff)-[s1:SUBMITTED]->(r) '
 			'				ON CREATE SET '
-			'					s1.time = timestamp() '
+			'					s1.time =  timestamp() '
 			' ) '
 			' WITH '
 			'	field, '
@@ -2037,6 +2037,11 @@ class Cypher:
 		'		}) '
 		'		-[: SUBMITTED]->(: Submissions) '
 		'		-[: SUBMITTED]->(data_sub: Records) '
+		# and the item/feature node
+		'	MATCH '
+		'		(item) '
+		'		<-[: FOR_ITEM]-(item_feature: ItemFeature)'
+		'		-[ :FOR_FEATURE*..2]->(feature) '
 		# and the field/feature node 
 		# todo consider the model here, this is an undirected match with two labels, not super happy with this one,
 		# todo would it be better to have a redundant ItemFeature node for fields?
@@ -2448,11 +2453,12 @@ class Cypher:
 		' MATCH '
 		'	(:User {username_lower: toLower($username)}) '
 		'		-[:SUBMITTED*3]->(uff:UserFieldFeature) '
-		'		-[s:SUBMITTED]->(record: Record), '
+		'		-[s:SUBMITTED]->(record: Record) '
+		'		-[:RECORD_FOR]->(), '
 		'	(uff)-[:CONTRIBUTED]->(ff:FieldFeature) '
 		'		-[:FROM_FIELD]->(field: Field), '
 		'	(ff)-[:FOR_FEATURE]->(feature: Feature) '
-		#' WHERE s.time >= $starttime AND s.time <= $endtime '
+		' WHERE s.time >= $starttime AND s.time <= $endtime '
 		' WITH '
 		'	feature, count(record) as record_count, field '
 		' RETURN '

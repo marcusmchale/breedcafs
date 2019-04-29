@@ -57,7 +57,6 @@ def correct_submit():
 			file_data = form.file.data
 			upload_object.file_save(file_data)
 			file_format_errors = upload_object.file_format_errors()
-
 			if file_format_errors:
 				return jsonify({
 					'submitted': file_format_errors

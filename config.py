@@ -9,6 +9,7 @@ RECORD_TYPES = [
 
 # record type to worksheet name dictionary
 WORKSHEET_NAMES = {
+	'mixed': 'Records',
 	'property': 'Properties (Input)',
 	'trait': 'Traits (Input)',
 	'condition': 'Conditions (Input)'

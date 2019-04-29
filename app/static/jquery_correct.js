@@ -39,8 +39,7 @@ correct_submit.click( function(e) {
 				}
 			}
 		},
-		error: function(error) {
-			console.log(error);
+		error: function() {
 			correct_submit.attr("enabled", "enabled")
 		}
 	});
@@ -53,7 +52,6 @@ correct_submit.click( function(e) {
 				type: 'GET',
 				url: "/status/" + task_id +"/",
 				success: function(response) {
-					console.log(response);
 					if (response.hasOwnProperty('status')) {
 						//flash_status = "<div id='upload_submit_flash' class='flash'> " + response.status + "</div>";
 						//$("#upload_submit_flash").replaceWith(flash_status);
@@ -86,9 +84,19 @@ correct_submit.click( function(e) {
 							correct_submit.prop('disabled', false);
 							}
 					    if (response.status === 'SUCCESS') {
-					    	correct_submit_flash.html(response.result.result);
-					    	correct_submit.prop('disabled', false);
-					    	}
+                            if (response.result.status === 'ERRORS') {
+                                correct_submit_flash.css({
+                                    'background': '#f0b7e1'
+                                });
+                                correct_submit_flash.html("<p>Errors were found in the uploaded file:</p>");
+                                correct_submit_flash.append('<div>' + response.result.result + '</div>');
+
+                            } else {
+                            	correct_submit_flash.html("<p>The below records were removed</p>");
+                                correct_submit_flash.html(response.result.result);
+                            }
+                            correct_submit.prop('disabled', false);
+                        }
 					}
 				}
 			});
