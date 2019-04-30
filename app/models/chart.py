@@ -8,8 +8,6 @@ from neo4j_driver import get_driver, neo4j_query
 from datetime import datetime
 from flask import jsonify
 from parsers import Parsers
-from itertools import chain
-
 
 class Chart:
 	def __init__(self):

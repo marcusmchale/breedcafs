@@ -675,6 +675,23 @@ class SubmissionResult:
 			self.submissions_writer.writerow(submission_item.record)
 			if submission_item.record['Found']:
 				self.resubmission_count += 1
+				# Since sometimes a record for assign to will be submitted before the item is registered
+				# To handle this, we collect all assign to submissions and set them whether found or not
+				# TODO it might be worth considering scanning for records assigning to the item on item creation
+				# but this would be very inefficient with trees and samples.
+				if self.record_type == 'property':
+					if submission_item.record['Feature'].lower() == 'assign to block':
+						self.property_updates['assign_to_block'].append(
+							[record['UID'], record['Value']]
+						)
+					if submission_item.record['Feature'].lower() == 'assign to trees':
+						self.property_updates['assign_to_trees'].append(
+							[record['UID'], record['Value']]
+						)
+					if submission_item.record['Feature'].lower() == 'assign to samples':
+						self.property_updates['assign_to_samples'].append(
+							[record['UID'], record['Value']]
+						)
 			else:
 				self.submission_count += 1
 				if self.record_type == 'property':

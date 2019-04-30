@@ -1,14 +1,76 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-
+import logging
 import sys
 import os
 import csv
-from instance import config, varieties
+from flask import Flask
 from neo4j.v1 import GraphDatabase
+from instance import varieties
+
+app = Flask(__name__, instance_relative_config=True)
+app.config.from_object('config')
+app.config.from_pyfile('config.py')
+
+# configure logging
+logging.basicConfig(
+	filename=app.config['BREEDCAFS_LOG'],
+	level=logging.DEBUG,
+	format='%(asctime)s %(levelname)-8s %(message)s',
+	datefmt='%Y-%m-%d %H:%M:%S'
+)
+
+# Varieties are defined in a list of nested dicts structured around the "Trials"
+# A bit complicated but this is how the partners initially provided me with details
+# so it is easier to update it in this way during development as they provide updates
+# The country, region, farm and varieties are all created where needed (IIRC)
+# This is defined in the varieties module.
+# e.g.
+# trials = [
+#	{
+#		"uid": 1, # an integer for trial UID
+#		"name": "A meaningful name for a trial",
+#		"country": "Ireland",
+#		"region": "Galway",
+#		"farm": "NUIG",
+#		"varieties": {
+#			"inbred": [
+#				"Marsellesa"
+#			],
+#			"hybrid": [
+#				"Hybrid1"
+#			],
+#			"graft": [
+#				"Variety 1 / Variety 2"
+#			]
+#		}
+#	},
+# variety codes are in current use in some regions, so these need to be defined
+# in the varieties module which I place in the instance path as it isn't public yet
+# It is a list of tuples,
+# - first element is the code (string or integer)
+# - second element is the maternal donor (mother plant)
+# - third element is the paternal donor
+# e.g:
+# variety_codes = [
+#	(1, "Mat 1", "Pat 1"),
+#	(2, "Mat 1", "Pat 2")
+# ]
+# Additional information about the parents of each variety that I was provided,
+# also in the varieties module which I place in the instance path as it isn't public yet
+# - first element is the name of the variety
+# - second element is the maternal donor (mother plant)
+# - third element is the paternal donor
+# e.g.:
+# hybrid_parents = [
+#	("variety 1 name", "mat 1", "pat 1"),
+#	("variety 2 name", "mat 1", "pat 2")
+# ]
 
 # neo4j config
-uri = config.BOLT_URI
+uri = app.config['BOLT_URI']
+print 'Initialising DB:' + uri
+
 auth = (os.environ['NEO4J_USERNAME'], os.environ['NEO4J_PASSWORD'])
 driver = GraphDatabase.driver(uri, auth=auth)
 
@@ -176,11 +238,6 @@ def create_features(tx, features_file):
 				'	ON CREATE SET '
 				'		f.name = trim($name), '
 				'		f.format = toLower(trim($format)), '
-				'		f.default_value = CASE '
-				'			WHEN size(trim($default_value)) = 0 '
-				'				THEN Null '
-				'			ELSE $default_value '
-				'			END, '
 				'		f.minimum = CASE '
 				'			WHEN size(trim($minimum)) = 0 '
 				'				THEN Null '
@@ -235,7 +292,6 @@ def create_features(tx, features_file):
 				levels=feature['levels'],
 				name=feature['name'],
 				format=feature['format'],
-				default_value=feature['defaultValue'],
 				minimum=feature['minimum'],
 				maximum=feature['maximum'],
 				details=feature['details'],
@@ -574,10 +630,10 @@ else:
 			print('clearing schema')
 			session.write_transaction(clear_schema)
 			print('creating constraints')
-			session.write_transaction(create_constraints, config.constraints)
+			session.write_transaction(create_constraints, app.config['CONSTRAINTS'])
 			print('creating indexes')
-			session.write_transaction(create_indexes, config.indexes)
-			session.write_transaction(create_partners, config.partners)
+			session.write_transaction(create_indexes, app.config['INDEXES'])
+			session.write_transaction(create_partners, app.config['PARTNERS'])
 			session.write_transaction(create_features, './instance/features.csv')
 			session.write_transaction(create_trials, varieties.trials)
 			session.write_transaction(create_variety_codes, varieties.variety_codes)
