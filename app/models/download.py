@@ -76,7 +76,8 @@ class Download:
 			sample_id_list,
 			per_item_count
 		)
-		if id_list:
+
+		if id_list.peek():
 			self.id_list = id_list
 			return True
 		else:
@@ -92,7 +93,7 @@ class Download:
 			count,
 			block_uid
 		)
-		if id_list:
+		if id_list.peek():
 			self.id_list = id_list
 			return True
 		else:
