@@ -367,6 +367,9 @@ class Download:
 							else:
 								ws_dict['feature_details'].write(feature_details_row_num, j, feature[field])
 		# iterate through id_list and write to worksheets
+		for i, feature in enumerate(self.features['property']):
+			if feature['name_lower'] == 'variety name':
+				variety_name_column = i + len(core_fields_details) + 1
 		item_num = 0
 		for record in self.id_list:
 			item_num += 1
@@ -391,6 +394,12 @@ class Download:
 							)
 					else:
 						ws_dict[record_type].write(item_num, 0, str(record[0]['UID']))
+					if all([
+						record_type == 'property',
+						'Variety' in record[0] and len(record[0]['Variety']) == 1,
+						variety_name_column
+						]):
+							ws_dict[record_type].write(item_num, variety_name_column, record[0]['Variety'][0])
 		# now that we know the item_num we can add the validation
 		for record_type in self.features.keys():
 			if self.features[record_type]:
