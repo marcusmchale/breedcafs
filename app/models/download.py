@@ -367,6 +367,7 @@ class Download:
 							else:
 								ws_dict['feature_details'].write(feature_details_row_num, j, feature[field])
 		# iterate through id_list and write to worksheets
+		variety_name_column = None
 		for i, feature in enumerate(self.features['property']):
 			if feature['name_lower'] == 'variety name':
 				variety_name_column = i + len(core_fields_details) + 1
