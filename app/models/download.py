@@ -366,11 +366,14 @@ class Download:
 									ws_dict['feature_details'].write(feature_details_row_num, j, value)
 							else:
 								ws_dict['feature_details'].write(feature_details_row_num, j, feature[field])
-		# iterate through id_list and write to worksheets
+		# to handle inheritance of Variety.
+		# we are writing the retrieved Variety value (if singular) to the input field.
+		# so we need the 'Variety name' column if found
 		variety_name_column = None
 		for i, feature in enumerate(self.features['property']):
 			if feature['name_lower'] == 'variety name':
-				variety_name_column = i + len(core_fields_details) + 1
+				variety_name_column = i + 2
+		# iterate through id_list and write to worksheets
 		item_num = 0
 		for record in self.id_list:
 			item_num += 1
@@ -395,9 +398,11 @@ class Download:
 							)
 					else:
 						ws_dict[record_type].write(item_num, 0, str(record[0]['UID']))
+					# to handle inheritance of Variety.
+					# we are writing the retrieved Variety value (if singular) to the input field.
 					if all([
 						record_type == 'property',
-						'Variety' in record[0] and len(record[0]['Variety']) == 1,
+						'Variety' in record[0] and record[0]['Variety'] and len(record[0]['Variety']) == 1,
 						variety_name_column
 						]):
 							ws_dict[record_type].write(item_num, variety_name_column, record[0]['Variety'][0])

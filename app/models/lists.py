@@ -444,25 +444,31 @@ class ItemList:
 
 	def generate_id_list(self, record_data):
 		statement, parameters = self.build_match_item_statement(record_data)
-		statement += (
-			' OPTIONAL MATCH '
-			'	(item)-[:FROM | OF_VARIETY | CONTAINS_VARIETY *]->(variety:Variety) '
-		)
 		if parameters['item_level'] == 'field':
 			statement += (
-				' WITH country, region, farm, item, collect(DISTINCT variety.name) as varieties '
+				' OPTIONAL MATCH '
+				'	(item)-[: OF_VARIETY | CONTAINS_VARIETY]->(variety:Variety) '
+				' WITH '
+				'	country, region, farm, item, '
+				'	collect(DISTINCT variety.name) as varieties '
 			)
-
 		if parameters['item_level'] in ['tree', 'sample']:
+			statement += (
+				' OPTIONAL MATCH '
+				'	(item)-[: FROM | OF_VARIETY *]->(variety: Variety) '
+				' OPTIONAL MATCH '
+				'	(item)-[: IS_IN | OF_VARIETY *]->(field_variety: Variety) '
+			)
 			if "block_uid" not in parameters:
 				statement += (
 					' OPTIONAL MATCH '
-					'	(item)-[:IS_IN | FROM*]->(:BlockTrees)'
+					'	(item)-[:IS_IN | FROM*]->(:BlockTrees) '
 					'	-[:IS_IN]->(block :Block) '
 				)
 			if parameters['item_level'] == 'tree':
 				statement += (
-					' WITH country, region, farm, field, block, item, collect(DISTINCT variety.name) as varieties '
+					' WITH country, region, farm, field, block, item, '
+					' collect(DISTINCT coalesce(variety.name, field_variety.name)) as varieties '
 				)
 			if parameters['item_level'] == 'sample':
 				if 'tree_id_list' not in parameters:
@@ -476,7 +482,7 @@ class ItemList:
 					' WITH DISTINCT '
 					' item, '
 					' country, region, farm, field, '
-					' collect(DISTINCT variety.name) as varieties, '
+					' collect(DISTINCT coalesce(variety.name, field_variety.name)) as varieties '
 					' collect(DISTINCT block.id) as block_ids, '
 					' collect(DISTINCT block.name) as blocks, '
 					' collect(DISTINCT tree.id) as tree_ids, '

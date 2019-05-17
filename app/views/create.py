@@ -52,7 +52,7 @@ def create():
 				add_field_form=add_field_form,
 				add_block_form=add_block_form,
 				add_trees_form=add_trees_form,
-				title='Register fields and submit details'
+				title='Fields and Trees'
 			)
 		except (ServiceUnavailable, SecurityError):
 				flash("Database unavailable")

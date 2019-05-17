@@ -73,7 +73,7 @@ class Record:
 					update_variety_parameters['username'] = record_data['username']
 					if 'variety name' in record_data['selected_features']:
 						update_variety_parameters['variety_name'] = record_data['features_dict']['variety name']
-						update_variety_statement += ' MATCH (update_variety:Variety {name_lower: $variety_name}) '
+						update_variety_statement += ' MATCH (update_variety:Variety {name_lower: toLower($variety_name)}) '
 					else:  # 'variety code' in record_data['selected_features']:
 						update_variety_parameters['variety_code'] = record_data['features_dict']['variety code']
 						update_variety_statement += ' MATCH (update_variety:Variety {code: $variety_code}) '
