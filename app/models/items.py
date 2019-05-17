@@ -526,7 +526,7 @@ class AddFieldItems:
 		)
 		statement += (
 			'	UID: tree.uid,	'
-			'	Variety: variety.name '
+			'	Variety: [variety.name] '
 			' } '
 		)
 		with get_driver().session() as neo4j_session:
