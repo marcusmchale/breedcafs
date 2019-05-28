@@ -33,6 +33,7 @@ class Download:
 		self.email_requested = email_requested
 		self.id_list = None
 		self.replicates = None
+		self.time_points = 1
 		self.item_fieldnames = None
 		self.item_level = None
 		self.features = {
@@ -211,6 +212,8 @@ class Download:
 			return False
 		if record_data['replicates'] and record_data['replicates'] > 1:
 			self.replicates = record_data['replicates']
+		if record_data['time_points'] and record_data['time_points'] >1:
+			self.time_points = record_data['time_points']
 		self.set_features(
 			record_data['item_level'],
 			record_data['record_type'],
@@ -351,7 +354,7 @@ class Download:
 				)
 				for i, fieldname in enumerate(fieldnames):
 					ws_dict[record_type].write(0, i, fieldname, header_format)
-				# - set right border formatting on the last collumn of record type specific worksheet
+				# - set right border formatting on the last column of record type specific worksheet
 				ws_dict[record_type].set_column(
 					len(fieldnames) - 1, len(fieldnames) - 1, None, cell_format=right_border
 				)
@@ -362,8 +365,8 @@ class Download:
 					for j, field in enumerate(feature_details_fieldnames):
 						if field in feature:
 							if isinstance(feature[field], list):
-									value = ", ".join(value for value in feature[field])
-									ws_dict['feature_details'].write(feature_details_row_num, j, value)
+								value = ", ".join(value for value in feature[field])
+								ws_dict['feature_details'].write(feature_details_row_num, j, value)
 							else:
 								ws_dict['feature_details'].write(feature_details_row_num, j, feature[field])
 		# to handle inheritance of Variety.
@@ -391,13 +394,28 @@ class Download:
 						self.replicates > 1
 					]):
 						replicate_ids = [str(i) for i in range(1, self.replicates + 1)]
-						for i, rep in enumerate(replicate_ids):
-							replicates_row_number = ((item_num - 1) * self.replicates) + 1 + i
-							ws_dict[record_type].write(
-								replicates_row_number, 0, '.'.join([record[0]['UID'], str(rep)])
-							)
+						replicates_row_number = ((item_num - 1) * (self.replicates * self.time_points)) + 1
+						for rep in replicate_ids:
+							if self.time_points > 1:
+								for j in range(0, self.time_points):
+									ws_dict[record_type].write(
+										replicates_row_number, 0, '.'.join([record[0]['UID'], str(rep)])
+									)
+									replicates_row_number += 1
+							else:
+								ws_dict[record_type].write(
+									replicates_row_number, 0, '.'.join([record[0]['UID'], str(rep)])
+								)
+								replicates_row_number += 1
 					else:
-						ws_dict[record_type].write(item_num, 0, str(record[0]['UID']))
+						if record_type in ['condition', 'trait'] and self.time_points > 1:
+							for i in range(0, self.time_points):
+								time_points_row_number = ((item_num - 1) * self.time_points) + 1 + i
+								ws_dict[record_type].write(
+									time_points_row_number, 0, str(record[0]['UID'])
+								)
+						else:
+							ws_dict[record_type].write(item_num, 0, str(record[0]['UID']))
 					# to handle inheritance of Variety.
 					# we are writing the retrieved Variety value (if singular) to the input field.
 					if all([
@@ -948,14 +966,23 @@ class Download:
 			row_number = 0
 			for i, j in enumerate(fieldnames):
 				worksheet.write(row_number, i, j)
+			# collect a set of used fields so can remove columns that don't contain data
+			used_fields = set()
 			for record in result:
 				record = self.format_record(record, data_format)
 				row_number += 1
 				col_number = 0
 				for field in fieldnames:
 					if field in record[0]:
+						if record[0][field]:
+							used_fields.add(field)
 						worksheet.write(row_number, col_number, record[0][field])
 					col_number += 1
+			# hide columns not written to,
+			# if we want to actually delete them we need to move to using openpyxl instead of xlsxwriter
+			for i, field in enumerate(fieldnames):
+				if field not in used_fields:
+					worksheet.set_column(i, i, None, None, {'hidden': True})
 			wb.close()
 		else:  # file_type == 'csv':
 			file_path = self.get_file_path(

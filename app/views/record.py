@@ -86,6 +86,7 @@ def generate_template():
 			]):
 				username = session['username']
 				record_type = request.form['record_type'] if request.form['record_type'] != '' else None
+				time_points = int(request.form['time_points']) if request.form['time_points'] != '' else None
 				if record_type in [None, 'trait']:
 					replicates = int(request.form['replicates']) if request.form['replicates'] != '' else None
 				else:
@@ -112,6 +113,7 @@ def generate_template():
 					features_dict[feature] = request.form[feature]
 				record_data = {
 					'record_type': record_type,
+					'time_points': time_points,
 					'replicates': replicates,
 					'item_level': item_level,
 					'country': country,

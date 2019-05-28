@@ -1,0 +1,21 @@
+{% extends "layout.html" %}	
+{% block body %}
+    <div class="text_body">
+        <h2>Variety codes</h2>
+            <table>
+                <tr>
+                    <th>Variety code</th>
+                    <th>Maternal donor</th>
+                    <th>Paternal donor</th>
+                </tr>
+            {%  for var in variety_codes %}
+                <tr>
+                    <td>{{ var[0] }}</td>
+                    <td>{{ var[1] }}</td>
+                    <td>{{ var[2] }}</td>
+                </tr>
+            {%  endfor %}
+            </table>
+    </div>
+
+{% endblock %}

@@ -55,7 +55,7 @@
                 <a href="#record">Record</a> page.
             </p>
 
-	<h2>
+	<h2 id="samples">
         <a href="{{ url_for('collect') }}">
             <img src = "{{ url_for('static', filename='collect.svg') }}">
         </a>
@@ -86,7 +86,7 @@
                 The filters allow you to select specific items to sample (Fields/Trees/Samples).
                 Your selection here will update the <a href="#selection">selection</a> below.
             </p>
-        <h3>
+        <h3 id="selection">
             Selection
         </h3>
             <p>
@@ -104,6 +104,108 @@
         </a>
         Record data
     </h2>
+        <p>
+            This page allows users to either <a href="#direct">directly submit</a> records or
+            generate templates to record data in <a href="#spreadsheet">spreadsheet software</a> such as Microsoft Excel,
+            or the <a href="#fieldbook">Field Book</a> application.
+        </p>
+        <p>
+            The first step is to filter for items for which you intend to submit records.
+            The type of item, be it <a href="#fields">Field</a>, <a href="#trees">Tree</a>
+            or <a href="#samples">Sample</a>, will determine the subsequent options that are available.
+        </p>
+        <p>
+            With the type selected, use the location and ID filters to narrow down to the chosen items.
+            The number of items selected is displayed under "Selection".
+        </p>
+        <p>
+            Once you have established your selection of items, you may now select the features
+            for which you intend to record data. Features fall into three supported record types,
+            <a href="#properties">Properties</a>, <a href="#traits">Traits</a> and <a href="#conditions">Conditions</a>.
+        </p>
+        <p>
+            To make a <a href="#direct">direct submission</a>, the record type must be selected.
+            For the  <a href="#fieldbook">Field Book</a> application the "Trait" record type must be selected.
+            For <a href="#spreadsheet">table templates</a> to use in spreadsheet software, this filter is optional.
+        </p>
+        <p>
+            Features are organised into groups to facilitate selection.
+            Select a group and then chose from among the features in that group.
+            If you have selected a record type (property/trait/condition),
+            then a <a href="#direct">web form</a> will be rendered to the right (or bottom) of the page
+            that allows direct submission of records for the selected features against the selected items.
+            In most cases however, you will likely wish to proceed to generate a template for either
+            <a href="#spreadsheet">spreadsheet software </a> or the <a href="#fieldbook">Field Book</a> application.
+        </p>
+        <p>
+            For <a href="#spreadsheet">table templates</a>, you may want to generate a table that contains
+            rows for multiple records per selected item.
+            This will be convenient when you intend to aggregate data from a time series, or
+            where you simply have a number of records to submit.
+            The number of rows per item is determined by the "time points" value which is distinct from true replicates.
+            Replicates are only available for trait records and allow
+            the submission and identification of multiple linked values (by replicate ID) at a single time-point.
+        </p>
+        <h3 id="direct">Direct submission</h3>
+            <p>
+                For direct submission please ensure you have carefully selected the items as
+                the same value will be recorded for the entire selection. Then simply enter values in the fields and click submit.
+                You will receive a report in the browser window that either warns of conflicts or confirms your submission.
+            </p>
+        <h3 id="spreadsheet">Spreadsheet software</h3>
+            <p>
+                For spreadsheet table templates, simply select "Table (xlsx)" in the drop down box (selected by default)
+                and click "Generate template". Templates you have generated can also be found through the
+                <a href="{{  url_for('download') }}">download page</a> among your
+                <a href="{{  url_for('download_files') }}">generated files</a>
+            </p>
+        <h3 id="fieldbook">Field Book application</h3>
+            <p>
+                To export templates for Field Book, simply select "Field Book (csv)" in the drop down box
+                and click "Generate template".
+                If this option is not available then ensure that the "Trait" record type is selected.
+                Templates you have generated can also be found through the
+                <a href="{{  url_for('download') }}">download page</a> among your
+                <a href="{{  url_for('download_files') }}">generated files</a>
+            </p>
+            <p>
+                More detailed instructions on using Field Book itself are available
+                <a href=" {{  url_for('field_book_help') }}">here</a></p>
+            </p>
+        <h3>Record Types</h3>
+        <h4 id="properties">Properties</h4>
+            <p>
+                Properties are recorded once for each item. These include "variety name" and "planting date".
+            </p>
+        <h4 id="traits">Traits</h4>
+            <p>
+                Traits are recorded for an item at a fixed time point.
+                Multiple records at a single time point are supported through replicate codes. These are implemented
+                as a decimal point followed by an integer following the UID, e.g. 1_T1.1.
+            </p>
+        <h4 id="conditions">Conditions</h4>
+            <p>
+                Conditions are recorded for an item over a period of time. Only a single value is accepted for any given period.
+                The start and end time are optional, although the following rules apply to a condition for each item:
+                <ul>
+                    <li>
+                        If a condition is set without bounds (i.e. without start or end) then no other (differing)
+                        condition record will be accepted.
+                    </li>
+                    <li>
+                        If a single bound is set (start or end) then no (differing) record will be accepted
+                        in the unbounded direction (later or earlier respectively).
+                    </li>
+                    <li>
+                        Fully bound records (preferred) will not be accepted
+                        where they differ with any record that has an overlapping period.
+                    </li>
+                </ul>
+            </p>
+            <p>
+                These rules can lead to a situation where to set a new value for an unbounded condition,
+                the old record must be <a href="#correct">deleted</a>.
+            </p>
     <h2 id="upload">
         <a href="{{ url_for('upload') }}">
             <img src = "{{ url_for('static', filename='upload.svg') }}">
@@ -130,6 +232,28 @@
 			when multiple data points are found for a single trait, these will be returned
 			as a list within a single cell of the table.
 		</p>
+    <h2 id="correct">
+        <a href=""{{ url_for('correct') }}>
+            <img src="{{ url_for('static', filename='correct.svg') }}">
+        </a>
+        Delete records
+    </h2>
+        <p>
+            To delete records (and revert property changes) you need to upload a file containing the specific records
+            you want to delete through the <a href="{{ url_for('correct') }}">correct</a> portal.
+        </p>
+        <p>
+            If you just uploaded the records and you want to delete the entire submission then the submission report file is suitable.
+            Otherwise generate a "database" format file on the download page using appropriate filters to include only the records you want to delete.
+            You may also manually remove rows from this generated file if you can't find all the appropriate filters.
+            With this file now describing the records you want to delete, simply upload the file on the <a href=""{{ url_for('correct') }}>correct</a> page.
+        </p>
+        <p>
+            Partner admins are able to delete records submitted by all members of their institute.
+            Other users are only be able to delete their own records.
+            If your report implies that the records cannot be found despite you being able to access these records
+            through the download page then you may need to contact the relevant partner admin to have these records deleted.
+        </p>
 	<h2>
         <a href="{{ url_for('user_page') }}">
             <img src = "{{ url_for('static', filename='user.svg') }}">

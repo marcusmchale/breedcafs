@@ -19,6 +19,7 @@
 			{% if session.username %}
 				<a href="{{ url_for('user_page') }}"><img src="{{ url_for('static', filename='user.svg') }}"></a>
 				<a href="{{ url_for('help') }}"><img src="{{ url_for('static', filename='help.svg') }}"></a>
+                <a href="{{ url_for('resources') }}"><img src="{{ url_for('static', filename='resources.svg') }}"></a>
 				{% if ('global_admin' in session.access) or ('partner_admin' in session.access) %}
 					<a href="{{ url_for('admin') }}"><img src = "{{ url_for('static', filename='admin.svg') }}"> </a>
 				{% endif %}

@@ -1,5 +1,6 @@
 from index import index
 from help import help
+from help import resources
 from upload import upload
 from download import download
 from user import register, confirm, login, logout
@@ -12,10 +13,7 @@ from method_views import (
 	ListBlocks,
 	TreeCount
 )
-from collect import (
-	collect
-)
-
+from collect import collect
 from correct import correct
 from create import create
 from record import record
