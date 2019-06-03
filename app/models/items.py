@@ -25,11 +25,14 @@ class FindLocations:
 			'		name_lower : toLower(trim($country))'
 			' 	}) '
 			' RETURN '
-			'	country '
+			'	country.name '
 		)
 		with get_driver().session() as neo4j_session:
-			result = neo4j_session.read_transaction(bolt_result, statement, parameters)
-			return result.single()
+			result = neo4j_session.read_transaction(bolt_result, statement, parameters).single()
+			if result:
+				return result.value()
+			else:
+				return None
 
 	def find_region(self, region):
 		parameters = {
@@ -44,11 +47,14 @@ class FindLocations:
 			'	<-[:IS_IN]-(region:Region { '
 			'		name_lower: toLower(trim($region)) '
 			' 	}) '
-			' RETURN region '
+			' RETURN region.name '
 		)
 		with get_driver().session() as neo4j_session:
-			result = neo4j_session.read_transaction(bolt_result, statement, parameters)
-			return result.single()
+			result = neo4j_session.read_transaction(bolt_result, statement, parameters).single()
+			if result:
+				return result.value()
+			else:
+				return None
 
 	def find_farm(self, region, farm):
 		parameters = {
@@ -67,11 +73,14 @@ class FindLocations:
 			'	<-[:IS_IN]-(farm:Farm { '
 			'		name_lower: toLower(trim($farm)) '
 			'	}) '
-			' RETURN farm '
+			' RETURN farm.name '
 		)
 		with get_driver().session() as neo4j_session:
-			result = neo4j_session.read_transaction(bolt_result, statement, parameters)
-			return result.single()
+			result = neo4j_session.read_transaction(bolt_result, statement, parameters).single()
+			if result:
+				return result.value()
+			else:
+				return None
 
 	def find_field(self, region, farm, field):
 		parameters = {
@@ -94,12 +103,17 @@ class FindLocations:
 			'	<-[:IS_IN]-(field:Field { '
 			'		name_lower: toLower(trim($field)) '
 			'	}) '
-			' RETURN '
-			'	field '
+			' RETURN [ '
+			'	field.uid, '
+			'	field.name '
+			' ] '
 		)
 		with get_driver().session() as neo4j_session:
-			result = neo4j_session.read_transaction(bolt_result, statement, parameters)
-			return result.single()
+			result = neo4j_session.read_transaction(bolt_result, statement, parameters).single()
+			if result:
+				return result.value()
+			else:
+				return None
 
 
 class AddLocations:
@@ -139,8 +153,11 @@ class AddLocations:
 			' RETURN country.name '
 		)
 		with get_driver().session() as neo4j_session:
-			result = neo4j_session.write_transaction(bolt_result, statement, parameters)
-			return result.single()
+			result = neo4j_session.write_transaction(bolt_result, statement, parameters).single()
+			if result:
+				return result.value()
+			else:
+				return None
 
 	def add_region(self, region):
 		parameters = {
@@ -180,8 +197,11 @@ class AddLocations:
 			' RETURN region.name '
 		)
 		with get_driver().session() as neo4j_session:
-			result = neo4j_session.write_transaction(bolt_result, statement, parameters)
-			return result.single()
+			result = neo4j_session.write_transaction(bolt_result, statement, parameters).single()
+			if result:
+				return result.value()
+			else:
+				return None
 
 	def add_farm(self, region, farm):
 		parameters = {
@@ -225,8 +245,11 @@ class AddLocations:
 			' RETURN farm.name '
 		)
 		with get_driver().session() as neo4j_session:
-			result = neo4j_session.write_transaction(bolt_result, statement, parameters)
-			return result.single()
+			result = neo4j_session.write_transaction(bolt_result, statement, parameters).single()
+			if result:
+				return result.value()
+			else:
+				return None
 
 	def add_field(self, region, farm, field):
 		parameters = {
@@ -281,14 +304,17 @@ class AddLocations:
 			'	CREATE '
 			'		(uf)-[s:SUBMITTED {time: timestamp()}]->(field) '
 			' ) '
-			' RETURN { '
-			'	uid: field.uid,'
-			'	name: field.name '
-			' } '
+			' RETURN [ '
+			'	field.uid,'
+			'	field.name '
+			' ] '
 		)
 		with get_driver().session() as neo4j_session:
-			result = neo4j_session.write_transaction(bolt_result, statement, parameters)
-			return result.single()
+			result = neo4j_session.write_transaction(bolt_result, statement, parameters).single()
+			if result:
+				return result.value()
+			else:
+				return None
 
 
 class FindFieldItems:
@@ -311,10 +337,13 @@ class FindFieldItems:
 				'		uid : toInteger($field_uid) '
 				'	}) '
 				' RETURN '
-				'	block '
+				'	block.name '
 			)
-			result = neo4j_session.read_transaction(bolt_result, statement, parameters)
-			return result.single()
+			result = neo4j_session.read_transaction(bolt_result, statement, parameters).single()
+			if result:
+				return result.value()
+			else:
+				return None
 
 
 class AddFieldItems:
@@ -375,13 +404,16 @@ class AddFieldItems:
 				'	CREATE '
 				'		(ub)-[s:SUBMITTED {time: timestamp()}]->(block) '
 				' ) '
-				' RETURN { '
-				'	uid: block.uid, '
-				'	name: block.name '
-				' } '
+				' RETURN [ '
+				'	block.uid, '
+				'	block.name '
+				' ] '
 			)
-			result = neo4j_session.write_transaction(bolt_result, statement, parameters)
-			return result.single()
+			result = neo4j_session.write_transaction(bolt_result, statement, parameters).single()
+			if result:
+				return result.value()
+			else:
+				return None
 
 	def add_trees(self, tree_count, block_uid=None):
 		parameters = {
@@ -520,7 +552,7 @@ class AddFieldItems:
 		if block_uid:
 			statement += (
 				'	Block: block.name, '
-				'	`Block ID`: block.uid, '
+				'	`Block ID`: block.id, '
 		)
 		statement += (
 			'	UID: tree.uid,	'

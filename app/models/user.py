@@ -15,7 +15,7 @@ from time import time
 
 from neo4j_driver import (
 	get_driver,
-	neo4j_query
+	bolt_result
 )
 
 
@@ -52,7 +52,7 @@ class User:
 				'username': self.username
 			}
 			result = neo4j_session.read_transaction(
-				neo4j_query,
+				bolt_result,
 				Cypher.user_affiliations,
 				parameters)
 		confirmed = []
