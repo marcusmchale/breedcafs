@@ -71,10 +71,10 @@ def add_country():
 			if form.validate_on_submit():
 				found = FindLocations(text_country).find_country()
 				if found:
-					return jsonify({"found": found[0]['name']})
+					return jsonify({"found": found['name']})
 				else:
 					result = AddLocations(session['username'], text_country).add_country()
-					return jsonify({"submitted": result[0]})
+					return jsonify({"submitted": result})
 			else:
 				return jsonify([form.errors])
 		except (ServiceUnavailable, SecurityError):
@@ -98,10 +98,10 @@ def add_region():
 				else:
 					found = FindLocations(country).find_region(text_region)
 					if found:
-						return jsonify({"found": found[0]['name']})
+						return jsonify({"found": found['name']})
 					else:
 						result = AddLocations(session['username'], country).add_region(text_region)
-						return jsonify({"submitted": result[0]})
+						return jsonify({"submitted": result})
 			else:
 				return jsonify([form.errors])
 		except (ServiceUnavailable, SecurityError):
@@ -126,10 +126,10 @@ def add_farm():
 				else:
 					found = FindLocations(country).find_farm(region, text_farm)
 					if found:
-						return jsonify({"found": found[0]['name']})
+						return jsonify({"found": found['name']})
 					else:
 						result = AddLocations(session['username'], country).add_farm(region, text_farm)
-						return jsonify({"submitted": result[0]})
+						return jsonify({"submitted": result})
 			else:
 				return jsonify([form.errors])
 		except (ServiceUnavailable, SecurityError):
@@ -155,10 +155,10 @@ def add_field():
 				else:
 					found = FindLocations(country).find_field(region, farm, text_field)
 					if found:
-						return jsonify({"found": {'uid': found[0]['uid'], 'name': found[0]['name']}})
+						return jsonify({"found": {'uid': found['uid'], 'name': found['name']}})
 					else:
 						result = AddLocations(session['username'], country).add_field(region, farm, text_field)
-						return jsonify({"submitted": {'uid': result[0]['uid'], 'name': result[0]['name']}})
+						return jsonify({"submitted": {'uid': result['uid'], 'name': result['name']}})
 			else:
 				return jsonify([form.errors])
 		except (ServiceUnavailable, SecurityError):
@@ -183,10 +183,10 @@ def add_block():
 				else:
 					found = FindFieldItems(field_uid).find_block(text_block)
 					if found:
-						return jsonify({"found": {'uid': found[0]['uid'], 'name': found[0]['name']}})
+						return jsonify({"found": {'uid': found['uid'], 'name': found['name']}})
 					else:
 						result = AddFieldItems(session['username'], field_uid).add_block(text_block)
-						return jsonify({"submitted": {'uid': result[0]['uid'], 'name': result[0]['name']}})
+						return jsonify({"submitted": {'uid': result['uid'], 'name': result['name']}})
 			else:
 				errors = jsonify([location_form.errors, add_block_form.errors])
 				return errors

@@ -4,8 +4,6 @@
 # from app import app
 from app.cypher import Cypher
 from neo4j_driver import (
-	# get_driver,
-	neo4j_query,
 	bolt_result
 )
 from flask import session
@@ -30,8 +28,8 @@ class FindLocations:
 			'	country '
 		)
 		with get_driver().session() as neo4j_session:
-			result = neo4j_session.read_transaction(neo4j_query, statement, parameters)
-			return [record[0] for record in result]
+			result = neo4j_session.read_transaction(bolt_result, statement, parameters)
+			return result.single()
 
 	def find_region(self, region):
 		parameters = {
@@ -49,8 +47,8 @@ class FindLocations:
 			' RETURN region '
 		)
 		with get_driver().session() as neo4j_session:
-			result = neo4j_session.read_transaction(neo4j_query, statement, parameters)
-			return [record[0] for record in result]
+			result = neo4j_session.read_transaction(bolt_result, statement, parameters)
+			return result.single()
 
 	def find_farm(self, region, farm):
 		parameters = {
@@ -72,8 +70,8 @@ class FindLocations:
 			' RETURN farm '
 		)
 		with get_driver().session() as neo4j_session:
-			result = neo4j_session.read_transaction(neo4j_query, statement, parameters)
-			return [record[0] for record in result]
+			result = neo4j_session.read_transaction(bolt_result, statement, parameters)
+			return result.single()
 
 	def find_field(self, region, farm, field):
 		parameters = {
@@ -100,8 +98,8 @@ class FindLocations:
 			'	field '
 		)
 		with get_driver().session() as neo4j_session:
-			result = neo4j_session.read_transaction(neo4j_query, statement, parameters)
-			return [record[0] for record in result]
+			result = neo4j_session.read_transaction(bolt_result, statement, parameters)
+			return result.single()
 
 
 class AddLocations:
@@ -141,8 +139,8 @@ class AddLocations:
 			' RETURN country.name '
 		)
 		with get_driver().session() as neo4j_session:
-			result = neo4j_session.write_transaction(neo4j_query, statement, parameters)
-			return [record[0] for record in result]
+			result = neo4j_session.write_transaction(bolt_result, statement, parameters)
+			return result.single()
 
 	def add_region(self, region):
 		parameters = {
@@ -182,8 +180,8 @@ class AddLocations:
 			' RETURN region.name '
 		)
 		with get_driver().session() as neo4j_session:
-			result = neo4j_session.write_transaction(neo4j_query, statement, parameters)
-			return [record[0] for record in result]
+			result = neo4j_session.write_transaction(bolt_result, statement, parameters)
+			return result.single()
 
 	def add_farm(self, region, farm):
 		parameters = {
@@ -227,8 +225,8 @@ class AddLocations:
 			' RETURN farm.name '
 		)
 		with get_driver().session() as neo4j_session:
-			result = neo4j_session.write_transaction(neo4j_query, statement, parameters)
-			return [record[0] for record in result]
+			result = neo4j_session.write_transaction(bolt_result, statement, parameters)
+			return result.single()
 
 	def add_field(self, region, farm, field):
 		parameters = {
@@ -289,8 +287,8 @@ class AddLocations:
 			' } '
 		)
 		with get_driver().session() as neo4j_session:
-			result = neo4j_session.write_transaction(neo4j_query, statement, parameters)
-			return [record[0] for record in result]
+			result = neo4j_session.write_transaction(bolt_result, statement, parameters)
+			return result.single()
 
 
 class FindFieldItems:
@@ -315,8 +313,8 @@ class FindFieldItems:
 				' RETURN '
 				'	block '
 			)
-			result = neo4j_session.read_transaction(neo4j_query, statement, parameters)
-			return [record[0] for record in result]
+			result = neo4j_session.read_transaction(bolt_result, statement, parameters)
+			return result.single()
 
 
 class AddFieldItems:
@@ -382,8 +380,8 @@ class AddFieldItems:
 				'	name: block.name '
 				' } '
 			)
-			result = neo4j_session.write_transaction(neo4j_query, statement, parameters)
-			return [record[0] for record in result]
+			result = neo4j_session.write_transaction(bolt_result, statement, parameters)
+			return result.single()
 
 	def add_trees(self, tree_count, block_uid=None):
 		parameters = {
