@@ -692,11 +692,11 @@ class DownloadForm(FlaskForm):
 	@staticmethod
 	def update():
 		form = DownloadForm()
-		form.record_type.choices += SelectionList.get_record_types()
-		form.item_level.choices += SelectionList.get_item_levels()
+		form.record_type.choices = [('', 'Any')] + SelectionList.get_record_types()
+		form.item_level.choices = [('', 'Any')] + SelectionList.get_item_levels()
 		item_level = form.item_level.data if form.item_level.data not in ['', 'None'] else None
 		record_type = form.record_type.data if form.record_type.data not in ['', 'None'] else None
-		form.feature_group.choices += SelectionList.get_feature_groups(item_level, record_type)
+		form.feature_group.choices = [('', 'Any')] + SelectionList.get_feature_groups(item_level, record_type)
 		selected_feature_group = form.feature_group.data if form.feature_group.data not in ['', 'None'] else None
 		features_details = FeatureList(
 			item_level,
