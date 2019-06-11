@@ -17,6 +17,8 @@ from app.models import(
 	User
 )
 
+from string import maketrans
+
 from app.emails import send_email
 
 import unicodecsv as csv
@@ -174,33 +176,23 @@ class Download:
 			features=None,
 			sample_level=None
 	):
-		if not record_type or record_type == 'property':
-			self.features['property'] = FeatureList(
+		if not record_type:
+			record_types = app.config['RECORD_TYPES']
+		else:
+			record_types = [record_type]
+		for rt in record_types:
+			self.features[rt] = FeatureList(
 				item_level,
-				'property').get_features(
+				rt).get_features(
 				feature_group=feature_group,
 				features=features
 			)
-			if item_level == 'sample' and feature_group == "Registration" and sample_level != 'field':
-				# drop "assign to trees and assign to samples"
-				not_used_features = ["assign to trees", "assign to samples"]
-				self.features['property'] = [
-					i for i in self.features['property'] if i['name_lower'] not in not_used_features
-				]
-		if not record_type or record_type == 'trait':
-			self.features['trait'] = FeatureList(
-				item_level,
-				'trait').get_features(
-				feature_group=feature_group,
-				features=features
-			)
-		if not record_type or record_type == 'condition':
-			self.features['condition'] = FeatureList(
-				item_level,
-				'condition').get_features(
-				feature_group=feature_group,
-				features=features
-			)
+		# drop "assign to trees" and "assign to samples" from sample registration if not at field level
+		if item_level == 'sample' and feature_group == "Registration" and sample_level != 'field':
+			not_used_features = ["assign to trees", "assign to samples"]
+			self.features['property'] = [
+				i for i in self.features['property'] if i['name_lower'] not in not_used_features
+			]
 
 	def record_form_to_template(
 		self,
@@ -283,6 +275,12 @@ class Download:
 				('End Date', date_lb_format),
 				('End Time', time_format),
 				('Person', right_border)
+			],
+			'curve': [
+				('UID', right_border),
+				('Date', date_lb_format),
+				('Time', time_format),
+				('Person', right_border)
 			]
 		}
 		# Create worksheets
@@ -292,10 +290,13 @@ class Download:
 			'property': None,
 			'trait': None,
 			'condition': None,
-			'item_details': wb.add_worksheet("Item Details (Reference)"),
-			'feature_details': wb.add_worksheet("Feature Details (Reference)"),
+			'item_details': wb.add_worksheet(app.config['WORKSHEET_NAMES']['item_details']),
+			'feature_details': wb.add_worksheet(app.config['WORKSHEET_NAMES']['feature_details']),
 			'hidden': wb.add_worksheet("hidden")
 		}
+		# We add a new worksheet for each "curve" feature
+		for feature in self.features["curve"]:
+			ws_dict[feature['name_lower']] = None
 		# write the item_details header
 		for i, j in enumerate(self.item_fieldnames):
 			ws_dict['item_details'].write(0, i, j, header_format)
@@ -317,7 +318,7 @@ class Download:
 		core_fields_details = [
 			("person", "Optional: Person responsible for determining these values")
 		]
-		if self.features['trait']:
+		if self.features['trait'] or self.features['curve']:
 			core_fields_details += [
 				("date", "Required: Date these values were determined (YYYY-MM-DD, e.g. 2017-06-01)"),
 				("time", "Optional: Time these values were determined (24hr, e.g. 13:00. Defaults to 12:00")
@@ -332,14 +333,24 @@ class Download:
 					"Optional: Time this condition ended (24hr, e.g. 13:00. Defaults to 00:00 of the following day"
 				)
 			]
+		if self.features['curve']:
+			core_fields_details += [
+				(
+					"Curve worksheets",
+					"X-values/independent variables as column headers, Y-Values/dependent variables in rows below"
+				)
+			]
 		for field, details in core_fields_details:
 			feature_details_row_num += 1
 			ws_dict['feature_details'].write(feature_details_row_num, 1, field)
 			ws_dict['feature_details'].write(feature_details_row_num, 5, details)
 		# empty row to separate date/time/person from features
 		categorical_features_count = 0
-		for record_type in self.features.keys():
-			if self.features[record_type]:
+		for record_type in [i for i in app.config['RECORD_TYPES'] if i in self.features]:
+			if all([
+				self.features[record_type],
+				record_type != 'curve'
+			]):
 				# create record type specific worksheet
 				ws_dict[record_type] = wb.add_worksheet(app.config['WORKSHEET_NAMES'][record_type])
 				# write headers:
@@ -357,17 +368,32 @@ class Download:
 				ws_dict[record_type].set_column(
 					len(fieldnames) - 1, len(fieldnames) - 1, None, cell_format=right_border
 				)
-				# write feature details into feature details sheet
+			if self.features[record_type] and record_type == 'curve':
 				for feature in self.features[record_type]:
-					feature['type'] = str(record_type)
-					feature_details_row_num += 1
-					for j, field in enumerate(feature_details_fieldnames):
-						if field in feature:
-							if isinstance(feature[field], list):
-								value = ", ".join(value for value in feature[field])
-								ws_dict['feature_details'].write(feature_details_row_num, j, value)
-							else:
-								ws_dict['feature_details'].write(feature_details_row_num, j, feature[field])
+					# Need to ensure curve feature names do not contain "[]:*?/\" or excel can't use them as sheetnames
+					ws_dict[feature['name_lower']] = wb.add_worksheet(feature['name'])
+					for i, field in enumerate(core_fields_formats[record_type]):
+						ws_dict[feature['name_lower']].set_column(i, i, None, cell_format=field[1])
+					# - add the feature field names
+					fieldnames = (
+							[field[0] for field in core_fields_formats[record_type]]
+					)
+					for i, fieldname in enumerate(fieldnames):
+						ws_dict[feature['name_lower']].write(0, i, fieldname, header_format)
+					ws_dict[feature['name_lower']].set_column(
+						len(fieldnames) - 1, len(fieldnames) - 1, None, cell_format=right_border
+					)
+			# write feature details into feature details sheet
+			for feature in self.features[record_type]:
+				feature['type'] = str(record_type)
+				feature_details_row_num += 1
+				for j, field in enumerate(feature_details_fieldnames):
+					if field in feature:
+						if isinstance(feature[field], list):
+							value = ", ".join(value for value in feature[field])
+							ws_dict['feature_details'].write(feature_details_row_num, j, value)
+						else:
+							ws_dict['feature_details'].write(feature_details_row_num, j, feature[field])
 		# to handle inheritance of Variety.
 		# we are writing the retrieved Variety value (if singular) to the input field.
 		# so we need the 'Variety name' column if found
@@ -407,14 +433,30 @@ class Download:
 								)
 								replicates_row_number += 1
 					else:
-						if record_type in ['condition', 'trait'] and self.time_points > 1:
+						if record_type in ['trait', 'condition', 'curve'] and self.time_points > 1:
 							for i in range(0, self.time_points):
 								time_points_row_number = ((item_num - 1) * self.time_points) + 1 + i
-								ws_dict[record_type].write(
-									time_points_row_number, 0, str(record[0]['UID'])
-								)
+								if record_type == 'curve':
+									for feature in self.features[record_type]:
+										ws_dict[feature['name_lower']].write(
+											time_points_row_number,
+											0,
+											str(record[0]['UID'])
+										)
+								else:
+									ws_dict[record_type].write(
+										time_points_row_number, 0, str(record[0]['UID'])
+									)
 						else:
-							ws_dict[record_type].write(item_num, 0, str(record[0]['UID']))
+							if record_type == 'curve':
+								for feature in self.features[record_type]:
+									ws_dict[feature['name_lower']].write(
+										item_num,
+										0,
+										str(record[0]['UID'])
+									)
+							else:
+								ws_dict[record_type].write(item_num, 0, str(record[0]['UID']))
 					# to handle inheritance of Variety.
 					# we are writing the retrieved Variety value (if singular) to the input field.
 					if all([
@@ -424,8 +466,9 @@ class Download:
 						]):
 							ws_dict[record_type].write(item_num, variety_name_column, record[0]['Variety'][0])
 		# now that we know the item_num we can add the validation
+		# currently no validation for curves as no definite columns
 		for record_type in self.features.keys():
-			if self.features[record_type]:
+			if self.features[record_type] and record_type != 'curve':
 				if record_type == 'trait' and self.replicates > 1:
 					row_count = (item_num - 1) * self.replicates + 1
 				else:

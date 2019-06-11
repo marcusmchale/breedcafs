@@ -83,18 +83,24 @@ PARTNERS = [
 RECORD_TYPES = [
 	'property',
 	'trait',
-	'condition'
+	'condition',
+	'curve'
 ]
 
 # record type to worksheet name dictionary
 WORKSHEET_NAMES = {
+	'hidden': 'hidden',
+	'feature_details': 'Feature Details (Reference)',
+	'item_details': 'Item Details (Reference)',
 	'mixed': 'Records',
 	'property': 'Properties (Input)',
 	'trait': 'Traits (Input)',
 	'condition': 'Conditions (Input)'
 }
 
-# The below are used in intialise_db.py
+REFERENCE_WORKSHEETS = ['item_details', 'feature_details', 'hidden']
+
+# The below are used in initialise_db.py
 CONSTRAINTS = [
 	# User/Partner
 	{'node': 'User', 'property': 'username_lower', 'constraint': 'IS UNIQUE'},

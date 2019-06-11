@@ -484,7 +484,7 @@ class ItemList:
 					' WITH DISTINCT '
 					' item, '
 					' country, region, farm, field, '
-					' collect(DISTINCT coalesce(variety.name, field_variety.name)) as varieties '
+					' collect(DISTINCT coalesce(variety.name, field_variety.name)) as varieties, '
 					' collect(DISTINCT block.id) as block_ids, '
 					' collect(DISTINCT block.name) as blocks, '
 					' collect(DISTINCT tree.id) as tree_ids, '
