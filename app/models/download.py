@@ -38,12 +38,9 @@ class Download:
 		self.time_points = 1
 		self.item_fieldnames = None
 		self.item_level = None
-		self.features = {
-			'property': [],
-			'trait': [],
-			'condition': []
-		}
-
+		self.features = {}
+		for record_type in app.config['RECORD_TYPES']:
+			self.features[record_type] = []
 		self.file_list = []
 		# create user download path if not found
 		self.user_download_folder = os.path.join(app.instance_path, app.config['DOWNLOAD_FOLDER'], username)
@@ -171,7 +168,7 @@ class Download:
 	def set_features(
 			self,
 			item_level,
-			record_type,
+			record_type=None,
 			feature_group=None,
 			features=None,
 			sample_level=None
@@ -203,7 +200,7 @@ class Download:
 			return False
 		if record_data['replicates'] and record_data['replicates'] > 1:
 			self.replicates = record_data['replicates']
-		if record_data['time_points'] and record_data['time_points'] >1:
+		if record_data['time_points'] and record_data['time_points'] > 1:
 			self.time_points = record_data['time_points']
 		self.set_features(
 			record_data['item_level'],
@@ -470,9 +467,9 @@ class Download:
 		for record_type in self.features.keys():
 			if self.features[record_type] and record_type != 'curve':
 				if record_type == 'trait' and self.replicates > 1:
-					row_count = (item_num - 1) * self.replicates + 1
+					row_count = (item_num - 1) * self.replicates * self.time_points + 1
 				else:
-					row_count = item_num
+					row_count = item_num * self.time_points
 				for i, field in enumerate(self.features[record_type]):
 					col_num = len(core_fields_formats[record_type]) + i
 					ws_dict[record_type].set_column(
@@ -921,15 +918,29 @@ class Download:
 	@staticmethod
 	def format_record(record, data_format='db'):
 		if data_format == 'table':
-			for feature in record[0]['Records']:
-				for value in feature['values']:
+			for f, feature in enumerate(record[0]['Records']):
+				for v, value in enumerate(feature['values']):
 					# flatten each value to string if it is a list
 					if isinstance(value, list):
-						record[0]['Records'][feature]['values'] = ', '.join([i.encode() for i in value])
-					# then flatten the list of values to a string stored in the record dict
+						if len(value) > 1:
+							for i, j in enumerate(value):
+								if isinstance(v, (float, int)):
+									record[0]['Records'][f]['values'][v][i] = str(j)
+							record[0]['Records'][f]['values'][v] = ', '.join(
+								[v.encode('utf8') for v in record[0]['Records'][feature]['values'][v]]
+							)
+						else:
+							record[0]['Records'][f]['values'][v] = record[0]['Records'][f]['values'][v][0]
+				# then flatten the list of values to a string stored in the record dict
+				if len(record[0]['Records'][f]['values']) > 1:
+					for v, value in enumerate(record[0]['Records'][f]['values']):
+						if isinstance(value, (float, int)):
+							record[0]['Records'][f]['values'][v] = str(value)
 					record[0][feature['feature_name']] = ', '.join(
-						[str(value).encode() for value in feature['values']]
+						[value.encode('utf8') for value in record[0]['Records'][f]['values']]
 					)
+				else:
+					record[0][feature['feature_name']] = record[0]['Records'][f]['values'][0]
 		else:  # data_format == 'db'
 			for key in record[0]:
 				if key == "Period":
@@ -954,9 +965,16 @@ class Download:
 		for key in record[0]:
 			if isinstance(record[0][key], list):
 				if not record[0][key]:
-					record[0][key] = None
+					if isinstance(record[0][key], list):
+						record[0][key] = None
 				else:
-					record[0][key] = ', '.join([str(i).encode() for i in record[0][key]])
+					if len(record[0][key]) > 1:
+						for i, j in enumerate(record[0][key]):
+							if isinstance(j, (float, int)):
+								record[0][key][i] = str(j)
+						record[0][key] = ', '.join([str(i).encode('utf8') for i in record[0][key]])
+					else:
+						record[0][key] = record[0][key][0]
 		return record
 
 	def records_to_file(self, result, data_format, file_type):

@@ -90,7 +90,6 @@ def register_samples():
 					download_object.item_level = "sample"
 					download_object.set_features(
 						'sample',
-						'property',
 						feature_group="Registration",
 						sample_level=level
 					)

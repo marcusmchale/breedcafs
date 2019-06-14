@@ -218,7 +218,6 @@ def add_trees():
 					download_object.item_level = "tree"
 					download_object.set_features(
 						'tree',
-						'property',
 						feature_group="Registration"
 					)
 					download_object.id_list_to_xlsx_template(

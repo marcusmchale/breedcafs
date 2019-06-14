@@ -198,7 +198,7 @@ class RowParseResult:
 								formatted_cells[field] += 'Expected N:P:K ratio format, e.g. 1:1:1'
 							elif field_feature_name == 'assign to block':
 								formatted_cells[field] += (
-									'Expected an integer corresponding to the Block ID '
+									'Expected a block name '
 								)
 							elif field_feature_name == 'assign to trees':
 								formatted_cells[field] += (
@@ -821,7 +821,8 @@ class SubmissionResult:
 				'		-[:IS_IN]->(: FieldTrees) '
 				'		-[:IS_IN]->(: Field) '
 				'		<-[:IS_IN]-(: FieldBlocks) '
-				'		<-[:IS_IN]-(block: Block {id: uid_value[1]}) '
+				'		<-[:IS_IN]-(block: Block) '
+				'	WHERE trim(block.name) = uid_value[1] '
 				'	OPTIONAL MATCH (tree)-[:IS_IN]->(existing:BlockTrees) '
 				'	WITH block, tree WHERE existing IS NULL '
 				'	MERGE '

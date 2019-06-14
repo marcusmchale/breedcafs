@@ -6,8 +6,8 @@ const chart = $('.chart');
 const r = new Resumable({
 	target: 'resumable_upload',
 	maxFiles: 1,
-    simultaneousUploads: 1,
-    fileType: ['csv', 'xlsx']
+    simultaneousUploads: 1
+    //fileType: ['csv', 'xlsx', 'fastq', 'fastq.gz']
 });
 
 remove_flash = function() {

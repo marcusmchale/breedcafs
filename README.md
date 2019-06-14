@@ -33,7 +33,13 @@
     * Conditions
       - Each record corresponds to a period of time
       - Un-bound ranges (i.e. no start and/or end time) are supported
-   * Records are stored in a direct path between the relevant Item and Feature
+    * Curves
+      - An independent (X) and dependent (Y) variable, paired.
+      - These are stored as a list of X and a list of Y variables that are the same length 
+      and in the paired order (ascending X values)
+      - Missing values from Y are removed from X
+      - Records are not accepted that differ in the value of Y at a given time, for a given replicate at a given X value.
+   * Records are stored as nodes connected to the "ItemFeature" node on the path between an Item and a Feature
  * Features
    * Standardised set of descriptions for properties, traits and conditions
      * Record Type
@@ -80,3 +86,7 @@
     are reverted when records are "deleted"
    * Users may "delete" their own records
    * Partner Admins may "delete" any record submitted by users with a primary affiliation to their corresponding Partner 
+   
+### Notes
+  * Ensure feature names for "curve" record type features are not more than 31 characters 
+  and do not contain characters that excel does not allow in sheet names: []:*?/\
