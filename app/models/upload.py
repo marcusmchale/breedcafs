@@ -250,7 +250,10 @@ class RowParseResult:
 					value = str(self.row[field])
 				else:
 					value = self.row[field].encode('utf8')
-				formatted_cells[field] += '">' + value + '</td>'
+				try:
+					formatted_cells[field] += '">'.encode('utf8') + value + '</td>'
+				except:
+					from celery.contrib import rdb; rdb.set_trace()
 		row_string = '<tr><td>' + str(self.row['row_index']) + '</td>'
 		for field in fieldnames:
 			if field in formatted_cells:
