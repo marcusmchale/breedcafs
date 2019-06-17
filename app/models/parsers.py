@@ -45,7 +45,10 @@ class Parsers:
 			try:
 				datetime.datetime.strptime(i[0:16], '%Y-%m-%d %H:%M')
 			except (ValueError, IndexError):
-				return False
+				if i == 'Undefined':
+					pass
+				else:
+					return False
 		return period_string
 
 	@staticmethod

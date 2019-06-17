@@ -314,7 +314,7 @@ class ParseResult:
 		else:
 			parsed_time = None
 		if 'period' in row and row['period']:
-			parsed_period = Parsers.period_format(row['period'])
+			parsed_period = Parsers.db_period_format(row['period'])
 			if not parsed_period:
 				self.merge_error(
 					row,
@@ -1468,7 +1468,7 @@ class Upload:
 					features=list(features_set)
 				).value()
 				# traits require additional time and replicate
-				if 'trait' in record_types:
+				if {'trait', 'curve'}.intersection(record_types):
 					self.required_fieldnames['mixed'].update([
 						'time',
 						'replicate'
@@ -2019,7 +2019,21 @@ class Upload:
 			'			) '
 			'		END '
 			'		ELSE Null '
-			'	END as end '
+			'	END as end, '
+			'	CASE '
+			# match at least one valid entry
+			'		WHEN csvLine.value =~ "\\\\[.+,.+\\\\].*" '
+			'		THEN '		
+			'			[x in split(csvLine.value, "],") | [i in split(x, ",") | toFloat(replace(replace(i, "[", ""), "]", ""))][0]] '
+			'		ELSE Null '
+			'	END as x_values, '
+			'	CASE '
+			# match at least one valid entry
+			'		WHEN csvLine.value =~ "\\\\[.+,.+\\\\].*" '
+			'		THEN '		
+			'			[x in split(csvLine.value, "],") | [i in split(x, ",") | toFloat(replace(replace(i, "[", ""), "]", ""))][1]] '
+			'		ELSE Null '
+			'	END as y_values '		
 			' MATCH '
 			'	(user)'
 			'	-[:SUBMITTED]->(:Submissions)  '
@@ -2060,6 +2074,14 @@ class Upload:
 			'		WHEN record.replicate IS NULL '
 			'		THEN True '
 			'		ELSE record.replicate = replicate '
+			'	END '
+			'	AND '
+			'	CASE '
+			'		WHEN record_type.name_lower = "curve" '
+			'		AND record.x_values = x_values '
+			'		AND record.y_values = y_values '
+			'		THEN True '
+			'		ELSE record_type.name_lower IN ["property", "trait", "condition"] '
 			'	END '
 			' MERGE '
 			'	(current_user)'
@@ -2301,10 +2323,10 @@ class Upload:
 					if not upload_object.row_count[record_type]:
 						upload_object.error_messages.append('No records found to delete')
 					upload_object.parse_rows(record_type)
-					if upload_object.parse_results[record_type].errors:
-						upload_object.error_messages.append(
-							upload_object.parse_results[record_type].html_table()
-						)
+					#if upload_object.parse_results[record_type].errors:
+					#	upload_object.error_messages.append(
+					#		upload_object.parse_results[record_type].html_table()
+					#	)
 					upload_object.db_check(tx, record_type)
 					if upload_object.error_messages:
 						error_messages = '<br>'.join(upload_object.error_messages)

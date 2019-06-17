@@ -58,14 +58,14 @@ correct_submit.click( function(e) {
 						if (response.status === 'PENDING') {
 							poll(task_id)
 						}
-						if (response.status === 'RETRY') {
+						else if (response.status === 'RETRY') {
 							correct_submit_flash.html(
 							   "<p>Your file will be processed as soon as the database becomes available</p>"
                             );
 							correct_submit.prop('disabled', false);
 							poll(task_id);
 						}
-						if (response.status === 'FAILURE') {
+						else if (response.status === 'FAILURE') {
 							correct_submit_flash.css({
                                     'background': '#f0b7e1'
                                 });
@@ -75,7 +75,7 @@ correct_submit.click( function(e) {
                             );
 							correct_submit.prop('disabled', false);
 						}
-						if (response.status === 'ERRORS') {
+						else if (response.status === 'ERRORS') {
 							correct_submit_flash.css({
                                     'background': '#f0b7e1'
                                 });
@@ -83,7 +83,7 @@ correct_submit.click( function(e) {
 							correct_submit_flash.append('<div>' + response.result + '</div>');
 							correct_submit.prop('disabled', false);
 							}
-					    if (response.status === 'SUCCESS') {
+					    else if (response.status === 'SUCCESS') {
                             if (response.result.status === 'ERRORS') {
                                 correct_submit_flash.css({
                                     'background': '#f0b7e1'
