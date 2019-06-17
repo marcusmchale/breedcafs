@@ -237,7 +237,7 @@ class Download:
 		right_border = wb.add_format({'right': 1})
 		header_format = wb.add_format({'bottom': 1})
 		# set the formatting for the feature columns
-		numeric_format = wb.add_format({'num_format': '#'})
+		numeric_format = wb.add_format({'num_format': ''})
 		date_format = wb.add_format({'num_format': 'yyyy-mm-dd'})
 		text_format = wb.add_format({'num_format': '@'})
 		# This converts the percent to a number i.e. 10% to 0.1, prefer not to use it, just store the number
@@ -467,7 +467,7 @@ class Download:
 		for record_type in self.features.keys():
 			if self.features[record_type] and record_type != 'curve':
 				if record_type == 'trait' and self.replicates > 1:
-					row_count = (item_num - 1) * self.replicates * self.time_points + 1
+					row_count = item_num * self.replicates * self.time_points
 				else:
 					row_count = item_num * self.time_points
 				for i, field in enumerate(self.features[record_type]):
