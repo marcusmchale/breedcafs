@@ -250,7 +250,7 @@ class RowParseResult:
 					value = str(self.row[field]).encode('utf8')
 				else:
 					value = self.row[field].encode('utf8')
-					formatted_cells[field] += '">'.encode('utf8') + value + '</td>'.encode('utf8')
+				formatted_cells[field] += '">'.encode('utf8') + value.encode('utf8') + '</td>'.encode('utf8')
 		row_string = '<tr><td>' + str(self.row['row_index']) + '</td>'
 		for field in fieldnames:
 			if field in formatted_cells:
