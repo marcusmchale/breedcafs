@@ -6,7 +6,7 @@ const chart = $('.chart');
 const r = new Resumable({
 	target: 'resumable_upload',
 	maxFiles: 1,
-    simultaneousUploads: 1
+    simultaneousUploads: 1,
     fileType: ['csv', 'xlsx', 'gz', 'fastq', 'zip']
 });
 
