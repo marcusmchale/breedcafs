@@ -246,7 +246,11 @@ class RowParseResult:
 									'\n'
 								])
 					formatted_cells[field] += '\n'
-				formatted_cells[field] += '">' + str(self.row[field]) + '</td>'
+				if isinstance(self.row[field], (int, float)):
+					value = str(self.row[field])
+				else:
+					value = self.row[field].encode('utf8')
+				formatted_cells[field] += '">' + value + '</td>'
 		row_string = '<tr><td>' + str(self.row['row_index']) + '</td>'
 		for field in fieldnames:
 			if field in formatted_cells:
