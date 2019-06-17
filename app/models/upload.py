@@ -177,7 +177,7 @@ class RowParseResult:
 																+ '">' + str(self.row[x]) + '</td>'
 															)
 			else:
-				formatted_cells[field] = '<td bgcolor = #FFFF00 title = "'
+				formatted_cells[field] = '<td bgcolor = #FFFF00 title = "'.encode('utf8')
 				for error in self.errors[field]:
 					field_error_type = error['error_type']
 					field_feature_name = error['feature_name'].lower() if error['feature_name'] else None
