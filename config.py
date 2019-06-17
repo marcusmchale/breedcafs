@@ -53,7 +53,7 @@ DOWNLOAD_FOLDER = 'export'
 # neo4j config: dbms.directories.import = 'insert UPLOAD_FOLDER path'
 
 # The below set controls which file extensions can be uploaded
-ALLOWED_EXTENSIONS = {'csv', 'xlsx'}
+ALLOWED_EXTENSIONS = {'csv', 'xlsx', 'gz', 'fastq', 'zip'}
 
 # I am using the setgid bit so both celery and the web server can write to import path
 # your solution may vary depending on your web infrastructure

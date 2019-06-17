@@ -7,7 +7,7 @@ const r = new Resumable({
 	target: 'resumable_upload',
 	maxFiles: 1,
     simultaneousUploads: 1
-    //fileType: ['csv', 'xlsx', 'fastq', 'fastq.gz']
+    fileType: ['csv', 'xlsx', 'gz', 'fastq', 'zip']
 });
 
 remove_flash = function() {

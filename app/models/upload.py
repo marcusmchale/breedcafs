@@ -810,7 +810,7 @@ class SubmissionResult:
 				'	MATCH '
 				'		(item: Sample {uid: uid_value[0]}) '
 				'	WHERE item.tissue IS NULL '
-				'	SET item.custom_id = uid_value[1] ',
+				'	SET item.tissue = uid_value[1] ',
 				tissue=self.property_updates['tissue']
 			)
 		if self.property_updates['assign_to_block']:
