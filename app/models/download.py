@@ -780,7 +780,10 @@ class Download:
 			statement += (
 				'	submitted.time as `Submitted at`, '
 				'	record.replicate as Replicate, '
-				'	record.value as Value, '
+				'	COALESCE( '
+				'		record.value, '
+				'	[i in range(0, size(record.x_values) - 1 ) | [record.x_values[i], record.y_values[i]]] '
+				'	) as Value, '
 				'	record.time as Time, '
 				'	record.start as Start, '
 				'	record.end as End, '
@@ -788,7 +791,11 @@ class Download:
 			)
 		else:  # data_format == 'table'
 			statement += (
-				' COLLECT(DISTINCT(record.value)) as Values '
+				' COLLECT(DISTINCT(COALESCE('
+				'	record.value, '
+				'	[i in range(0, size(record.x_values) - 1 ) | [record.x_values[i], record.y_values[i]]] '
+				' ))) '
+				' as Values '
 			)
 		with_filters = []
 		if parameters['field_uid']:
@@ -924,10 +931,18 @@ class Download:
 					if isinstance(value, list):
 						if len(value) > 1:
 							for i, j in enumerate(value):
-								if isinstance(v, (float, int)):
+								if isinstance(j, (float, int)):
 									record[0]['Records'][f]['values'][v][i] = str(j)
+								if isinstance(j, list):
+									if len(j) > 1:
+										for ji, jj in enumerate(j):
+											if isinstance(jj, (float, int)):
+												record[0]['Records'][f]['values'][v][i][ji] = str(jj)
+										record[0]['Records'][f]['values'][v][i] = '[' + ', '.join(
+											[jl.encode('utf8') for jl in record[0]['Records'][f]['values'][v][i]]
+										) + ']'
 							record[0]['Records'][f]['values'][v] = ', '.join(
-								[v.encode('utf8') for v in record[0]['Records'][feature]['values'][v]]
+								[l.encode('utf8') for l in record[0]['Records'][f]['values'][v]]
 							)
 						else:
 							record[0]['Records'][f]['values'][v] = record[0]['Records'][f]['values'][v][0]
@@ -939,7 +954,7 @@ class Download:
 					record[0][feature['feature_name']] = ', '.join(
 						[value.encode('utf8') for value in record[0]['Records'][f]['values']]
 					)
-				else:
+				elif record[0]['Records'][f]['values']:
 					record[0][feature['feature_name']] = record[0]['Records'][f]['values'][0]
 		else:  # data_format == 'db'
 			for key in record[0]:
@@ -972,6 +987,11 @@ class Download:
 						for i, j in enumerate(record[0][key]):
 							if isinstance(j, (float, int)):
 								record[0][key][i] = str(j)
+							if isinstance(j, list):
+								for ii,jj in enumerate(j):
+									if isinstance(jj, (float, int)):
+										record[0][key][i][ii] = str(jj)
+								record[0][key][i] = '[' + ', '.join([l.encode('utf8') for l in record[0][key][i]]) + ']'
 						record[0][key] = ', '.join([str(i).encode('utf8') for i in record[0][key]])
 					else:
 						record[0][key] = record[0][key][0]
