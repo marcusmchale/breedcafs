@@ -1340,6 +1340,9 @@ class Upload:
 		]):
 			wb = load_workbook(self.file_path, read_only=True)
 			if self.submission_type == 'db':
+
+
+
 				ws = wb['Records']
 			elif self.submission_type == 'table':
 				if worksheet in app.config['WORKSHEET_NAMES']:
@@ -2325,6 +2328,12 @@ class Upload:
 					# there should only be one record type here, "mixed", so no need to iterate
 					record_type = upload_object.record_types[0]
 					# todo Stop trimming before parsing, this should be done in one pass of the file
+					wb = load_workbook(upload_object.file_path, read_only=True)
+					if 'Records' not in wb.sheetnames:
+						return {
+							'status': 'ERRORS',
+							'result': 'This workbook does not contain the expected "Records" worksheet'
+						}
 					upload_object.trim_file(record_type)
 					if not upload_object.row_count[record_type]:
 						upload_object.error_messages.append('No records found to delete')
