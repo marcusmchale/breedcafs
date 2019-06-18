@@ -412,7 +412,7 @@ class Download:
 			for record_type in self.features.keys():
 				if self.features[record_type]:
 					if all([
-						record_type == 'trait',
+						record_type in ['trait', 'curve'],
 						self.replicates > 1
 					]):
 						replicate_ids = [str(i) for i in range(1, self.replicates + 1)]
@@ -420,14 +420,26 @@ class Download:
 						for rep in replicate_ids:
 							if self.time_points > 1:
 								for j in range(0, self.time_points):
+									if record_type == 'curve':
+										for feature in self.features[record_type]:
+											ws_dict[feature['name_lower']].write(
+												replicates_row_number, 0, '.'.join([record[0]['UID'], str(rep)])
+											)
+									else:
+										ws_dict[record_type].write(
+											replicates_row_number, 0, '.'.join([record[0]['UID'], str(rep)])
+										)
+									replicates_row_number += 1
+							else:
+								if record_type == 'curve':
+									for feature in self.features[record_type]:
+										ws_dict[feature['name_lower']].write(
+											replicates_row_number, 0, '.'.join([record[0]['UID'], str(rep)])
+										)
+								else:
 									ws_dict[record_type].write(
 										replicates_row_number, 0, '.'.join([record[0]['UID'], str(rep)])
 									)
-									replicates_row_number += 1
-							else:
-								ws_dict[record_type].write(
-									replicates_row_number, 0, '.'.join([record[0]['UID'], str(rep)])
-								)
 								replicates_row_number += 1
 					else:
 						if record_type in ['trait', 'condition', 'curve'] and self.time_points > 1:
