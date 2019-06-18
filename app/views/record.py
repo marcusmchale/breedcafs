@@ -87,7 +87,7 @@ def generate_template():
 				username = session['username']
 				record_type = request.form['record_type'] if request.form['record_type'] != '' else None
 				time_points = int(request.form['time_points']) if request.form['time_points'] != '' else None
-				if record_type in [None, 'trait']:
+				if record_type in [None, 'trait', 'curve']:
 					replicates = int(request.form['replicates']) if request.form['replicates'] != '' else None
 				else:
 					replicates = None

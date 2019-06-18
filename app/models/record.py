@@ -48,7 +48,7 @@ class Record:
 			else:
 				return jsonify({
 					'submitted': (
-						'This record type is not yet defined, please contact an administrator'
+						'This record type is not yet supported by direct submission'
 					)
 				})
 			# if any updates to perform:
@@ -953,7 +953,7 @@ class Record:
 	def result_table(result, record_type):
 		conflicts_found = False
 		header_string = '<tr><th><p>'
-		if record_type == 'trait':
+		if record_type in ['trait', 'curve']:
 			headers = ['UID', 'Feature', 'Time', 'Submitted by', 'Submitted at', 'Value']
 		elif record_type == 'condition':
 			headers = ['UID', 'Feature', 'Start', 'End', 'Submitted by', 'Submitted at', 'Value']
@@ -987,7 +987,7 @@ class Record:
 						record['user'],
 						submitted_at
 					]
-			elif record_type == 'trait':
+			elif record_type in ['trait', 'curve']:
 				if record['time']:
 					time = datetime.datetime.utcfromtimestamp(int(record['time']) / 1000).strftime("%Y-%m-%d %H:%M")
 

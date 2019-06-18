@@ -751,7 +751,7 @@ class RecordForm(FlaskForm):
 			Optional(),
 			NumberRange(min=1, max=100, message='Currently limited to to a maximum of 100 replicates per item')
 		],
-		description="Number of replicated trait measuremuents per item at each time point"
+		description="Number of replicated trait measurements or curves per item at each time point"
 	)
 	feature_group = SelectField(
 		'Feature group',

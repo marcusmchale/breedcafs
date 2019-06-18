@@ -109,79 +109,76 @@ level_update = function() {
 };
 
 generate_form = function (response) {
-    const record_type = record_type_select.val();
     dynamic_form_div.append('<dl></dl>');
     for (let i = 0; i < response.length; i++) {
-        if (record_type !== 'curve') {
-            if (['text', 'numeric', 'percent'].includes(response[i]['format'])) {
-                dynamic_form_div.find('dl').append(
-                    '<dt>' + response[i]['name'] + '</dt>' +
-                    '<dd><input type="text" ' +
-                    'id="' + response[i]['name_lower'] + '" ' +
-                    'name="' + response[i]['name_lower'] + '" ' +
-                    'placeholder="' + response[i]['details'] + '" ' +
-                    'title="' + response[i]['details'] + '" ' +
-                    '</dd>'
+        if (['text', 'numeric', 'percent'].includes(response[i]['format'])) {
+            dynamic_form_div.find('dl').append(
+                '<dt>' + response[i]['name'] + '</dt>' +
+                '<dd><input type="text" ' +
+                'id="' + response[i]['name_lower'] + '" ' +
+                'name="' + response[i]['name_lower'] + '" ' +
+                'placeholder="' + response[i]['details'] + '" ' +
+                'title="' + response[i]['details'] + '" ' +
+                '</dd>'
+            )
+        } else if (response[i]['format'] === 'boolean') {
+            dynamic_form_div.find('dl').append(
+                '<dt>' + response[i]['name'] + '</dt>' +
+                '<dd><select ' +
+                'id="' + response[i]['name_lower'] + '" ' +
+                'name="' + response[i]['name_lower'] + '" ' +
+                'title="' + response[i]['details'] + '"> ' +
+                '<option value = "true">True</option>' +
+                '<option value = "false">False</option>' +
+                '</select></dd>'
+            )
+        } else if (response[i]['format'] === 'date') {
+            dynamic_form_div.find('dl').append(
+                '<dt>' + response[i]['name'] + '</dt>' +
+                '<dd><input type="text" ' +
+                'id="' + response[i]['name_lower'] + '" ' +
+                'name="' + response[i]['name_lower'] + '" ' +
+                'placeholder="' + response[i]['details'] + '" ' +
+                'title="' + response[i]['details'] + '" ' +
+                '</dd>'
+            );
+            $('[id="' + response[i]["name_lower"] + '"]').datepicker({dateFormat: 'yy-mm-dd'});
+        } else if (response[i]['format'] === 'categorical') {
+            let category_options = "";
+            const category_list = response[i]['category_list'];
+            for (let j = 0; j < category_list.length; j++) {
+                const category = category_list[j];
+                category_options += (
+                    '<option value = "' + category + '">' +
+                    category + '</option>'
                 )
-            } else if (response[i]['format'] === 'boolean') {
-                dynamic_form_div.find('dl').append(
-                    '<dt>' + response[i]['name'] + '</dt>' +
-                    '<dd><select ' +
-                    'id="' + response[i]['name_lower'] + '" ' +
-                    'name="' + response[i]['name_lower'] + '" ' +
-                    'title="' + response[i]['details'] + '"> ' +
-                    '<option value = "true">True</option>' +
-                    '<option value = "false">False</option>' +
-                    '</select></dd>'
-                )
-            } else if (response[i]['format'] === 'date') {
-                dynamic_form_div.find('dl').append(
-                    '<dt>' + response[i]['name'] + '</dt>' +
-                    '<dd><input type="text" ' +
-                    'id="' + response[i]['name_lower'] + '" ' +
-                    'name="' + response[i]['name_lower'] + '" ' +
-                    'placeholder="' + response[i]['details'] + '" ' +
-                    'title="' + response[i]['details'] + '" ' +
-                    '</dd>'
-                );
-                $('[id="' + response[i]["name_lower"] + '"]').datepicker({dateFormat: 'yy-mm-dd'});
-            } else if (response[i]['format'] === 'categorical') {
-                let category_options = "";
-                const category_list = response[i]['category_list'];
-                for (let j = 0; j < category_list.length; j++) {
-                    const category = category_list[j];
-                    category_options += (
-                        '<option value = "' + category + '">' +
-                        category + '</option>'
-                    )
-                }
-                dynamic_form_div.find('dl').append(
-                    '<dt>' + response[i]['name'] + '</dt>' +
-                    '<dd><select ' +
-                    'id="' + response[i]['name_lower'] + '" ' +
-                    'name="' + response[i]['name_lower'] + '" ' +
-                    'title="' + response[i]['details'] + '"> ' +
-                    category_options + '</select></dd>'
-                );
-            } else if (response[i]['format'] === 'multicat') {
-                let category_options = "";
-                const category_list = response[i]['category_list'];
-                for (let j = 0; j < category_list.length; j++) {
-                    const category = category_list[j];
-                    category_options += (
-                        '<option value = "' + category.toLowerCase() + '">' +
-                        category + '</option>'
-                    )
-                }
-                dynamic_form_div.find('dl').append(
-                    '<dt>' + response[i]['name'] + '</dt>' +
-                    '<dd><select ' +
-                    'id="' + response[i]['name_lower'] + '" ' +
-                    'name="' + response[i]['name_lower'] + '" ' +
-                    'title="' + response[i]['details'] + '"> ' +
-                    category_options + '</select></dd>'
-                );
             }
+            dynamic_form_div.find('dl').append(
+                '<dt>' + response[i]['name'] + '</dt>' +
+                '<dd><select ' +
+                'id="' + response[i]['name_lower'] + '" ' +
+                'name="' + response[i]['name_lower'] + '" ' +
+                'title="' + response[i]['details'] + '"> ' +
+                category_options + '</select></dd>'
+            );
+        } else if (response[i]['format'] === 'multicat') {
+            let category_options = "";
+            const category_list = response[i]['category_list'];
+            for (let j = 0; j < category_list.length; j++) {
+                const category = category_list[j];
+                category_options += (
+                    '<option value = "' + category.toLowerCase() + '">' +
+                    category + '</option>'
+                )
+            }
+            dynamic_form_div.find('dl').append(
+                '<dt>' + response[i]['name'] + '</dt>' +
+                '<dd><select ' +
+                'id="' + response[i]['name_lower'] + '" ' +
+                'name="' + response[i]['name_lower'] + '" ' +
+                'title="' + response[i]['details'] + '"> ' +
+                category_options + '</select></dd>'
+            );
         }
         feature_checkbox_div.find('ul').append(
             "<li>" +
