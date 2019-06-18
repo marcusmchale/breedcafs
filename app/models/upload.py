@@ -249,8 +249,10 @@ class RowParseResult:
 				if isinstance(self.row[field], (int, float)):
 					value = str(self.row[field]).encode('utf8')
 				else:
-					value = self.row[field].encode('utf8')
-				formatted_cells[field] += '">'.encode('utf8') + value.encode('utf8') + '</td>'.encode('utf8')
+					value = self.row[field]
+				formatted_cells[field] += '">'
+				formatted_cells[field] += value.encode('utf8').decode('utf8')
+				formatted_cells[field] += '</td>'
 		row_string = '<tr><td>' + str(self.row['row_index']) + '</td>'
 		for field in fieldnames:
 			if field in formatted_cells:
