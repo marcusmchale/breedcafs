@@ -353,7 +353,6 @@ def submit_records():
 					detailed_record_form.select_features.choices = features_list
 				features_list = [(feature['name_lower'], feature['name']) for feature in features_details]
 				detailed_record_form.select_features.choices = features_list
-				import pdb; pdb.set_trace()
 				if all([
 					detailed_record_form.validate_on_submit(),
 					location_form.validate_on_submit()
