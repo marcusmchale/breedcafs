@@ -155,8 +155,22 @@ class RowParseResult:
 				if x_values:
 					for error in self.errors[field]:
 						if error['conflicts']:
-							for conflict in error['conflicts']:
+							# only show 3 conflicts or "title" attribute is overloaded
+							# TODO implement better tooltips to include as a table rather than "title" attribute
+							for conflict in itertools.islice(error['conflicts'], 3):
 								if isinstance(conflict['existing_value'], list):
+									submitted_by_string = ''.join([
+										'Submitted by: ',
+										conflict['user'],
+										'\n'
+									])
+									submitted_at_string = ''.join([
+										'Submitted at: ',
+										datetime.datetime.utcfromtimestamp(
+											int(conflict['submitted at']) / 1000
+										).strftime("%Y-%m-%d %H:%M:%S"),
+										'\n'
+									])
 									for x_y in conflict['existing_value']:
 										x_value = x_y[0]
 										y_value = x_y[1]
@@ -164,18 +178,32 @@ class RowParseResult:
 											if float(x) == x_value:
 												try:
 													if y_value != float(self.row[x]):
-														formatted_cells[x] = (
-															'<td bgcolor = #FFFF00 title = "'
-															+ ''.join(['Existing value: ', str(y_value), '\n'])
-															+ '">' + str(self.row[x]) + '</td>'
+														formatted_cells[x] = '<td bgcolor = #FFFF00 title = "'.encode('utf8')
+														formatted_cells[x] += self.error_comments['other'][
+															error['error_type']]
+														formatted_cells[x] += (
+															''.join(['Existing value: ', str(y_value), '\n'])
+
 														)
+														formatted_cells[x] += ''.join([
+															submitted_by_string,
+															submitted_at_string
+														])
+														formatted_cells[x] += '">' + str(self.row[x]) + '</td>'
 												except ValueError:
-													if y_value != self.row[x]:
-														formatted_cells[x] = (
-																'<td bgcolor = #FFFF00 title = "'
-																+ ''.join(['Existing value: ', str(y_value), '\n'])
-																+ '">' + str(self.row[x]) + '</td>'
-															)
+													formatted_cells[x] = '<td bgcolor = #FFFF00 title = "'.encode(
+														'utf8')
+													formatted_cells[x] += self.error_comments['other'][
+														error['error_type']]
+													formatted_cells[x] += (
+														''.join(['Existing value: ', str(y_value), '\n'])
+
+													)
+													formatted_cells[x] += ''.join([
+														submitted_by_string,
+														submitted_at_string
+													])
+													formatted_cells[x] += '">' + str(self.row[x]) + '</td>'
 			else:
 				formatted_cells[field] = '<td bgcolor = #FFFF00 title = "'.encode('utf8')
 				for error in self.errors[field]:
@@ -237,8 +265,8 @@ class RowParseResult:
 										"%Y-%m-%d %H:%M")
 											+ '\n'
 									)
-									formatted_cells[field] += ''.join(['Submitted by: ', conflict['user'], '\n'])
-									formatted_cells[field] += ''.join([
+								formatted_cells[field] += ''.join(['Submitted by: ', conflict['user'], '\n'])
+								formatted_cells[field] += ''.join([
 									'Submitted at: ',
 									datetime.datetime.utcfromtimestamp(
 										int(conflict['submitted at']) / 1000

@@ -154,73 +154,77 @@
                 Additional worksheets are provided with details about the item (Item Details) and features (Feature Details).
             </p>
             <p>
-                If you are aggregating data from multiple periods of recording you may want to a table that contains
+                If you are aggregating data from multiple periods of recording you may want a table that contains
                 rows for multiple records per selected item.
                 For convenience, the number of duplicated rows per item can be set by the "time points" value.
-            </p>
-            <p>
                 Time points is distinct from replicates which allow the submission and identification of multiple values
                 at a single time-point (see <a href="#traits">traits</a> description for details).
             </p>
             <p>
-                To generate spreadsheet table templates, simply select "Table (xlsx)" in the drop down box (selected by default)
+                To generate spreadsheet table templates for the selected items and features,
+                simply select "Table (xlsx)" in the drop down box (selected by default)
                 and click "Generate template".
             </p>
         <h3 id="direct">Direct submission</h3>
             <p>
-                To make a <a href="#direct">direct submission</a>, the record type must be selected.
-                Further, curves are not currently supported for direct submission.
+                To easily make direct submissions of a single value for a set of items a web-form is provided.
+                Please ensure you have carefully selected the items as the same value will be recorded for the entire selection.
             </p>
             <p>
-                For direct submission please ensure you have carefully selected the items as
-                the same value will be recorded for the entire selection. Then simply enter values and click submit.
-                You will receive a report in the browser window that either warns of conflicts or confirms your submission.
+                Currently, to make a <a href="#direct">direct submission</a> the record type must be selected
+                and curves are not supported.
+            </p>
+            <p>
+                With items, features and record type selected, simply enter values for all selected features and click submit.
+                You will receive a report in the browser window that will either confirm your submission or warn of errors and/or conflicts.
             </p>
         <h3 id = "field book">Field Book application</h3>
             <p>
-                For Field Book application templates the "Trait" record type must be selected.
-            </p>
-            <p>
-                To export templates for Field Book (fields.csv and traits.trt), simply select "Field Book (csv)"
-                in the drop down box and click "Generate template".
-            </p>
-            <p>
-                More detailed instructions on using Field Book itself are available
+                The Field Book application is designed to support data collection for simple traits.
+                To facilitate the use of this application the database tools site can generate the required input files;
+                "traits.trt" and "fields.csv". More detailed instructions on using Field Book application are available
                 <a href=" {{  url_for('field_book_help') }}">here</a>
+            </p>
+            <p>
+                To generate the Field Book input files the "Trait" record type must be selected.
+            </p>
+            <p>
+                With items, features and record type selected, simply select "Field Book (csv)"
+                in the drop down box and click "Generate template".
             </p>
         <h3>Record Types</h3>
         <h4 id="properties">Properties</h4>
             <p>
-                Properties are recorded once for each item. These include "variety name" and "planting date".
+                Properties have a single value for each item. These include "variety name" and "planting date".
             </p>
         <h4 id="traits">Traits</h4>
             <p>
-                Traits are recorded for an item at a fixed time point.
+                Traits have a single value for each item at an assessed time point.
 
-                Replicates at a single time-point are identifiable by replicate ID which is simply an integer (e.g. "1")
+                Replicates at a single time-point are supported and identifiable by replicate ID which is simply an integer (e.g. "1")
                 concatenated to the UID following a period ".".
-                For example two replicate UIDs for 1_T1 would be "1_T1.1" and "1_T1.2".
+                For example, two replicate UIDs for 1_T1 would be "1_T1.1" and "1_T1.2".
                 Replicate codes are only guaranteed unique at a single time point.
             </p>
         <h4 id="curves">Curves</h4>
             <p>
-                Curves allow recording a paired list of independent ("X") and dependent ("Y") variables.
+                Curves have a paired list of independent ("X") and dependent ("Y") variables for each item at an assessed time point.
             </p>
             <p>
-                The templates for curve features are generated as a full worksheet for each feature.
+                As for traits, replicates are supported through replicate codes
+                (see <a href="#traits">traits</a> description for details).
+            </p>
+            <p>
+                The templates for curve features are generated as a worksheet for each feature.
                 These worksheets will include column headers for the required (UID, Date) and optional (Time, Person) details
                 while the rest of the worksheet is left blank. To input data into these worksheets, simply include the "X" value
                 as a column header and the "Y" value in the corresponding row. Both "X" and "Y" values must be floating point numbers.
             </p>
-            <p>
-                As for traits, curves are recorded for an item at a fixed time point and
-                multiple records at a single time point are supported through replicate codes
-                (see <a href="#traits">traits</a> description for details).
-            </p>
         <h4 id="conditions">Conditions</h4>
             <p>
-                Conditions are recorded for an item over a period of time. Only a single value is accepted for any given period.
-                The start and end time are optional, although the following rules apply to a condition for each item:
+                Conditions have a single value for any given period.
+                The start and end time of this period are optionally defined in each record,
+                however the following rules apply:
                 <ul>
                     <li>
                         If a condition is set without bounds (i.e. without start or end) then no other (differing)
@@ -238,7 +242,7 @@
             </p>
             <p>
                 These rules can lead to a situation where to set a new value for an unbounded condition,
-                the old record must be <a href="#correct">deleted</a>.
+                an existing record must be <a href="#correct">deleted</a>.
             </p>
     <h2 id="upload">
         <a href="{{ url_for('upload') }}">
@@ -246,6 +250,29 @@
         </a>
         Upload data
     </h2>
+        <p>
+            This is the portal to submit templates and exported data from Field Book.
+            A simple graphic is displayed to provide immediate feedback on the submission process.
+        </p>
+        <p>
+            For <a href="#spreadsheet">table templates</a> simply select "Table (xlsx, csv)" in the drop down menu
+            then either drag and drop your file onto the icon below
+            or click the icon to use your browser to select a file to upload.
+        </p>
+        <p>
+            You will be given feedback about the upload process and a report either confirming the submission or
+            alerting you of any errors will be returned.
+        </p>
+        <p>
+            Once the upload itself is complete you will be notified that the file is being checked.
+            At this stage you may navigate away from the page if desired.
+            An email will be sent detailing the outcome of your submission.
+        </p>
+        <p>
+            In these reports, frequently a table is returned, detailing the line number containing the error.
+            If there are highlighted cells in these tables
+            simply hover the mouse over the cell to see more details about the error.
+        </p>
 	<h2 id="download">
 		<a href="{{ url_for('download') }}">
 			<img src = "{{ url_for('static', filename='download_espresso.svg') }}">
