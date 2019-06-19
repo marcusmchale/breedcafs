@@ -41,7 +41,7 @@
                 with UID 1. Blocks are best added first so that subsequent <a href="#trees">Trees</a>
                 may be registered directly into a Block.
                 However, <a href="#trees">Trees</a> may be later assigned to a
-                registered Block by recording the block ID number in the "Assign to block" condition.
+                Block (must be in the same field) by recording the registered block name in the "Assign to block" feature.
 			</p>
 		<h3 id="trees">Trees</h3>
 			<p>
@@ -51,8 +51,8 @@
 			</p>
             <p>
                 In registering Trees you are be provided a BreedCAFS template listing the Tree UIDs and allowing you
-                to record details for later <a href="#upload">submission</a>. These templates can also be generated on the
-                <a href="#record">Record</a> page.
+                to record details for later <a href="#upload">submission</a>. This same template can also be generated on the
+                <a href="#record">Record</a> page by selecting the "Registration" feature group.
             </p>
 
 	<h2 id="samples">
@@ -90,13 +90,16 @@
             Selection
         </h3>
             <p>
-                Here you can see the number of items selected to sample. You can optionally specify
-                the number of samples to register per item (default is 1).
+                Here you can see the number of items selected to sample.
+            </p>
+            <p>
+                You can then optionally specify the number of samples to register per item (default is 1).
             </p>
             <p>
                 When you register samples you are provided a BreedCAFS template detailing the sample UIDs
                 and allowing you to record details for later <a href="#upload">submission</a>.
-                These templates can also be generated on the <a href="#record">Record</a> page.
+                This same template can also be generated on the
+                <a href="#record">Record</a> page by selecting the "Registration" feature group.
             </p>
     <h2 id="record">
         <a href="{{ url_for('record') }}">
@@ -107,70 +110,83 @@
         <p>
             This page allows users to either <a href="#direct">directly submit</a> records or
             generate templates to record data in <a href="#spreadsheet">spreadsheet software</a> such as Microsoft Excel,
-            or the <a href="#fieldbook">Field Book</a> application.
+            or alternatively generate files required for the <a href="#field book">Field Book</a> application.
         </p>
         <p>
-            The first step is to filter for items for which you intend to submit records.
+            Templates you have already generated can be found through the
+            <a href="{{  url_for('download') }}">download page</a> among your
+            <a href="{{  url_for('download_files') }}">generated files</a>
+        </p>
+        <h3>
+            Items
+        </h3>
+        <p>
+            To record data the first step is to filter for items for which you intend to submit records.
             The type of item, be it <a href="#fields">Field</a>, <a href="#trees">Tree</a>
             or <a href="#samples">Sample</a>, will determine the subsequent options that are available.
         </p>
         <p>
-            With the type selected, use the location and ID filters to narrow down to the chosen items.
+            With the item type selected, use the location and ID filters to narrow down to the desired items.
             The number of items selected is displayed under "Selection".
         </p>
+        <h3>
+            Features
+        </h3>
         <p>
             Once you have established your selection of items, you may now select the features
-            for which you intend to record data. Features fall into three supported record types,
-            <a href="#properties">Properties</a>, <a href="#traits">Traits</a> and <a href="#conditions">Conditions</a>.
-        </p>
+            for which you intend to record data. Features fall into four supported record types,
+            <a href="#properties">Properties</a>,
+            <a href="#traits">Traits</a>,
+            <a href="#curves">Curves</a> and
+            <a href="#conditions">Conditions</a>.
         <p>
-            To make a <a href="#direct">direct submission</a>, the record type must be selected.
-            For the  <a href="#fieldbook">Field Book</a> application the "Trait" record type must be selected.
-            For <a href="#spreadsheet">table templates</a> to use in spreadsheet software, this filter is optional.
-        </p>
-        <p>
-            Features are organised into groups to facilitate selection.
+            Features are further organised into groups to facilitate selection (even across multiple record types).
             Select a group and then chose from among the features in that group.
-            If you have selected a record type (property/trait/condition),
-            then a <a href="#direct">web form</a> will be rendered to the right (or bottom) of the page
-            that allows direct submission of records for the selected features against the selected items.
-            In most cases however, you will likely wish to proceed to generate a template for either
-            <a href="#spreadsheet">spreadsheet software </a> or the <a href="#fieldbook">Field Book</a> application.
+            If the group of features you would like to select is not available then please contact an admin
+            to create a new feature group.
         </p>
-        <p>
-            For <a href="#spreadsheet">table templates</a>, you may want to generate a table that contains
-            rows for multiple records per selected item.
-            This will be convenient when you intend to aggregate data from a time series, or
-            where you simply have a number of records to submit.
-            The number of rows per item is determined by the "time points" value which is distinct from true replicates.
-            Replicates are only available for trait records and allow
-            the submission and identification of multiple linked values (by replicate ID) at a single time-point.
-        </p>
-        <h3 id="direct">Direct submission</h3>
-            <p>
-                For direct submission please ensure you have carefully selected the items as
-                the same value will be recorded for the entire selection. Then simply enter values in the fields and click submit.
-                You will receive a report in the browser window that either warns of conflicts or confirms your submission.
-            </p>
         <h3 id="spreadsheet">Spreadsheet software</h3>
             <p>
-                For spreadsheet table templates, simply select "Table (xlsx)" in the drop down box (selected by default)
-                and click "Generate template". Templates you have generated can also be found through the
-                <a href="{{  url_for('download') }}">download page</a> among your
-                <a href="{{  url_for('download_files') }}">generated files</a>
+                In most cases users are familiar with <a href="#spreadsheet">spreadsheet table templates</a>
+                for data collection.
+                In BreedCAFS templates the features are split into a worksheet per record type
+                and a worksheet per feature for curve records.
+                Additional worksheets are provided with details about the item (Item Details) and features (Feature Details).
             </p>
-        <h3 id="fieldbook">Field Book application</h3>
             <p>
-                To export templates for Field Book, simply select "Field Book (csv)" in the drop down box
+                If you are aggregating data from multiple periods of recording you may want to a table that contains
+                rows for multiple records per selected item.
+                For convenience, the number of duplicated rows per item can be set by the "time points" value.
+            </p>
+            <p>
+                Time points is distinct from replicates which allow the submission and identification of multiple values
+                at a single time-point (see <a href="#traits">traits</a> description for details).
+            </p>
+            <p>
+                To generate spreadsheet table templates, simply select "Table (xlsx)" in the drop down box (selected by default)
                 and click "Generate template".
-                If this option is not available then ensure that the "Trait" record type is selected.
-                Templates you have generated can also be found through the
-                <a href="{{  url_for('download') }}">download page</a> among your
-                <a href="{{  url_for('download_files') }}">generated files</a>
+            </p>
+        <h3 id="direct">Direct submission</h3>
+            <p>
+                To make a <a href="#direct">direct submission</a>, the record type must be selected.
+                Further, curves are not currently supported for direct submission.
+            </p>
+            <p>
+                For direct submission please ensure you have carefully selected the items as
+                the same value will be recorded for the entire selection. Then simply enter values and click submit.
+                You will receive a report in the browser window that either warns of conflicts or confirms your submission.
+            </p>
+        <h3 id = "field book">Field Book application</h3>
+            <p>
+                For Field Book application templates the "Trait" record type must be selected.
+            </p>
+            <p>
+                To export templates for Field Book (fields.csv and traits.trt), simply select "Field Book (csv)"
+                in the drop down box and click "Generate template".
             </p>
             <p>
                 More detailed instructions on using Field Book itself are available
-                <a href=" {{  url_for('field_book_help') }}">here</a></p>
+                <a href=" {{  url_for('field_book_help') }}">here</a>
             </p>
         <h3>Record Types</h3>
         <h4 id="properties">Properties</h4>
@@ -180,8 +196,26 @@
         <h4 id="traits">Traits</h4>
             <p>
                 Traits are recorded for an item at a fixed time point.
-                Multiple records at a single time point are supported through replicate codes. These are implemented
-                as a decimal point followed by an integer following the UID, e.g. 1_T1.1.
+
+                Replicates at a single time-point are identifiable by replicate ID which is simply an integer (e.g. "1")
+                concatenated to the UID following a period ".".
+                For example two replicate UIDs for 1_T1 would be "1_T1.1" and "1_T1.2".
+                Replicate codes are only guaranteed unique at a single time point.
+            </p>
+        <h4 id="curves">Curves</h4>
+            <p>
+                Curves allow recording a paired list of independent ("X") and dependent ("Y") variables.
+            </p>
+            <p>
+                The templates for curve features are generated as a full worksheet for each feature.
+                These worksheets will include column headers for the required (UID, Date) and optional (Time, Person) details
+                while the rest of the worksheet is left blank. To input data into these worksheets, simply include the "X" value
+                as a column header and the "Y" value in the corresponding row. Both "X" and "Y" values must be floating point numbers.
+            </p>
+            <p>
+                As for traits, curves are recorded for an item at a fixed time point and
+                multiple records at a single time point are supported through replicate codes
+                (see <a href="#traits">traits</a> description for details).
             </p>
         <h4 id="conditions">Conditions</h4>
             <p>

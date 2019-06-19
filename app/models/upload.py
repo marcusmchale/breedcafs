@@ -828,7 +828,7 @@ class SubmissionResult:
 				'		-[:IS_IN]->(: Field) '
 				'		<-[:IS_IN]-(: FieldBlocks) '
 				'		<-[:IS_IN]-(block: Block) '
-				'	WHERE trim(block.name) = uid_value[1] '
+				'	WHERE trim(block.name_lower) = toLower(trim(uid_value[1])) '
 				'	OPTIONAL MATCH (tree)-[:IS_IN]->(existing:BlockTrees) '
 				'	WITH block, tree WHERE existing IS NULL '
 				'	MERGE '
