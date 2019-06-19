@@ -1326,7 +1326,10 @@ class Upload:
 							'contains unexpected column labels.'
 							' For curve data only float values are accepted in addition to required labels: '
 						)
-						for i in self.required_fieldnames['curve']:
+						# we are calling trait required fieldnames here because they are the same for traits and curves
+						# and when uplaoding a csv we check if this is curve data by all other headers not in required list being numbers
+						# so the required fieldnames will have been set as trait
+						for i in self.required_fieldnames['trait']:
 							error_message += '<dd>' + str(i) + '</dd>'
 						errors.append(error_message)
 		header_report = '<br>'.join(errors)
