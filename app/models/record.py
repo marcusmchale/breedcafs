@@ -28,6 +28,7 @@ class Record:
 						conflicts_query['statement'],
 						conflicts_query['parameters']
 					)
+				import pdb; pdb.set_trace()
 				if conflicts.peek():
 					tx.close()
 					html_table = self.result_table(conflicts, record_data['record_type'])['table']
@@ -675,61 +676,67 @@ class Record:
 		statement += (
 			' WHERE '
 			# If don't have access or if have access and values don't match then potential conflict 
-			# time parsing to allow various degrees of specificity in the relevant time range is below
+			# time parsing to allow reduced specificity in the relevant time range is below
 			' ( '
 			'		cu IS NULL '
 			'		OR '
 			'		r.value <> value '
-			' ) AND ( '
+			' ) AND ('
 			'	( '
+			'		( '
 			# handle fully bound records
 			# - any overlapping records
-			'		r_start < end '
-			'		AND '
-			'		r_end > start '
-			'	) OR ( '
+			'			r_start < end '
+			'			AND '
+			'			r_end > start '
+			'		) OR ( '
 			# - a record that has a lower bound in the bound period 
-			'		r_start >= start '
-			'		AND '
-			'		r_start < end '
-			'	) OR ( '
+			'			r_start >= start '
+			'			AND '
+			'			r_start < end '
+			'		) OR ( '
 			# - a record that has an upper bound in the bound period
-			'		r_end > start '
-			'		AND '
-			'		r_end <= end '
+			'			r_end > start '
+			'			AND '
+			'			r_end <= end '
+			'		) '
 			'	) OR ( '
 			# now handle lower bound only records
 			'		end IS NULL '
 			'		AND ( '
 			# - existing bound period includes start
-			'			r_end > start '
-			'			AND '
-			'			r_start <= start '
+			'			( '
+			'				r_end > start '
+			'				AND '
+			'				r_start <= start '
 			# - record with same lower bound
-			'		) OR ( '
-			'			r_start = start '
+			'			) OR ( '
+			'				r_start = start '
 			# - record with upper bound only greater than this lower bound
-			'		) OR ( '
-			'			r_start IS NULL '
-			'			AND '
-			'			r_end > start '
+			'			) OR ( '
+			'				r_start IS NULL '
+			'				AND '
+			'				r_end > start '
+			'			) '
 			'		) '
 			'	) OR ( '
 			# now handle upper bound only records 
 			'		start IS NULL '
 			'		AND ( '
 			# - existing bound period includes end
-			'			r_end >= end '
-			'			AND '
-			'			r_start < end '
+			'			( '
+			'				r_end >= end '
+			'				AND '
+			'				r_start < end '
 			# - record with same upper bound
-			'		) OR ( '
-			'			r_end = end '
+			'			) OR ( '
+			'				r_end = end '
 			# - record with lower bound only less than this upper bound
-			'		) OR ( '
-			'			r_end IS NULL '
-			'			AND '
-			'			r_start < end '
+			'			) OR ( '
+			'				r_end IS NULL '
+			'				AND '
+			'				r_start < end '
+			'			) '
 			'		) '
 			'	) OR ( '
 			# always conflict with unbound records
