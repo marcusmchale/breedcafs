@@ -97,7 +97,6 @@ def range_list_check(form, field):
 
 def secure_filename_check(form, field):
 	if not field.data == secure_filename(field.data):
-		import pdb; pdb.set_trace()
 		raise ValueError(
 			'This filename is not safe for the system. '
 			'Please remove any special characters from the filename. '
