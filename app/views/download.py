@@ -113,7 +113,7 @@ def download_files_list():
 		return redirect(url_for('login'))
 	else:
 		try:
-			path = os.path.join(app.instance_path, app.config['DOWNLOAD_FOLDER'], session['username'])
+			path = os.path.join(app.config['DOWNLOAD_FOLDER'], session['username'])
 			file_list = os.listdir(path)
 			file_list.sort(key=lambda x: os.path.getmtime(os.path.join(path, x)), reverse=True)
 			html_file_table = (
@@ -263,9 +263,9 @@ def download_file(username, filename):
 		return redirect(url_for('index'))
 	else:
 		try:
-			if os.path.isfile(os.path.join(app.instance_path, app.config['DOWNLOAD_FOLDER'], username, filename)):
+			if os.path.isfile(os.path.join(app.config['DOWNLOAD_FOLDER'], username, filename)):
 				return send_from_directory(
-					os.path.join(app.instance_path, app.config['DOWNLOAD_FOLDER'], username),
+					os.path.join(app.config['DOWNLOAD_FOLDER'], username),
 					filename,
 					as_attachment = True
 				)

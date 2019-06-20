@@ -43,7 +43,7 @@ class Download:
 			self.features[record_type] = []
 		self.file_list = []
 		# create user download path if not found
-		self.user_download_folder = os.path.join(app.instance_path, app.config['DOWNLOAD_FOLDER'], username)
+		self.user_download_folder = os.path.join(app.config['DOWNLOAD_FOLDER'], username)
 		if not os.path.isdir(self.user_download_folder):
 			os.mkdir(self.user_download_folder)
 			gid = grp.getgrnam(app.config['CELERYGRPNAME']).gr_gid

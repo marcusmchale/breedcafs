@@ -671,7 +671,7 @@ class SubmissionRecord:
 
 class SubmissionResult:
 	def __init__(self, username, filename, submission_type, record_type):
-		download_path = os.path.join(app.instance_path, app.config['DOWNLOAD_FOLDER'], username)
+		download_path = os.path.join(app.config['DOWNLOAD_FOLDER'], username)
 		if not os.path.isdir(download_path):
 			os.mkdir(download_path)
 			gid = grp.getgrnam(app.config['CELERYGRPNAME']).gr_gid
@@ -1005,7 +1005,7 @@ class Upload:
 		self.raw_filename = raw_filename
 		self.filename = secure_filename(raw_filename)
 		self.submission_type = submission_type
-		self.file_path = os.path.join(app.instance_path, app.config['UPLOAD_FOLDER'], username, self.filename)
+		self.file_path = os.path.join(app.config['UPLOAD_FOLDER'], username, self.filename)
 		self.record_types = []
 		self.required_fieldnames = dict()
 		self.trimmed_file_paths = dict()
@@ -1020,7 +1020,7 @@ class Upload:
 
 	def file_save(self, file_data):
 		# create user upload path if not found
-		upload_path = os.path.join(app.instance_path, app.config['UPLOAD_FOLDER'], self.username)
+		upload_path = os.path.join(app.config['UPLOAD_FOLDER'], self.username)
 		if not os.path.isdir(upload_path):
 			os.mkdir(upload_path)
 			gid = grp.getgrnam(app.config['CELERYGRPNAME']).gr_gid
@@ -2486,7 +2486,6 @@ class Resumable:
 		self.resumable_id = resumable_id
 		self.chunk_paths = None
 		user_upload_dir = os.path.join(
-			app.instance_path,
 			app.config['UPLOAD_FOLDER'],
 			self.username
 		)
@@ -2496,7 +2495,6 @@ class Resumable:
 			# os.chown(user_upload_dir, -1, gid)
 			os.chmod(user_upload_dir, app.config['IMPORT_FOLDER_PERMISSIONS'])
 		self.temp_dir = os.path.join(
-			app.instance_path,
 			app.config['UPLOAD_FOLDER'],
 			self.username,
 			self.resumable_id
@@ -2508,7 +2506,6 @@ class Resumable:
 			os.chmod(self.temp_dir, app.config['IMPORT_FOLDER_PERMISSIONS'])
 		self.filename = secure_filename(raw_filename)
 		self.file_path = os.path.join(
-			app.instance_path,
 			app.config['UPLOAD_FOLDER'],
 			self.username,
 			self.filename

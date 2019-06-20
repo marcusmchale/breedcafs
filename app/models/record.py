@@ -28,7 +28,6 @@ class Record:
 						conflicts_query['statement'],
 						conflicts_query['parameters']
 					)
-				import pdb; pdb.set_trace()
 				if conflicts.peek():
 					tx.close()
 					html_table = self.result_table(conflicts, record_data['record_type'])['table']
