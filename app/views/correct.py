@@ -15,7 +15,8 @@ from flask import (
 )
 
 from app.models import (
-	Upload
+	Upload,
+	Resumable
 )
 
 from app.forms import (
@@ -52,7 +53,7 @@ def correct_submit():
 			submission_type = form.submission_type.data
 			raw_filename = form.file.data.filename
 			upload_object = Upload(username, submission_type, raw_filename)
-			if not upload_object.allowed_file():
+			if not Resumable.allowed_file(raw_filename, submission_type=submission_type):
 				return jsonify({'submitted': 'Please select a supported file type'})
 			file_data = form.file.data
 			upload_object.file_save(file_data)

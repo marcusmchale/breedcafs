@@ -1012,19 +1012,11 @@ class Upload:
 		self.parse_results = dict()
 		self.submission_results = dict()
 		self.fieldnames = dict()
-		self.file_extension = None
+		self.file_extension = raw_filename.rsplit('.', 1)[1].lower()
 		self.contains_data = None
 		self.features = dict()
 		self.row_count = dict()
 		self.error_messages = []
-
-	def allowed_file(self):
-		if '.' in self.raw_filename:
-			self.file_extension = self.raw_filename.rsplit('.', 1)[1].lower()
-			if self.file_extension in app.config['ALLOWED_EXTENSIONS']:
-				return True
-		else:
-			return False
 
 	def file_save(self, file_data):
 		# create user upload path if not found
@@ -1110,6 +1102,11 @@ class Upload:
 					# Field Book csv exports
 					self.record_types = ['trait']
 					self.required_fieldnames = {'trait': ['uid', 'trait', 'value', 'timestamp', 'person', 'location']}
+					if not (set(self.required_fieldnames['trait'])).issubset(set(file_dict.fieldnames)):
+						return (
+								'This file does not appear to contain a full set of required fieldnames for Field Book inputs'
+								+ ': ' + ', '.join([str(i) for i in self.required_fieldnames['trait']])
+						)
 					self.fieldnames = {'trait': file_dict.fieldnames}
 				elif self.submission_type == 'table':
 					# All record types will match the requirements for property
@@ -1202,12 +1199,15 @@ class Upload:
 						self.required_fieldnames[sheetname] = record_type_sets['curve']
 					else:
 						return (
-							'This workbook does not appear to contain any of the following accepted worksheets: <br> - '
-							+ '<br>  - '.join(
+							'This workbook contains an unsupported worksheet:<br> "' + sheetname + '"<br><br>'
+							+ 'Other than worksheets named after curve features, only the following are accepted: '
+							+ '<ul><li>'
+							+ '</li><li>'.join(
 								[
 									str(i) for i in app.config['WORKSHEET_NAMES'].values() if i not in app.config['REFERENCE_WORKSHEETS']
 								]
-							) + '<br> Nor does it appear to contain a "curve" feature. '
+							)
+							+ '</li>'
 						)
 			if not self.fieldnames:
 				return (
@@ -1286,10 +1286,15 @@ class Upload:
 							error_message += '<dt>' + field[0] + ':</dt> '
 							feature_record_type = field[1]
 							if feature_record_type:
-								error_message += (
-									' <dd> Required fields present for ' + record_type + ' records but'							
-									' this feature is a ' + feature_record_type + '.'
-								)
+								if record_type == 'mixed':
+									error_message += (
+										' <dd> Required fields missing: '
+									)
+								else:
+									error_message += (
+										' <dd> Required fields present for ' + record_type + ' records but'							
+										' this feature is a ' + feature_record_type + '.'
+									)
 								if feature_record_type == 'condition':
 									error_message += (
 										'. Condition records require "start date", "start time", "end date" and "end time" '
@@ -1327,7 +1332,7 @@ class Upload:
 							' For curve data only float values are accepted in addition to required labels: '
 						)
 						# we are calling trait required fieldnames here because they are the same for traits and curves
-						# and when uplaoding a csv we check if this is curve data by all other headers not in required list being numbers
+						# and when uploading a csv we check if this is curve data by all other headers not in required list being numbers
 						# so the required fieldnames will have been set as trait
 						for i in self.required_fieldnames['trait']:
 							error_message += '<dd>' + str(i) + '</dd>'
@@ -1371,9 +1376,6 @@ class Upload:
 		]):
 			wb = load_workbook(self.file_path, read_only=True)
 			if self.submission_type == 'db':
-
-
-
 				ws = wb['Records']
 			elif self.submission_type == 'table':
 				if worksheet in app.config['WORKSHEET_NAMES']:
@@ -2513,11 +2515,30 @@ class Resumable:
 		)
 
 	@staticmethod
-	def allowed_file(raw_filename):
+	def allowed_file(raw_filename, submission_type=None):
 		if '.' in raw_filename:
 			file_extension = raw_filename.rsplit('.', 1)[1].lower()
 			if file_extension in  app.config['ALLOWED_EXTENSIONS']:
-				return True
+				if submission_type:
+					if submission_type == 'fb':
+						if file_extension != 'csv':
+							return False
+						else:
+							return True
+					elif submission_type in ['db', 'table']:
+						if file_extension not in ['csv', 'xlsx']:
+							return False
+						else:
+							return True
+					elif submission_type == 'seq':
+						if file_extension not in ['fastq', 'gz', 'zip']:
+							return False
+						else:
+							return True
+					else:
+						return False
+				else:
+					return True
 		else:
 			return False
 

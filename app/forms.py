@@ -97,6 +97,7 @@ def range_list_check(form, field):
 
 def secure_filename_check(form, field):
 	if not field.data == secure_filename(field.data):
+		import pdb; pdb.set_trace()
 		raise ValueError(
 			'This filename is not safe for the system. '
 			'Please remove any special characters from the filename. '
@@ -586,7 +587,8 @@ class UploadForm(FlaskForm):
 		[InputRequired()],
 		choices=[
 			('table', 'Table (xlsx, csv)'),
-			('fb', 'Field Book (.csv)')
+			('fb', 'Field Book (.csv)'),
+			('seq', 'Sequencing data (.fastq, .gz, .zip)')
 		]
 	)
 	filename = HiddenField(
@@ -594,7 +596,7 @@ class UploadForm(FlaskForm):
 		[
 			InputRequired(),
 			Length(min=1, max=200, message='Maximum 200 characters in filename')
-			#secure_filename_check
+			# secure_filename_check  # not a useful check here, we just use the secure filename on server side.
 		],
 		description="filename hidden field"
 	)

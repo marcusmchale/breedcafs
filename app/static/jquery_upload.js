@@ -125,7 +125,6 @@ r.on('fileSuccess', function(file, message){
                                             if (response.status === 'PENDING') {
                                                 poll(task_id)
                                             }
-                                            ;
                                             if (response.status === 'RETRY') {
                                                 remove_flash();
                                                 upload_button.after("<div id='upload_submit_flash' class='flash'></div>");
@@ -139,14 +138,25 @@ r.on('fileSuccess', function(file, message){
                                                 $('#response').append("<p>Errors were found in the uploaded file:</p>");
                                                 $('#response').append('<div>' + response.result + '</div>');
                                             }
-                                            ;
                                             if (response.status === 'SUCCESS') {
                                                 remove_flash();
-                                                upload_button.after("<div id='response' class='flash'></div>")
-                                                $('#response').append(response.result.result);
-                                                load_graph("/json_submissions");
+                                                if (response.result.hasOwnProperty('status')) {
+                                                    if (response.result.status === 'SUCCESS') {
+                                                        upload_button.after("<div id='response' class='flash'></div>")
+                                                        $('#response').append(response.result.result);
+                                                        load_graph("/json_submissions");
+                                                    } else if (response.result.status === 'ERRORS') {
+                                                        upload_button.after("<div id='response' style='background:#f0b7e1' class='flash'></div>");
+                                                        $('#response').append("<p>Errors were found in the uploaded file:</p>");
+                                                        $('#response').append('<div>' + response.result.result + '</div>');
+                                                    }
+                                                }
+                                                else {
+                                                    upload_button.after("<div id='response' class='flash'></div>")
+                                                    $('#response').append(response.result.result);
+                                                    load_graph("/json_submissions");
+                                                }
                                             }
-                                            ;
                                         }
                                     }
                                 });

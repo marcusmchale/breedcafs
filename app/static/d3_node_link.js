@@ -24,15 +24,15 @@ var load_graph = function(data) {
 			$("svg").replaceWith("<div class='flash'>" + graph.status + "</div>")
 		}
 		else {
-			simulation.tick();
 			update(graph.links, graph.nodes);
+			simulation.tick();
 		}
 	})
 };
 
 var update = function(links, nodes){
-	svg.selectAll(".link").remove();
-	svg.selectAll(".node").remove();
+	svg.selectAll(".link").exit().remove();
+	svg.selectAll(".node").exit().remove();
 
 	link = svg.selectAll(".link")
 	.data(links)
@@ -72,7 +72,7 @@ var update = function(links, nodes){
 
 	simulation.force("link")
 		.links(links)
-		.tick;
+		.distance(100);
 };
 
 var ticked = function() {

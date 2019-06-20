@@ -55,12 +55,12 @@ def resumable_post():
 	if 'username' not in session:
 		flash('Please log in')
 		return redirect(url_for('login'))
-	raw_filename = request.form.get('resumableFilename', default='error', type=str)
+	raw_filename = request.form.get('resumableFilename', default='error', type=unicode)
 	if not Resumable.allowed_file(raw_filename):
 		print('In resumable post')
 		abort(415, 'File type not supported')
 	chunk_number = request.form.get('resumableChunkNumber', default=1, type=int)
-	resumable_id = request.form.get('resumableIdentifier', default='error', type=str)
+	resumable_id = request.form.get('resumableIdentifier', default='error', type=unicode)
 	total_chunks = request.args.get('resumableTotalChunks', type=int)
 	chunk_data = request.files['file']
 	resumable_object = Resumable(session['username'], raw_filename, resumable_id)
@@ -77,12 +77,12 @@ def resumable_assemble():
 	if 'username' not in session:
 		flash('Please log in')
 		return redirect(url_for('login'))
-	raw_filename = request.form.get('fileName', default='error', type=str)
+	raw_filename = request.form.get('fileName', default='error', type=unicode)
 	if not Resumable.allowed_file(raw_filename):
 		print('In assemble post')
 		abort(415, 'File type not supported')
 	size = request.form.get('size', type=int)
-	resumable_id = request.form.get('uniqueIdentifier', default='error', type=str)
+	resumable_id = request.form.get('uniqueIdentifier', default='error', type=unicode)
 	total_chunks = request.form.get('total_chunks', type=int)
 	resumable_object = Resumable(session['username'], raw_filename, resumable_id)
 	if resumable_object.complete(total_chunks):
@@ -102,10 +102,13 @@ def upload_submit():
 		if form.validate_on_submit():
 			username = session['username']
 			submission_type = form.submission_type.data
-			raw_filename = request.form.get('filename', default='error', type=str)
+			raw_filename = request.form.get('filename', default='error', type=unicode)
+			if not Resumable.allowed_file(raw_filename, submission_type=submission_type):
+				return jsonify({
+					'result': 'File type not supported for this submission type',
+					'status': 'ERRORS'
+				})
 			upload_object = Upload(username, submission_type, raw_filename)
-			if not upload_object.allowed_file():
-				abort(415, 'File type not supported')
 			file_format_errors = upload_object.file_format_errors()
 			if file_format_errors:
 				return jsonify({

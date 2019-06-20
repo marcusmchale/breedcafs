@@ -395,9 +395,12 @@ class Download:
 		# we are writing the retrieved Variety value (if singular) to the input field.
 		# so we need the 'Variety name' column if found
 		variety_name_column = None
+		tissue_column = None
 		for i, feature in enumerate(self.features['property']):
 			if feature['name_lower'] == 'variety name':
 				variety_name_column = i + 2
+			if feature['name_lower'] == 'tissue':
+				tissue_column = i + 2
 		# iterate through id_list and write to worksheets
 		item_num = 0
 		for record in self.id_list:
@@ -466,7 +469,8 @@ class Download:
 									)
 							else:
 								ws_dict[record_type].write(item_num, 0, str(record[0]['UID']))
-					# to handle inheritance of Variety.
+					# to handle inheritance
+					# Variety.
 					# we are writing the retrieved Variety value (if singular) to the input field.
 					if all([
 						record_type == 'property',
@@ -474,6 +478,15 @@ class Download:
 						variety_name_column
 						]):
 							ws_dict[record_type].write(item_num, variety_name_column, record[0]['Variety'][0])
+					# Tissue.
+					# we are writing the retrieved tissue value (if singular) to the input field.
+					if all([
+						record_type == 'property',
+						self.item_level == 'sample',
+						'Tissue' in record[0] and record[0]['Tissue'],
+						tissue_column
+					]):
+						ws_dict[record_type].write(item_num, tissue_column, record[0]['Tissue'])
 		# now that we know the item_num we can add the validation
 		# currently no validation for curves as no definite columns
 		for record_type in self.features.keys():
