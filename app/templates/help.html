@@ -227,12 +227,13 @@
                 however the following rules apply:
                 <ul>
                     <li>
-                        If a condition is set without bounds (i.e. without start or end) then no other (differing)
-                        condition record will be accepted.
+                        If a condition is set without bounds (i.e. without start or end) then no differing
+                        record will be accepted.
                     </li>
                     <li>
-                        If a single bound is set (start or end) then no (differing) record will be accepted
-                        in the unbounded direction (later or earlier respectively).
+                        If a single bound is set (start or end) then no differing record
+                        with an opposite bound (i.e. end or start respectively)
+                        will be accepted in the unbounded direction (later or earlier respectively) .
                     </li>
                     <li>
                         Fully bound records (preferred) will not be accepted
