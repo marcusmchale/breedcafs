@@ -897,7 +897,6 @@ class Download:
 			)
 		else:
 			statement += (
-				#' RETURN { '
 				' WITH { '
 				'	Records: collect({'
 				'		feature_name: Feature, '
@@ -917,12 +916,12 @@ class Download:
 				'	Country: Country, '
 				'	ID: ID '
 				' } as result '
-				' RETURN result '
 				' ORDER BY '
 				'	CASE '
-				'		WHEN result["`Field UID`"] IS NOT NULL THEN result["`Field UID`"] '
-				'		ELSE result["`UID`"] END, '
-				'	result["`ID`"] '
+				'		WHEN result["Field UID"] IS NOT NULL THEN result["Field UID"] '
+				'		ELSE result["UID"] END, '
+				'	result["ID"] '
+				' RETURN result '
 			)
 		return statement
 
@@ -1071,11 +1070,13 @@ class Download:
 			wb = Workbook(file_path)
 			worksheet = wb.add_worksheet('Records')
 			row_number = 0
-			for i, j in enumerate(fieldnames):
-				worksheet.write(row_number, i, j)
 			# collect a set of used fields so can remove columns that don't contain data
 			used_fields = set()
 			for record in result:
+				# check if new fieldnames to add
+				for feature_name in [feature['feature_name'] for feature in record[0]['Records']]:
+					if feature_name not in fieldnames:
+								fieldnames.append(feature_name)
 				record = self.format_record(record, data_format)
 				row_number += 1
 				col_number = 0
@@ -1087,6 +1088,8 @@ class Download:
 					col_number += 1
 			# hide columns not written to,
 			# if we want to actually delete them we need to move to using openpyxl instead of xlsxwriter
+			for i, j in enumerate(fieldnames):
+				worksheet.write(0, i, j)
 			for i, field in enumerate(fieldnames):
 				if field not in used_fields:
 					worksheet.set_column(i, i, None, None, {'hidden': True})
