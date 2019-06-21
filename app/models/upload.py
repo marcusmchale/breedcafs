@@ -2490,7 +2490,9 @@ class Resumable:
 			self.username
 		)
 		if not os.path.isdir(user_upload_dir):
+			logging.debug('Creating path for user: %s', username)
 			os.mkdir(user_upload_dir)
+			logging.debug('Settings permissions on created path for user: %s', username)
 			# gid = grp.getgrnam(app.config['CELERYGRPNAME']).gr_gid
 			# os.chown(user_upload_dir, -1, gid)
 			os.chmod(user_upload_dir, app.config['IMPORT_FOLDER_PERMISSIONS'])

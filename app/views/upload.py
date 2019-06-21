@@ -1,4 +1,4 @@
-from app import app, ServiceUnavailable, SecurityError
+from app import app, ServiceUnavailable, SecurityError, logging
 from flask import (
 	flash, request, redirect, url_for, abort, session, render_template, jsonify
 )
@@ -32,7 +32,6 @@ def resumable():
 	username = session['username']
 	raw_filename = request.args.get('resumableFilename', default='error', type=str)
 	if not Resumable.allowed_file(raw_filename):
-		print('In resumable get')
 		abort(415, 'File type not supported')
 	chunk_number = request.args.get('resumableChunkNumber', default=1, type=int)
 	resumable_id = request.args.get('resumableIdentifier', default='error', type=str)
@@ -57,7 +56,6 @@ def resumable_post():
 		return redirect(url_for('login'))
 	raw_filename = request.form.get('resumableFilename', default='error', type=unicode)
 	if not Resumable.allowed_file(raw_filename):
-		print('In resumable post')
 		abort(415, 'File type not supported')
 	chunk_number = request.form.get('resumableChunkNumber', default=1, type=int)
 	resumable_id = request.form.get('resumableIdentifier', default='error', type=unicode)
@@ -79,7 +77,6 @@ def resumable_assemble():
 		return redirect(url_for('login'))
 	raw_filename = request.form.get('fileName', default='error', type=unicode)
 	if not Resumable.allowed_file(raw_filename):
-		print('In assemble post')
 		abort(415, 'File type not supported')
 	size = request.form.get('size', type=int)
 	resumable_id = request.form.get('uniqueIdentifier', default='error', type=unicode)
