@@ -103,11 +103,11 @@ class Record:
 					update_block_statement = match_item_query[0]
 					update_block_parameters = match_item_query[1]
 					update_block_parameters['username'] = record_data['username']
-					update_block_parameters['assign_to_block'] = int(record_data['features_dict']['assign to block'])
+					update_block_parameters['assign_to_block'] = record_data['features_dict']['assign to block']
 					update_block_statement += (
 						' WITH DISTINCT item, field '
 						' MATCH '
-						'	(block_update: Block {id: $assign_to_block})-[:IS_IN]->(:FieldBlocks)-[:IS_IN]->(field) '
+						'	(block_update: Block {name_lower: toLower(trim($assign_to_block))})-[:IS_IN]->(:FieldBlocks)-[:IS_IN]->(field) '
 						' OPTIONAL MATCH '
 						'	(item)-[:IS_IN]->(bt: BlockTrees) '
 						' WITH '

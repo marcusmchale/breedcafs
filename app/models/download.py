@@ -897,6 +897,7 @@ class Download:
 			)
 		else:
 			statement += (
+				#' RETURN { '
 				' WITH { '
 				'	Records: collect({'
 				'		feature_name: Feature, '
@@ -914,14 +915,14 @@ class Download:
 				'	Farm: Farm, '
 				'	Region: Region, '
 				'	Country: Country, '
-				'	ID: ID'
+				'	ID: ID '
 				' } as result '
 				' RETURN result '
 				' ORDER BY '
 				'	CASE '
-				'		WHEN result["Field UID"] IS NOT NULL THEN result["Field UID"] '
-				'		ELSE result["UID"] END, '
-				'	result["ID"] '
+				'		WHEN result["`Field UID`"] IS NOT NULL THEN result["`Field UID`"] '
+				'		ELSE result["`UID`"] END, '
+				'	result["`ID`"] '
 			)
 		return statement
 
@@ -934,8 +935,9 @@ class Download:
 			' MATCH '
 			'	(: User {username_lower: toLower($username)}) '
 			'	-[: AFFILIATED {confirmed: True}]->(partner: Partner) '
-			' MATCH '
-			'	(partner)'
+			' WITH partner '
+			'	MATCH '
+			'	(partner) '
 			'	<-[: AFFILIATED {data_shared: True}]-(user: User) '
 		)
 		statement += self.user_record_query(parameters, data_format)

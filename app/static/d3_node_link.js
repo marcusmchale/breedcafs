@@ -25,14 +25,13 @@ var load_graph = function(data) {
 		}
 		else {
 			update(graph.links, graph.nodes);
-			simulation.tick();
 		}
 	})
 };
 
 var update = function(links, nodes){
-	svg.selectAll(".link").exit().remove();
-	svg.selectAll(".node").exit().remove();
+	svg.selectAll(".link").remove().exit();
+	svg.selectAll(".node").remove().exit();
 
 	link = svg.selectAll(".link")
 	.data(links)

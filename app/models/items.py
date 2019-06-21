@@ -494,6 +494,7 @@ class AddFieldItems:
 			)
 		statement += (
 			' WITH '
+			'	user, '
 			'	country.name as country, '
 			'	region.name as region, '
 			'	farm.name as farm, '
@@ -535,8 +536,8 @@ class AddFieldItems:
 				'	(if) '
 				'	<-[:RECORD_FOR]-(r: Record { '
 				'		found: False, '
-				'		value: block.id, '
-				'		person: $username '
+				'		value: block.name, '
+				'		person: user.name '
 				'	}) '
 				' CREATE '
 				'	(uff)-[:SUBMITTED {time: timestamp()}]->(r) '
