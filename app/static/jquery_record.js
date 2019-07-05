@@ -4,15 +4,15 @@ const block_div = $('#block_div');
 const tree_div = $('#tree_selection_div');
 const sample_div = $('#sample_selection_div');
 const item_count_div = $('#item_count_div');
-const feature_group_select = $('#feature_group');
-const feature_checkbox_div = $('#feature_checkbox_div');
+const input_group_select = $('#input_group');
+const input_variable_checkbox_div = $('#input_variable_checkbox_div');
 const dynamic_form_div = $('#dynamic_form_div');
 const location_div = $('#location');
-const feature_div = $('#feature_selection');
+const input_variable_div = $('#input_variable_selection');
 const generate_template_button = $('#generate_template');
 const generate_template_div = $('#generate_template_div');
 const submit_records_button = $('#submit_records');
-const replicates_div = $('#replicates_div')
+const replicates_div = $('#replicates_div');
 
 $("#record_start").datepicker({ dateFormat: 'yy-mm-dd'});
 $("#record_end").datepicker({ dateFormat: 'yy-mm-dd'});
@@ -35,7 +35,7 @@ record_type_update = function() {
         tree_div.hide();
         sample_div.hide();
         item_count_div.hide();
-        feature_div.hide();
+        input_variable_div.hide();
         replicates_div.hide();
     }
     if (record_type === "trait") {
@@ -51,8 +51,8 @@ record_type_update = function() {
 level_update = function() {
     const record_type = record_type_select.val();
     const item_level = item_level_select.val();
-    feature_group_select.empty();
-    feature_group_select.append(
+    input_group_select.empty();
+    input_group_select.append(
         '<option value="">Select group</option>'
     );
     location_div.show();
@@ -85,17 +85,17 @@ level_update = function() {
     //}
     $.ajax({
         url: (
-            "/feature_groups"
+            "/input_groups"
             + "?record_type=" + record_type
             + "&item_level=" + item_level
         ),
         type: 'GET',
         success: function (response) {
-            const feature_groups = response;
-            for (let i = 0; i < feature_groups.length; i++) {
-                feature_group_select.append(
+            const input_groups = response;
+            for (let i = 0; i < input_groups.length; i++) {
+                input_group_select.append(
                     $("<option></option>").attr(
-                        "value", feature_groups[i][0]).text(feature_groups[i][1])
+                        "value", input_groups[i][0]).text(input_groups[i][1])
                 );
             }
         },
@@ -180,10 +180,10 @@ generate_form = function (response) {
                 category_options + '</select></dd>'
             );
         }
-        feature_checkbox_div.find('ul').append(
+        input_variable_checkbox_div.find('ul').append(
             "<li>" +
-            "<input id=select_features-" + i + " " +
-            "name='select_features' " +
+            "<input id=select_input_variables-" + i + " " +
+            "name='select_input_variables' " +
             "type=checkbox value='" + response[i]['name_lower'] + "' " +
             ">" +
             "<label for='checkbox_" + response[i]['name_lower'] + "'>" +
@@ -194,7 +194,7 @@ generate_form = function (response) {
         const form_field = $('[id="' + response[i]['name_lower'] + '"]').parent('dd');
         form_field.hide();
         form_field.prev().hide();
-        $('#select_features-' + i).change(function () {
+        $('#select_input_variables-' + i).change(function () {
             if (this.checked) {
                  form_field.show();
                  form_field.prev().show();
@@ -210,34 +210,34 @@ generate_form = function (response) {
 };
 
 group_update = function() {
-    feature_checkbox_div.empty();
+    input_variable_checkbox_div.empty();
     dynamic_form_div.empty();
     const record_type = record_type_select.val();
     const item_level = item_level_select.val();
-    const feature_group = feature_group_select.val();
-    if (item_level && feature_group) {
+    const input_group = input_group_select.val();
+    if (item_level && input_group) {
         $.ajax({
             url: (
-                "/features"
+                "/inputs"
                 + "?record_type=" + record_type
                 + "&item_level=" + item_level
-                + "&feature_group=" + feature_group
+                + "&input_group=" + input_group
             ),
             type: 'GET',
             success: function (response) {
-                feature_checkbox_div.append(
-                    "<br><input id=select_all_features type=checkbox>" +
+                input_variable_checkbox_div.append(
+                    "<br><input id=select_all_input_variables type=checkbox>" +
                     "<label>Select all</label>" +
-                    "<ul id='select_features'></ul>"
+                    "<ul id='select_input_variables'></ul>"
                 );
                 generate_form(response);
-                $('#select_all_features').change(function () {
+                $('#select_all_input_variables').change(function () {
                     if (this.checked) {
-                        feature_checkbox_div.find(":checkbox:not(#select_all_features)").each(function () {
+                        input_variable_checkbox_div.find(":checkbox:not(#select_all_input_variables)").each(function () {
                             this.checked = true;
                         }).trigger('change');
                     } else {
-                        feature_checkbox_div.find(":checkbox:not(#select_all_features)").each(function () {
+                        input_variable_checkbox_div.find(":checkbox:not(#select_all_input_variables)").each(function () {
                             this.checked = false;
                         }).trigger('change');
                     }
@@ -256,7 +256,7 @@ update_submit_fields = function () {
     const record_type = record_type_select.val();
     const record_period_div = $('#record_period_div');
     const record_time_div = $('#record_time_div');
-    const checkboxes = feature_checkbox_div.find(":checkbox:not(#select_all_features)");
+    const checkboxes = input_variable_checkbox_div.find(":checkbox:not(#select_all_input_variables)");
     const count_checkboxes = checkboxes.length;
     const count_checked = checkboxes.filter(":checked").length;
     if (count_checked > 0){
@@ -277,12 +277,12 @@ update_submit_fields = function () {
         }
 
         if (count_checked === count_checkboxes) {
-            $('#select_all_features').prop('checked', true);
+            $('#select_all_input_variables').prop('checked', true);
         } else {
-            $('#select_all_features').prop('checked', false);
+            $('#select_all_input_variables').prop('checked', false);
         }
     } else {
-        $('#select_all_features').prop('checked', false);
+        $('#select_all_input_variables').prop('checked', false);
         $('#web_form_div').hide();
         submit_records_button.hide();
         generate_template_div.hide();
@@ -317,7 +317,7 @@ update_item_count = function() {
             ),
             success: function (response) {
             	if (isNaN(response['item_count']) || response['item_count'] === 0) {
-            	    feature_div.hide();
+            	    input_variable_div.hide();
                     item_count_text.replaceWith(
                         "<a>None</a>"
                     );
@@ -325,7 +325,7 @@ update_item_count = function() {
                         "<a></a>"
                     );
                 } else {
-            	    feature_div.show();
+            	    input_variable_div.show();
                     item_count_text.replaceWith(
                         "<a>" + response['item_count'] + "</a>"
                     );
@@ -451,6 +451,6 @@ $(window).on('load', record_type_update);
 
 record_type_select.change(record_type_update);
 item_level_select.change(level_update);
-feature_group_select.change(group_update);
+input_group_select.change(group_update);
 
 $("#country, #region, #farm, #field, #block, #level").change(update_item_count);

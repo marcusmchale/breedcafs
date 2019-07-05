@@ -1,8 +1,8 @@
 const record_type_select = $('#record_type');
 const item_level_select = $('#item_level');
-const feature_group_select = $('#feature_group');
-const feature_selection_div = $('#feature_selection');
-const feature_checkbox_div = $('#feature_checkbox_div');
+const input_group_select = $('#input_group');
+const input_variable_selection_div = $('#input_variable_selection_div');
+const input_variable_checkbox_div = $('#input_variable_checkbox_div');
 const submit_download_button = $('#submit_download');
 const block_select_div = $('#block_div');
 const tree_selection_div = $('#tree_selection_div');
@@ -17,34 +17,33 @@ $("#record_date_to").datepicker({ dateFormat: 'yy-mm-dd'});
 
 items_update = function() {
     const item_type = item_level_select.val();
-    if (item_type == 'field') {
+    if (item_type === 'field') {
         block_select_div.hide();
         tree_selection_div.hide();
         sample_selection_div.hide();
-        replicate_selection_div.hide();
     }
 };
 
 group_select_update = function() {
     const record_type = record_type_select.val();
     const item_level = item_level_select.val();
-    feature_group_select.empty();
-    feature_group_select.append(
+    input_group_select.empty();
+    input_group_select.append(
         '<option value="">Select group</option>'
     );
     $.ajax({
         url: (
-            "/feature_groups"
+            "/input_groups"
             + "?record_type=" + record_type
             + "&item_level=" + item_level
         ),
         type: 'GET',
         success: function (response) {
-            const feature_groups = response;
-            for (let i = 0; i < feature_groups.length; i++) {
-                feature_group_select.append(
+            const input_groups = response;
+            for (let i = 0; i < input_groups.length; i++) {
+                input_group_select.append(
                     $("<option></option>").attr(
-                        "value", feature_groups[i][0]).text(feature_groups[i][1])
+                        "value", input_groups[i][0]).text(input_groups[i][1])
                 );
             }
         },
@@ -54,37 +53,37 @@ group_select_update = function() {
     });
 };
 
-features_update = function() {
-    feature_checkbox_div.empty();
+inputs_variables_update = function() {
+    input_variable_checkbox_div.empty();
     const record_type = record_type_select.val();
     const item_level = item_level_select.val();
-    const feature_group = feature_group_select.val();
+    const input_group = input_group_select.val();
     $.ajax({
         url: (
-            "/features"
+            "/inputs"
             + "?record_type=" + record_type
             + "&item_level=" + item_level
-            + "&feature_group=" + feature_group
+            + "&input_group=" + input_group
         ),
         type: 'GET',
         success: function (response) {
-            $('#select_all_features').change(function () {
+            $('#select_all_input_variables').change(function () {
                     const _this = this;
                     if (_this.checked) {
-                        feature_checkbox_div.find(":checkbox").each(function () {
+                        input_variable_checkbox_div.find(":checkbox").each(function () {
                             this.checked = true;
                         })
                     } else {
-                        feature_checkbox_div.find(":checkbox").each(function () {
+                        input_variable_checkbox_div.find(":checkbox").each(function () {
                             this.checked = false;
                         })
                     }
                 });
             for (let i = 0; i < response.length; i++) {
-                feature_checkbox_div.append(
+                input_variable_checkbox_div.append(
                     "<li>" +
-                    "<input id=select_features-" + i + " " +
-                    "name='select_features' " +
+                    "<input id=select_input_variables-" + i + " " +
+                    "name='select_input_variables' " +
                     "type=checkbox value='" + response[i]['name_lower'] + "' " +
                     ">" +
                     "<label for='checkbox_" + response[i]['name_lower'] + "'>" +
@@ -143,7 +142,7 @@ submit_download_button.click( function (e) {
 
 item_level_select.change(group_select_update);
 record_type_select.change(group_select_update);
-item_level_select.change(features_update);
-record_type_select.change(features_update);
-feature_group_select.change(features_update);
-group_select_update();features_update();
+item_level_select.change(inputs_variables_update);
+record_type_select.change(inputs_variables_update);
+input_group_select.change(inputs_variables_update);
+group_select_update();inputs_variables_update();

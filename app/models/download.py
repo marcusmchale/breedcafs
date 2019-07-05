@@ -13,7 +13,7 @@ from flask import (
 from app.models import(
 	AddFieldItems,
 	ItemList,
-	FeatureList,
+	InputList,
 	User
 )
 
@@ -38,9 +38,9 @@ class Download:
 		self.time_points = 1
 		self.item_fieldnames = None
 		self.item_level = None
-		self.features = {}
+		self.inputs = {}
 		for record_type in app.config['RECORD_TYPES']:
-			self.features[record_type] = []
+			self.inputs[record_type] = []
 		self.file_list = []
 		# create user download path if not found
 		self.user_download_folder = os.path.join(app.config['DOWNLOAD_FOLDER'], username)
@@ -165,12 +165,12 @@ class Download:
 				file_path = os.path.join(self.user_download_folder, filename)
 		return file_path
 
-	def set_features(
+	def set_inputs(
 			self,
 			item_level,
 			record_type=None,
-			feature_group=None,
-			features=None,
+			input_group=None,
+			inputs=None,
 			sample_level=None
 	):
 		if not record_type:
@@ -178,17 +178,17 @@ class Download:
 		else:
 			record_types = [record_type]
 		for rt in record_types:
-			self.features[rt] = FeatureList(
+			self.inputs[rt] = InputList(
 				item_level,
-				rt).get_features(
-				feature_group=feature_group,
-				features=features
+				rt).get_inputs(
+				input_group=input_group,
+				inputs=inputs
 			)
 		# drop "assign to trees" and "assign to samples" from sample registration if not at field level
-		if item_level == 'sample' and feature_group == "Registration" and sample_level != 'field':
-			not_used_features = ["assign to trees", "assign to samples"]
-			self.features['property'] = [
-				i for i in self.features['property'] if i['name_lower'] not in not_used_features
+		if item_level == 'sample' and input_group == "Registration" and sample_level != 'field':
+			irrelevant_inputs = ["assign to trees", "assign to samples"]
+			self.inputs['property'] = [
+				i for i in self.inputs['property'] if i['name_lower'] not in irrelevant_inputs
 			]
 
 	def record_form_to_template(
@@ -202,13 +202,13 @@ class Download:
 			self.replicates = record_data['replicates']
 		if record_data['time_points'] and record_data['time_points'] > 1:
 			self.time_points = record_data['time_points']
-		self.set_features(
+		self.set_inputs(
 			record_data['item_level'],
 			record_data['record_type'],
-			feature_group=record_data['feature_group'] if 'feature_group' in record_data else None,
-			features=record_data['selected_features'] if 'selected_features' in record_data else None
+			input_group=record_data['input_group'] if 'input_group' in record_data else None,
+			inputs=record_data['selected_inputs'] if 'selected_inputs' in record_data else None
 		)
-		if not any(self.features.values()):
+		if not any(self.inputs.values()):
 			return False
 		if record_data['template_format'] == 'fb':
 			self.make_fb_template()
@@ -222,7 +222,7 @@ class Download:
 			self,
 			base_filename=None
 	):
-		if not self.id_list and self.item_level and any(self.features.values()):
+		if not self.id_list and self.item_level and any(self.inputs.values()):
 			return False
 		self.set_item_fieldnames()
 		file_path = self.get_file_path(
@@ -236,14 +236,14 @@ class Download:
 		time_format = wb.add_format({'num_format': 'hh:mm', 'right': 1})
 		right_border = wb.add_format({'right': 1})
 		header_format = wb.add_format({'bottom': 1})
-		# set the formatting for the feature columns
+		# set the formatting for the input columns
 		numeric_format = wb.add_format({'num_format': ''})
 		date_format = wb.add_format({'num_format': 'yyyy-mm-dd'})
 		text_format = wb.add_format({'num_format': '@'})
 		# This converts the percent to a number i.e. 10% to 0.1, prefer not to use it, just store the number
 		# percent_format = wb.add_format({'num_format': 9})
 		location_format = wb.add_format({'num_format': '0.0000; 0.0000'})
-		feature_formats = {
+		input_formats = {
 			"numeric": numeric_format,
 			"date": date_format,
 			"text": text_format,
@@ -288,16 +288,16 @@ class Download:
 			'trait': None,
 			'condition': None,
 			'item_details': wb.add_worksheet(app.config['WORKSHEET_NAMES']['item_details']),
-			'feature_details': wb.add_worksheet(app.config['WORKSHEET_NAMES']['feature_details']),
+			'input_details': wb.add_worksheet(app.config['WORKSHEET_NAMES']['input_details']),
 			'hidden': wb.add_worksheet("hidden")
 		}
-		# We add a new worksheet for each "curve" feature
-		for feature in self.features["curve"]:
-			ws_dict[feature['name_lower']] = None
+		# We add a new worksheet for each "curve" input
+		for i in self.inputs["curve"]:
+			ws_dict[i['name_lower']] = None
 		# write the item_details header
 		for i, j in enumerate(self.item_fieldnames):
 			ws_dict['item_details'].write(0, i, j, header_format)
-		feature_details_fieldnames = [
+		input_details_fieldnames = [
 			'type',
 			'name',
 			'format',
@@ -306,21 +306,21 @@ class Download:
 			'details',
 			'category_list'
 		]
-		# write the feature_details header
-		for header in feature_details_fieldnames:
-			column_number = feature_details_fieldnames.index(header)
-			ws_dict['feature_details'].write(0, column_number, header, header_format)
-		# write the core fields to the feature details page
-		feature_details_row_num = 0
+		# write the input_details header
+		for header in input_details_fieldnames:
+			column_number = input_details_fieldnames.index(header)
+			ws_dict['input_details'].write(0, column_number, header, header_format)
+		# write the core fields to the input details page
+		input_details_row_num = 0
 		core_fields_details = [
 			("person", "Optional: Person responsible for determining these values")
 		]
-		if self.features['trait'] or self.features['curve']:
+		if self.inputs['trait'] or self.inputs['curve']:
 			core_fields_details += [
 				("date", "Required: Date these values were determined (YYYY-MM-DD, e.g. 2017-06-01)"),
 				("time", "Optional: Time these values were determined (24hr, e.g. 13:00. Defaults to 12:00")
 			]
-		if self.features['condition']:
+		if self.inputs['condition']:
 			core_fields_details += [
 				("start date", "Optional: Date this condition started (YYYY-MM-DD, e.g. 2017-06-01)"),
 				("start time", "Optional: Time this condition started (24hr, e.g. 13:00. Defaults to 00:00"),
@@ -330,7 +330,7 @@ class Download:
 					"Optional: Time this condition ended (24hr, e.g. 13:00. Defaults to 00:00 of the following day"
 				)
 			]
-		if self.features['curve']:
+		if self.inputs['curve']:
 			core_fields_details += [
 				(
 					"Curve worksheets",
@@ -338,14 +338,14 @@ class Download:
 				)
 			]
 		for field, details in core_fields_details:
-			feature_details_row_num += 1
-			ws_dict['feature_details'].write(feature_details_row_num, 1, field)
-			ws_dict['feature_details'].write(feature_details_row_num, 5, details)
-		# empty row to separate date/time/person from features
-		categorical_features_count = 0
-		for record_type in [i for i in app.config['RECORD_TYPES'] if i in self.features]:
+			input_details_row_num += 1
+			ws_dict['input_details'].write(input_details_row_num, 1, field)
+			ws_dict['input_details'].write(input_details_row_num, 5, details)
+		# empty row to separate date/time/person from inputs
+		categorical_inputs_count = 0
+		for record_type in [i for i in app.config['RECORD_TYPES'] if i in self.inputs]:
 			if all([
-				self.features[record_type],
+				self.inputs[record_type],
 				record_type != 'curve'
 			]):
 				# create record type specific worksheet
@@ -354,10 +354,10 @@ class Download:
 				# - add the core fields (e.g. person, date, time)
 				for i, field in enumerate(core_fields_formats[record_type]):
 					ws_dict[record_type].set_column(i, i, None, cell_format=field[1])
-				# - add the feature field names
+				# - add the input field names
 				fieldnames = (
 						[field[0] for field in core_fields_formats[record_type]]
-						+ [feature['name'] for feature in self.features[record_type]]
+						+ [i['name'] for i in self.inputs[record_type]]
 				)
 				for i, fieldname in enumerate(fieldnames):
 					ws_dict[record_type].write(0, i, fieldname, header_format)
@@ -365,41 +365,41 @@ class Download:
 				ws_dict[record_type].set_column(
 					len(fieldnames) - 1, len(fieldnames) - 1, None, cell_format=right_border
 				)
-			if self.features[record_type] and record_type == 'curve':
-				for feature in self.features[record_type]:
-					# Need to ensure curve feature names do not contain "[]:*?/\" or excel can't use them as sheetnames
-					ws_dict[feature['name_lower']] = wb.add_worksheet(feature['name'])
+			if self.inputs[record_type] and record_type == 'curve':
+				for input_type in self.inputs[record_type]:
+					# Need to ensure curve input names do not contain "[]:*?/\" or excel can't use them as sheetnames
+					ws_dict[input['name_lower']] = wb.add_worksheet(input['name'])
 					for i, field in enumerate(core_fields_formats[record_type]):
-						ws_dict[feature['name_lower']].set_column(i, i, None, cell_format=field[1])
-					# - add the feature field names
+						ws_dict[input_type['name_lower']].set_column(i, i, None, cell_format=field[1])
+					# - add the input field names
 					fieldnames = (
 							[field[0] for field in core_fields_formats[record_type]]
 					)
 					for i, fieldname in enumerate(fieldnames):
-						ws_dict[feature['name_lower']].write(0, i, fieldname, header_format)
-					ws_dict[feature['name_lower']].set_column(
+						ws_dict[input_type['name_lower']].write(0, i, fieldname, header_format)
+					ws_dict[input_type['name_lower']].set_column(
 						len(fieldnames) - 1, len(fieldnames) - 1, None, cell_format=right_border
 					)
-			# write feature details into feature details sheet
-			for feature in self.features[record_type]:
-				feature['type'] = str(record_type)
-				feature_details_row_num += 1
-				for j, field in enumerate(feature_details_fieldnames):
-					if field in feature:
-						if isinstance(feature[field], list):
-							value = ", ".join(value for value in feature[field])
-							ws_dict['feature_details'].write(feature_details_row_num, j, value)
+			# write input details into input details sheet
+			for input_type in self.inputs[record_type]:
+				input_type['type'] = str(record_type)
+				input_details_row_num += 1
+				for j, field in enumerate(input_details_fieldnames):
+					if field in input_type:
+						if isinstance(input_type[field], list):
+							value = ", ".join(value for value in input_type[field])
+							ws_dict['input_details'].write(input_details_row_num, j, value)
 						else:
-							ws_dict['feature_details'].write(feature_details_row_num, j, feature[field])
-		# to handle inheritance of Variety.
-		# we are writing the retrieved Variety value (if singular) to the input field.
-		# so we need the 'Variety name' column if found
+							ws_dict['input_details'].write(input_details_row_num, j, input_type[field])
+		# To handle inheritance of Variety and Tissue by user confirmation in templates
+		# we are writing the existing retrieved value (if singular) to the input field.
+		# so we need the 'Variety name' and 'Tissue' columns if found
 		variety_name_column = None
 		tissue_column = None
-		for i, feature in enumerate(self.features['property']):
-			if feature['name_lower'] == 'variety name':
+		for i, input_type in enumerate(self.inputs['property']):
+			if input_type['name_lower'] == 'variety name':
 				variety_name_column = i + 2
-			if feature['name_lower'] == 'tissue':
+			if input_type['name_lower'] == 'tissue':
 				tissue_column = i + 2
 		# iterate through id_list and write to worksheets
 		item_num = 0
@@ -412,8 +412,8 @@ class Download:
 					value = ", ".join([str(i) for i in value])
 				item_details_column_number = self.item_fieldnames.index(key)
 				ws_dict['item_details'].write(item_num, item_details_column_number, value)
-			for record_type in self.features.keys():
-				if self.features[record_type]:
+			for record_type in self.inputs.keys():
+				if self.inputs[record_type]:
 					if all([
 						record_type in ['trait', 'curve'],
 						self.replicates > 1
@@ -424,8 +424,8 @@ class Download:
 							if self.time_points > 1:
 								for j in range(0, self.time_points):
 									if record_type == 'curve':
-										for feature in self.features[record_type]:
-											ws_dict[feature['name_lower']].write(
+										for input_type in self.inputs[record_type]:
+											ws_dict[input_type['name_lower']].write(
 												replicates_row_number, 0, '.'.join([record[0]['UID'], str(rep)])
 											)
 									else:
@@ -435,8 +435,8 @@ class Download:
 									replicates_row_number += 1
 							else:
 								if record_type == 'curve':
-									for feature in self.features[record_type]:
-										ws_dict[feature['name_lower']].write(
+									for input_type in self.inputs[record_type]:
+										ws_dict[input_type['name_lower']].write(
 											replicates_row_number, 0, '.'.join([record[0]['UID'], str(rep)])
 										)
 								else:
@@ -449,8 +449,8 @@ class Download:
 							for i in range(0, self.time_points):
 								time_points_row_number = ((item_num - 1) * self.time_points) + 1 + i
 								if record_type == 'curve':
-									for feature in self.features[record_type]:
-										ws_dict[feature['name_lower']].write(
+									for input_type in self.inputs[record_type]:
+										ws_dict[input_type['name_lower']].write(
 											time_points_row_number,
 											0,
 											str(record[0]['UID'])
@@ -461,8 +461,8 @@ class Download:
 									)
 						else:
 							if record_type == 'curve':
-								for feature in self.features[record_type]:
-									ws_dict[feature['name_lower']].write(
+								for input_type in self.inputs[record_type]:
+									ws_dict[input_type['name_lower']].write(
 										item_num,
 										0,
 										str(record[0]['UID'])
@@ -489,28 +489,28 @@ class Download:
 						ws_dict[record_type].write(item_num, tissue_column, record[0]['Tissue'])
 		# now that we know the item_num we can add the validation
 		# currently no validation for curves as no definite columns
-		for record_type in self.features.keys():
-			if self.features[record_type] and record_type != 'curve':
+		for record_type in self.inputs.keys():
+			if self.inputs[record_type] and record_type != 'curve':
 				if record_type == 'trait' and self.replicates > 1:
 					row_count = item_num * self.replicates * self.time_points
 				else:
 					row_count = item_num * self.time_points
-				for i, field in enumerate(self.features[record_type]):
+				for i, field in enumerate(self.inputs[record_type]):
 					col_num = len(core_fields_formats[record_type]) + i
 					ws_dict[record_type].set_column(
-						col_num, col_num, None, cell_format=feature_formats[field['format']]
+						col_num, col_num, None, cell_format=input_formats[field['format']]
 					)
 					if 'category_list' in field:
-						categorical_features_count += 1
-						ws_dict['hidden'].write((categorical_features_count - 1), 0, field['name_lower'])
+						categorical_inputs_count += 1
+						ws_dict['hidden'].write((categorical_inputs_count - 1), 0, field['name_lower'])
 						for j, category in enumerate(field['category_list']):
-							ws_dict['hidden'].write((categorical_features_count -1), j + 1 , category)
+							ws_dict['hidden'].write((categorical_inputs_count -1), j + 1 , category)
 						ws_dict[record_type].data_validation(1, col_num, row_count, col_num, {
 							'validate': 'list',
 							'source': (
-								'=hidden!$B$' + str(categorical_features_count)
+								'=hidden!$B$' + str(categorical_inputs_count)
 								+ ':$' + utility.xl_col_to_name(len(field['category_list']) + 1)
-								+ '$' + str(categorical_features_count)
+								+ '$' + str(categorical_inputs_count)
 							)
 						})
 		ws_dict['hidden'].hide()
@@ -584,7 +584,7 @@ class Download:
 			base_filename=base_filename,
 			with_timestamp=with_timestamp
 		)
-		feature_fieldnames = [
+		input_fieldnames = [
 			'name',
 			'format',
 			'defaultValue',
@@ -595,12 +595,12 @@ class Download:
 			'isVisible',
 			'realPosition'
 		]
-		for i, feature in enumerate(self.features['trait']):
-			feature['realPosition'] = str(i + 1)
-			feature['isVisible'] = 'True'
+		for i, input_type in enumerate(self.inputs['trait']):
+			input_type['realPosition'] = str(i + 1)
+			input_type['isVisible'] = 'True'
 		self.make_csv_file(
-			feature_fieldnames,
-			self.features['trait'],
+			input_fieldnames,
+			self.inputs['trait'],
 			base_filename=base_filename,
 			with_timestamp=with_timestamp,
 			file_extension='trt'
@@ -611,20 +611,20 @@ class Download:
 			self,
 			fieldnames,
 			id_list,
-			features,
+			inputs,
 			base_filename=None,
 			with_timestamp=True
 	):
 		fieldnames += ['Date', 'Time', 'Person']
-		fieldnames += [feature['name'] for feature in features]
+		fieldnames += [input_type['name'] for input_type in inputs]
 		self.make_csv_file(
 			fieldnames,
 			id_list,
 			base_filename=base_filename + '_data',
 			with_timestamp=with_timestamp
 		)
-		# and a file that describes the feature details
-		feature_fieldnames = [
+		# and a file that describes the input details
+		input_fieldnames = [
 			'name',
 			'format',
 			'minimum',
@@ -633,8 +633,8 @@ class Download:
 			'category_list'
 		]
 		self.make_csv_file(
-			feature_fieldnames,
-			features,
+			input_fieldnames,
+			inputs,
 			base_filename=base_filename + '_details',
 			with_timestamp=with_timestamp
 		)
@@ -649,21 +649,21 @@ class Download:
 			' MATCH '
 			'	(user)-[: SUBMITTED]->(: Submissions)'
 			'	-[: SUBMITTED]->(: Records) '
-			'	-[: SUBMITTED]->(: UserFieldFeature) '
+			'	-[: SUBMITTED]->(: UserFieldInput) '
 			'	-[submitted: SUBMITTED]->(record: Record) '
-			'	-[:RECORD_FOR]->(item_feature:ItemFeature) '
-			'	-[:FOR_FEATURE*..2]->(feature:Feature)'
+			'	-[:RECORD_FOR]->(item_input:ItemInput) '
+			'	-[:FOR_INPUT*..2]->(input:Input) '
 			'	-[:OF_TYPE]->(record_type:RecordType), '
-			'	(item_feature) '
+			'	(item_input) '
 			'	-[:FOR_ITEM]->(item:Item) '
 			'	-[:FROM | IS_IN *]->(farm: Farm) '
 			'	-[:IS_IN]->(region: Region) '
 			'	-[:IS_IN]->(country: Country) '
 		)
 		filters = []
-		if parameters['selected_features']:
+		if parameters['selected_inputs']:
 			filters.append(
-				' feature.name_lower IN $selected_features '
+				' input.name_lower IN $selected_inputs '
 			)
 		if parameters['submission_start']:
 			filters.append(' submitted.time >= $submission_start ')
@@ -764,7 +764,7 @@ class Download:
 			'	-[: IS_IN]->(block_field: Field) '
 			' WITH '
 			'	record_type.name_lower as record_type, '
-			'	feature.name as Feature, '
+			'	input.name as Input, '
 			'	partner.name as Partner, '
 			'	user.name as `Submitted by`, '
 			'	item, '
@@ -864,7 +864,7 @@ class Download:
 			statement += (
 				' WITH { '
 				'	record_type: record_type, '
-				'	Feature: Feature, '
+				'	Input: Input, '
 				'	Partner: Partner, '
 				'	`Submitted by`: `Submitted by`, '
 				'	`Submitted at`: `Submitted at`, '
@@ -888,7 +888,7 @@ class Download:
 				' } as result'
 				' RETURN result '
 				' ORDER BY '
-				'	result["Feature"], '
+				'	result["Input"], '
 				'	CASE '
 				'		WHEN result["Field UID"] IS NOT NULL THEN result["Field UID"] '
 				'		ELSE result["UID"] END, '
@@ -899,7 +899,7 @@ class Download:
 			statement += (
 				' WITH { '
 				'	Records: collect({'
-				'		feature_name: Feature, '
+				'		input_name: Input, '
 				'		record_type: record_type, '
 				'		values: Values '
 				'	}), '
@@ -951,8 +951,8 @@ class Download:
 	@staticmethod
 	def format_record(record, data_format='db'):
 		if data_format == 'table':
-			for f, feature in enumerate(record[0]['Records']):
-				for v, value in enumerate(feature['values']):
+			for f, input_type in enumerate(record[0]['Records']):
+				for v, value in enumerate(input_type['values']):
 					# flatten each value to string if it is a list
 					if isinstance(value, list):
 						if len(value) > 1:
@@ -977,11 +977,11 @@ class Download:
 					for v, value in enumerate(record[0]['Records'][f]['values']):
 						if isinstance(value, (float, int)):
 							record[0]['Records'][f]['values'][v] = str(value)
-					record[0][feature['feature_name']] = ', '.join(
+					record[0][input_type['input_name']] = ', '.join(
 						[value.encode('utf8') for value in record[0]['Records'][f]['values']]
 					)
 				elif record[0]['Records'][f]['values']:
-					record[0][feature['feature_name']] = record[0]['Records'][f]['values'][0]
+					record[0][input_type['input_name']] = record[0]['Records'][f]['values'][0]
 		else:  # data_format == 'db'
 			for key in record[0]:
 				if key == "Period":
@@ -1049,11 +1049,11 @@ class Download:
 		]
 		fieldnames = [i for i in item_fieldnames if i in first_result[0].keys()]
 		if data_format == 'table':
-			features = [i['feature_name'] for i in first_result[0]['Records']]
-			fieldnames += features
+			inputs = [i['input_name'] for i in first_result[0]['Records']]
+			fieldnames += inputs
 		else:
 			fieldnames += [
-				'Feature',
+				'Input',
 				'Value',
 				'Time',
 				'Period',
@@ -1074,9 +1074,9 @@ class Download:
 			used_fields = set()
 			for record in result:
 				# check if new fieldnames to add
-				for feature_name in [feature['feature_name'] for feature in record[0]['Records']]:
-					if feature_name not in fieldnames:
-								fieldnames.append(feature_name)
+				for input_name in [input_type['input_name'] for input_type in record[0]['Records']]:
+					if input_name not in fieldnames:
+								fieldnames.append(input_name)
 				record = self.format_record(record, data_format)
 				row_number += 1
 				col_number = 0

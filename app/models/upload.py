@@ -89,11 +89,11 @@ class RowParseResult:
 				"  - Sample UID should include the Field and Sample ID separated by '_S' (e.g. '1_S1')\n",
 				"missing": "This UID is not found in the database. "
 			},
-			"feature": {
+			"input": {
 				"missing": (
-					"This feature is not found in the database. "
+					"This input variable is not found in the database. "
 					"Please check the spelling and "
-					"that this feature is found among those supported by BreedCAFS "
+					"that this input variable is found among those supported by BreedCAFS "
 					"for the level of data you are submitting."
 				)
 			},
@@ -121,8 +121,8 @@ class RowParseResult:
 			field,
 			error_type,
 			# optional arguments only relevant to value errors
-			feature_name=None,
-			feature_format=None,
+			input_name=None,
+			input_format=None,
 			category_list=None,
 			# optional arguments only relevant to conflicts
 			conflicts=None
@@ -131,8 +131,8 @@ class RowParseResult:
 			self.errors[field] = []
 		self.errors[field].append({
 				'error_type': error_type,
-				'feature_name': feature_name,
-				'feature_format': feature_format,
+				'input_name': input_name,
+				'input_format': input_format,
 				'category_list': category_list,
 				'conflicts': conflicts
 		})
@@ -143,7 +143,7 @@ class RowParseResult:
 	def html_row(self, fieldnames):
 		formatted_cells = {}
 		for field in self.errors.keys():
-			if field not in fieldnames: # curve conflicts return this
+			if field not in fieldnames:  # curve conflicts return this
 				# get x_values
 				x_values = []
 				for x in fieldnames:
@@ -208,31 +208,31 @@ class RowParseResult:
 				formatted_cells[field] = '<td bgcolor = #FFFF00 title = "'.encode('utf8')
 				for error in self.errors[field]:
 					field_error_type = error['error_type']
-					field_feature_name = error['feature_name'].lower() if error['feature_name'] else None
-					field_feature_format = error['feature_format']
+					field_input_name = error['input_name'].lower() if error['input_name'] else None
+					field_input_format = error['input_format']
 					field_category_list = error['category_list']
 					field_conflicts = error['conflicts']
-					# if it is a simple error (time format, UID format or UID/Feature not found)
+					# if it is a simple error (time format, UID format or UID/Input not found)
 					if field in self.error_comments:
 						formatted_cells[field] += self.error_comments[field][field_error_type]
 					else:
 						if field_error_type == 'format':
-							formatted_cells[field] += self.error_comments['other'][field_error_type][field_feature_format]
-							if field_feature_name == 'variety name':
+							formatted_cells[field] += self.error_comments['other'][field_error_type][field_input_format]
+							if field_input_name == 'variety name':
 								formatted_cells[field] += 'Expected one of the following variety names: \n'
-							elif field_feature_name == 'variety code':
+							elif field_input_name == 'variety code':
 								formatted_cells[field] += 'Expected one of the following codes: \n'
-							elif field_feature_name == 'fertiliser n:p:k ratio':
+							elif field_input_name == 'fertiliser n:p:k ratio':
 								formatted_cells[field] += 'Expected N:P:K ratio format, e.g. 1:1:1'
-							elif field_feature_name == 'assign to block':
+							elif field_input_name == 'assign to block':
 								formatted_cells[field] += (
 									'Expected a block name '
 								)
-							elif field_feature_name == 'assign to trees':
+							elif field_input_name == 'assign to trees':
 								formatted_cells[field] += (
 									'Expected a comma separated list of integers corresponding to the ID within the field '
 								)
-							elif 'time' in field_feature_name:
+							elif 'time' in field_input_name:
 								formatted_cells[field] += 'Expected time format as HH:MM e.g. 13:01'
 							if field_category_list:
 								formatted_cells[field] += ", ".join([i for i in field_category_list])
@@ -242,28 +242,38 @@ class RowParseResult:
 							# TODO implement better tooltips to include as a table rather than "title" attribute
 							for conflict in itertools.islice(field_conflicts, 3):
 								formatted_cells[field] += '\n\n'
-								formatted_cells[field] += ''.join(['Existing value: ', conflict['existing_value'], '\n'])
+								formatted_cells[field] += ''.join(
+									['Existing value: ', conflict['existing_value'], '\n']
+								)
 								if 'time' in conflict and conflict['time']:
 									formatted_cells[field] += (
-											'Time: '
-											+ datetime.datetime.utcfromtimestamp(int(conflict['time']) / 1000).strftime(
-										"%Y-%m-%d %H:%M")
-											+ '\n'
+										'Time: '
+										+ datetime.datetime.utcfromtimestamp(
+											int(conflict['time']) / 1000
+										).strftime(
+											"%Y-%m-%d %H:%M"
+										)
+										+ '\n'
 									)
 								if 'start' in conflict and conflict['start']:
 									formatted_cells[field] += (
-											'Start: '
-											+ datetime.datetime.utcfromtimestamp(
-										int(conflict['start']) / 1000).strftime(
-										"%Y-%m-%d %H:%M")
-											+ '\n'
+										'Start: '
+										+ datetime.datetime.utcfromtimestamp(
+											int(conflict['start']) / 1000
+										).strftime(
+											"%Y-%m-%d %H:%M"
+										)
+										+ '\n'
 									)
 								if 'end' in conflict and conflict['end']:
 									formatted_cells[field] += (
-											'End: '
-											+ datetime.datetime.utcfromtimestamp(int(conflict['end']) / 1000).strftime(
-										"%Y-%m-%d %H:%M")
-											+ '\n'
+										'End: '
+										+ datetime.datetime.utcfromtimestamp(
+											int(conflict['end']) / 1000
+										).strftime(
+											"%Y-%m-%d %H:%M"
+										)
+										+ '\n'
 									)
 								formatted_cells[field] += ''.join(['Submitted by: ', conflict['user'], '\n'])
 								formatted_cells[field] += ''.join([
@@ -370,7 +380,7 @@ class ParseResult:
 		else:
 			parsed_replicate = None
 		parsed_uid = Parsers.uid_format(row['uid'])
-		unique_key = (parsed_uid, parsed_submitted_at, parsed_time, parsed_period, parsed_replicate, row['feature'])
+		unique_key = (parsed_uid, parsed_submitted_at, parsed_time, parsed_period, parsed_replicate, row['input'])
 		if unique_key not in self.unique_keys:
 			self.unique_keys.add(unique_key)
 		else:
@@ -536,8 +546,8 @@ class ParseResult:
 			field,
 			error_type,
 			# optional arguments only relevant to value errors
-			feature_name=None,
-			feature_format=None,
+			input_name=None,
+			input_format=None,
 			category_list=None,
 			# optional arguments only relevant to conflicts
 			conflicts=None
@@ -545,7 +555,7 @@ class ParseResult:
 		errors = self.errors
 		if not int(row['row_index']) in errors:
 			errors[int(row['row_index'])] = RowParseResult(row)
-		errors[int(row['row_index'])].add_error(field, error_type, feature_name, feature_format, category_list, conflicts)
+		errors[int(row['row_index'])].add_error(field, error_type, input_name, input_format, category_list, conflicts)
 
 	def duplicate_keys_table(self):
 		if not self.duplicate_keys:
@@ -699,7 +709,7 @@ class SubmissionResult:
 			])
 		fieldnames = [
 			"UID",
-			"Feature",
+			"Input",
 			"Value",
 			"Submitted by",
 			"Submitted at",
@@ -776,54 +786,54 @@ class SubmissionResult:
 				# TODO it might be worth considering scanning for records assigning to the item on item creation
 				# but this would be very inefficient with trees and samples.
 				if self.record_type == 'property':
-					if submission_item.record['Feature'].lower() == 'assign to block':
+					if submission_item.record['Input'].lower() == 'assign to block':
 						self.property_updates['assign_to_block'].append(
 							[record['UID'], record['Value']]
 						)
-					if submission_item.record['Feature'].lower() == 'assign to trees':
+					if submission_item.record['Input'].lower() == 'assign to trees':
 						self.property_updates['assign_to_trees'].append(
 							[record['UID'], record['Value']]
 						)
-					if submission_item.record['Feature'].lower() == 'assign to samples':
+					if submission_item.record['Input'].lower() == 'assign to samples':
 						self.property_updates['assign_to_samples'].append(
 							[record['UID'], record['Value']]
 						)
 			else:
 				self.submission_count += 1
 				if self.record_type == 'property':
-					if submission_item.record['Feature'].lower() == 'custom id':
+					if submission_item.record['Input'].lower() == 'custom id':
 						self.property_updates['custom_id'].append(
 							[record['UID'], record['Value']]
 						)
-					if submission_item.record['Feature'].lower() == 'tissue':
+					if submission_item.record['Input'].lower() == 'tissue':
 						self.property_updates['tissue'].append(
 							[record['UID'], record['Value']]
 						)
-					if submission_item.record['Feature'].lower() == 'assign to block':
+					if submission_item.record['Input'].lower() == 'assign to block':
 						self.property_updates['assign_to_block'].append(
 							[record['UID'], record['Value']]
 						)
-					if submission_item.record['Feature'].lower() == 'assign to trees':
+					if submission_item.record['Input'].lower() == 'assign to trees':
 						self.property_updates['assign_to_trees'].append(
 							[record['UID'], record['Value']]
 						)
-					if submission_item.record['Feature'].lower() == 'assign to samples':
+					if submission_item.record['Input'].lower() == 'assign to samples':
 						self.property_updates['assign_to_samples'].append(
 							[record['UID'], record['Value']]
 						)
-					if submission_item.record['Feature'].lower() == 'variety name':
+					if submission_item.record['Input'].lower() == 'variety name':
 						if not record['UID'] in self.property_updates['variety']:
 							self.property_updates['variety'][record['UID']] = {}
 						self.property_updates['variety'][record['UID']]['name'] = record['Value']
-					if submission_item.record['Feature'].lower() == 'variety code':
+					if submission_item.record['Input'].lower() == 'variety code':
 						if not record['UID'] in self.property_updates['variety']:
 							self.property_updates['variety'][record['UID']] = {}
 						self.property_updates['variety'][record['UID']]['code'] = record['Value']
-					if submission_item.record['Feature'].lower() == 'harvest date':
+					if submission_item.record['Input'].lower() == 'harvest date':
 						if not record['UID'] in self.property_updates['harvest_time']:
 							self.property_updates['harvest_time'][record['UID']] = {}
 						self.property_updates['harvest_time'][record['UID']]['date'] = record['Value']
-					if submission_item.record['Feature'].lower() == 'harvest time':
+					if submission_item.record['Input'].lower() == 'harvest time':
 						if not record['UID'] in self.property_updates['harvest_time']:
 							self.property_updates['harvest_time'][record['UID']] = {}
 						self.property_updates['harvest_time'][record['UID']]['time'] = record['Value']
@@ -1014,7 +1024,7 @@ class Upload:
 		self.fieldnames = dict()
 		self.file_extension = raw_filename.rsplit('.', 1)[1].lower()
 		self.contains_data = None
-		self.features = dict()
+		self.inputs = dict()
 		self.row_count = dict()
 		self.error_messages = []
 
@@ -1047,12 +1057,12 @@ class Upload:
 				)
 				return 'This file does not appear to be a valid xlsx file'
 			if not set(app.config['WORKSHEET_NAMES'].values()) & set(wb.sheetnames):
-				# Need to check for curve feature worksheets
+				# Need to check for curve input worksheets
 				statement = (
 					' MATCH '
-					'	(feature: Feature)-[:OF_TYPE]->(:RecordType {name_lower:"curve"}) '
-					' WHERE feature.name_lower IN $names '
-					' RETURN feature.name '
+					'	(input: Input)-[:OF_TYPE]->(:RecordType {name_lower:"curve"}) '
+					' WHERE input.name_lower IN $names '
+					' RETURN input.name '
 				)
 				parameters = {
 					'names': [i.lower for i in wb.sheetnames]
@@ -1067,7 +1077,7 @@ class Upload:
 					return (
 						'This workbook does not appear to contain any of the following accepted worksheets: <br> - '
 						+ '<br>  - '.join([str(i) for i in app.config['WORKSHEET_NAMES'].values()])
-						+ ' nor does it appear to contain a "curve" feature. '
+						+ ' nor does it appear to contain a "curve" input variable. '
 					)
 		else:
 			return None
@@ -1086,17 +1096,17 @@ class Upload:
 				if self.submission_type == 'db':
 					# 'Correct' submissions have mixed record types
 					# these are uploads for correct
-					# uid, replicate, feature (and for traits or properties the time (and replicate) or period respectively)
+					# uid, replicate, input (and for traits or properties the time (and replicate) or period respectively)
 					# are required to identify the unique record
 					# but to further confirm we only delete the intended record, e.g. if a record is later resubmitted
 					# we include the check for submission time.
 					# todo We need to check later for the types of records in the file
 					# todo and then ensure the corresponding fields are present,
 					# todo this can be done during a db_check as we iterate through the file
-					# todo just y collecting the "Feature" field entries as a set
+					# todo just y collecting the "Input" field entries as a set
 					# todo then finally check the types from this set.
 					self.record_types = ['mixed']
-					self.required_fieldnames = {'mixed': ['uid', 'feature', 'submitted at']}
+					self.required_fieldnames = {'mixed': ['uid', 'input', 'submitted at']}
 					self.fieldnames = {'mixed': file_dict.fieldnames}
 				elif self.submission_type == 'fb':
 					# Field Book csv exports
@@ -1144,7 +1154,8 @@ class Upload:
 								+ ' <br> Property records require: ' + ', '.join([str(i) for i in record_type_sets['property']])
 								+ ' <br> Trait records require: ' + ', '.join([str(i) for i in record_type_sets['trait']])
 								+ ' <br> Condition records require: ' + ', '.join([str(i) for i in record_type_sets['condition']])
-								+ ' <br> Trait records require: ' + ', '.join([str(i) for i in record_type_sets['trait']]) + ' and other column labels must be numbers.'
+								+ ' <br> Curve records require: ' + ', '.join([str(i) for i in record_type_sets['trait']])
+								+ ' and other column labels must be numbers.'
 						)
 				else:
 					return 'Submission type not recognised'
@@ -1162,7 +1173,7 @@ class Upload:
 			sheetname_to_record_type = {v.lower(): k for k, v in app.config['WORKSHEET_NAMES'].iteritems()}
 			for sheetname in wb.sheetnames:
 				if sheetname.lower() in sheetname_to_record_type.keys():
-					if sheetname_to_record_type[sheetname.lower()] in ['item_details', 'feature_details', 'hidden']:
+					if sheetname_to_record_type[sheetname.lower()] in ['item_details', 'input_details', 'hidden']:
 						pass
 					else:
 						record_type = sheetname_to_record_type[sheetname.lower()]
@@ -1175,8 +1186,8 @@ class Upload:
 				else:
 					statement = (
 						' MATCH '
-						'	(feature: Feature {name_lower: $name})-[:OF_TYPE]->(:RecordType {name_lower:"curve"}) '
-						' RETURN feature.name '
+						'	(input: Input {name_lower: $name})-[:OF_TYPE]->(:RecordType {name_lower:"curve"}) '
+						' RETURN input.name '
 					)
 					parameters = {
 						'name': sheetname.lower()
@@ -1188,7 +1199,7 @@ class Upload:
 							parameters
 						)
 					if result.peek():
-						self.features[sheetname] = result.single()[0]
+						self.inputs[sheetname] = result.single()[0]
 						self.record_types.append('curve')
 						ws = wb[sheetname]
 						rows = ws.iter_rows(min_row=1, max_row=1)
@@ -1200,7 +1211,7 @@ class Upload:
 					else:
 						return (
 							'This workbook contains an unsupported worksheet:<br> "' + sheetname + '"<br><br>'
-							+ 'Other than worksheets named after curve features, only the following are accepted: '
+							+ 'Other than worksheets named after curve input variables, only the following are accepted: '
 							+ '<ul><li>'
 							+ '</li><li>'.join(
 								[
@@ -1247,23 +1258,23 @@ class Upload:
 				errors.append(error_message)
 			if self.submission_type == 'table':
 				# now we strip back the fieldnames to keep only those that aren't in the required list
-				# these should now just be the features which we confirm are found in the db.
+				# these should now just be the input variables which we confirm are found in the db.
 				# except for curves, where they should all be numbers
 				if worksheet in app.config['WORKSHEET_NAMES']:
-					self.features[worksheet] = [
+					self.inputs[worksheet] = [
 						i for i in self.fieldnames[worksheet] if i not in self.required_fieldnames[worksheet]
 					]
 					record_type = worksheet
 					statement = (
 						' UNWIND $fields AS field '
 						'	OPTIONAL MATCH '
-						'		(feature:Feature {name_lower: toLower(trim(toString(field)))}) '
+						'		(input: Input {name_lower: toLower(trim(toString(field)))}) '
 						'	OPTIONAL MATCH '
-						'		(feature)-[:OF_TYPE]->(record_type: RecordType) '
+						'		(input)-[:OF_TYPE]->(record_type: RecordType) '
 						'	WITH '
 						'		field, record_type '
 						'	WHERE '
-						'		feature IS NULL '
+						'		input IS NULL '
 						'		OR '
 						'		record_type.name_lower <> $record_type '
 						'	RETURN '
@@ -1272,7 +1283,7 @@ class Upload:
 					field_errors = tx.run(
 						statement,
 						record_type=record_type,
-						fields=self.features[worksheet]
+						fields=self.inputs[worksheet]
 					)
 					if field_errors.peek():
 						if self.file_extension == 'xlsx':
@@ -1280,12 +1291,12 @@ class Upload:
 						else:
 							error_message = '<p>This file '
 						error_message += (
-							'contains column headers that are not recognised as features or required details: </p>'
+							'contains column headers that are not recognised as input variables or required details: </p>'
 						)
 						for field in field_errors:
 							error_message += '<dt>' + field[0] + ':</dt> '
-							feature_record_type = field[1]
-							if feature_record_type:
+							input_record_type = field[1]
+							if input_record_type:
 								if record_type == 'mixed':
 									error_message += (
 										' <dd> Required fields missing: '
@@ -1293,25 +1304,25 @@ class Upload:
 								else:
 									error_message += (
 										' <dd> Required fields present for ' + record_type + ' records but'							
-										' this feature is a ' + feature_record_type + '.'
+										' this input variable is a ' + input_record_type + '.'
 									)
-								if feature_record_type == 'condition':
+								if input_record_type == 'condition':
 									error_message += (
 										'. Condition records require "start date", "start time", "end date" and "end time" '
 										' in addition to the "UID" and "Person" fields.'
 									)
-								elif feature_record_type == 'trait':
+								elif input_record_type == 'trait':
 									error_message += (
 										'. Trait records require "date" and "time" fields'
 										' in addition to the "UID" and "Person" fields.'
 									)
-								elif feature_record_type == 'property':
+								elif input_record_type == 'property':
 									error_message += '. Property records require the "UID" and "Person" fields.'
 								error_message += (
 										'</dd>\n'
 								)
 							else:
-								error_message += '<dd>Unrecognised feature. Please check your spelling.</dd>\n'
+								error_message += '<dd>Unrecognised input variable. Please check your spelling.</dd>\n'
 						errors.append(error_message)
 				else:
 					other_fields = fieldnames_set - self.required_fieldnames[worksheet]
@@ -1442,8 +1453,8 @@ class Upload:
 			for row in trimmed_dict:
 				if submission_type == 'table':
 					if record_type != 'curve':
-						# first check for feature data, if none then just skip this row
-						if [row[feature] for feature in self.features[worksheet] if row[feature]]:
+						# first check for input data, if none then just skip this row
+						if [row[input_variable] for input_variable in self.inputs[worksheet] if row[input_variable]]:
 							parse_result.contains_data = True
 							parse_result.parse_table_row(row)
 					else:
@@ -1483,7 +1494,7 @@ class Upload:
 	):
 		# todo it seems like the field errors here should not occur
 		# todo we are handling this check before we parse the rows
-		# todo so we could remove this check for features from  here to simplify
+		# todo so we could remove this check for input variables from  here to simplify
 		username = self.username
 		if worksheet in app.config['WORKSHEET_NAMES']:
 			record_type = worksheet
@@ -1496,18 +1507,18 @@ class Upload:
 		with open(trimmed_file_path, 'r') as trimmed_file:
 			if submission_type == 'db':
 				trimmed_dict_reader = DictReaderInsensitive(trimmed_file)
-				features_set = set()
+				inputs_set = set()
 				# todo move this to the parse procedure where we iterate through the file already
 				for row in trimmed_dict_reader:
-					features_set.add(row['feature'].lower())
+					inputs_set.add(row['input'].lower())
 				record_types = tx.run(
-					' UNWIND $features as feature_name'
+					' UNWIND $inputs as input_name'
 					'	MATCH '
-					'	(f:Feature { '
-					'		name_lower: feature_name'
+					'	(f:Input { '
+					'		name_lower: input_name '
 					'	})-[:OF_TYPE]->(record_type: RecordType) '
 					' RETURN distinct(record_type.name_lower) ',
-					features=list(features_set)
+					inputs=list(inputs_set)
 				).value()
 				# traits require additional time and replicate
 				if {'trait', 'curve'}.intersection(record_types):
@@ -1551,23 +1562,23 @@ class Upload:
 							"uid",
 							"missing"
 						)
-					if not record['Feature']:
+					if not record['Input']:
 						parse_result.merge_error(
 							row,
-							"feature",
+							"input",
 							"missing"
 						)
 					if all([
 						record['UID'],
-						record['Feature'],
+						record['Input'],
 						not record['Value']
 					]):
 						parse_result.merge_error(
 							row,
 							"value",
 							"format",
-							feature_name=record['Feature'],
-							feature_format=record['Format'],
+							input_name=record['Input'],
+							input_format=record['Format'],
 							category_list=record['Category list']
 						)
 					# need to check an element of the list as all results
@@ -1584,7 +1595,7 @@ class Upload:
 					parameters = {
 						'username': username,
 						'filename': urls.url_fix('file:///' + username + '/' + trimmed_filename ),
-						'features': self.features[worksheet],
+						'inputs': self.inputs[worksheet],
 						'record_type': record_type
 					}
 				elif record_type == 'trait':
@@ -1592,7 +1603,7 @@ class Upload:
 					parameters = {
 						'username': username,
 						'filename': urls.url_fix('file:///' + username + '/' + trimmed_filename),
-						'features': self.features[worksheet],
+						'inputs': self.inputs[worksheet],
 						'record_type': record_type
 					}
 				elif record_type == 'condition':
@@ -1600,7 +1611,7 @@ class Upload:
 					parameters = {
 						'username': username,
 						'filename': urls.url_fix('file:///' + username + '/' + trimmed_filename),
-						'features': self.features[worksheet],
+						'inputs': self.inputs[worksheet],
 						'record_type': record_type
 					}
 				elif record_type == 'curve':
@@ -1608,7 +1619,7 @@ class Upload:
 					parameters = {
 						'username': username,
 						'filename': urls.url_fix('file:///' + username + '/' + trimmed_filename),
-						'feature_name': self.features[worksheet],
+						'input_name': self.inputs[worksheet],
 						'x_values': sorted(
 							[float(i) for i in self.fieldnames[worksheet] if i not in self.required_fieldnames[worksheet]]
 						),
@@ -1634,36 +1645,36 @@ class Upload:
 							"uid",
 							"missing"
 						)
-					if not record['Feature']:
+					if not record['Input']:
 						parse_result.add_field_error(
-							record['Input feature'],
+							record['Input variable'],
 							(
-								"This feature is not found. Please check your spelling. "
-								"This may also be because the feature is not available at the level of these items"
+								"This input variable is not found. Please check your spelling. "
+								"This may also be because the input variable is not available at the level of these items"
 							)
 						)
 					# we add found fields to a list to handle mixed items in input
 					# i.e. if found at level of one item but not another
 					else:
-						parse_result.add_field_found(record['Feature'])
+						parse_result.add_field_found(record['Input'])
 					if all([
 						record['UID'],
-						record['Feature'],
+						record['Input'],
 						not record['Value']
 					]):
 						parse_result.merge_error(
 							row,
-							record['Input feature'],
+							record['Input variable'],
 							"format",
-							feature_name=record['Feature'],
-							feature_format=record['Format'],
+							input_name=record['Input'],
+							input_format=record['Format'],
 							category_list=record['Category list']
 						)
 					# need to check an element of the list as all results
 					if record['Conflicts'][0]['existing_value']:
 						parse_result.merge_error(
 							row,
-							record['Input feature'],
+							record['Input variable'],
 							"conflict",
 							conflicts=record['Conflicts']
 						)
@@ -1726,7 +1737,7 @@ class Upload:
 		trimmed_filename = os.path.basename(trimmed_file_path)
 		submission_type = self.submission_type
 		filename = self.filename
-		features = self.features[worksheet]
+		inputs = self.inputs[worksheet]
 		with contextlib.closing(SubmissionResult(username, filename, submission_type, worksheet)) as submission_result:
 			self.submission_results[worksheet] = submission_result
 			if submission_type == 'fb':
@@ -1743,7 +1754,7 @@ class Upload:
 						statement,
 						username=username,
 						filename=urls.url_fix("file:///" + username + '/' + trimmed_filename),
-						features=features,
+						inputs=inputs,
 						record_type=record_type
 					)
 				elif record_type == 'trait':
@@ -1752,7 +1763,7 @@ class Upload:
 						statement,
 						username=username,
 						filename=urls.url_fix("file:///" + username + '/' + trimmed_filename),
-						features=features,
+						inputs=inputs,
 						record_type=record_type
 					)
 				elif record_type == 'condition':
@@ -1761,7 +1772,7 @@ class Upload:
 						statement,
 						username=username,
 						filename=urls.url_fix("file:///" + username + '/' + trimmed_filename),
-						features=features,
+						inputs=inputs,
 						record_type=record_type
 					)
 				elif record_type == 'curve':
@@ -1770,7 +1781,7 @@ class Upload:
 						statement,
 						username=username,
 						filename=urls.url_fix("file:///" + username + '/' + trimmed_filename),
-						feature_name=self.features[worksheet],
+						input_name=self.inputs[worksheet],
 						x_values=sorted(
 							[float(i) for i in self.fieldnames[worksheet] if i not in self.required_fieldnames[worksheet]]
 						),
@@ -1829,7 +1840,7 @@ class Upload:
 							# parse the trimmed file/worksheet for errors
 							# also adds parse_result to upload_object.parse_result dict (by record_type)
 							upload_object.parse_rows(worksheet)
-							# with string parsing performed, now we check against the database for UID, feature, value
+							# with string parsing performed, now we check against the database for UID, input variable, value
 							upload_object.db_check(tx, worksheet)
 						if not upload_object.contains_data:
 							upload_object.error_messages.append(
@@ -2020,7 +2031,7 @@ class Upload:
 			'		"ms", '
 			'		 "yyyy-MM-dd HH:mm:ss"'
 			'	) as `submitted at`, '
-			'	toLower(csvLine.feature) as feature_name, '
+			'	toLower(csvLine.`input variable`) as input_name, '
 			'	CASE '
 			'		WHEN toInteger(csvLine.uid) IS NOT NULL '
 			'		THEN toInteger(csvLine.uid) '
@@ -2080,15 +2091,15 @@ class Upload:
 			'	(user)'
 			'	-[:SUBMITTED]->(:Submissions)  '
 			'	-[:SUBMITTED]->(:Records) '
-			'	-[:SUBMITTED]->(uff:UserFieldFeature) '
+			'	-[:SUBMITTED]->(uff:UserFieldInput) '
 			'	-[submitted:SUBMITTED]->(record :Record) '
-			'	-[record_for:RECORD_FOR]->(if:ItemFeature) '
+			'	-[record_for:RECORD_FOR]->(if:ItemInput) '
 			'	-[:FOR_ITEM]-(item:Item {'
 			'		uid: uid'
 			'	}), '
 			'	(if)'
-			'	-[FOR_FEATURE*..2]->(feature:Feature {'
-			'		name_lower:feature_name'
+			'	-[FOR_INPUT*..2]->(input:Input {'
+			'		name_lower:input_name'
 			'	})-[:OF_TYPE]->(record_type:RecordType) '
 			' WHERE '
 			# account for rounding to nearest second for submitted at in output files
@@ -2140,7 +2151,7 @@ class Upload:
 			'	time: time, '
 			'	record_time: record.time, '
 			'	uid: uid, '
-			'	feature: feature.name_lower, '
+			'	input: input.name_lower, '
 			'	row_index: row_index '
 			' } '
 			' ORDER BY row_index '
@@ -2240,8 +2251,8 @@ class Upload:
 				' WITH item, field '
 				' MATCH '
 				'	(item) '
-				'	<-[:FOR_ITEM]-(if:ItemFeature) '
-				'	-[:FOR_FEATURE*..2]->(:Feature { '
+				'	<-[:FOR_ITEM]-(if:ItemInput) '
+				'	-[:FOR_INPUT*..2]->(:Input { '
 				'		name_lower: "variety code"'
 				'	}), '
 				'	(if)<-[:RECORD_FOR]-(record:Record) '
@@ -2274,8 +2285,8 @@ class Upload:
 				' WITH item, field '
 				' MATCH '
 				'	(item) '
-				'	<-[:FOR_ITEM]-(if:ItemFeature) '
-				'	-[:FOR_FEATURE*..2]->(:Feature { '
+				'	<-[:FOR_ITEM]-(if:ItemInput) '
+				'	-[:FOR_INPUT*..2]->(:Input { '
 				'		name_lower: "variety name"'
 				'	}), '
 				'	(if)<-[:RECORD_FOR]-(record:Record) '
@@ -2419,11 +2430,11 @@ class Upload:
 								expected_row_index += 1
 								if expected_row_index != record[0]['row_index']:
 									missing_row_indexes.append(expected_row_index)
-							if not record[0]['feature'] in record_tally:
-								record_tally[record[0]['feature']] = 0
-							record_tally[record[0]['feature']] += 1
-							if record[0]['feature'] in property_uid:
-								property_uid[record[0]['feature']].append(record[0]['uid'])
+							if not record[0]['input'] in record_tally:
+								record_tally[record[0]['input']] = 0
+							record_tally[record[0]['input']] += 1
+							if record[0]['input'] in property_uid:
+								property_uid[record[0]['input']].append(record[0]['uid'])
 						upload_object.remove_properties(tx, property_uid)
 						if not expected_row_index == upload_object.row_count[record_type]:
 							missing_row_indexes += range(expected_row_index, upload_object.row_count[record_type] + 2)

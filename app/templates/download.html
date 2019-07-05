@@ -40,14 +40,18 @@
                 </div>
                 <h3>Record type</h3>
                     <dd>{{  download_form.record_type }}</dd>
-			    <h3>Features</h3>
-                    <div id='feature_selection'>
-                        <dd>{{  render_field (download_form.feature_group) }}</dd>
+			    <h3>Input variables</h3>
+                    <p>
+                        Currently data retrieval through this page is limited to extracting submitted data
+                        as it corresponds to input variables.
+                    </p>
+                    <div id='input_variable_selection'>
+                        <dd>{{  render_field (download_form.input_group) }}</dd>
                         <br>
-                            <input title='select_all_features' id='select_all_features' type='checkbox'>
+                            <input title='select_all_input_variables' id='select_all_input_variables' type='checkbox'>
                                 <label>Select all</label>
-                                <ul id='select_features'></ul>
-                        <div id="feature_checkbox_div"></div>
+                                <ul id='select_input_variables'></ul>
+                        <div id="input_variable_checkbox_div"></div>
                     </div>
             <h2>Generate file</h2>
                 <dt>{{ download_form.data_format }}  {{ download_form.file_type }}</dt> <br>

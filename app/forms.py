@@ -26,7 +26,7 @@ from flask_wtf import FlaskForm
 from flask_wtf.file import FileField, FileRequired
 # from app import app
 from app.models import (
-	FeatureList,
+	InputList,
 	SelectionList,
 	Parsers,
 	User
@@ -665,17 +665,18 @@ class DownloadForm(FlaskForm):
 		],
 		description="List of replicate IDs, e.g. '1, 2-5' "
 	)
-	feature_group = SelectField(
-		'Feature group',
+	input_group = SelectField(
+		'Input group',
 		[Optional()],
-		description="Feature group to select fields for form/template",
+		description="Select group of input variables for form/template",
 		choices=[("", "Select group")]
 	)
-	select_features = SelectMultipleField(
+	select_inputs = SelectMultipleField(
 		[Optional()],
 		coerce=unicode,
 		option_widget=widgets.CheckboxInput(),
 		widget=widgets.ListWidget(prefix_label=False),
+		description="Select individual input variables to include in the form/template",
 		choices=[]
 	)
 	data_format = SelectField(
@@ -697,14 +698,14 @@ class DownloadForm(FlaskForm):
 		form.item_level.choices = [('', 'Any')] + SelectionList.get_item_levels()
 		item_level = form.item_level.data if form.item_level.data not in ['', 'None'] else None
 		record_type = form.record_type.data if form.record_type.data not in ['', 'None'] else None
-		form.feature_group.choices = [('', 'Any')] + SelectionList.get_feature_groups(item_level, record_type)
-		selected_feature_group = form.feature_group.data if form.feature_group.data not in ['', 'None'] else None
-		features_details = FeatureList(
+		form.input_group.choices = [('', 'Any')] + SelectionList.get_input_groups(item_level, record_type)
+		selected_input_group = form.input_group.data if form.input_group.data not in ['', 'None'] else None
+		inputs_details = InputList(
 			item_level,
 			record_type
-		).get_features(feature_group=selected_feature_group)
-		features_list = [(feature['name_lower'], feature['name']) for feature in features_details]
-		form.select_features.choices = features_list
+		).get_inputs(input_group=selected_input_group)
+		inputs_list = [(input_variable['name_lower'], input_variable['name']) for input_variable in inputs_details]
+		form.select_inputs.choices = inputs_list
 		return form
 
 
@@ -754,17 +755,18 @@ class RecordForm(FlaskForm):
 		],
 		description="Number of replicated trait measurements or curves per item at each time point"
 	)
-	feature_group = SelectField(
-		'Feature group',
+	input_group = SelectField(
+		'Input group',
 		[InputRequired()],
-		description="Feature group to select fields for form/template",
+		description="Input variable group to select fields for form/template",
 		choices=[("", "Select group")]
 	)
-	select_features = SelectMultipleField(
+	select_inputs = SelectMultipleField(
 		[InputRequired()],
 		coerce=unicode,
 		option_widget=widgets.CheckboxInput(),
 		widget=widgets.ListWidget(prefix_label=False),
+		description='Select input variables to include',
 		choices=[]
 	)
 	record_time = DateField(
@@ -799,17 +801,17 @@ class RecordForm(FlaskForm):
 		form.item_level.choices = SelectionList.get_item_levels()
 		item_level = form.item_level.data if form.item_level.data not in ['', 'None'] else None
 		record_type = form.record_type.data if form.record_type.data not in ['', 'None'] else None
-		form.feature_group.choices += SelectionList.get_feature_groups(item_level, record_type)
+		form.input_group.choices += SelectionList.get_input_groups(item_level, record_type)
 		if record_type == 'trait':
 			form.template_format.choices.append(('fb', 'Field Book'))
-		selected_feature_group = form.feature_group.data if form.feature_group.data not in ['', 'None'] else None
-		if selected_feature_group:
-			features_details = FeatureList(
+		selected_input_group = form.input_group.data if form.input_group.data not in ['', 'None'] else None
+		if selected_input_group:
+			inputs_details = InputList(
 				item_level,
 				record_type
-			).get_features(feature_group=selected_feature_group)
-			features_list = [(feature['name_lower'], feature['name']) for feature in features_details]
-			form.select_features.choices = features_list
+			).get_inputs(input_group=selected_input_group)
+			inputs_list = [(input_variable['name_lower'], input_variable['name']) for input_variable in inputs_details]
+			form.select_inputs.choices = inputs_list
 		return form
 
 

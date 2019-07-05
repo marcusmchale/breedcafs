@@ -179,7 +179,7 @@ class SelectionList:
 		return [tuple(record[0]) for record in result]
 
 	@staticmethod
-	def get_feature_groups(item_level, record_type):
+	def get_input_groups(item_level, record_type):
 		parameters = {
 			"item_level": item_level,
 			"record_type": record_type
@@ -187,37 +187,37 @@ class SelectionList:
 		if item_level and record_type:
 			statement = (
 				' MATCH '
-				'	(feature_group: FeatureGroup) '
-				'	<-[:IN_GROUP]-(feature: Feature) '
+				'	(input_group: InputGroup) '
+				'	<-[:IN_GROUP]-(input: Input) '
 				'	-[:AT_LEVEL]->(: ItemLevel {name_lower: toLower($item_level)}), '
-				'	(feature)-[:OF_TYPE]->(: RecordType {name_lower: toLower($record_type)}) '
+				'	(input)-[:OF_TYPE]->(: RecordType {name_lower: toLower($record_type)}) '
 			)
 		elif item_level:
 			statement = (
 				' MATCH '
-				'	(feature_group: FeatureGroup) '
-				'	<-[:IN_GROUP]-(: Feature) '
+				'	(input_group: InputGroup) '
+				'	<-[:IN_GROUP]-(: Input) '
 				'	-[:AT_LEVEL]->(: ItemLevel {name_lower: toLower($item_level)}) '
 			)
 		elif record_type:
 			statement = (
 				' MATCH '
-				'	(feature_group: FeatureGroup) '
-				'	<-[:IN_GROUP]-(: Feature) '
+				'	(input_group: InputGroup) '
+				'	<-[:IN_GROUP]-(: Input) '
 				'	-[:OF_TYPE]->(: RecordType {name_lower: toLower($record_type)}) '
 			)
 		else:
 			statement = (
 				' MATCH '
-				'	(feature_group: FeatureGroup) '
+				'	(input_group: InputGroup) '
 			)
 		statement += (
-				' WITH DISTINCT (feature_group) '
+				' WITH DISTINCT (input_group) '
 				' RETURN [ '
-				'	feature_group.name_lower, '
-				'	feature_group.name '
+				'	input_group.name_lower, '
+				'	input_group.name '
 				' ] '
-				' ORDER BY feature_group.name_lower '
+				' ORDER BY input_group.name_lower '
 		)
 		with get_driver().session() as neo4j_session:
 			result = neo4j_session.read_transaction(
@@ -669,15 +669,15 @@ class ItemList:
 		return [record[0] for record in result]
 
 
-class FeatureList:
+class InputList:
 	def __init__(self, item_level, record_type):
 		self.item_level = item_level
 		self.record_type = record_type
 
-	def get_features(
+	def get_inputs(
 			self,
-			feature_group=None,
-			features=None
+			input_group=None,
+			inputs=None
 	):
 		parameters = {
 			"record_type": self.record_type,
@@ -687,42 +687,42 @@ class FeatureList:
 			statement = (
 				' MATCH '
 				'	(: RecordType {name_lower: toLower($record_type)})'
-				'	<-[:OF_TYPE]-(feature: Feature) '
+				'	<-[:OF_TYPE]-(input: Input) '
 				'	-[:AT_LEVEL]->(: ItemLevel {name_lower: toLower($item_level)}) '
 			)
 		elif self.record_type:
 			statement = (
 				' MATCH '
 				'	(: RecordType {name_lower: toLower($record_type)})'
-				'	<-[:OF_TYPE]-(feature: Feature) '
+				'	<-[:OF_TYPE]-(input: Input) '
 			)
 		elif self.item_level:
 			statement = (
 				' MATCH '
-				'	(feature:Feature) '
+				'	(input: Input) '
 				'	-[:AT_LEVEL]->(: ItemLevel {name_lower: toLower($item_level)}) '
 			)
 		else:
 			statement = (
-				' MATCH (feature: Feature) '
+				' MATCH (input: Input) '
 			)
-		if feature_group:
-			parameters['feature_group'] = feature_group
+		if input_group:
+			parameters['input_group'] = input_group
 			statement += (
 				' , '
-				'	(feature)'
-				'	-[:IN_GROUP]->(: FeatureGroup { '
-				'		name_lower: toLower($feature_group) '
+				'	(input)'
+				'	-[:IN_GROUP]->(: InputGroup { '
+				'		name_lower: toLower($input_group) '
 				'	}) '
 			)
-		if features:
-			parameters['features'] = features
+		if inputs:
+			parameters['inputs'] = inputs
 			statement += (
-				' WHERE feature.name_lower IN extract(item IN $features | toLower(trim(item))) '
+				' WHERE input.name_lower IN extract(item IN $inputs | toLower(trim(item))) '
 			)
 		statement += (
-			' RETURN properties(feature) '
-			' ORDER BY feature.name_lower '
+			' RETURN properties(input) '
+			' ORDER BY input.name_lower '
 		)
 		with get_driver().session() as neo4j_session:
 			result = neo4j_session.read_transaction(

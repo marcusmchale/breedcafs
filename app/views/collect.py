@@ -88,12 +88,12 @@ def register_samples():
 					per_item_count
 				):
 					download_object.item_level = "sample"
-					download_object.set_features(
+					download_object.set_inputs(
 						'sample',
-						feature_group="Registration",
+						input_group="Registration",
 						sample_level=level
 					)
-					# drop some items from the self.features list to avoid confusion when they aren't relevant
+					# drop some items from the self.inputs list to avoid confusion when they aren't relevant
 					download_object.id_list_to_xlsx_template(
 						base_filename="Sample Registration Template",
 					)

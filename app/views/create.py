@@ -216,9 +216,9 @@ def add_trees():
 						count
 				):
 					download_object.item_level = "tree"
-					download_object.set_features(
+					download_object.set_inputs(
 						'tree',
-						feature_group="Registration"
+						input_group="Registration"
 					)
 					download_object.id_list_to_xlsx_template(
 						base_filename="Tree Registration Template",

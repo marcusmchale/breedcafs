@@ -42,7 +42,7 @@ from app.models import (
 	Parsers,
 	Download,
 	User,
-	FeatureList,
+	InputList,
 	SelectionList
 )
 
@@ -103,14 +103,14 @@ def generate_template():
 				sample_id_list = (
 					Parsers.parse_range_list(request.form['sample_id_list']) if request.form['sample_id_list'] != '' else None
 				)
-				if 'select_features' in request.form:
-					selected_features = request.form.getlist('select_features')
+				if 'select_inputs' in request.form:
+					selected_inputs = request.form.getlist('select_inputs')
 				else:
-					selected_features = None
-				features_dict = {}
+					selected_inputs = []
+				inputs_dict = {}
+				for input_variable in selected_inputs:
+					inputs_dict[input_variable] = request.form[input_variable]
 				template_format = request.form['template_format']
-				for feature in selected_features:
-					features_dict[feature] = request.form[feature]
 				record_data = {
 					'record_type': record_type,
 					'time_points': time_points,
@@ -123,8 +123,8 @@ def generate_template():
 					'block_uid': block_uid,
 					'tree_id_list': tree_id_list,
 					'sample_id_list': sample_id_list,
-					'selected_features': selected_features,
-					'features_dict': features_dict,
+					'selected_inputs': selected_inputs,
+					'inputs_dict': inputs_dict,
 					'template_format': template_format
 				}
 				download_object = Download(username)
@@ -197,19 +197,19 @@ def submit_records():
 				record_form.validate_on_submit(),
 				location_form.validate_on_submit()
 			]):
-				class FeatureFormDetailed(RecordForm):
+				class InputFormDetailed(RecordForm):
 					pass
 
 				item_level = record_form.item_level.data if record_form.item_level.data not in ['', 'None'] else None
 				record_type = record_form.record_type.data if record_form.record_type.data not in ['', 'None'] else None
-				features_details = FeatureList(
+				inputs_details = InputList(
 					item_level,
 					record_type
-				).get_features(features=record_form['select_features'].data)
-				for feature in features_details:
-					if feature['format'] in ["numeric", "percent"]:
-						min_value = feature['minimum'] if 'minimum' in feature else None
-						max_value = feature['maximum'] if 'maximum' in feature else None
+				).get_inputs(inputs=record_form['select_input_variables'].data)
+				for input_variable in inputs_details:
+					if input_variable['format'] in ["numeric", "percent"]:
+						min_value = input_variable['minimum'] if 'minimum' in input_variable else None
+						max_value = input_variable['maximum'] if 'maximum' in input_variable else None
 						if all([min_value, max_value]):
 							validator_message = (
 									'Must be between ' +
@@ -230,8 +230,8 @@ def submit_records():
 						else:
 							validator_message = "Number range error"
 						setattr(
-							FeatureFormDetailed,
-							feature['name_lower'],
+							InputFormDetailed,
+							input_variable['name_lower'],
 							DecimalField(
 								validators=[
 									InputRequired(),
@@ -241,45 +241,45 @@ def submit_records():
 										message=validator_message
 									)
 								],
-								description=feature['details']
+								description=input_variable['details']
 							)
 						)
-					elif feature['format'] == "date":
+					elif input_variable['format'] == "date":
 						setattr(
-							FeatureFormDetailed,
-							feature['name_lower'],
+							InputFormDetailed,
+							input_variable['name_lower'],
 							DateField(
 								validators=[InputRequired()],
-								description=feature['details']
+								description=input_variable['details']
 							)
 						)
-					elif feature['format'] == "categorical":
+					elif input_variable['format'] == "categorical":
 						categories_list = [
-							(category, category) for category in feature['category_list']
+							(category, category) for category in input_variable['category_list']
 						]
 						setattr(
-							FeatureFormDetailed,
-							feature['name_lower'],
+							InputFormDetailed,
+							input_variable['name_lower'],
 							SelectField(
 								validators=[InputRequired()],
 								choices=categories_list,
-								description=feature['details']
+								description=input_variable['details']
 							)
 						)
-					elif feature['format'] == "boolean":
+					elif input_variable['format'] == "boolean":
 						setattr(
-							FeatureFormDetailed,
-							feature['name_lower'],
+							InputFormDetailed,
+							input_variable['name_lower'],
 							BooleanField(
 								validators=[InputRequired()],
-								description=feature['details']
+								description=input_variable['details']
 							)
 						)
-					elif feature['format'] == "text":
-						if 'time' in feature['name_lower']:
+					elif input_variable['format'] == "text":
+						if 'time' in input_variable['name_lower']:
 							setattr(
-								FeatureFormDetailed,
-								feature['name_lower'],
+								InputFormDetailed,
+								input_variable['name_lower'],
 								StringField(
 									validators=[
 										InputRequired(),
@@ -288,24 +288,24 @@ def submit_records():
 											message='Please use time format HH:mm e.g. 13:00 '
 										)
 									],
-									description=feature['details']
+									description=input_variable['details']
 								)
 							)
-						elif feature['name_lower'] == 'assign to block':
+						elif input_variable['name_lower'] == 'assign to block':
 							setattr(
-								FeatureFormDetailed,
-								feature['name_lower'],
+								InputFormDetailed,
+								input_variable['name_lower'],
 								IntegerField(
 									validators=[
 										InputRequired()
 									],
-									description=feature['details']
+									description=input_variable['details']
 								)
 							)
-						elif feature['name_lower'] == 'assign to trees':
+						elif input_variable['name_lower'] == 'assign to trees':
 							setattr(
-								FeatureFormDetailed,
-								feature['name_lower'],
+								InputFormDetailed,
+								input_variable['name_lower'],
 								StringField(
 									validators=[
 										InputRequired(),
@@ -315,44 +315,44 @@ def submit_records():
 										),
 										range_list_check
 									],
-									description=feature['details']
+									description=input_variable['details']
 								)
 							)
 						else:
 							setattr(
-								FeatureFormDetailed,
-								feature['name_lower'],
+								InputFormDetailed,
+								input_variable['name_lower'],
 								StringField(
 									validators=[
 										InputRequired(),
 										Length(min=1, max=100, message='Maximum 100 characters')
 									],
-									description=feature['details']
+									description=input_variable['details']
 								)
 							)
-				detailed_record_form = FeatureFormDetailed()
+				detailed_record_form = InputFormDetailed()
 				detailed_record_form.record_type.choices = [('', 'Any')] + SelectionList.get_record_types()
 				detailed_record_form.item_level.choices = SelectionList.get_item_levels()
 				item_level = record_form.item_level.data if record_form.item_level.data not in ['', 'None'] else None
 				record_type = record_form.record_type.data if record_form.record_type.data not in ['', 'None'] else None
-				detailed_record_form.feature_group.choices += SelectionList.get_feature_groups(item_level, record_type)
+				detailed_record_form.input_group.choices += SelectionList.get_input_groups(item_level, record_type)
 				if record_type == 'trait':
 					detailed_record_form.template_format.choices.append(('fb', 'Field Book'))
 					detailed_record_form.record_time.validators = [InputRequired()]
-				selected_feature_group = (
-					record_form.feature_group.data if record_form.feature_group.data not in [
+				selected_input_group = (
+					record_form.input_group.data if record_form.input_group.data not in [
 						'',	'None'
 					] else None
 				)
-				if selected_feature_group:
-					features_details = FeatureList(
+				if selected_input_group:
+					inputs_details = InputList(
 						item_level,
 						record_type
-					).get_features(feature_group=selected_feature_group)
-					features_list = [(feature['name_lower'], feature['name']) for feature in features_details]
-					detailed_record_form.select_features.choices = features_list
-				features_list = [(feature['name_lower'], feature['name']) for feature in features_details]
-				detailed_record_form.select_features.choices = features_list
+					).get_inputs(input_group=selected_input_group)
+					inputs_list = [(input_variable['name_lower'], input_variable['name']) for input_variable in inputs_details]
+					detailed_record_form.select_inputs.choices = inputs_list
+				inputs_list = [(input_variable['name_lower'], input_variable['name']) for input_variable in inputs_details]
+				detailed_record_form.select_inputs.choices = inputs_list
 				if all([
 					detailed_record_form.validate_on_submit(),
 					location_form.validate_on_submit()
@@ -394,13 +394,13 @@ def submit_records():
 						return jsonify({
 							'submitted': 'Please make sure the start date is before the end date'
 						})
-					if 'select_features' in request.form:
-						selected_features = request.form.getlist('select_features')
+					if 'select_input_variables' in request.form:
+						selected_inputs = request.form.getlist('select_input_variables')
 					else:
-						selected_features = None
-					features_dict = {}
-					for feature in selected_features:
-						features_dict[feature] = request.form[feature]
+						selected_inputs = None
+					inputs_dict = {}
+					for input_variable in selected_inputs:
+						inputs_dict[input_variable] = request.form[input_variable]
 					record_data = {
 						'record_type': record_type,
 						'item_level': item_level,
@@ -414,8 +414,8 @@ def submit_records():
 						'record_time': record_time,
 						'start_time': start_time,
 						'end_time': end_time,
-						'selected_features': selected_features,
-						'features_dict': features_dict
+						'selected_inputs': selected_inputs,
+						'inputs_dict': inputs_dict
 					}
 					result = Record(username).submit_records(record_data)
 					return result

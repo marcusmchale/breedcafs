@@ -27,20 +27,20 @@
                     <h3>Selection</h3>
                     <p><a>0</a> <a>items</a></p>
                 </div>
-                <h3>Filter features by type</h3>
+                <h3>Filter input variables by type</h3>
                 <p>Optional for templates</p>
                 <dd>{{  record_form.record_type }}</dd>
-                <div id='feature_selection'>
-                    <h3>Select features</h3>
-                        <dd>{{  render_field (record_form.feature_group) }}</dd>
-                        <div id="feature_checkbox_div"></div>
+                <div id='input_variable_selection'>
+                    <h3>Select input variables</h3>
+                        <dd>{{  render_field (record_form.input_group) }}</dd>
+                        <div id="input_variable_checkbox_div"></div>
                     <br><br>
                 </div>
                 <div id="replicates_div" title="Number of replicated measures per item">
                     <h3>Replicates</h3>
                         <h4>Time points</h4>
                             <p>
-                                Number of values per item for each feature.
+                                Number of values per item for each input.
                                 This is to support a single template for trait/condition values at multiple times/periods.
                             </p>
                             {{  render_field (record_form.time_points) }}<br>

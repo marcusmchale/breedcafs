@@ -41,7 +41,7 @@
                 with UID 1. Blocks are best added first so that subsequent <a href="#trees">Trees</a>
                 may be registered directly into a Block.
                 However, <a href="#trees">Trees</a> may be later assigned to a
-                Block (must be in the same field) by recording the registered block name in the "Assign to block" feature.
+                Block (must be in the same field) by recording the registered block name in the "Assign to block" input variable.
 			</p>
 		<h3 id="trees">Trees</h3>
 			<p>
@@ -52,7 +52,7 @@
             <p>
                 In registering Trees you are be provided a BreedCAFS template listing the Tree UIDs and allowing you
                 to record details for later <a href="#upload">submission</a>. This same template can also be generated on the
-                <a href="#record">Record</a> page by selecting the "Registration" feature group.
+                <a href="#record">Record</a> page by selecting the "Registration" input group.
             </p>
 
 	<h2 id="samples">
@@ -99,7 +99,7 @@
                 When you register samples you are provided a BreedCAFS template detailing the sample UIDs
                 and allowing you to record details for later <a href="#upload">submission</a>.
                 This same template can also be generated on the
-                <a href="#record">Record</a> page by selecting the "Registration" feature group.
+                <a href="#record">Record</a> page by selecting the "Registration" input group.
             </p>
     <h2 id="record">
         <a href="{{ url_for('record') }}">
@@ -130,28 +130,28 @@
             The number of items selected is displayed under "Selection".
         </p>
         <h3>
-            Features
+            Input variables
         </h3>
         <p>
-            Once you have established your selection of items, you may now select the features
-            for which you intend to record data. Features fall into four supported record types,
+            Once you have established your selection of items, you may now select the variables
+            for which you intend to record data. Input variables fall into four supported record types,
             <a href="#properties">Properties</a>,
             <a href="#traits">Traits</a>,
             <a href="#curves">Curves</a> and
             <a href="#conditions">Conditions</a>.
         <p>
-            Features are further organised into groups to facilitate selection (even across multiple record types).
-            Select a group and then chose from among the features in that group.
-            If the group of features you would like to select is not available then please contact an admin
-            to create a new feature group.
+            Input variables are further organised into groups to facilitate selection (even across multiple record types).
+            Select a group and then chose from among the variables in that group.
+            If the group of variables you would like to select is not available then please contact an admin
+            to create a new group.
         </p>
         <h3 id="spreadsheet">Spreadsheet software</h3>
             <p>
                 In most cases users are familiar with <a href="#spreadsheet">spreadsheet table templates</a>
                 for data collection.
-                In BreedCAFS templates the features are split into a worksheet per record type
-                and a worksheet per feature for curve records.
-                Additional worksheets are provided with details about the item (Item Details) and features (Feature Details).
+                In BreedCAFS templates the input variables are split into a worksheet per record type
+                and a worksheet per variable for curve type variables.
+                Additional worksheets are provided with details about the item (Item Details) and input variables (Input Variable Details).
             </p>
             <p>
                 If you are aggregating data from multiple periods of recording you may want a table that contains
@@ -161,7 +161,7 @@
                 at a single time-point (see <a href="#traits">traits</a> description for details).
             </p>
             <p>
-                To generate spreadsheet table templates for the selected items and features,
+                To generate spreadsheet table templates for the selected items and input variables,
                 simply select "Table (xlsx)" in the drop down box (selected by default)
                 and click "Generate template".
             </p>
@@ -175,7 +175,7 @@
                 and curves are not supported.
             </p>
             <p>
-                With items, features and record type selected, simply enter values for all selected features and click submit.
+                With items, input variables and record type selected, simply enter values for all selected input variables and click submit.
                 You will receive a report in the browser window that will either confirm your submission or warn of errors and/or conflicts.
             </p>
         <h3 id = "field book">Field Book application</h3>
@@ -189,7 +189,7 @@
                 To generate the Field Book input files the "Trait" record type must be selected.
             </p>
             <p>
-                With items, features and record type selected, simply select "Field Book (csv)"
+                With items, input variables and record type selected, simply select "Field Book (csv)"
                 in the drop down box and click "Generate template".
             </p>
         <h3>Record Types</h3>
@@ -215,7 +215,7 @@
                 (see <a href="#traits">traits</a> description for details).
             </p>
             <p>
-                The templates for curve features are generated as a worksheet for each feature.
+                The templates for curve input variables are generated as a worksheet for each input variable.
                 These worksheets will include column headers for the required (UID, Date) and optional (Time, Person) details
                 while the rest of the worksheet is left blank. To input data into these worksheets, simply include the "X" value
                 as a column header and the "Y" value in the corresponding row. Both "X" and "Y" values must be floating point numbers.

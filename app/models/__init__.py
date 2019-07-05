@@ -1,7 +1,7 @@
 from user import User
 from upload import Upload, Resumable
 from lists import (
-	FeatureList,
+	InputList,
 	ItemList,
 	SelectionList
 )

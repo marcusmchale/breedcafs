@@ -19,7 +19,7 @@ from app.models import (
 	User,
 	Download,
 	SelectionList,
-	FeatureList,
+	InputList,
 	Parsers
 )
 from app.forms import (
@@ -33,8 +33,8 @@ from app.emails import (
 from datetime import datetime, timedelta
 
 
-@app.route("/feature_groups")
-def feature_groups():
+@app.route("/input_groups")
+def input_groups():
 	item_level = request.args.get('item_level', None)
 	record_type = request.args.get('record_type', None)
 	if 'username' not in session:
@@ -42,8 +42,8 @@ def feature_groups():
 		return redirect(url_for('login'))
 	else:
 		try:
-			feature_groups_list = SelectionList.get_feature_groups(item_level, record_type)
-			response = make_response(jsonify(feature_groups_list))
+			input_groups_list = SelectionList.get_input_groups(item_level, record_type)
+			response = make_response(jsonify(input_groups_list))
 			response.content_type = 'application/json'
 			return response
 		except (ServiceUnavailable, SecurityError):
@@ -51,18 +51,18 @@ def feature_groups():
 			return redirect(url_for('index'))
 
 
-@app.route("/features")
-def features():
+@app.route("/inputs")
+def inputs():
 	item_level = request.args.get('item_level', None)
 	record_type = request.args.get('record_type', None)
-	feature_group = request.args.get('feature_group', None)
+	input_group = request.args.get('input_group', None)
 	if 'username' not in session:
 		flash('Please log in')
 		return redirect(url_for('login'))
 	else:
 		try:
-			features_details = FeatureList(item_level, record_type).get_features(feature_group=feature_group)
-			response = make_response(jsonify(features_details))
+			inputs_details = InputList(item_level, record_type).get_inputs(input_group=input_group)
+			response = make_response(jsonify(inputs_details))
 			response.content_type = 'application/json'
 			return response
 		except (ServiceUnavailable, SecurityError):
@@ -219,10 +219,10 @@ def generate_file():
 						request.form['replicate_id_list']
 					) if request.form['replicate_id_list'] != '' else None
 				)
-				if 'select_features' in request.form:
-					selected_features = request.form.getlist('select_features')
+				if 'select_input_variables' in request.form:
+					selected_inputs = request.form.getlist('select_input_variables')
 				else:
-					selected_features = None
+					selected_inputs = None
 				parameters = {
 					'username': username,
 					'submission_start': submission_start,
@@ -239,7 +239,7 @@ def generate_file():
 					'tree_id_list': tree_id_list,
 					'sample_id_list': sample_id_list,
 					'replicate_id_list': replicate_id_list,
-					'selected_features': selected_features
+					'selected_inputs': selected_inputs
 				}
 				records = download_object.collect_records(parameters, data_format)
 				return jsonify(download_object.records_to_file(records, data_format, file_type))
