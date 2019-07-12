@@ -90,7 +90,7 @@ RECORD_TYPES = [
 # record type to worksheet name dictionary
 WORKSHEET_NAMES = {
 	'hidden': 'hidden',
-	'feature_details': 'Feature Details (Reference)',
+	'input_details': 'Input Variables (Reference)',
 	'item_details': 'Item Details (Reference)',
 	'mixed': 'Records',
 	'property': 'Properties (Input)',
@@ -98,15 +98,15 @@ WORKSHEET_NAMES = {
 	'condition': 'Conditions (Input)'
 }
 
-REFERENCE_WORKSHEETS = ['item_details', 'feature_details', 'hidden']
+REFERENCE_WORKSHEETS = ['item_details', 'input_details', 'hidden']
 
 # The below are used in initialise_db.py
 CONSTRAINTS = [
 	# User/Partner
 	{'node': 'User', 'property': 'username_lower', 'constraint': 'IS UNIQUE'},
 	{'node': 'Partner', 'property': 'name_lower', 'constraint': 'IS UNIQUE'},
-	# Features
-	{'node': 'Feature', 'property': 'name_lower', 'constraint': 'IS UNIQUE'},
+	# Input variables
+	{'node': 'Input', 'property': 'name_lower', 'constraint': 'IS UNIQUE'},
 	# Items (Fields/Blocks/Trees/Samples)
 	# all these should be created with the Item label
 	{'node': 'Item', 'property': 'uid', 'constraint': 'IS UNIQUE'},

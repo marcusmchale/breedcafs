@@ -114,11 +114,11 @@ def delete_data(tx):
 	)
 
 
-def delete_features(tx):
+def delete_inputs(tx):
 	tx.run(
 		' MATCH '
-		'	(feature:Feature) ' 
-		' DETACH DELETE feature '
+		'	(input:Input) ' 
+		' DETACH DELETE input '
 	)
 
 
@@ -226,17 +226,18 @@ def create_partners(tx, partner_list):
 				)
 
 
-def create_features(tx, features_file):
-	with open(features_file, 'rb') as features_csv:
-		reader = csv.DictReader(features_csv, delimiter=',', quotechar='"')
-		for feature in reader:
-			feature_create = tx.run(
+def create_inputs(tx, inputs_file):
+	with open(inputs_file, 'rb') as inputs_csv:
+		reader = csv.DictReader(inputs_csv, delimiter=',', quotechar='"')
+		for input_variable in reader:
+			input_create = tx.run(
 				' MERGE '
-				'	(f:Feature { '
+				'	(f:Input { '
 				'		name_lower: toLower(trim($name)) '
 				'	}) '
 				'	ON CREATE SET '
 				'		f.name = trim($name), '
+				'		f.notes = trim($notes), '
 				'		f.format = toLower(trim($format)), '
 				'		f.minimum = CASE '
 				'			WHEN size(trim($minimum)) = 0 '
@@ -268,13 +269,13 @@ def create_features(tx, features_file):
 				'	ON CREATE SET record_type.name = trim($type) '
 				' FOREACH (group in extract(x in split($groups, "/") | trim(x)) | '
 				'	MERGE '
-				'		(feature_group: FeatureGroup {'
+				'		(input_group: InputGroup {'
 				'			name_lower:toLower(trim(group))'
 				'		}) '
 				'		ON CREATE SET '
-				'			feature_group.name = trim(group) '
+				'			input_group.name = trim(group) '
 				' 	MERGE '
-				'		(f)-[:IN_GROUP]->(feature_group) '
+				'		(f)-[:IN_GROUP]->(input_group) '
 				' ) '
 				' FOREACH (level in extract(x in split($levels, "/") | trim(x)) | '
 				'	MERGE '
@@ -287,31 +288,32 @@ def create_features(tx, features_file):
 				'		(f)-[:AT_LEVEL]->(item_level) '
 				' ) '
 				' RETURN f.found ',
-				type=feature['type'],
-				groups=feature['groups'],
-				levels=feature['levels'],
-				name=feature['name'],
-				format=feature['format'],
-				minimum=feature['minimum'],
-				maximum=feature['maximum'],
-				details=feature['details'],
-				categories=feature['categories']
+				type=input_variable['type'],
+				groups=input_variable['groups'],
+				levels=input_variable['levels'],
+				name=input_variable['name'],
+				format=input_variable['format'],
+				minimum=input_variable['minimum'],
+				maximum=input_variable['maximum'],
+				details=input_variable['details'],
+				categories=input_variable['categories'],
+				notes=input_variable['notes']
 			)
-			for record in feature_create:
+			for record in input_create:
 				if record['f.found']:
-					print ('Found feature ' + feature['name'])
+					print ('Found input variable ' + input_variable['name'])
 				elif not record['f.found']:
-					print ('Created feature: ' + feature['name'])
+					print ('Created input variable: ' + input_variable['name'])
 				else:
-					print ('Error with merger of feature: ' + feature['name'])
+					print ('Error with merger of input variable: ' + input_variable['name'])
 
 
 def create_trials(tx, trials):
-	# also creates the variety name feature and list of varieties as its categories
+	# also creates the variety name input and list of varieties as its categories
 	# as well as a number of known locations (from trial information)
 	tx.run(
-		' MATCH (feature: Feature {name_lower: "variety name"}) '
-		' SET feature.category_list = [] '
+		' MATCH (input: Input {name_lower: "variety name"}) '
+		' SET input.category_list = [] '
 	)
 	for trial in trials:
 		# TODO major revision to handle the field trials that span multiple regions/farms.
@@ -401,22 +403,22 @@ def create_trials(tx, trials):
 					name=trial['name'],
 					country=trial['country']
 				)
-		# add a relationship between the trial and the "variety name" feature
+		# add a relationship between the trial and the "variety name" input variable
 		# make this relationship contain a category list
 		# use this later with coalesce to obtain location dependent category lists
 		tx.run(
 			' MATCH '
 			'	(trial: Trial {uid:$uid}), '
-			'	(feature: Feature {name_lower: "variety name"}) '
+			'	(input: Input {name_lower: "variety name"}) '
 			' MERGE '
 			'	(trial)'
-			'		<-[assessed_in: ASSESSED_IN]-(feature) '
-			' SET assessed_in.category_list = [] ',
+			'		<-[recorded_in: RECORDED_IN]-(input) '
+			' SET recorded_in.category_list = [] ',
 			uid=trial['uid']
 		)
-		# now merge these varieties into the assessed_in relationship as a category_list
-		# but also collect all as categories on feature category_list
-		# will rely on a coalesce of assessed in and the feature category list to return items
+		# now merge the varieties into the recorded_in relationship as a category_list
+		# but also collect all as categories on input category_list
+		# will rely on a coalesce of assessed in and the input category list to return items
 		# also create the varieties
 		for variety_type in trial['varieties']:
 			for variety in trial['varieties'][variety_type]:
@@ -424,19 +426,19 @@ def create_trials(tx, trials):
 					' MATCH '
 					'	(trial: Trial { '
 					'		uid: $trial '
-					'	})<-[assessed_in:ASSESSED_IN]-(feature: Feature { '
+					'	})<-[recorded_in:RECORDED_IN]-(input: Input { '
 					'		name_lower: "variety name" '
 					'	}) '
 					' SET '
-					'	assessed_in.category_list = CASE '
-					'		WHEN $variety IN assessed_in.category_list '
-					'		THEN assessed_in.category_list '
-					'		ELSE assessed_in.category_list + $variety '
+					'	recorded_in.category_list = CASE '
+					'		WHEN $variety IN recorded_in.category_list '
+					'		THEN recorded_in.category_list '
+					'		ELSE recorded_in.category_list + $variety '
 					'		END, '
-					'	feature.category_list = CASE '
-					'		WHEN $variety IN feature.category_list '
-					'		THEN feature.category_list '
-					'		ELSE feature.category_list + $variety '
+					'	input.category_list = CASE '
+					'		WHEN $variety IN input.category_list '
+					'		THEN input.category_list '
+					'		ELSE input.category_list + $variety '
 					'		END '
 					' MERGE '
 					'	(variety: Variety { '
@@ -448,11 +450,13 @@ def create_trials(tx, trials):
 					'		variety.found = False '
 					'	ON MATCH SET '
 					'		variety.found = True '
+					' MERGE '
+					'	(variety)-[:ASSESSED_IN]->(trial) '
 					' RETURN '
 					'	variety.name, variety.found ',
-					variety = variety,
-					trial = trial['uid'],
-					variety_type = variety_type
+					variety=variety,
+					trial=trial['uid'],
+					variety_type=variety_type
 				)
 				for record in variety_create:
 					print ("Created" if record[1] else "Found"), record[0]
@@ -520,40 +524,41 @@ def create_trials(tx, trials):
 	)
 	# now sort the list of variety names (this sorting will handle numbers better than a simple string sort does)
 	tx.run(
-		' MATCH (feature: Feature {name_lower: "variety name"}) '
-		' WITH feature, feature.category_list as L '
+		' MATCH (input: Input {name_lower: "variety name"}) '
+		' WITH input, input.category_list as L '
 		' UNWIND L as l '
-		' WITH feature, coalesce(toInteger(l), l) as L ORDER BY L '
-		' WITH feature, collect(toString(L)) as l '
-		' SET feature.category_list = l '
+		' WITH input, coalesce(toInteger(l), l) as L ORDER BY L '
+		' WITH input, collect(toString(L)) as l '
+		' SET input.category_list = l '
 	)
 
 
 def create_variety_codes(tx, variety_codes):
 	tx.run(
-		' MATCH (feature: Feature {name_lower: "variety code"}) '
-		' SET feature.category_list = [] '
+		' MATCH (input: Input {name_lower: "variety code"}) '
+		' SET input.category_list = [] '
 	)
 	for item in variety_codes:
 		if item[1].lower() == item[2].lower():  # if inbred
 			result = tx.run(
-				' MATCH (feature: Feature {name_lower: "variety code"}) '
+				' MATCH (input: Input {name_lower: "variety code"}) '
 				' MERGE (var:Variety {name_lower: toLower($variety)}) '
 				'	ON CREATE SET '
 				'		var.name = $variety, '
-				'		var.found = False, '
-				'		feature.category_list = feature.category_list + $code '
+				'		var.found = False '
 				'	ON MATCH SET '
 				'		var.found = True '
-				' SET var.code = $code '
-				' SET var.code_lower = toLower($code) '
+				' SET '
+				'	var.code = $code, '
+				'	var.code_lower = toLower($code), '
+				'	input.category_list = input.category_list + $code'
 				' RETURN var.found ',
-				code = str(item[0]),
-				variety = str(item[1])
+				code=str(item[0]),
+				variety=str(item[1])
 			)
 		else:  # hybrid
 			result = tx.run(
-				' MATCH (feature: Feature {name_lower: "variety code"}) '
+				' MATCH (input: Input {name_lower: "variety code"}) '
 				' MERGE (mat:Variety {name_lower: toLower($maternal)}) '
 				'	ON CREATE SET '
 				'		mat.name = $maternal '
@@ -571,11 +576,11 @@ def create_variety_codes(tx, variety_codes):
 				' SET '
 				'	var.code = $code, '
 				'	var.code_lower = toLower($code), '
-				'	feature.category_list = feature.category_list + $code '
+				'	input.category_list = input.category_list + $code '
 				' RETURN var.found ',
-				code = str(item[0]).lower(),
-				maternal = str(item[1]).lower(),
-				paternal = str(item[2]).lower()
+				code=str(item[0]).lower(),
+				maternal=str(item[1]).lower(),
+				paternal=str(item[2]).lower()
 			)
 		print str(item[0]).lower(), str(item[1]).lower(), str(item[2]).lower()
 		for record in result:
@@ -586,12 +591,12 @@ def create_variety_codes(tx, variety_codes):
 				print "New variety created"
 	# now sort that list of codes (this sorting will handle numbers better than a simple string sort does)
 	tx.run(
-		' MATCH (feature: Feature {name_lower: "variety code"}) '
-		' WITH feature, feature.category_list as L '
+		' MATCH (input: Input {name_lower: "variety code"}) '
+		' WITH input, input.category_list as L '
 		' UNWIND L as l '
-		' WITH feature, coalesce(toInteger(l), l) as L ORDER BY L '
-		' WITH feature, collect(toString(L)) as l '
-		' SET feature.category_list = l '
+		' WITH input, coalesce(toInteger(l), l) as L ORDER BY L '
+		' WITH input, collect(toString(L)) as l '
+		' SET input.category_list = l '
 	)
 
 
@@ -610,16 +615,16 @@ if not confirm('Are you sure you want to proceed? This is should probably only b
 	sys.exit()
 else:
 	if not confirm(
-			'Would you like to remove everything? Select no to delete just the items, data or features.'
+			'Would you like to remove everything? Select no to delete just the items, data or input variables.'
 	):
 		with driver.session() as session:
 			if confirm('Would you like to delete all data?'):
 				session.write_transaction(delete_data)
 			if confirm('Would you like to delete all items?'):
 				session.write_transaction(delete_items)
-			if confirm('Would you like to delete features and varieties then recreate them from features.csv and varieties.py?'):
-				session.write_transaction(delete_features)
-				session.write_transaction(create_features, './instance/features.csv')
+			if confirm('Would you like to delete inputs and varieties then recreate them from inputs.csv and varieties.py?'):
+				session.write_transaction(delete_inputs)
+				session.write_transaction(create_inputs, './instance/inputs.csv')
 				session.write_transaction(create_trials, varieties.trials)
 				session.write_transaction(create_variety_codes, varieties.variety_codes)
 	elif confirm('Do you want to a delete everything rebuild the constraints and reset the indexes?'):
@@ -634,7 +639,7 @@ else:
 			print('creating indexes')
 			session.write_transaction(create_indexes, app.config['INDEXES'])
 			session.write_transaction(create_partners, app.config['PARTNERS'])
-			session.write_transaction(create_features, './instance/features.csv')
+			session.write_transaction(create_inputs, './instance/inputs.csv')
 			session.write_transaction(create_trials, varieties.trials)
 			session.write_transaction(create_variety_codes, varieties.variety_codes)
 			session.write_transaction(create_start_email)

@@ -89,7 +89,7 @@ class RowParseResult:
 				"  - Sample UID should include the Field and Sample ID separated by '_S' (e.g. '1_S1')\n",
 				"missing": "This UID is not found in the database. "
 			},
-			"input": {
+			"input variable": {
 				"missing": (
 					"This input variable is not found in the database. "
 					"Please check the spelling and "
@@ -380,7 +380,14 @@ class ParseResult:
 		else:
 			parsed_replicate = None
 		parsed_uid = Parsers.uid_format(row['uid'])
-		unique_key = (parsed_uid, parsed_submitted_at, parsed_time, parsed_period, parsed_replicate, row['input'])
+		unique_key = (
+			parsed_uid,
+			parsed_submitted_at,
+			parsed_time,
+			parsed_period,
+			parsed_replicate,
+			row['input variable']
+		)
 		if unique_key not in self.unique_keys:
 			self.unique_keys.add(unique_key)
 		else:
@@ -681,6 +688,7 @@ class SubmissionRecord:
 
 class SubmissionResult:
 	def __init__(self, username, filename, submission_type, record_type):
+		self.username = username
 		download_path = os.path.join(app.config['DOWNLOAD_FOLDER'], username)
 		if not os.path.isdir(download_path):
 			os.mkdir(download_path)
@@ -709,7 +717,7 @@ class SubmissionResult:
 			])
 		fieldnames = [
 			"UID",
-			"Input",
+			"Input variable",
 			"Value",
 			"Submitted by",
 			"Submitted at",
@@ -751,6 +759,7 @@ class SubmissionResult:
 			'assign_to_block': [],
 			'assign_to_trees': [],
 			'assign_to_samples': [],
+			'planted': [],
 			'tissue': [],
 			'variety': {},
 			'harvest_time': {}
@@ -779,66 +788,190 @@ class SubmissionResult:
 				return
 			submission_item.lists_to_strings()
 			self.submissions_writer.writerow(submission_item.record)
+
+			# Since sometimes a record for assign to will be submitted before the item is registered
+			# To handle this, we collect all assign to submissions and set them whether found or not
+			# TODO it might be worth considering scanning for records assigning to the item on item creation
+			# but this would be very inefficient with trees and samples.
+			if self.record_type == 'property':
+				if submission_item.record['Input variable'].lower() == 'assign to block':
+					self.property_updates['assign_to_block'].append(
+						[record['UID'], record['Value']]
+					)
+				if submission_item.record['Input variable'].lower() == 'assign to trees':
+					self.property_updates['assign_to_trees'].append(
+						[record['UID'], record['Value']]
+					)
+				if submission_item.record['Input variable'].lower() == 'assign to samples':
+					self.property_updates['assign_to_samples'].append(
+						[record['UID'], record['Value']]
+					)
 			if submission_item.record['Found']:
 				self.resubmission_count += 1
-				# Since sometimes a record for assign to will be submitted before the item is registered
-				# To handle this, we collect all assign to submissions and set them whether found or not
-				# TODO it might be worth considering scanning for records assigning to the item on item creation
-				# but this would be very inefficient with trees and samples.
-				if self.record_type == 'property':
-					if submission_item.record['Input'].lower() == 'assign to block':
-						self.property_updates['assign_to_block'].append(
-							[record['UID'], record['Value']]
-						)
-					if submission_item.record['Input'].lower() == 'assign to trees':
-						self.property_updates['assign_to_trees'].append(
-							[record['UID'], record['Value']]
-						)
-					if submission_item.record['Input'].lower() == 'assign to samples':
-						self.property_updates['assign_to_samples'].append(
-							[record['UID'], record['Value']]
-						)
 			else:
 				self.submission_count += 1
 				if self.record_type == 'property':
-					if submission_item.record['Input'].lower() == 'custom id':
+					if submission_item.record['Input variable'].lower() == 'assign custom id':
 						self.property_updates['custom_id'].append(
 							[record['UID'], record['Value']]
 						)
-					if submission_item.record['Input'].lower() == 'tissue':
+					if submission_item.record['Input variable'].lower() == 'specify tissue':
 						self.property_updates['tissue'].append(
 							[record['UID'], record['Value']]
 						)
-					if submission_item.record['Input'].lower() == 'assign to block':
-						self.property_updates['assign_to_block'].append(
+					if submission_item.record['Input variable'].lower() == 'planting date':
+						self.property_updates['planted'].append(
 							[record['UID'], record['Value']]
 						)
-					if submission_item.record['Input'].lower() == 'assign to trees':
-						self.property_updates['assign_to_trees'].append(
-							[record['UID'], record['Value']]
-						)
-					if submission_item.record['Input'].lower() == 'assign to samples':
-						self.property_updates['assign_to_samples'].append(
-							[record['UID'], record['Value']]
-						)
-					if submission_item.record['Input'].lower() == 'variety name':
+					if submission_item.record['Input variable'].lower() == 'variety name':
 						if not record['UID'] in self.property_updates['variety']:
 							self.property_updates['variety'][record['UID']] = {}
 						self.property_updates['variety'][record['UID']]['name'] = record['Value']
-					if submission_item.record['Input'].lower() == 'variety code':
+					if submission_item.record['Input variable'].lower() == 'variety code':
 						if not record['UID'] in self.property_updates['variety']:
 							self.property_updates['variety'][record['UID']] = {}
 						self.property_updates['variety'][record['UID']]['code'] = record['Value']
-					if submission_item.record['Input'].lower() == 'harvest date':
+					if submission_item.record['Input variable'].lower() == 'harvest date':
 						if not record['UID'] in self.property_updates['harvest_time']:
 							self.property_updates['harvest_time'][record['UID']] = {}
 						self.property_updates['harvest_time'][record['UID']]['date'] = record['Value']
-					if submission_item.record['Input'].lower() == 'harvest time':
+					if submission_item.record['Input variable'].lower() == 'harvest time':
 						if not record['UID'] in self.property_updates['harvest_time']:
 							self.property_updates['harvest_time'][record['UID']] = {}
 						self.property_updates['harvest_time'][record['UID']]['time'] = record['Value']
 
 	def update_properties(self, tx):
+		if self.property_updates['variety']:
+			variety = [
+				[
+					str(key),
+					value['name'] if 'name' in value else None,
+					value['code'] if 'code' in value else None
+				] for key, value in self.property_updates['variety'].iteritems()
+			]
+			statement = (
+				' UNWIND $variety AS uid_name_code '
+				'	WITH '
+				'		CASE '
+				'			WHEN size(split(uid_name_code[0], "_")) = 1 '
+				'			THEN toInteger(uid_name_code[0]) '
+				'			ELSE uid_name_code[0] '
+				'			END as uid, '
+				'		uid_name_code[1] as name, '
+				'		uid_name_code[2] as code '
+				'	MATCH '
+				'		(self: User {username_lower: toLower(trim($username))}) '
+				'		-[:AFFILIATED {data_shared:True}]->(self_partner:Partner), '
+				'		(item: Item {uid: uid}), '
+				'		(field: Field {uid: '
+				'			CASE '
+				'			WHEN toInteger(uid) IS NOT NULL '
+				'				THEN uid '
+				'			ELSE '
+				'				toInteger(split(uid, "_")[0]) '
+				'			END '
+				'		}), '
+				'		(variety: Variety) '
+				'			WHERE variety.name_lower = toLower(trim(name)) '
+				'			OR variety.code = toLower(trim(code)) '
+				'	OPTIONAL MATCH '
+				'		(name_variety: Variety {name_lower: toLower(trim(name))}) '
+				'	OPTIONAL MATCH '
+				'		(code_variety: Variety {code_lower: toLower(trim(code))}) '
+				'	OPTIONAL MATCH '
+				'		(item)-[:OF_VARIETY]->(:FieldVariety) '
+				'		-[:OF_VARIETY]->(current_variety: Variety) '
+				'	OPTIONAL MATCH '
+				'		(item)<-[:FOR_ITEM]-(ii:ItemInput) '
+				'		-[:FOR_INPUT]->(:FieldInput)-[:FOR_INPUT]->(input:Input), '
+				'		(ii)<-[:RECORD_FOR]-(record:Record) '
+				'		<-[s:SUBMITTED]-() '
+				'		<-[:SUBMITTED*..4]-(user:User) '
+				'		-[:AFFILIATED {data_shared: True}]->(p:Partner) '
+				'		WHERE input.name_lower CONTAINS "variety" '
+				'	OPTIONAL MATCH '
+				'		(self) '
+				'		-[access:AFFILIATED]->(p) '
+				'	WITH '
+				'		item, '
+				'		field, '
+				'		collect(variety)[0] as variety, '
+				'		name_variety, '
+				'		code_variety, '
+				'		current_variety, '
+				'		CASE '
+				'			WHEN access.confirmed THEN user.name + "(" + p.name + ")" '
+				'			ELSE p.name '
+				'		END as `Submitted by`, '
+				'		s.time as `Submitted at`, '
+				'		self.name + "(" + self_partner.name + ")" as tx_user '
+				'	ORDER BY field.uid, CASE WHEN toInteger(item.uid) IS NOT NULL THEN Null Else item.id END '
+				'	MERGE '
+				'		(field) '
+				'		-[: CONTAINS_VARIETY]->(fv:FieldVariety) '
+				'		-[: OF_VARIETY]->(variety) '
+				'	MERGE '
+				'		(item) '
+				'		-[: OF_VARIETY]->(fv) '
+				'	RETURN { '
+				'		UID: item.uid, '
+				'		by_name_name: name_variety.name, '
+				'		by_name_code: name_variety.code, '
+				'		by_code_name: code_variety.name, '
+				'		by_code_code: code_variety.code, '
+				'		set_variety: variety.name, '
+				'		current_variety: current_variety.name, '
+				'		`Submitted at`: `Submitted at`, '
+				'		`Submitted by`: `Submitted by`, '
+				'		tx_timestamp:  datetime.transaction().epochMillis, '
+				'		tx_user: tx_user '
+				'	} '
+			)
+			result = tx.run(statement, variety=variety, username=self.username)
+			variety_update_errors = []
+			for record in result:
+				if len(variety_update_errors) >= 5:
+					variety_update_errors.insert(0, 'Only the first 5 variety update conflicts are being reported: <br>')
+					break
+				if all([
+					record[0]['by_name_name'] and record[0]['by_code_name'],
+					record[0]['by_name_name'] != record[0]['by_code_name']
+					]):
+						variety_update_errors.append(
+							'For '
+							+ str(record[0]['UID'])
+							+ ' the variety name submitted ('
+							+ record[0]['by_name_name']
+							+ ') does not match the variety corresponding to the code submitted ( '
+							+ 'code: '
+							+ record[0]['by_code_code']
+							+ ', name: '
+							+ record[0]['by_code_name']
+							+ '). '
+						)
+				if all([
+					record[0]['current_variety'] and record[0]['set_variety'],
+					record[0]['current_variety'] != record[0]['set_variety']
+				]):
+
+					if (record[0]['tx_user'], record[0]['tx_timestamp']) != (record[0]['Submitted by'], record[0]['Submitted at']):
+						variety_update_errors.append(
+							'For '
+							+ str(record[0]['UID'])
+							+ ' the variety submitted ('
+							+ record[0]['set_variety']
+							+ ') does not match an earlier submission ('
+							+ record[0]['current_variety']
+							+ ') by '
+							+ record[0]['Submitted by']
+							+ '('
+							+ datetime.datetime.utcfromtimestamp(
+								int(record[0]['Submitted at']) / 1000
+							).strftime("%Y-%m-%d %H:%M:%S")
+							+ ')'
+						)
+			if variety_update_errors:
+				return variety_update_errors
 		if self.property_updates['custom_id']:
 			tx.run(
 				' UNWIND $custom_ids AS uid_value '
@@ -856,6 +989,15 @@ class SubmissionResult:
 				'	WHERE item.tissue IS NULL '
 				'	SET item.tissue = uid_value[1] ',
 				tissue=self.property_updates['tissue']
+			)
+		if self.property_updates['planted']:
+			tx.run(
+				' UNWIND $planted AS uid_value '
+				'	MATCH '
+				'		(item: Item {uid: uid_value[0]}) '
+				'	WHERE item.planted IS NULL '
+				'	SET item.planted = uid_value[1] ',
+				planted=self.property_updates['planted']
 			)
 		if self.property_updates['assign_to_block']:
 			statement = (
@@ -928,55 +1070,6 @@ class SubmissionResult:
 				'	) ',
 				assign_to_samples=self.property_updates['assign_to_samples']
 			)
-		if self.property_updates['variety']:
-			variety = [
-				[
-					str(key),
-					value['name'] if 'name' in value else None,
-					value['code'] if 'code' in value else None
-				] for key, value in self.property_updates['variety'].iteritems()
-			]
-			statement = (
-				' UNWIND $variety AS uid_name_code '
-				'	WITH '
-				'		CASE '
-				'			WHEN size(split(uid_name_code[0], "_")) = 1 '
-				'			THEN toInteger(uid_name_code[0]) '
-				'			ELSE uid_name_code[0] '
-				'			END as uid, '
-				'		uid_name_code[1] as name, '
-				'		uid_name_code[2] as code '
-				'	MATCH '
-				'		(item: Item {uid: uid}), '
-				'		(field: Field {uid: '
-				'			CASE '
-				'			WHEN toInteger(uid) IS NOT NULL '
-				'				THEN uid '
-				'			ELSE '
-				'				toInteger(split(uid, "_")[0]) '
-				'			END '
-				'		}), '
-				'		(variety: Variety) '
-				'		WHERE '
-				'			variety.name_lower = toLower(trim(name)) '
-				'			OR '
-				'			variety.code = toLower(trim(code)) '
-				'	OPTIONAL MATCH (item)-[:OF_VARIETY]->(existing:FieldVariety) '
-				'	WITH '
-				'		item, '
-				'		field, '
-				'		collect(variety)[0] as variety, '
-				'		existing '
-				'	WHERE existing IS NULL '
-				'	MERGE '
-				'		(field) '
-				'		-[: CONTAINS_VARIETY]->(fv:FieldVariety) '
-				'		-[: OF_VARIETY]->(variety) '
-				'	CREATE '
-				'		(item) '
-				'		-[: OF_VARIETY]->(fv) '
-			)
-			tx.run(statement, variety=variety)
 		if self.property_updates['harvest_time']:
 			harvest_time = [
 				[
@@ -1106,7 +1199,7 @@ class Upload:
 					# todo just y collecting the "Input" field entries as a set
 					# todo then finally check the types from this set.
 					self.record_types = ['mixed']
-					self.required_fieldnames = {'mixed': ['uid', 'input', 'submitted at']}
+					self.required_fieldnames = {'mixed': ['uid', 'input variable', 'submitted at']}
 					self.fieldnames = {'mixed': file_dict.fieldnames}
 				elif self.submission_type == 'fb':
 					# Field Book csv exports
@@ -1123,8 +1216,9 @@ class Upload:
 					# as such we check the length of the required list before updating,
 					# and only update if longer than existing
 					self.required_fieldnames = set()
-					for record_type, required_set in record_type_sets:
-						if record_type_sets[record_type].issubset(set(file_dict.fieldnames)):
+					for record_type in record_type_sets.keys():
+						required_set = record_type_sets[record_type]
+						if required_set.issubset(set(file_dict.fieldnames)):
 							if len(required_set) > len(self.required_fieldnames):
 								self.required_fieldnames = {record_type: required_set}
 								self.record_types = [record_type]
@@ -1510,7 +1604,7 @@ class Upload:
 				inputs_set = set()
 				# todo move this to the parse procedure where we iterate through the file already
 				for row in trimmed_dict_reader:
-					inputs_set.add(row['input'].lower())
+					inputs_set.add(row['input variable'].lower())
 				record_types = tx.run(
 					' UNWIND $inputs as input_name'
 					'	MATCH '
@@ -1562,22 +1656,22 @@ class Upload:
 							"uid",
 							"missing"
 						)
-					if not record['Input']:
+					if not record['Input variable']:
 						parse_result.merge_error(
 							row,
-							"input",
+							"input variable",
 							"missing"
 						)
 					if all([
 						record['UID'],
-						record['Input'],
+						record['Input variable'],
 						not record['Value']
 					]):
 						parse_result.merge_error(
 							row,
 							"value",
 							"format",
-							input_name=record['Input'],
+							input_name=record['Input variable'],
 							input_format=record['Format'],
 							category_list=record['Category list']
 						)
@@ -1645,9 +1739,9 @@ class Upload:
 							"uid",
 							"missing"
 						)
-					if not record['Input']:
+					if not record['Input variable']:
 						parse_result.add_field_error(
-							record['Input variable'],
+							record['Supplied input name'],
 							(
 								"This input variable is not found. Please check your spelling. "
 								"This may also be because the input variable is not available at the level of these items"
@@ -1656,17 +1750,17 @@ class Upload:
 					# we add found fields to a list to handle mixed items in input
 					# i.e. if found at level of one item but not another
 					else:
-						parse_result.add_field_found(record['Input'])
+						parse_result.add_field_found(record['Input variable'])
 					if all([
 						record['UID'],
-						record['Input'],
+						record['Input variable'],
 						not record['Value']
 					]):
 						parse_result.merge_error(
 							row,
-							record['Input variable'],
+							record['Supplied input name'],
 							"format",
-							input_name=record['Input'],
+							input_name=record['Input variable'],
 							input_format=record['Format'],
 							category_list=record['Category list']
 						)
@@ -1674,7 +1768,7 @@ class Upload:
 					if record['Conflicts'][0]['existing_value']:
 						parse_result.merge_error(
 							row,
-							record['Input variable'],
+							record['Supplied input name'],
 							"conflict",
 							conflicts=record['Conflicts']
 						)
@@ -1922,7 +2016,14 @@ class Upload:
 						# todo :and later updating, consider why I did it this way, likely just an artifact
 						# todo :of my early failure to consume results properly.
 						if 'property' in upload_object.record_types:
-							upload_object.submission_results['property'].update_properties(tx)
+							property_update_errors = upload_object.submission_results['property'].update_properties(tx)
+							if property_update_errors:
+								error_messages = '<br>'.join(property_update_errors)
+								tx.rollback()
+								return {
+									'status': 'ERRORS',
+									'result': error_messages
+								}
 						tx.commit()
 						# now need app context for the following (this is running asynchronously)
 						with app.app_context():
@@ -2141,7 +2242,7 @@ class Upload:
 			'	-[:DELETED]->(del:Deletions) '
 			' CREATE '
 			'	(del)-[:DELETED { '
-			'		`deleted at`: timestamp() '
+			'		`deleted at`: datetime.transaction().epochMillis '
 			'	}]->(record) '
 			' CREATE '
 			'	(record)-[:DELETED_FROM]->(if) '
@@ -2151,7 +2252,7 @@ class Upload:
 			'	time: time, '
 			'	record_time: record.time, '
 			'	uid: uid, '
-			'	input: input.name_lower, '
+			'	`input variable`: input.name_lower, '
 			'	row_index: row_index '
 			' } '
 			' ORDER BY row_index '
@@ -2168,21 +2269,29 @@ class Upload:
 
 	@staticmethod
 	def remove_properties(tx, property_uid):
-		if property_uid['custom id']:
+		if property_uid['assign custom id']:
 			tx.run(
 				' UNWIND $uid_list as uid'
 				' MATCH '
 				'	(item: Item {uid: uid}) '
 				' REMOVE item.custom_id ',
-				uid_list=property_uid['custom id']
+				uid_list=property_uid['assign custom id']
 			)
-		if property_uid['tissue']:
+		if property_uid['specify tissue']:
 			tx.run(
 				' UNWIND $uid_list as uid'
 				' MATCH '
 				'	(sample: Sample {uid: uid}) '
 				' REMOVE sample.tissue ',
-				uid_list=property_uid['tissue']
+				uid_list=property_uid['specify tissue']
+			)
+		if property_uid['planting date']:
+			tx.run(
+				' UNWIND $uid_list as uid'
+				' MATCH '
+				'	(item: Item {uid: uid}) '
+				' REMOVE item.planted ',
+				uid_list=property_uid['planting date']
 			)
 		if property_uid['assign to block']:
 			tx.run(
@@ -2239,7 +2348,7 @@ class Upload:
 				'	(item: Item { '
 				'		uid: uid '
 				'	})-[of_variety:OF_VARIETY]->(fv:FieldVariety) '
-				'	-[contains_variety:CONTAINS_VARIETY]->(field:Field) '
+				'	<-[contains_variety:CONTAINS_VARIETY]-(field:Field) '
 				' DELETE of_variety '
 				' WITH '
 				' item, fv, field, contains_variety '
@@ -2260,7 +2369,7 @@ class Upload:
 				'	(variety:Variety {code_lower: toLower(record.value)}) '
 				' MERGE '
 				'	(field) '
-				'	<-[:CONTAINS_VARIETY]-(fv:FieldVariety) '
+				'	-[:CONTAINS_VARIETY]->(fv:FieldVariety) '
 				' MERGE '
 				'	(item) '
 				'	-[:OF_VARIETY]->(fv) ',
@@ -2273,7 +2382,7 @@ class Upload:
 				'	(item: Item { '
 				'		uid: uid '
 				'	})-[of_variety:OF_VARIETY]->(fv:FieldVariety) '
-				'	-[contains_variety:CONTAINS_VARIETY]->(field:Field) '
+				'	<-[contains_variety:CONTAINS_VARIETY]-(field:Field) '
 				' DELETE of_variety '
 				' WITH '
 				' item, fv, field, contains_variety '
@@ -2294,7 +2403,7 @@ class Upload:
 				'	(variety:Variety {name_lower: toLower(record.value)}) '
 				' MERGE '
 				'	(field) '
-				'	<-[:CONTAINS_VARIETY]-(fv:FieldVariety) '
+				'	-[:CONTAINS_VARIETY]->(fv:FieldVariety) '
 				' MERGE '
 				'	(item) '
 				'	-[:OF_VARIETY]->(fv) ',
@@ -2372,12 +2481,13 @@ class Upload:
 					# there should only be one record type here, "mixed", so no need to iterate
 					record_type = upload_object.record_types[0]
 					# todo Stop trimming before parsing, this should be done in one pass of the file
-					wb = load_workbook(upload_object.file_path, read_only=True)
-					if 'Records' not in wb.sheetnames:
-						return {
-							'status': 'ERRORS',
-							'result': 'This workbook does not contain the expected "Records" worksheet'
-						}
+					if upload_object.file_extension == 'xlsx':
+						wb = load_workbook(upload_object.file_path, read_only=True)
+						if 'Records' not in wb.sheetnames:
+							return {
+								'status': 'ERRORS',
+								'result': 'This workbook does not contain the expected "Records" worksheet'
+							}
 					upload_object.trim_file(record_type)
 					if not upload_object.row_count[record_type]:
 						upload_object.error_messages.append('No records found to delete')
@@ -2405,11 +2515,12 @@ class Upload:
 					deletion_result = upload_object.correct(tx, access, record_type)
 					# update properties where needed
 					property_uid = {
-						'custom id': [],
+						'assign custom id': [],
 						'assign to block': [],
 						'assign to trees': [],
 						'assign to samples': [],
-						'tissue': [],
+						'specify tissue': [],
+						'planting date': [],
 						'variety name': [],
 						'variety code': [],
 						'harvest date': [],
@@ -2430,11 +2541,11 @@ class Upload:
 								expected_row_index += 1
 								if expected_row_index != record[0]['row_index']:
 									missing_row_indexes.append(expected_row_index)
-							if not record[0]['input'] in record_tally:
-								record_tally[record[0]['input']] = 0
-							record_tally[record[0]['input']] += 1
-							if record[0]['input'] in property_uid:
-								property_uid[record[0]['input']].append(record[0]['uid'])
+							if not record[0]['input variable'] in record_tally:
+								record_tally[record[0]['input variable']] = 0
+							record_tally[record[0]['input variable']] += 1
+							if record[0]['input variable'] in property_uid:
+								property_uid[record[0]['input variable']].append(record[0]['uid'])
 						upload_object.remove_properties(tx, property_uid)
 						if not expected_row_index == upload_object.row_count[record_type]:
 							missing_row_indexes += range(expected_row_index, upload_object.row_count[record_type] + 2)

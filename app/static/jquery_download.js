@@ -82,8 +82,8 @@ inputs_variables_update = function() {
             for (let i = 0; i < response.length; i++) {
                 input_variable_checkbox_div.append(
                     "<li>" +
-                    "<input id=select_input_variables-" + i + " " +
-                    "name='select_input_variables' " +
+                    "<input id=select_inputs-" + i + " " +
+                    "name='select_inputs' " +
                     "type=checkbox value='" + response[i]['name_lower'] + "' " +
                     ">" +
                     "<label for='checkbox_" + response[i]['name_lower'] + "'>" +

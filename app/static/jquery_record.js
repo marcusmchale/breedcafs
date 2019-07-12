@@ -182,8 +182,8 @@ generate_form = function (response) {
         }
         input_variable_checkbox_div.find('ul').append(
             "<li>" +
-            "<input id=select_input_variables-" + i + " " +
-            "name='select_input_variables' " +
+            "<input id=select_inputs-" + i + " " +
+            "name='select_inputs' " +
             "type=checkbox value='" + response[i]['name_lower'] + "' " +
             ">" +
             "<label for='checkbox_" + response[i]['name_lower'] + "'>" +
@@ -194,7 +194,7 @@ generate_form = function (response) {
         const form_field = $('[id="' + response[i]['name_lower'] + '"]').parent('dd');
         form_field.hide();
         form_field.prev().hide();
-        $('#select_input_variables-' + i).change(function () {
+        $('#select_inputs-' + i).change(function () {
             if (this.checked) {
                  form_field.show();
                  form_field.prev().show();
@@ -228,7 +228,7 @@ group_update = function() {
                 input_variable_checkbox_div.append(
                     "<br><input id=select_all_input_variables type=checkbox>" +
                     "<label>Select all</label>" +
-                    "<ul id='select_input_variables'></ul>"
+                    "<ul id='select_inputs'></ul>"
                 );
                 generate_form(response);
                 $('#select_all_input_variables').change(function () {

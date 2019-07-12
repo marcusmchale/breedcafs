@@ -864,7 +864,7 @@ class Download:
 			statement += (
 				' WITH { '
 				'	record_type: record_type, '
-				'	Input: Input, '
+				'	`Input variable`: Input, '
 				'	Partner: Partner, '
 				'	`Submitted by`: `Submitted by`, '
 				'	`Submitted at`: `Submitted at`, '
@@ -888,7 +888,7 @@ class Download:
 				' } as result'
 				' RETURN result '
 				' ORDER BY '
-				'	result["Input"], '
+				'	result["Input variable"], '
 				'	CASE '
 				'		WHEN result["Field UID"] IS NOT NULL THEN result["Field UID"] '
 				'		ELSE result["UID"] END, '
@@ -1053,7 +1053,7 @@ class Download:
 			fieldnames += inputs
 		else:
 			fieldnames += [
-				'Input',
+				'Input variable',
 				'Value',
 				'Time',
 				'Period',
@@ -1074,9 +1074,10 @@ class Download:
 			used_fields = set()
 			for record in result:
 				# check if new fieldnames to add
-				for input_name in [input_type['input_name'] for input_type in record[0]['Records']]:
-					if input_name not in fieldnames:
-								fieldnames.append(input_name)
+				if data_format == 'table':
+					for input_name in [input_type['input_name'] for input_type in record[0]['Records']]:
+						if input_name not in fieldnames:
+							fieldnames.append(input_name)
 				record = self.format_record(record, data_format)
 				row_number += 1
 				col_number = 0
@@ -1099,16 +1100,46 @@ class Download:
 				'csv',
 				base_filename
 			)
-			with open(file_path, 'w') as csv_file:
-				writer = csv.DictWriter(
-					csv_file,
-					fieldnames=fieldnames,
-					quoting=csv.QUOTE_ALL,
-					extrasaction='ignore')
-				writer.writeheader()
-				for record in result:
-					record = self.format_record(record, data_format)
-					writer.writerow(record[0])
+			if data_format == 'table':
+				file_path_temp = self.get_file_path(
+					'csv',
+					base_filename + '_temp'
+				)
+				with open(file_path_temp, 'w') as csv_temp_file:
+					temp_writer = csv.DictWriter(
+						csv_temp_file,
+						fieldnames=fieldnames,
+						quoting=csv.QUOTE_ALL,
+						extrasaction='ignore')
+					for record in result:
+						for input_name in [input_type['input_name'] for input_type in record[0]['Records']]:
+							if input_name not in fieldnames:
+								fieldnames.append(input_name)
+						record = self.format_record(record, data_format)
+						temp_writer.writerow(record[0])
+				with open(file_path_temp, 'r') as csv_temp_file:
+					with open(file_path, 'w') as csv_file:
+						writer = csv.DictWriter(
+							csv_file,
+							fieldnames=fieldnames,
+							quoting=csv.QUOTE_ALL,
+							extrasaction='ignore'
+						)
+						writer.writeheader()
+						csv_file.write(csv_temp_file.read())
+				os.unlink(file_path_temp)
+			else:
+				with open(file_path, 'w') as csv_file:
+					writer = csv.DictWriter(
+						csv_file,
+						fieldnames=fieldnames,
+						quoting=csv.QUOTE_ALL,
+						extrasaction='ignore'
+					)
+					writer.writeheader()
+					for record in result:
+						record = self.format_record(record, data_format)
+						writer.writerow(record[0])
 		download_url = url_for(
 						"download_file",
 						username=self.username,

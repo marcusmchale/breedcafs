@@ -15,7 +15,6 @@ from flask.views import MethodView
 
 from app.models import (
 	SelectionList,
-	FeatureList,
 	Chart
 )
 

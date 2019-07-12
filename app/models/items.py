@@ -148,7 +148,7 @@ class AddLocations:
 			'	MERGE '
 			'		(ul)-[:SUBMITTED]->(uc:Countries) '
 			'	CREATE '
-			'		(uc)-[s:SUBMITTED {time: timestamp()}]->(country) '
+			'		(uc)-[s:SUBMITTED {time: datetime.transaction().epochMillis}]->(country) '
 			' ) '
 			' RETURN country.name '
 		)
@@ -192,7 +192,7 @@ class AddLocations:
 			'	MERGE '
 			'		(ul)-[:SUBMITTED]->(ur:Regions) '
 			'	CREATE '
-			'		(ur)-[s:SUBMITTED {time: timestamp()}]->(region) '
+			'		(ur)-[s:SUBMITTED {time: datetime.transaction().epochMillis}]->(region) '
 			' ) '
 			' RETURN region.name '
 		)
@@ -240,7 +240,7 @@ class AddLocations:
 			'	MERGE '
 			'		(ul)-[:SUBMITTED]->(uf:Farms) '
 			'	CREATE '
-			'		(uf)-[s:SUBMITTED {time: timestamp()}]->(farm) '
+			'		(uf)-[s:SUBMITTED {time: datetime.transaction().epochMillis}]->(farm) '
 			' ) '
 			' RETURN farm.name '
 		)
@@ -284,7 +284,7 @@ class AddLocations:
 			' MERGE '
 			'	(farm) '
 			'		<-[:IS_IN]-(field: Field: Item { '
-			'			name_lower: $field '
+			'			name_lower: toLower(trim($field)) '
 			'	}) '
 			'	ON MATCH SET '
 			'		field.found = True '
@@ -302,7 +302,7 @@ class AddLocations:
 			'	MERGE '
 			'		(ul)-[:SUBMITTED]->(uf:Fields) '
 			'	CREATE '
-			'		(uf)-[s:SUBMITTED {time: timestamp()}]->(field) '
+			'		(uf)-[s:SUBMITTED {time: datetime.transaction().epochMillis}]->(field) '
 			' ) '
 			' RETURN [ '
 			'	field.uid,'
@@ -330,14 +330,16 @@ class FindFieldItems:
 			statement = (
 				' MATCH '
 				'	(block:Block { '
-				'		name : $block_name'
+				'		name_lower : toLower(trim($block_name)) '
 				'	}) '
 				'	-[:IS_IN]->(:FieldBlocks) '
 				'	-[:IS_IN]->(:Field { '
 				'		uid : toInteger($field_uid) '
 				'	}) '
-				' RETURN '
+				' RETURN [ '
+				'	block.uid, '
 				'	block.name '
+				' ] '
 			)
 			result = neo4j_session.read_transaction(bolt_result, statement, parameters).single()
 			if result:
@@ -402,7 +404,7 @@ class AddFieldItems:
 				'	MERGE '
 				'		(ui)-[:SUBMITTED]->(ub:Blocks) '
 				'	CREATE '
-				'		(ub)-[s:SUBMITTED {time: timestamp()}]->(block) '
+				'		(ub)-[s:SUBMITTED {time: datetime.transaction().epochMillis}]->(block) '
 				' ) '
 				' RETURN [ '
 				'	block.uid, '
@@ -512,7 +514,7 @@ class AddFieldItems:
 			'	SET '
 			'		field_tree_counter.count = field_tree_counter.count + 1 '
 			'	CREATE '
-			'		(uft)-[:SUBMITTED {time: timestamp()}]-> '
+			'		(uft)-[:SUBMITTED {time: datetime.transaction().epochMillis}]-> '
 			'		(tree: Tree: Item { '
 			'			uid: (field.uid + "_T" + field_tree_counter.count), '
 			'			id: field_tree_counter.count '
@@ -540,7 +542,7 @@ class AddFieldItems:
 				'		person: user.name '
 				'	}) '
 				' CREATE '
-				'	(uff)-[:SUBMITTED {time: timestamp()}]->(r) '
+				'	(uff)-[:SUBMITTED {time: datetime.transaction().epochMillis}]->(r) '
 			)
 		statement += (
 			' RETURN { '

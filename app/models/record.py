@@ -56,16 +56,39 @@ class Record:
 					{
 						'variety name',
 						'variety code',
-						'custom id',
+						'assign custom id',
 						'assign to block',
 						'assign to trees',
-						'assign to samples'
+						'assign to samples',
+						'specify tissue',
+						'harvest date',
+						# 'harvest time'  # this only updates when set at same time as harvest date
+						'planting date'
 					} & set(record_data['selected_inputs'])
 			):
 				match_item_query = ItemList.build_match_item_statement(record_data)
 				if bool(
 						{'variety name', 'variety code'} & set(record_data['selected_inputs'])
 				):
+					# before going any further check that code and name match if both are provided
+					if {'variety name', 'variety code'}.issubset(set(record_data['selected_inputs'])):
+						same_variety = tx.run(
+							' MATCH '
+							'	(v:Variety {name:$name, code:$code}) '
+							' RETURN v.name ',
+							name=record_data['inputs_dict']['variety name'],
+							code=record_data['inputs_dict']['variety code']
+							).single()
+						if not same_variety:
+							tx.rollback()
+							return jsonify({
+								'submitted': (
+									' Submission rejected: '
+									' The entered variety name and variety code do not match. '
+									' Please note that it is not necessary to enter both. '
+								),
+								'class': 'conflict'
+							})
 					update_variety_statement = match_item_query[0] + ' WITH DISTINCT item '
 					if record_data['item_level'] != 'field':
 						update_variety_statement += ', field '
@@ -79,13 +102,41 @@ class Record:
 						update_variety_statement += ' MATCH (update_variety:Variety {code: $variety_code}) '
 					update_variety_statement += (
 						' OPTIONAL MATCH '
-						'	(item)'
+						'	(item) '
 						'	-[of_current_variety: OF_VARIETY]->(:FieldVariety) '
 						' OPTIONAL MATCH '
 						'	(item)-[:FROM]->(source_sample:Sample) '
-						' WITH item, update_variety '
-						'	WHERE of_current_variety IS NULL '
-						'	AND source_sample IS NULL '
+						'	OPTIONAL MATCH '
+						'		(item)<-[:FOR_ITEM]-(ii:ItemInput) '
+						'		-[:FOR_INPUT]->(:FieldInput)-[:FOR_INPUT]->(input:Input), '
+						'		(ii)<-[:RECORD_FOR]-(record:Record) '
+						'		<-[s:SUBMITTED]-() '
+						'		<-[:SUBMITTED*..4]-(user:User) '
+						'		-[:AFFILIATED {data_shared: True}]->(p:Partner) '
+						'		WHERE input.name_lower CONTAINS "variety" '
+						'	OPTIONAL MATCH '
+						'		(:User {username_lower:toLower(trim($username))}) '
+						'		-[access:AFFILIATED]->(p) '
+						' WITH '
+						'	item, '
+					)
+					if record_data['item_level'] != 'field':
+						update_variety_statement += ', field '
+					update_variety_statement += (
+						'	update_variety, '
+						'	current_variety, '
+						'	s.time as `Submitted at`, '
+						'	CASE '
+						'		WHEN access.confirmed THEN user.name + "(" + p.name + ")" '
+						'		ELSE p.name '
+						'	END as `Submitted by`, '						
+						' WHERE s.time <> datetime.transaction().epochMillis '
+						# removing these because
+						# we want to keep all and roll back to be able to provide feedback about conflicts
+						# and prevent the record being created
+						#' WITH item, update_variety '
+						#'	WHERE of_current_variety IS NULL '
+						#'	AND source_sample IS NULL '
 					)
 					if record_data['item_level'] == 'field':
 						update_variety_statement += (
@@ -97,8 +148,48 @@ class Record:
 						)
 					update_variety_statement += (
 						' MERGE (item)-[:OF_VARIETY]->(fv) '
+						'	RETURN { '
+						'		UID: item.uid, '
+						'		set_variety: update_variety.name, '
+						'		current_variety: current_variety.name, '
+						'		`Submitted at`: `Submitted at`, '
+						'		`Submitted by`: `Submitted by`, '
+						'	} '
 					)
-					tx.run(update_variety_statement, update_variety_parameters)
+					result = tx.run(update_variety_statement, update_variety_parameters)
+					variety_update_errors = []
+					while all([
+						len(variety_update_errors) <= 10,
+						result.peek()
+					]):
+						for record in result:
+							if all([
+								record[0]['current_variety'] and record[0]['set_variety'],
+								record[0]['current_variety'] != record[0]['set_variety']
+							]):
+								variety_update_errors.append(
+									'For '
+									+ str(record[0]['UID'])
+									+ ' the variety submitted ('
+									+ record[0]['set_variety']
+									+ ') does not match an earlier submission ('
+									+ record[0]['current_variety']
+									+ ') by '
+									+ record[0]['Submitted by']
+									+ '('
+									+ datetime.datetime.utcfromtimestamp(
+										int(record[0]['Submitted at']) / 1000
+									).strftime("%Y-%m-%d %H:%M:%S")
+									+ ')'
+								)
+					if variety_update_errors:
+						tx.rollback()
+						return jsonify({
+							'submitted': (
+									'<br> - '.join(variety_update_errors)
+							),
+							'class': 'conflicts'
+						})
 				if 'assign to block' in record_data['selected_inputs']:
 					update_block_statement = match_item_query[0]
 					update_block_parameters = match_item_query[1]
@@ -126,7 +217,7 @@ class Record:
 						' MERGE '
 						' 	(item)-[s1:IS_IN]->(block_trees_update) '
 						' ON CREATE SET '
-						' 	s1.time = timestamp(), '
+						' 	s1.time = datetime.transaction().epochMillis, '
 						' 	s1.user = $username '
 						' SET '
 						' 	block_tree_counter_update._LOCK_ = True, '
@@ -185,10 +276,10 @@ class Record:
 						'	) '
 					)
 					tx.run(update_samples_statement, update_samples_parameters)
-				if 'custom id' in record_data['selected_inputs']:
+				if 'assign custom id' in record_data['selected_inputs']:
 					update_custom_id_statement = match_item_query[0] + ' WITH DISTINCT item '
 					update_custom_id_parameters = match_item_query[1]
-					update_custom_id_parameters['custom_id'] = record_data['inputs_dict']['custom id']
+					update_custom_id_parameters['assign custom_id'] = record_data['inputs_dict']['assign custom id']
 					update_custom_id_statement += (
 						' SET item.custom_id = CASE WHEN item.custom_id IS NULL '
 						'	THEN $custom_id '
@@ -196,17 +287,28 @@ class Record:
 						'	END '
 					)
 					tx.run(update_custom_id_statement, update_custom_id_parameters)
-				if 'tissue type' in record_data['selected_inputs']:
-					update_tissue_type_statement = match_item_query[0] + ' WITH DISTINCT item '
-					update_tissue_type_parameters = match_item_query[1]
-					update_tissue_type_parameters['tissue_type'] = record_data['inputs_dict']['tissue type']
-					update_tissue_type_statement += (
+				if 'specify tissue' in record_data['selected_inputs']:
+					update_tissue_statement = match_item_query[0] + ' WITH DISTINCT item '
+					update_tissue_parameters = match_item_query[1]
+					update_tissue_parameters['tissue'] = record_data['inputs_dict']['specify tissue']
+					update_tissue_statement += (
 						' SET item.tissue = CASE WHEN item.tissue IS NULL '
-						'	THEN $tissue_type '
+						'	THEN $tissue '
 						'	ELSE item.tissue '
 						'	END '
 					)
-					tx.run(update_custom_id_statement, update_custom_id_parameters)
+					tx.run(update_tissue_statement, update_tissue_parameters)
+				if 'planting date' in record_data['selected_inputs']:
+					update_planted_statement = match_item_query[0] + ' WITH DISTINCT item '
+					update_planted_parameters = match_item_query[1]
+					update_planted_parameters['planted'] = record_data['inputs_dict']['planting date']
+					update_planted_statement += (
+						' SET item.planted = CASE WHEN item.planted IS NULL '
+						'	THEN $planted '
+						'	ELSE item.planted '
+						'	END '
+					)
+					tx.run(update_planted_statement, update_planted_parameters)
 				if 'harvest date' in record_data['selected_inputs']:
 					update_harvest_time_statement = match_item_query[0] + ' WITH DISTINCT item '
 					update_harvest_time_parameters = match_item_query[1]
@@ -356,7 +458,7 @@ class Record:
 		statement += (
 			# then the record with a timestamp
 			'				CREATE '
-			'					(uff)-[s1:SUBMITTED {time: timestamp()}]->(r) '
+			'					(uff)-[s1:SUBMITTED {time: datetime.transaction().epochMillis}]->(r) '
 			' ) '
 			' WITH '
 			'	r, input, value, '
@@ -529,7 +631,7 @@ class Record:
 		statement += (
 			# then the record with a timestamp
 			'				CREATE '
-			'					(uff)-[s1:SUBMITTED {time: timestamp()}]->(r) '
+			'					(uff)-[s1:SUBMITTED {time: datetime.transaction().epochMillis}]->(r) '
 			' ) '
 			' WITH '
 			'	r, input, value, '
@@ -896,7 +998,7 @@ class Record:
 		statement += (
 			# then the record with a timestamp
 			'				CREATE '
-			'					(uff)-[s1:SUBMITTED {time: timestamp()}]->(r) '
+			'					(uff)-[s1:SUBMITTED {time: datetime.transaction().epochMillis}]->(r) '
 			'				'
 			' ) '
 			' WITH '

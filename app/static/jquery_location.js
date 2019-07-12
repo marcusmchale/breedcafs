@@ -274,6 +274,7 @@ $("#submit_field").click( function(e) {
 		data: $("form").serialize(),
 		type: 'POST',
 			success: function(response) {
+				console.log(response);
 				if (response.hasOwnProperty('submitted')) {
 					const flash = "<div id='field_flash' class='flash'> Submitted: " + response['submitted']['name'] + " </div>";
 					$("#submit_field").after(flash);

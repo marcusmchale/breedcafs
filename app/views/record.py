@@ -71,6 +71,28 @@ def record():
 			return redirect(url_for('index'))
 
 
+@app.route('/record/input_group_management', methods=['GET', 'POST'])
+def input_group_management():
+	if 'username' not in session:
+		flash('Please log in')
+		return redirect(url_for('login'))
+	elif all([
+		'global_admin' not in session['access'],
+		'partner_admin' not in session['access']
+	]):
+		flash('You attempted to access a restricted page')
+		return redirect(url_for('index'))
+	else:
+		try:
+			return render_template(
+				'input_group_management.html',
+				title='Input variable group management',
+			)
+		except (ServiceUnavailable, SecurityError):
+			flash("Database unavailable")
+			return redirect(url_for('index'))
+
+
 @app.route('/record/generate_template', methods=['POST'])
 def generate_template():
 	if 'username' not in session:
@@ -103,10 +125,12 @@ def generate_template():
 				sample_id_list = (
 					Parsers.parse_range_list(request.form['sample_id_list']) if request.form['sample_id_list'] != '' else None
 				)
-				if 'select_inputs' in request.form:
+				input_group = request.form['input_group']
+				if 'selected_inputs' in request.form:
 					selected_inputs = request.form.getlist('select_inputs')
 				else:
 					selected_inputs = []
+
 				inputs_dict = {}
 				for input_variable in selected_inputs:
 					inputs_dict[input_variable] = request.form[input_variable]
@@ -123,6 +147,7 @@ def generate_template():
 					'block_uid': block_uid,
 					'tree_id_list': tree_id_list,
 					'sample_id_list': sample_id_list,
+					'input_group': input_group,
 					'selected_inputs': selected_inputs,
 					'inputs_dict': inputs_dict,
 					'template_format': template_format
@@ -200,12 +225,12 @@ def submit_records():
 				class InputFormDetailed(RecordForm):
 					pass
 
-				item_level = record_form.item_level.data if record_form.item_level.data not in ['', 'None'] else None
-				record_type = record_form.record_type.data if record_form.record_type.data not in ['', 'None'] else None
+				item_level = request.form['item_level'] if request.form['item_level'] not in ['', 'None'] else None
+				record_type = request.form['record_type'] if request.form['record_type'] not in ['', 'None'] else None
 				inputs_details = InputList(
 					item_level,
 					record_type
-				).get_inputs(inputs=record_form['select_input_variables'].data)
+				).get_inputs(inputs=request.form.getlist('select_inputs') if 'select_inputs' in request.form else None)
 				for input_variable in inputs_details:
 					if input_variable['format'] in ["numeric", "percent"]:
 						min_value = input_variable['minimum'] if 'minimum' in input_variable else None
@@ -333,14 +358,14 @@ def submit_records():
 				detailed_record_form = InputFormDetailed()
 				detailed_record_form.record_type.choices = [('', 'Any')] + SelectionList.get_record_types()
 				detailed_record_form.item_level.choices = SelectionList.get_item_levels()
-				item_level = record_form.item_level.data if record_form.item_level.data not in ['', 'None'] else None
-				record_type = record_form.record_type.data if record_form.record_type.data not in ['', 'None'] else None
+				item_level = request.form['item_level'] if request.form['item_level'] not in ['', 'None'] else None
+				record_type = request.form['record_type'] if request.form['record_type'] not in ['', 'None'] else None
 				detailed_record_form.input_group.choices += SelectionList.get_input_groups(item_level, record_type)
 				if record_type == 'trait':
 					detailed_record_form.template_format.choices.append(('fb', 'Field Book'))
 					detailed_record_form.record_time.validators = [InputRequired()]
 				selected_input_group = (
-					record_form.input_group.data if record_form.input_group.data not in [
+					request.form['input_group'] if request.form['input_group'] not in [
 						'',	'None'
 					] else None
 				)
@@ -394,10 +419,10 @@ def submit_records():
 						return jsonify({
 							'submitted': 'Please make sure the start date is before the end date'
 						})
-					if 'select_input_variables' in request.form:
-						selected_inputs = request.form.getlist('select_input_variables')
+					if 'select_inputs' in request.form:
+						selected_inputs = request.form.getlist('select_inputs')
 					else:
-						selected_inputs = None
+						selected_inputs = []
 					inputs_dict = {}
 					for input_variable in selected_inputs:
 						inputs_dict[input_variable] = request.form[input_variable]

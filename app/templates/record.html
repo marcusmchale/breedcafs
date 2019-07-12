@@ -32,6 +32,9 @@
                 <dd>{{  record_form.record_type }}</dd>
                 <div id='input_variable_selection'>
                     <h3>Select input variables</h3>
+                        {% if ('global_admin' in session.access) or ('partner_admin' in session.access) %}
+		        			<a href={{  url_for('input_group_management') }}>Input group management</a>
+        				{% endif %}
                         <dd>{{  render_field (record_form.input_group) }}</dd>
                         <div id="input_variable_checkbox_div"></div>
                     <br><br>
