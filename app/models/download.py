@@ -11,9 +11,9 @@ from flask import (
 )
 
 from app.models import(
+	SelectionList,
 	AddFieldItems,
 	ItemList,
-	InputList,
 	User
 )
 
@@ -178,11 +178,13 @@ class Download:
 		else:
 			record_types = [record_type]
 		for rt in record_types:
-			self.inputs[rt] = InputList(
-				item_level,
-				rt).get_inputs(
+			self.inputs[rt] = SelectionList.get_inputs(
+				item_level=item_level,
+				record_type=rt,
 				input_group=input_group,
-				inputs=inputs
+				inputs=inputs,
+				username=self.username,
+				details=True
 			)
 		# drop "assign to trees" and "assign to samples" from sample registration if not at field level
 		if item_level == 'sample' and input_group == "Registration" and sample_level != 'field':
@@ -204,7 +206,6 @@ class Download:
 			self.time_points = record_data['time_points']
 		self.set_inputs(
 			record_data['item_level'],
-			record_data['record_type'],
 			input_group=record_data['input_group'] if 'input_group' in record_data else None,
 			inputs=record_data['selected_inputs'] if 'selected_inputs' in record_data else None
 		)

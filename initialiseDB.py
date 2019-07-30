@@ -145,6 +145,17 @@ def create_constraints(tx, constraints_list):
 		)
 
 
+def create_item_levels(tx, levels):
+	tx.run(
+		' UNWIND $levels as level'
+		' CREATE (il: ItemLevel { '
+		'	name_lower: toLower(trim(level)), '
+		'	name: trim(level) '
+		' }) ',
+		levels=levels
+	)
+
+
 def create_partners(tx, partner_list):
 	for partner in partner_list:
 		partner_create = tx.run(
@@ -639,6 +650,7 @@ else:
 			print('creating indexes')
 			session.write_transaction(create_indexes, app.config['INDEXES'])
 			session.write_transaction(create_partners, app.config['PARTNERS'])
+			session.write_transaction(create_item_levels, app.config['ITEM_LEVELS'])
 			session.write_transaction(create_inputs, './instance/inputs.csv')
 			session.write_transaction(create_trials, varieties.trials)
 			session.write_transaction(create_variety_codes, varieties.variety_codes)

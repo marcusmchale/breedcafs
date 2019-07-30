@@ -37,6 +37,37 @@ svg {
 	overflow: auto;
 }
 
+#manage_group_members_div {
+	max-height: 500px;
+}
+
+#group_inputs_div {
+	max-height:500px;
+	float: left
+}
+
+#group_inputs_list_div {
+	max-height:400px;
+	overflow: auto;
+	border: 5px solid #6f4e37;
+	padding: 5px;
+}
+
+#group_inputs {
+	padding:10px
+}
+
+#all_inputs_div {
+	max-height:500px;
+	float: right
+}
+
+#all_inputs_list_div {
+	max-height:400px;
+	overflow: auto;
+	border: 5px solid #6f4e37;
+	padding: 5px;
+}
 
 #response_table {
 	max-height:500px;

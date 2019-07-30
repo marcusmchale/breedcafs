@@ -1,5 +1,66 @@
 {% extends "layout.html" %}
 {% block body %}
-    <h3>Manage input variable groups</h3>
+
+    <div class="text_body">
+    <h2>Manage input variable groups</h2>
+        <form>
+        <h3>Create an input group</h3>
+            <p>
+                Input groups are used to select input variables for templates
+                They are managed at the partner level, so that members of your group
+                will only see the input groups that you manage.
+            </p>
+            <p>
+                You can make your own copy of an input group that was created by another partner
+                or leave the filters blank to create a new empty input group and add input variables below.
+            </p>
+			<dl>
+                <dd>Copy default variable groups or from a selected partner</dd>
+                <dt>{{ add_input_group_form.partner_to_copy }}</dt>
+                <dd>Select the group to copy</dd>
+                <dt>{{ add_input_group_form.group_to_copy }}</dt>
+                <dd>Group members:</dd>
+                <dt>
+                    <ul id="group_to_copy_members">
+                    </ul>
+                </dt>
+            </dl>
+            <dl>
+                <dd>Enter a name for your new group </dd>
+				<dt>{{ add_input_group_form.input_group_name }}
+                {{ add_input_group_form.submit_input_group_name }}</dt>
+                {{ add_input_group_form.csrf_token }}
+            </dl>
+            <div id="manage_group_members_div">
+                <p>
+                    Drag and drop between lists to add/remove items
+                    or within the list to arrange their order of appearance.
+                    Click commit to store these changes.
+                </p>
+                <div id="group_inputs_div">
+                    <h3>Manage group members</h3>
+                    {{ manage_input_group_form.input_group_select }}
+                    {{ manage_input_group_form.commit_group_changes }}
+                    {{ manage_input_group_form.csrf_token }}
+                    <div id="group_inputs_list_div">
+                        {{ manage_input_group_form.group_inputs }}
+                    </div>
+                </div>
+                <div id="all_inputs_div">
+                    <h4>Other input variables</h4>
+                    <h3>Filter by type</h3>
+                        <dd>{{  manage_input_group_form.record_type }}</dd>
+                        <div id="all_inputs_list_div">
+                            {{ manage_input_group_form.all_inputs }}
+                        </div>
+                </div>
+            </div>
+        </form>
+    </div>
+
+
+<script src="{{ url_for('static', filename='jquery_1.8.3_min.js') }}"></script>
+<script src="{{ url_for('static', filename='jquery-ui-1.12.1.custom/jquery-ui.js') }}"></script>
+<script src="{{ url_for('static', filename='jquery_input_group_mgmt.js') }}"></script>
 
 {% endblock %}

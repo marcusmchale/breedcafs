@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
 from wtforms import (
+	Field,
 	StringField,
 	PasswordField,
 	DecimalField,
@@ -26,11 +27,12 @@ from flask_wtf import FlaskForm
 from flask_wtf.file import FileField, FileRequired
 # from app import app
 from app.models import (
-	InputList,
 	SelectionList,
 	Parsers,
 	User
 )
+from flask import session
+
 # from collections import defaultdict
 from safe import check
 
@@ -369,7 +371,7 @@ class AddCountry(FlaskForm):
 			Length(min=1, max=50, message='Maximum 50 characters')
 		],
 		filters=[strip_filter],
-		description = "Add new country"
+		description="Add new country"
 	)
 	submit_country = SubmitField('+')
 
@@ -384,7 +386,7 @@ class AddRegion(FlaskForm):
 			Length(min=1, max=50, message='Maximum 50 characters')
 		],
 		filters=[strip_filter],
-		description = "Add new region"
+		description="Add new region"
 	)
 	submit_region = SubmitField('+')
 
@@ -399,7 +401,7 @@ class AddFarm(FlaskForm):
 			Length(min=1, max=50, message='Maximum 50 characters')
 		],
 		filters=[strip_filter],
-		description = "Add new farm"
+		description="Add new farm"
 	)
 	submit_farm = SubmitField('+')
 
@@ -414,7 +416,7 @@ class AddField(FlaskForm):
 			Length(min=1, max=50, message='Maximum 50 characters')
 		],
 		filters = [strip_filter],
-		description = "Add new field"
+		description="Add new field"
 	)
 	submit_field = SubmitField('+')
 
@@ -437,7 +439,7 @@ class AddBlock(FlaskForm):
 			Length(min=1, max=50, message='Maximum 50 characters')
 		],
 		filters=[strip_filter],
-		description = "Add new block")
+		description="Add new block")
 	submit_block = SubmitField('+')
 
 
@@ -457,66 +459,66 @@ class AddTreesForm(FlaskForm):
 			InputRequired(),
 			NumberRange(min=1, max=10000, message='Register up to 10000 trees at a time')
 		],
-		description= "Number of new trees")
+		description="Number of new trees")
 	submit_trees = SubmitField('Register new trees')
 
 
 # Trials
-class TrialForm(FlaskForm):
-	country = SelectField('Country')
-	region = SelectField('Region')
-	farm = SelectField('Farm')
-	field = SelectField('Field')
-	select_trial = SelectField(
-		'Trial',
-		[InputRequired()],
-		description="Trial to modify",
-		choices=[("", "Select Trial")]
-	)
-	# to display either fields or trees relevant fields for item selection
-	item_level = SelectField(
-		'Item Level',
-		[InputRequired()],
-		description="Item Level",
-		choices=[
-			('', 'Select level'),
-			('field', 'Field'),
-			('tree', 'Tree')
-		]
-	)
-	tree_id_list = StringField(
-		'Tree list',
-		[
-			Optional(),
-			Regexp("^[0-9,-]*$", message='List should be comma separated with hyphens for ranges, e.g. "1,2-5"'),
-			range_list_check
-		],
-		description="List of tree IDs, e.g. '1, 2-5' "
-	)
-	assign_to_trial = SubmitField('Assign to trial')
-
-	@staticmethod
-	def update():
-		form = TrialForm()
-		country = form.country.data if form.country.data != '' else None
-		region = form.region.data if form.region.data != '' else None
-		farm = form.farm.data if form.farm.data != '' else None
-		field_uid = form.field.data if form.field.data != '' else None
-		countries = SelectionList.get_countries()
-		regions = SelectionList.get_regions(country)
-		farms = SelectionList.get_farms(country, region)
-		fields = SelectionList.get_fields(country, region, farm)
-		form.country.choices = [('', 'Select Country')] + countries
-		form.region.choices = [('', 'Select Region')] + regions
-		form.farm.choices = [('', 'Select Farm')] + farms
-		form.field.choices = [('', 'Select Field')] + fields
-		form.select_trial.choices = [('', 'Select Trial')] + SelectionList.get_trials(
-			country,
-			region,
-			farm,
-			field_uid
-		)
-		return form
+#class TrialForm(FlaskForm):
+#	country = SelectField('Country')
+#	region = SelectField('Region')
+#	farm = SelectField('Farm')
+#	field = SelectField('Field')
+#	select_trial = SelectField(
+#		'Trial',
+#		[InputRequired()],
+#		description="Trial to modify",
+#		choices=[("", "Select Trial")]
+#	)
+#	# to display either fields or trees relevant fields for item selection
+#	item_level = SelectField(
+#		'Item Level',
+#		[InputRequired()],
+#		description="Item Level",
+#		choices=[
+#			('', 'Select level'),
+#			('field', 'Field'),
+#			('tree', 'Tree')
+#		]
+#	)
+#	tree_id_list = StringField(
+#		'Tree list',
+#		[
+#			Optional(),
+#			Regexp("^[0-9,-]*$", message='List should be comma separated with hyphens for ranges, e.g. "1,2-5"'),
+#			range_list_check
+#		],
+#		description="List of tree IDs, e.g. '1, 2-5' "
+#	)
+#	assign_to_trial = SubmitField('Assign to trial')
+#
+#	@staticmethod
+#	def update():
+#		form = TrialForm()
+#		country = form.country.data if form.country.data != '' else None
+#		region = form.region.data if form.region.data != '' else None
+#		farm = form.farm.data if form.farm.data != '' else None
+#		field_uid = form.field.data if form.field.data != '' else None
+#		countries = SelectionList.get_countries()
+#		regions = SelectionList.get_regions(country)
+#		farms = SelectionList.get_farms(country, region)
+#		fields = SelectionList.get_fields(country, region, farm)
+#		form.country.choices = [('', 'Select Country')] + countries
+#		form.region.choices = [('', 'Select Region')] + regions
+#		form.farm.choices = [('', 'Select Farm')] + farms
+#		form.field.choices = [('', 'Select Field')] + fields
+#		form.select_trial.choices = [('', 'Select Trial')] + SelectionList.get_trials(
+#			country,
+#			region,
+#			farm,
+#			field_uid
+#		)
+#		return form
 
 
 class AddTrial(FlaskForm):
@@ -543,10 +545,7 @@ class CollectForm(FlaskForm):
 		[InputRequired()],
 		description="Item Level",
 		choices=[
-			('', 'Select level'),
-			('field', 'Field'),
-			('tree', 'Tree'),
-			('sample', 'Sample')
+			('', 'Select level')
 		]
 	)
 	tree_id_list = StringField(
@@ -576,6 +575,12 @@ class CollectForm(FlaskForm):
 		description="Samples to register per item"
 	)
 	submit_collect = SubmitField('Register samples')
+
+	@staticmethod
+	def update():
+		form = CollectForm()
+		form.item_level.choices = form.item_level.choices + SelectionList.get_item_levels()
+		return form
 
 
 # upload
@@ -698,23 +703,114 @@ class DownloadForm(FlaskForm):
 		form.item_level.choices = [('', 'Any')] + SelectionList.get_item_levels()
 		item_level = form.item_level.data if form.item_level.data not in ['', 'None'] else None
 		record_type = form.record_type.data if form.record_type.data not in ['', 'None'] else None
-		form.input_group.choices = [('', 'Any')] + SelectionList.get_input_groups(item_level, record_type)
+		form.input_group.choices = [('', 'Any')] + SelectionList.get_input_groups(
+			item_level=item_level,
+			record_type=record_type,
+			username=session['username']
+		)
 		selected_input_group = form.input_group.data if form.input_group.data not in ['', 'None'] else None
-		inputs_details = InputList(
-			item_level,
-			record_type
-		).get_inputs(input_group=selected_input_group)
-		inputs_list = [(input_variable['name_lower'], input_variable['name']) for input_variable in inputs_details]
+		inputs_list = SelectionList.get_inputs(
+			item_level=item_level,
+			record_type=record_type,
+			input_group=selected_input_group,
+			username=session['username']
+		)
 		form.select_inputs.choices = inputs_list
 		return form
 
 
-class RecordForm(FlaskForm):
+class AddInputGroupForm(FlaskForm):
+	all_partners = SelectionList.get_partners()
+	all_partners.insert(0, ("", "Default variable groups"))
+	partner_to_copy = SelectField(
+		'Select a partner from whom to copy an input group',
+		[Optional()],
+		description='Filter the groups to copy by partner',
+		choices=all_partners
+	)
+	all_groups = SelectionList.get_input_groups()
+	all_groups.insert(0, ("", ""))
+	group_to_copy = SelectField(
+		'Select input group to make a copy',
+		[Optional()],
+		description='Select input variable group to copy',
+		choices=all_groups
+	)
+	input_group_name = StringField(
+		'Create a new input variable group',
+		[
+			InputRequired(),
+			Length(min=1, max=100, message='Maximum 100 characters')
+		],
+		description='Enter a label for a new input variable group'
+	)
+	submit_input_group_name = SubmitField('+')
+
+	@staticmethod
+	def update():
+		form = AddInputGroupForm()
+		partner_to_copy = form.partner_to_copy.data if form.partner_to_copy.data not in ['', 'None'] else None
+		if partner_to_copy:
+			partner_groups = SelectionList.get_input_groups(partner=partner_to_copy)
+			partner_groups.insert(0, ("", ""))
+			form.group_to_copy.choices = partner_groups
+		return form
+
+
+class ManageInputGroupForm(FlaskForm):
 	record_type = SelectField(
-		[InputRequired()],
+		[Optional()],
 		choices=[],
 		description="Record Type"
 	)
+	input_group_select = SelectField(
+		'Select input variable group to manage',
+		[
+			InputRequired(),
+		],
+		description='Select input variable group to manage',
+		choices=[]
+	)
+	group_inputs = SelectMultipleField(
+		'Group members',
+		[Optional()],
+		description='Select inputs',
+		widget=widgets.ListWidget(prefix_label=False),
+		choices=[]
+	)
+	all_inputs = SelectMultipleField(
+		'Other input variables',
+		coerce=unicode,
+		description='Select inputs to add to group',
+		widget=widgets.ListWidget(prefix_label=False),
+		choices=[]
+	)
+	add_to_group = SubmitField('Add to group')
+	commit_group_changes = SubmitField('Commit changes to group')
+
+	@staticmethod
+	def update():
+		form = ManageInputGroupForm()
+		form.record_type.choices = [('', 'Any')] + SelectionList.get_record_types()
+		record_type = form.record_type.data if form.record_type.data not in ['', 'None'] else None
+		partner_groups = SelectionList.get_input_groups(username=session['username'])
+		form.input_group_select.choices = partner_groups
+		group_members = SelectionList.get_inputs(username=session['username'], input_group=form.input_group_select.data)
+		form.group_inputs.choices = group_members
+		form.all_inputs.choices = [i for i in SelectionList.get_inputs(record_type=record_type) if i not in group_members]
+		return form
+
+	@staticmethod
+	def commit():
+		form = ManageInputGroupForm()
+		partner_groups = SelectionList.get_input_groups(username=session['username'])
+		form.input_group_select.choices = partner_groups
+		form.group_inputs.choices = SelectionList.get_inputs()
+		form.all_inputs.choices = SelectionList.get_inputs()
+		return form
+
+
+class RecordForm(FlaskForm):
 	item_level = SelectField(
 		'Item Level',
 		[InputRequired()],
@@ -797,21 +893,29 @@ class RecordForm(FlaskForm):
 	@staticmethod
 	def update():
 		form = RecordForm()
-		form.record_type.choices = [('', 'Any')] + SelectionList.get_record_types()
 		form.item_level.choices = SelectionList.get_item_levels()
 		item_level = form.item_level.data if form.item_level.data not in ['', 'None'] else None
-		record_type = form.record_type.data if form.record_type.data not in ['', 'None'] else None
-		form.input_group.choices += SelectionList.get_input_groups(item_level, record_type)
-		if record_type == 'trait':
-			form.template_format.choices.append(('fb', 'Field Book'))
+		form.input_group.choices += SelectionList.get_input_groups(
+			item_level=item_level,
+			username=session['username']
+		)
+		# list is no longer all we need as no longer specifying record type.
+		# need to get record types for format choices and for direct submission forms
 		selected_input_group = form.input_group.data if form.input_group.data not in ['', 'None'] else None
 		if selected_input_group:
-			inputs_details = InputList(
-				item_level,
-				record_type
-			).get_inputs(input_group=selected_input_group)
-			inputs_list = [(input_variable['name_lower'], input_variable['name']) for input_variable in inputs_details]
-			form.select_inputs.choices = inputs_list
+			inputs_list = SelectionList.get_inputs(
+				item_level=item_level,
+				input_group=selected_input_group,
+				username=session['username'],
+				details=True
+			)
+			field_book_supported = True
+			for input_variable in inputs_list:
+				form.select_inputs.choices.append((input_variable['name_lower'], input_variable['name']))
+				if input_variable['record_type'] != 'trait':
+					field_book_supported = False
+			if field_book_supported:
+				form.template_format.choices.append(('fb', 'Field Book'))
 		return form
 
 

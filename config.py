@@ -79,6 +79,13 @@ PARTNERS = [
 	{'BASED_IN': 'Ireland', 'name': 'NUIG', 'fullname': 'National University of Ireland, Galway'}
 ]
 
+ITEM_LEVELS = [
+	"Field",
+	"Block",
+	"Tree",
+	"Sample"
+]
+
 # NB: only upper case config variables are stored in the app.Config object
 RECORD_TYPES = [
 	'property',

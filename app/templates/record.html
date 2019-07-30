@@ -27,13 +27,12 @@
                     <h3>Selection</h3>
                     <p><a>0</a> <a>items</a></p>
                 </div>
-                <h3>Filter input variables by type</h3>
-                <p>Optional for templates</p>
-                <dd>{{  record_form.record_type }}</dd>
                 <div id='input_variable_selection'>
                     <h3>Select input variables</h3>
                         {% if ('global_admin' in session.access) or ('partner_admin' in session.access) %}
-		        			<a href={{  url_for('input_group_management') }}>Input group management</a>
+		        			<a href={{  url_for('input_group_management') }}>
+                                Click here to create and manage input groups
+                            </a><br><br>
         				{% endif %}
                         <dd>{{  render_field (record_form.input_group) }}</dd>
                         <div id="input_variable_checkbox_div"></div>

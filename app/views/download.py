@@ -12,62 +12,18 @@ from flask import (
 	session, 
 	render_template, 
 	jsonify,
-	send_from_directory,
-	make_response
+	send_from_directory
 )
 from app.models import (
-	User,
 	Download,
-	SelectionList,
-	InputList,
 	Parsers
 )
 from app.forms import (
 	DownloadForm,
 	LocationForm
 )
-from app.emails import (
-	send_email,
-	send_static_attachment
-)
+
 from datetime import datetime, timedelta
-
-
-@app.route("/input_groups")
-def input_groups():
-	item_level = request.args.get('item_level', None)
-	record_type = request.args.get('record_type', None)
-	if 'username' not in session:
-		flash('Please log in')
-		return redirect(url_for('login'))
-	else:
-		try:
-			input_groups_list = SelectionList.get_input_groups(item_level, record_type)
-			response = make_response(jsonify(input_groups_list))
-			response.content_type = 'application/json'
-			return response
-		except (ServiceUnavailable, SecurityError):
-			flash("Database unavailable")
-			return redirect(url_for('index'))
-
-
-@app.route("/inputs")
-def inputs():
-	item_level = request.args.get('item_level', None)
-	record_type = request.args.get('record_type', None)
-	input_group = request.args.get('input_group', None)
-	if 'username' not in session:
-		flash('Please log in')
-		return redirect(url_for('login'))
-	else:
-		try:
-			inputs_details = InputList(item_level, record_type).get_inputs(input_group=input_group)
-			response = make_response(jsonify(inputs_details))
-			response.content_type = 'application/json'
-			return response
-		except (ServiceUnavailable, SecurityError):
-			flash("Database unavailable")
-			return redirect(url_for('index'))
 
 
 @app.route('/download', methods=['GET', 'POST'])

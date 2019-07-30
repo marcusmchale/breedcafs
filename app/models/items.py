@@ -582,6 +582,7 @@ class AddFieldItems:
 	#     - FROM required on sample creation
 	#     - FROM updates must create longer path to current parent item
 	#       - i.e. new parent must have FROM/IS_IN path to current parent that does not include self node
+	# All the above are handled by effectively only allowing a Field level sample to be reassigned
 	@staticmethod
 	# can have multiple field UIDs so not true to class
 	def add_samples(
@@ -659,7 +660,7 @@ class AddFieldItems:
 		if level == 'field':
 			statement += (
 				' OPTIONAL MATCH (field) '
-				'	-[:OF_VARIETY*2]->(variety: Variety)'
+				'	-[:OF_VARIETY*2]->(variety: Variety) '
 				' WITH '
 				' field AS item, '
 				' user_samples, '
@@ -675,6 +676,22 @@ class AddFieldItems:
 					'	uid: $block_uid '
 					' }) '
 				)
+			if level == 'block' and not block_uid:
+				statement += (
+					' <-[:IS_IN]-(: FieldBlocks) '
+					' <-[:IS_IN]-(block: Block) '
+				)
+			if level == 'block':
+				statement += (
+					' OPTIONAL MATCH (field) '
+					'	-[:OF_VARIETY*2]->(variety: Variety) '
+					' WITH '
+					' block AS item, '
+					' user_samples, '
+					' COLLECT(DISTINCT(variety.name)) as varieties, '
+					' country, region, farm, field '
+				)
+
 			if any([level == 'tree', tree_id_list]):
 				statement += (
 					' <-[: IS_IN]-'
@@ -818,6 +835,16 @@ class AddFieldItems:
 				' item_samples, '
 				' field_sample_counter '
 			)
+		elif level == 'block':
+			statement += (
+				' WITH '
+				' country, region, farm, field, '
+				' varieties, '
+				' item, '
+				' user_item_samples, '
+				' item_samples, '
+				' field_sample_counter '
+			)
 		elif level == 'tree':
 			statement += (
 				' WITH '
@@ -885,7 +912,12 @@ class AddFieldItems:
 				'	Field: field.name, '
 				'	`Field UID`: field.uid, '
 			)
-			if level == 'tree':
+			if level == 'block':
+				statement += (
+					' Block: item.name, '
+					' `Block ID`: item.id '
+				)
+			elif level == 'tree':
 				statement += (
 					' Block: block.name, '
 					' `Block ID` : block.id, '

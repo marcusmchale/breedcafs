@@ -1,4 +1,3 @@
-const record_type_select = $('#record_type');
 const item_level_select = $('#item_level');
 const block_div = $('#block_div');
 const tree_div = $('#tree_selection_div');
@@ -26,30 +25,38 @@ remove_flash = function() {
 	$(".flash").remove();
 };
 
-record_type_update = function() {
-    const record_type = record_type_select.val();
-    const item_level = item_level_select.val();
-    if (item_level === "") {
-        location_div.hide();
-        block_div.hide();
-        tree_div.hide();
-        sample_div.hide();
-        item_count_div.hide();
-        input_variable_div.hide();
-        replicates_div.hide();
-    }
-    if (record_type === "trait") {
-        $('#template_format').append('<option value="fb">Field Book (csv)</option>');
-    }
-    else {
-        $('#template_format option[value="fb"]').remove();
-    }
-    level_update();
-    suppress_input();
-};
+// need to reimplement with scan of selected input group for record types
+    //if (record_type === "trait") {
+    //    $('#template_format').append('<option value="fb">Field Book (csv)</option>');
+    //}
+    //else {
+    //    $('#template_format option[value="fb"]').remove();
+    //}
+
+
+
+
+//        if (['trait', 'property', 'condition'].includes(record_type)){
+//                 $('#web_form_div').show();
+//         }
+
+
+//    const record_period_div = $('#record_period_div');
+//     const record_time_div = $('#record_time_div');
+//  if (record_type === 'trait') {
+//             record_period_div.hide();
+//             record_time_div.show();
+//         } else if (record_type === 'condition') {
+//             record_period_div.show();
+//             record_time_div.hide();
+//         } else {
+//             record_period_div.hide();
+//             record_time_div.hide();
+//         }
+
+
 
 level_update = function() {
-    const record_type = record_type_select.val();
     const item_level = item_level_select.val();
     input_group_select.empty();
     input_group_select.append(
@@ -77,17 +84,11 @@ level_update = function() {
         tree_div.show();
         sample_div.show();
     }
-    //if (record_type === 'trait' && item_level !== '') {
-    //replicates_div.show();
-    //}
-    //else {
-    //    replicates_div.hide();
-    //}
     $.ajax({
         url: (
-            "/input_groups"
-            + "?record_type=" + record_type
-            + "&item_level=" + item_level
+            "/record/input_groups"
+            + "?item_level=" + item_level
+            + "&username=True"
         ),
         type: 'GET',
         success: function (response) {
@@ -108,120 +109,19 @@ level_update = function() {
     remove_flash();
 };
 
-generate_form = function (response) {
-    dynamic_form_div.append('<dl></dl>');
-    for (let i = 0; i < response.length; i++) {
-        if (['text', 'numeric', 'percent'].includes(response[i]['format'])) {
-            dynamic_form_div.find('dl').append(
-                '<dt>' + response[i]['name'] + '</dt>' +
-                '<dd><input type="text" ' +
-                'id="' + response[i]['name_lower'] + '" ' +
-                'name="' + response[i]['name_lower'] + '" ' +
-                'placeholder="' + response[i]['details'] + '" ' +
-                'title="' + response[i]['details'] + '" ' +
-                '</dd>'
-            )
-        } else if (response[i]['format'] === 'boolean') {
-            dynamic_form_div.find('dl').append(
-                '<dt>' + response[i]['name'] + '</dt>' +
-                '<dd><select ' +
-                'id="' + response[i]['name_lower'] + '" ' +
-                'name="' + response[i]['name_lower'] + '" ' +
-                'title="' + response[i]['details'] + '"> ' +
-                '<option value = "true">True</option>' +
-                '<option value = "false">False</option>' +
-                '</select></dd>'
-            )
-        } else if (response[i]['format'] === 'date') {
-            dynamic_form_div.find('dl').append(
-                '<dt>' + response[i]['name'] + '</dt>' +
-                '<dd><input type="text" ' +
-                'id="' + response[i]['name_lower'] + '" ' +
-                'name="' + response[i]['name_lower'] + '" ' +
-                'placeholder="' + response[i]['details'] + '" ' +
-                'title="' + response[i]['details'] + '" ' +
-                '</dd>'
-            );
-            $('[id="' + response[i]["name_lower"] + '"]').datepicker({dateFormat: 'yy-mm-dd'});
-        } else if (response[i]['format'] === 'categorical') {
-            let category_options = "";
-            const category_list = response[i]['category_list'];
-            for (let j = 0; j < category_list.length; j++) {
-                const category = category_list[j];
-                category_options += (
-                    '<option value = "' + category + '">' +
-                    category + '</option>'
-                )
-            }
-            dynamic_form_div.find('dl').append(
-                '<dt>' + response[i]['name'] + '</dt>' +
-                '<dd><select ' +
-                'id="' + response[i]['name_lower'] + '" ' +
-                'name="' + response[i]['name_lower'] + '" ' +
-                'title="' + response[i]['details'] + '"> ' +
-                category_options + '</select></dd>'
-            );
-        } else if (response[i]['format'] === 'multicat') {
-            let category_options = "";
-            const category_list = response[i]['category_list'];
-            for (let j = 0; j < category_list.length; j++) {
-                const category = category_list[j];
-                category_options += (
-                    '<option value = "' + category.toLowerCase() + '">' +
-                    category + '</option>'
-                )
-            }
-            dynamic_form_div.find('dl').append(
-                '<dt>' + response[i]['name'] + '</dt>' +
-                '<dd><select ' +
-                'id="' + response[i]['name_lower'] + '" ' +
-                'name="' + response[i]['name_lower'] + '" ' +
-                'title="' + response[i]['details'] + '"> ' +
-                category_options + '</select></dd>'
-            );
-        }
-        input_variable_checkbox_div.find('ul').append(
-            "<li>" +
-            "<input id=select_inputs-" + i + " " +
-            "name='select_inputs' " +
-            "type=checkbox value='" + response[i]['name_lower'] + "' " +
-            ">" +
-            "<label for='checkbox_" + response[i]['name_lower'] + "'>" +
-            response[i]['name'] +
-            "</label>" +
-            "</li>"
-        );
-        const form_field = $('[id="' + response[i]['name_lower'] + '"]').parent('dd');
-        form_field.hide();
-        form_field.prev().hide();
-        $('#select_inputs-' + i).change(function () {
-            if (this.checked) {
-                 form_field.show();
-                 form_field.prev().show();
-                 update_submit_fields();
-            } else {
-                 form_field.hide();
-                 form_field.prev().hide();
-                 update_submit_fields();
-            }
-        });
-    }
-    suppress_input();
-};
 
 group_update = function() {
     input_variable_checkbox_div.empty();
     dynamic_form_div.empty();
-    const record_type = record_type_select.val();
     const item_level = item_level_select.val();
     const input_group = input_group_select.val();
     if (item_level && input_group) {
         $.ajax({
             url: (
-                "/inputs"
-                + "?record_type=" + record_type
-                + "&item_level=" + item_level
+                "/record/inputs"
+                + "?item_level=" + item_level
                 + "&input_group=" + input_group
+                + "&username=True"
             ),
             type: 'GET',
             success: function (response) {
@@ -252,30 +152,113 @@ group_update = function() {
 };
 
 
+generate_form = function (response) {
+    dynamic_form_div.append('<dl></dl>');
+    for (let i = 0; i < response.length; i++) {
+//        if (['text', 'numeric', 'percent'].includes(response[i]['format'])) {
+//            dynamic_form_div.find('dl').append(
+//                '<dt>' + response[i]['name'] + '</dt>' +
+//                '<dd><input type="text" ' +
+//                'id="' + response[i]['name_lower'] + '" ' +
+//                'name="' + response[i]['name_lower'] + '" ' +
+//                'placeholder="' + response[i]['details'] + '" ' +
+//                'title="' + response[i]['details'] + '" ' +
+//                '</dd>'
+//            )
+//        } else if (response[i]['format'] === 'boolean') {
+//            dynamic_form_div.find('dl').append(
+//                '<dt>' + response[i]['name'] + '</dt>' +
+//                '<dd><select ' +
+//                'id="' + response[i]['name_lower'] + '" ' +
+//                'name="' + response[i]['name_lower'] + '" ' +
+//                'title="' + response[i]['details'] + '"> ' +
+//                '<option value = "true">True</option>' +
+//                '<option value = "false">False</option>' +
+//                '</select></dd>'
+//            )
+//        } else if (response[i]['format'] === 'date') {
+//            dynamic_form_div.find('dl').append(
+//                '<dt>' + response[i]['name'] + '</dt>' +
+//                '<dd><input type="text" ' +
+//                'id="' + response[i]['name_lower'] + '" ' +
+//                'name="' + response[i]['name_lower'] + '" ' +
+//                'placeholder="' + response[i]['details'] + '" ' +
+//                'title="' + response[i]['details'] + '" ' +
+//                '</dd>'
+//            );
+//            $('[id="' + response[i]["name_lower"] + '"]').datepicker({dateFormat: 'yy-mm-dd'});
+//        } else if (response[i]['format'] === 'categorical') {
+//            let category_options = "";
+//            const category_list = response[i]['category_list'];
+//            for (let j = 0; j < category_list.length; j++) {
+//                const category = category_list[j];
+//                category_options += (
+//                    '<option value = "' + category + '">' +
+//                    category + '</option>'
+//                )
+//            }
+//            dynamic_form_div.find('dl').append(
+//                '<dt>' + response[i]['name'] + '</dt>' +
+//                '<dd><select ' +
+//                'id="' + response[i]['name_lower'] + '" ' +
+//                'name="' + response[i]['name_lower'] + '" ' +
+//                'title="' + response[i]['details'] + '"> ' +
+//                category_options + '</select></dd>'
+//            );
+//        } else if (response[i]['format'] === 'multicat') {
+//            let category_options = "";
+//            const category_list = response[i]['category_list'];
+//            for (let j = 0; j < category_list.length; j++) {
+//                const category = category_list[j];
+//                category_options += (
+//                    '<option value = "' + category.toLowerCase() + '">' +
+//                    category + '</option>'
+//                )
+//            }
+//            dynamic_form_div.find('dl').append(
+//                '<dt>' + response[i]['name'] + '</dt>' +
+//                '<dd><select ' +
+//                'id="' + response[i]['name_lower'] + '" ' +
+//                'name="' + response[i]['name_lower'] + '" ' +
+//                'title="' + response[i]['details'] + '"> ' +
+//                category_options + '</select></dd>'
+//            );
+//        }
+        input_variable_checkbox_div.find('ul').append(
+            "<li>" +
+            "<input id=select_inputs-" + i + " " +
+            "name='select_inputs' " +
+            "type=checkbox value='" + response[i]['name_lower'] + "' " +
+            ">" +
+            "<label for='checkbox_" + response[i]['name_lower'] + "'>" +
+            response[i]['name'] +
+            "</label>" +
+            "</li>"
+        );
+//        const form_field = $('[id="' + response[i]['name_lower'] + '"]').parent('dd');
+//        form_field.hide();
+//        form_field.prev().hide();
+        $('#select_inputs-' + i).change(function () {
+            update_submit_fields();
+//            if (this.checked) {
+//                 form_field.show();
+//                 form_field.prev().show();
+//            } else {
+//                 form_field.hide();
+//                 form_field.prev().hide();
+//            }
+        });
+    }
+    suppress_input();
+};
+
 update_submit_fields = function () {
-    const record_type = record_type_select.val();
-    const record_period_div = $('#record_period_div');
-    const record_time_div = $('#record_time_div');
     const checkboxes = input_variable_checkbox_div.find(":checkbox:not(#select_all_input_variables)");
     const count_checkboxes = checkboxes.length;
     const count_checked = checkboxes.filter(":checked").length;
     if (count_checked > 0){
-        if (['trait', 'property', 'condition'].includes(record_type)){
-                $('#web_form_div').show();
-        }
         submit_records_button.show();
         generate_template_div.show();
-        if (record_type === 'trait') {
-            record_period_div.hide();
-            record_time_div.show();
-        } else if (record_type === 'condition') {
-            record_period_div.show();
-            record_time_div.hide();
-        } else {
-            record_period_div.hide();
-            record_time_div.hide();
-        }
-
         if (count_checked === count_checkboxes) {
             $('#select_all_input_variables').prop('checked', true);
         } else {
@@ -445,11 +428,9 @@ suppress_input = function () {
 };
 
 
-$(window).on('load', record_type_update);
-//$(window).on('load', group_update);
+$(window).on('load', level_update);
 //$( window ).load(update_item_count);
 
-record_type_select.change(record_type_update);
 item_level_select.change(level_update);
 input_group_select.change(group_update);
 

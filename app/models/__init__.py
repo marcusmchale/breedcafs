@@ -1,7 +1,6 @@
 from user import User
 from upload import Upload, Resumable
 from lists import (
-	InputList,
 	ItemList,
 	SelectionList
 )

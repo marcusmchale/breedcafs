@@ -31,7 +31,7 @@ def collect():
 		return redirect(url_for('login'))
 	else:
 		try:
-			collect_form = CollectForm()
+			collect_form = CollectForm.update()
 			location_form = LocationForm.update()
 			return render_template(
 				'collect.html',
@@ -51,7 +51,7 @@ def register_samples():
 		return redirect(url_for('login'))
 	else:
 		try:
-			collect_form = CollectForm()
+			collect_form = CollectForm.update()
 			location_form = LocationForm.update(optional=True)
 			if all([
 				collect_form.validate_on_submit(),

@@ -11,6 +11,175 @@ class SelectionList:
 		pass
 
 	@staticmethod
+	def get_inputs(
+			record_type=None,
+			item_level=None,
+			input_group=None,
+			inputs=None,
+			partner=None,
+			username=None,
+			inverse=False,
+			details=False
+	):
+		import pdb;
+		pdb.set_trace()
+		parameters = {
+			"record_type": record_type,
+			"item_level": item_level,
+			"input_group": input_group,
+			"inputs": inputs,
+			"partner": partner,
+			"username": username
+		}
+		if record_type and item_level:
+			statement = (
+				' MATCH '
+				'	(: RecordType {name_lower: toLower($record_type)})'
+				'	<-[:OF_TYPE]-(input: Input) '
+				'	-[:AT_LEVEL]->(: ItemLevel {name_lower: toLower($item_level)}) '
+			)
+		elif record_type:
+			statement = (
+				' MATCH '
+				'	(: RecordType {name_lower: toLower($record_type)})'
+				'	<-[:OF_TYPE]-(input: Input) '
+			)
+		elif item_level:
+			statement = (
+				' MATCH '
+				'	(input: Input) '
+				'	-[:AT_LEVEL]->(: ItemLevel { '
+				'		name_lower: toLower($item_level) '
+				'	}) '
+			)
+		else:
+			statement = (
+				' MATCH (input: Input) '
+			)
+		if partner and input_group:
+			statement += (
+				' MATCH '
+				'	(partner: Partner { '
+				'		name_lower: toLower(trim($partner)) '
+				'	}) '
+				'	<-[:AFFILIATED { '
+				'		data_shared: True '
+				'	}]-(: User) '
+				'	-[: SUBMITTED]->(:  Submissions) '
+				'	-[: SUBMITTED]->(: InputGroups) '
+				'	-[: SUBMITTED]->(: InputGroup {'
+				'		name_lower: toLower(trim($input_group)) '
+				'	}) '
+				'	<-[in_group:IN_GROUP]-(input) '
+			)
+		elif partner:
+			statement += (
+				' MATCH '
+				'	(partner: Partner {'
+				'		name_lower: toLower(trim($partner)) '
+				'	}) '
+				'	<-[:AFFILIATED { '
+				'		data_shared: True '
+				'	}]-(: User) '
+				'	-[: SUBMITTED]->(:  Submissions) '
+				'	-[: SUBMITTED]->(: InputGroups) '
+				'	-[: SUBMITTED]->(: InputGroup) '
+				'	<-[in_group:IN_GROUP]-(input) '
+			)
+		elif username and input_group:
+			# handle defaulting to generic "non-partner submitted" group where not found
+			statement += (
+				' MATCH '
+				'	(: User { '
+				'		username_lower: toLower(trim($username)) '
+				'	})-[:AFFILATED {data_shared: True})->(partner :Partner) '
+				' MATCH '
+				'	(input) '
+				'	-[in_group: IN_GROUP]->(ig:InputGroup {'
+				'		name_lower: toLower(trim($input_group)) '
+				'	}) '
+				' OPTIONAL MATCH '
+				'	(partner)<-[:AFFILIATED { '
+				'		data_shared:True'
+				'	}]-(:User) '
+				'	-[:SUBMITTED]->(:Submissions) '
+				'	-[:SUBMITTED]->(:InputGroups) '
+				'	-[:SUBMITTED]->(ig) '
+				' WITH '
+				'	input, '
+
+			)
+		elif username:
+			statement += (
+
+				# TODO this is broken , need to first find partner then the partner associated input groups
+				' MATCH '
+				'	(: User {username_lower: toLower(trim($username))}) '
+				'	-[: SUBMITTED]->(:  Submissions) '
+				'	-[: SUBMITTED]->(: InputGroups) '
+				'	-[: SUBMITTED]->(: InputGroup) '
+				'	<-[in_group:IN_GROUP]-(input) '
+			)
+		elif input_group:
+			statement += (
+				' MATCH '
+				'	(ig: InputGroup { '
+				'		name_lower: toLower(trim($input_group)) '
+				'	}) '
+				'	<-[in_group:IN_GROUP]-(input) '
+				' OPTIONAL MATCH '
+				'	()-[s:SUBMITTED]->(ig) '
+				' WITH input, in_group WHERE s IS NULL '
+			)
+		if inputs:
+			parameters['inputs'] = inputs
+			statement += (
+				' WHERE input.name_lower IN extract(item IN $inputs | toLower(trim(item))) '
+			)
+		if inverse:
+			statement += (
+				' WITH collect(input) as selected_inputs '
+				' MATCH (input: Input) '
+				'	WHERE NOT input in selected_inputs '
+			)
+		if details:
+			statement += (
+				' WITH input '
+				' MATCH '
+				'	(level: ItemLevel)<-[: AT_LEVEL]-(input)-[: OF_TYPE]->(rt: RecordType) '
+				' RETURN { '
+				'	name: input.name, '
+				'	name_lower: input.name_lower, '
+				'	format: input.format, '
+				'	details: input.details, '
+				'	record_type: rt.name_lower, '
+				'	levels: collect(level.name) '
+				' } '
+			)
+		else:
+			statement += (
+				' RETURN [ '
+				'	input.name_lower, '
+				'	input.name '
+				' ] '
+			)
+		if input_group and not inverse and not details:
+			statement += (
+				' ORDER BY in_group.position, input.name_lower '
+			)
+		elif not details:
+			statement += (
+				' ORDER BY input.name_lower '
+			)
+		with get_driver().session() as neo4j_session:
+			result = neo4j_session.read_transaction(
+				bolt_result,
+				statement,
+				parameters
+			)
+		return [record[0] for record in result]
+
+	@staticmethod
 	def get_partners():
 		parameters = {}
 		query = (
@@ -179,45 +348,81 @@ class SelectionList:
 		return [tuple(record[0]) for record in result]
 
 	@staticmethod
-	def get_input_groups(item_level, record_type):
+	def get_input_groups(
+			item_level=None,
+			record_type=None,
+			username=None,
+			partner=None
+	):
 		parameters = {
 			"item_level": item_level,
-			"record_type": record_type
+			"record_type": record_type,
+			"username": username,
+			"partner": partner
 		}
-		if item_level and record_type:
-			statement = (
+		statement = ' MATCH '
+		if any([username, partner]):
+			if username:
+				statement += (
+					' (p:Partner) '
+					' <-[:AFFILIATED { '
+					'	data_shared: True '
+					' }]-(:User { '
+					'	username_lower: toLower(trim($username)) '
+					' }) '
+				)
+			else:
+				statement += (
+					' (p:Partner) '
+				)
+			statement += (
 				' MATCH '
-				'	(input_group: InputGroup) '
+				'	(p) '
+				'	<-[: AFFILIATED {data_shared: True}]-(: User) '
+				'	-[: SUBMITTED]->(: Submissions) '
+				'	-[: SUBMITTED]->(: InputGroups) '
+				'	-[: SUBMITTED]->(ig: InputGroup) '
+			)
+			if partner:
+				statement += (
+					' WHERE p.name_lower = toLower(trim($partner)) '
+				)
+		else:
+			statement += (
+				' (ig: InputGroup) '
+				' OPTIONAL MATCH '
+				'	(ig)<-[s:SUBMITTED]-() '
+				' WITH ig WHERE s IS NULL '
+			)
+		if item_level and record_type:
+			statement += (
+				' MATCH '
+				'	(ig) '
 				'	<-[:IN_GROUP]-(input: Input) '
 				'	-[:AT_LEVEL]->(: ItemLevel {name_lower: toLower($item_level)}), '
 				'	(input)-[:OF_TYPE]->(: RecordType {name_lower: toLower($record_type)}) '
 			)
 		elif item_level:
-			statement = (
+			statement += (
 				' MATCH '
-				'	(input_group: InputGroup) '
+				'	(ig) '
 				'	<-[:IN_GROUP]-(: Input) '
 				'	-[:AT_LEVEL]->(: ItemLevel {name_lower: toLower($item_level)}) '
 			)
 		elif record_type:
-			statement = (
+			statement += (
 				' MATCH '
-				'	(input_group: InputGroup) '
+				'	(ig) '
 				'	<-[:IN_GROUP]-(: Input) '
 				'	-[:OF_TYPE]->(: RecordType {name_lower: toLower($record_type)}) '
 			)
-		else:
-			statement = (
-				' MATCH '
-				'	(input_group: InputGroup) '
-			)
 		statement += (
-				' WITH DISTINCT (input_group) '
+				' WITH DISTINCT ig '
 				' RETURN [ '
-				'	input_group.name_lower, '
-				'	input_group.name '
+				'	ig.name_lower, '
+				'	ig.name '
 				' ] '
-				' ORDER BY input_group.name_lower '
+				' ORDER BY ig.name_lower '
 		)
 		with get_driver().session() as neo4j_session:
 			result = neo4j_session.read_transaction(
@@ -326,7 +531,6 @@ class ItemList:
 	@staticmethod
 	def build_match_item_statement(record_data):
 		parameters = {
-			'record_type': record_data['record_type'],
 			'item_level': record_data['item_level']
 		}
 		statement = (
@@ -666,68 +870,4 @@ class ItemList:
 				bolt_result,
 				query,
 				parameters)
-		return [record[0] for record in result]
-
-
-class InputList:
-	def __init__(self, item_level, record_type):
-		self.item_level = item_level
-		self.record_type = record_type
-
-	def get_inputs(
-			self,
-			input_group=None,
-			inputs=None
-	):
-		parameters = {
-			"record_type": self.record_type,
-			"item_level": self.item_level
-		}
-		if self.record_type and self.item_level:
-			statement = (
-				' MATCH '
-				'	(: RecordType {name_lower: toLower($record_type)})'
-				'	<-[:OF_TYPE]-(input: Input) '
-				'	-[:AT_LEVEL]->(: ItemLevel {name_lower: toLower($item_level)}) '
-			)
-		elif self.record_type:
-			statement = (
-				' MATCH '
-				'	(: RecordType {name_lower: toLower($record_type)})'
-				'	<-[:OF_TYPE]-(input: Input) '
-			)
-		elif self.item_level:
-			statement = (
-				' MATCH '
-				'	(input: Input) '
-				'	-[:AT_LEVEL]->(: ItemLevel {name_lower: toLower($item_level)}) '
-			)
-		else:
-			statement = (
-				' MATCH (input: Input) '
-			)
-		if input_group:
-			parameters['input_group'] = input_group
-			statement += (
-				' , '
-				'	(input)'
-				'	-[:IN_GROUP]->(: InputGroup { '
-				'		name_lower: toLower($input_group) '
-				'	}) '
-			)
-		if inputs:
-			parameters['inputs'] = inputs
-			statement += (
-				' WHERE input.name_lower IN extract(item IN $inputs | toLower(trim(item))) '
-			)
-		statement += (
-			' RETURN properties(input) '
-			' ORDER BY input.name_lower '
-		)
-		with get_driver().session() as neo4j_session:
-			result = neo4j_session.read_transaction(
-				bolt_result,
-				statement,
-				parameters
-			)
 		return [record[0] for record in result]

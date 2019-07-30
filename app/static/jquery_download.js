@@ -36,9 +36,11 @@ group_select_update = function() {
             "/input_groups"
             + "?record_type=" + record_type
             + "&item_level=" + item_level
+            + "&username=True"
         ),
         type: 'GET',
         success: function (response) {
+            console.log(response);
             const input_groups = response;
             for (let i = 0; i < input_groups.length; i++) {
                 input_group_select.append(
@@ -58,12 +60,18 @@ inputs_variables_update = function() {
     const record_type = record_type_select.val();
     const item_level = item_level_select.val();
     const input_group = input_group_select.val();
+    let args = ("?record_type=" + record_type
+            + "&item_level=" + item_level
+    );
+    if (input_group !== '') {
+        args = (args
+            + "&input_group=" + input_group
+            + "&username=True"
+        )
+    }
     $.ajax({
         url: (
-            "/inputs"
-            + "?record_type=" + record_type
-            + "&item_level=" + item_level
-            + "&input_group=" + input_group
+            "/inputs" + args
         ),
         type: 'GET',
         success: function (response) {
@@ -137,7 +145,6 @@ submit_download_button.click( function (e) {
 		}
     })
 });
-
 
 
 item_level_select.change(group_select_update);

@@ -13,6 +13,7 @@ from flask import (
 	render_template,
 	jsonify,
 	request,
+	make_response
 )
 
 from wtforms import (
@@ -34,6 +35,8 @@ from wtforms.validators import (
 from app.forms import (
 	LocationForm,
 	RecordForm,
+	AddInputGroupForm,
+	ManageInputGroupForm,
 	range_list_check
 )
 
@@ -42,7 +45,6 @@ from app.models import (
 	Parsers,
 	Download,
 	User,
-	InputList,
 	SelectionList
 )
 
@@ -71,6 +73,218 @@ def record():
 			return redirect(url_for('index'))
 
 
+@app.route("/record/input_groups")
+def input_groups():
+	item_level = request.args.get('item_level', None)  if request.args.get('item_level') not in ['', 'None', 'false'] else None
+	record_type = request.args.get('record_type', None)  if request.args.get('record_type') not in ['', 'None', 'false'] else None
+	partner = request.args.get('partner', None) if request.args.get('partner') not in ['', 'None', 'false'] else None
+	# send false for username to get other for partner admin etc.
+	username = request.args.get('username', True) if request.args.get('username') not in ['', 'None', 'false'] else None
+	if 'username' not in session:
+		flash('Please log in')
+		return redirect(url_for('login'))
+	else:
+		try:
+			input_groups_list = SelectionList.get_input_groups(
+				item_level=item_level,
+				record_type=record_type,
+				partner=partner,
+				username=session['username'] if username else None
+			)
+			response = make_response(jsonify(input_groups_list))
+			response.content_type = 'application/json'
+			return response
+		except (ServiceUnavailable, SecurityError):
+			flash("Database unavailable")
+			return redirect(url_for('index'))
+
+
+@app.route("/record/inputs")
+def inputs():
+	item_level = request.args.get('item_level', None)
+	record_type = (
+		request.args.get('record_type', None) if request.args.get('record_type') not in ['', 'None', 'false'] else None
+	)
+	input_group = (
+		request.args.get('input_group', None) if request.args.get('username') not in ['', 'None', 'false'] else None
+	)
+	username = (
+		request.args.get('username', None) if request.args.get('username') not in ['', 'None', 'false'] else None
+	)
+	if 'username' not in session:
+		flash('Please log in')
+		return redirect(url_for('login'))
+	else:
+		try:
+			inputs_details = SelectionList.get_inputs(
+				item_level=item_level,
+				record_type=record_type,
+				input_group=input_group,
+				username=session['username'] if username else None,
+				details=True
+			)
+			response = make_response(jsonify(inputs_details))
+			response.content_type = 'application/json'
+			return response
+		except (ServiceUnavailable, SecurityError):
+			flash("Database unavailable")
+			return redirect(url_for('index'))
+
+
+@app.route('/record/add_input_group', methods=['POST'])
+def add_input_group():
+	if 'username' not in session:
+		flash('Please log in')
+		return redirect(url_for('login'))
+	elif all([
+		'global_admin' not in session['access'],
+		'partner_admin' not in session['access']
+	]):
+		flash('You attempted to access a restricted page')
+		return redirect(url_for('index'))
+	else:
+		try:
+			add_input_group_form = AddInputGroupForm.update()
+			if all([
+				add_input_group_form.validate_on_submit()
+			]):
+				input_group_name = request.form['input_group_name'] if request.form['input_group_name'] not in ['', None] else None
+				partner_to_copy = request.form['partner_to_copy'] if request.form['partner_to_copy'] not in ['', None] else None
+				group_to_copy = request.form['group_to_copy'] if request.form['group_to_copy'] not in ['', None] else None
+				recorder = Record(session['username'])
+				found_name = recorder.add_input_group(
+					input_group_name,
+					partner_to_copy=partner_to_copy,
+					group_to_copy=group_to_copy
+				)
+				if found_name[0]:
+					return jsonify({"found": [
+						found_name[1],  # name lowercase
+						found_name[2]  # name Capitalised
+					]})
+				else:
+					return jsonify({"submitted": [
+						found_name[1],
+						found_name[2]
+					]})
+			else:
+				return jsonify({
+					'errors': [
+						add_input_group_form.errors
+					]
+				})
+		except (ServiceUnavailable, SecurityError):
+			flash("Database unavailable")
+			return redirect(url_for('index'))
+
+
+@app.route("/inputs_selection")
+def inputs_selection():
+	input_group = (
+		request.args.get('input_group', None) if request.args.get('input_group') not in ['', 'None', 'false'] else None
+	)
+	partner = request.args.get('partner', False) if request.args.get('partner') not in ['', 'None', 'false'] else False
+	username = request.args.get('username', False) if request.args.get('username') not in ['', 'None', 'false'] else False
+	inverse = request.args.get('inverse', False) if request.args.get('inverse') not in ['', 'None', 'false'] else False
+	if 'username' not in session:
+		flash('Please log in')
+		return redirect(url_for('login'))
+	else:
+		try:
+			inputs_details = SelectionList.get_inputs(
+				input_group=input_group,
+				partner=partner,
+				username=session['username'] if username else False,
+				inverse=inverse
+			)
+			response = make_response(jsonify(inputs_details))
+			response.content_type = 'application/json'
+			return response
+		except (ServiceUnavailable, SecurityError):
+			flash("Database unavailable")
+			return redirect(url_for('index'))
+
+
+@app.route('/record/commit_group_changes', methods=['POST'])
+def commit_group_changes():
+	if 'username' not in session:
+		flash('Please log in')
+		return redirect(url_for('login'))
+	elif all([
+		'global_admin' not in session['access'],
+		'partner_admin' not in session['access']
+	]):
+		flash('You attempted to access a restricted page')
+		return redirect(url_for('index'))
+	else:
+		try:
+			form = ManageInputGroupForm.commit()
+			if form.validate_on_submit():
+				input_group = request.form.get('input_group_select', None) if request.args.get('input_group') != '' else None
+				inputs = request.form.getlist('group_inputs')
+				recorder = Record(session['username'])
+				result = recorder.update_group(input_group, inputs)
+				report = 'Group members set: <ul>'
+				for i in result:
+					report += '<li>' + i + '</li>'
+				report += '</ul>'
+				return jsonify({
+					'submitted': report
+				})
+			else:
+				return jsonify({
+					'errors': [
+						form.errors
+					]
+				})
+		except (ServiceUnavailable, SecurityError):
+			flash("Database unavailable")
+			return redirect(url_for('index'))
+
+
+@app.route('/record/add_inputs_to_group', methods=['POST'])
+def add_inputs_to_group():
+	if 'username' not in session:
+		flash('Please log in')
+		return redirect(url_for('login'))
+	elif all([
+		'global_admin' not in session['access'],
+		'partner_admin' not in session['access']
+	]):
+		flash('You attempted to access a restricted page')
+		return redirect(url_for('index'))
+	else:
+		try:
+			form = ManageInputGroupForm.update()
+			if form.validate_on_submit():
+				input_group = request.form.get('input_group_select', None) if request.args.get('input_group') != '' else None
+				inputs = request.form.getlist('all_inputs')
+				recorder = Record(session['username'])
+				result = recorder.add_inputs_to_group(input_group, inputs)
+				new = 'Added to group: <ul>'
+				existing = 'Already in group: <ul>'
+				for i in result:
+					if not i[0]:
+						new += '<li>' + i[1] + '</li>'
+					else:
+						existing += '<li>' + i[1] + '</li>'
+				new += '</ul>'
+				existing += '</ul>'
+				report = new + existing
+				return jsonify({
+					'submitted': report
+				})
+			else:
+				return jsonify({
+					'errors': [
+						form.errors
+					]
+				})
+		except (ServiceUnavailable, SecurityError):
+			flash("Database unavailable")
+			return redirect(url_for('index'))
+
+
 @app.route('/record/input_group_management', methods=['GET', 'POST'])
 def input_group_management():
 	if 'username' not in session:
@@ -84,9 +298,13 @@ def input_group_management():
 		return redirect(url_for('index'))
 	else:
 		try:
+			add_input_group_form = AddInputGroupForm.update()
+			manage_input_group_form = ManageInputGroupForm.update()
 			return render_template(
 				'input_group_management.html',
 				title='Input variable group management',
+				add_input_group_form=add_input_group_form,
+				manage_input_group_form=manage_input_group_form
 			)
 		except (ServiceUnavailable, SecurityError):
 			flash("Database unavailable")
@@ -107,12 +325,8 @@ def generate_template():
 				location_form.validate_on_submit()
 			]):
 				username = session['username']
-				record_type = request.form['record_type'] if request.form['record_type'] != '' else None
 				time_points = int(request.form['time_points']) if request.form['time_points'] != '' else None
-				if record_type in [None, 'trait', 'curve']:
-					replicates = int(request.form['replicates']) if request.form['replicates'] != '' else None
-				else:
-					replicates = None
+				replicates = int(request.form['replicates']) if request.form['replicates'] != '' else None
 				item_level = request.form['item_level'] if request.form['item_level'] != '' else None
 				country = request.form['country'] if request.form['country'] != '' else None
 				region = request.form['region'] if request.form['region'] != '' else None
@@ -136,7 +350,6 @@ def generate_template():
 					inputs_dict[input_variable] = request.form[input_variable]
 				template_format = request.form['template_format']
 				record_data = {
-					'record_type': record_type,
 					'time_points': time_points,
 					'replicates': replicates,
 					'item_level': item_level,
@@ -227,10 +440,12 @@ def submit_records():
 
 				item_level = request.form['item_level'] if request.form['item_level'] not in ['', 'None'] else None
 				record_type = request.form['record_type'] if request.form['record_type'] not in ['', 'None'] else None
-				inputs_details = InputList(
-					item_level,
-					record_type
-				).get_inputs(inputs=request.form.getlist('select_inputs') if 'select_inputs' in request.form else None)
+				inputs_details = SelectionList.get_inputs(
+					item_level=item_level,
+					record_type=record_type,
+					inputs=request.form.getlist('select_inputs') if 'select_inputs' in request.form else None,
+					details=True
+				)
 				for input_variable in inputs_details:
 					if input_variable['format'] in ["numeric", "percent"]:
 						min_value = input_variable['minimum'] if 'minimum' in input_variable else None
@@ -370,10 +585,12 @@ def submit_records():
 					] else None
 				)
 				if selected_input_group:
-					inputs_details = InputList(
-						item_level,
-						record_type
-					).get_inputs(input_group=selected_input_group)
+					inputs_details = SelectionList.get_inputs(
+						item_level=item_level,
+						record_type=record_type,
+						input_group=selected_input_group,
+						username=session['username']
+					)
 					inputs_list = [(input_variable['name_lower'], input_variable['name']) for input_variable in inputs_details]
 					detailed_record_form.select_inputs.choices = inputs_list
 				inputs_list = [(input_variable['name_lower'], input_variable['name']) for input_variable in inputs_details]
