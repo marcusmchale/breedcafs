@@ -356,6 +356,7 @@ $("#submit_trees").click( function(e) {
 		data: $("form").serialize(),
 		type: 'POST',
 		success: function(response) {
+			console.log(response);
 			if (response.hasOwnProperty('submitted')) {
 				const flash_submitted = "<div id='trees_flash' class='flash'>" + response.submitted + "</div>";
 				$("#trees_flash").replaceWith(flash_submitted);
@@ -373,17 +374,6 @@ $("#submit_trees").click( function(e) {
 							}
 						}
 					}
-
-
-					//for (const i in response) {
-					//	if (response.hasOwnProperty(i)) {
-					//		for (const key in response[i]){
-					//			if (response[i].hasOwnProperty(key)) {
-					//				const flash = "<div id='flash_" + key + "' class='flash'>" + response[i][key][0] + "</div>";
-					//				$('#' + key).after(flash);
-					//			}
-					//		}
-					//	}
 				}
 		},
 		error: function(error) {

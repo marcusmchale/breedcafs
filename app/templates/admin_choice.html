@@ -1,10 +1,15 @@
 {% extends "layout.html" %}	
 {% block body %}
 <div class="text_body">
-	{% from "_formhelpers_admin.html" import render_field %}
-	<h2>Global Administration</h2>
-	 <a href={{url_for('user_admin')}}>User admin</a>
-	 <a><br></a>
-	 <a href={{url_for('partner_admin')}}>Partner admin</a>
+<ul>
+	<li><a href={{url_for('user_admin')}}>User admin</a></li>
+    <li><a href={{url_for('input_group_management')}}>Input group management</a></li>
+</ul>
+		{% if ('global_admin' in session.access) %}
+        <h2>Global Administration Only</h2>
+        <ul>
+	        <a href={{url_for('partner_admin')}}>Partner admin</a>
+        </ul>
+        {% endif %}
 </div>
 {% endblock %}

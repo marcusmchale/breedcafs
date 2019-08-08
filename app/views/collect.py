@@ -57,6 +57,7 @@ def register_samples():
 				collect_form.validate_on_submit(),
 				location_form.validate_on_submit()
 			]):
+				sampling_activity = request.form['sampling_activity']
 				level = request.form['item_level'] if request.form['item_level'] != '' else None
 				country = request.form['country'] if request.form['country'] != '' else None
 				region = request.form['region'] if request.form['region'] != '' else None
@@ -88,9 +89,11 @@ def register_samples():
 					per_item_count
 				):
 					download_object.item_level = "sample"
+					if level == 'field' and sampling_activity in ['sample registration (in situ)', 'sample registration (harvest)']:
+						sampling_activity = 'field ' + sampling_activity
 					download_object.set_inputs(
 						'sample',
-						input_group="Registration",
+						input_group=sampling_activity,
 						sample_level=level
 					)
 					# drop some items from the self.inputs list to avoid confusion when they aren't relevant

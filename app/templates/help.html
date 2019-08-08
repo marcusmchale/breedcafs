@@ -40,8 +40,9 @@
 				As an example, "1_B2" is the UID for the second block registered within the <a href="#fields">Field</a>
                 with UID 1. Blocks are best added first so that subsequent <a href="#trees">Trees</a>
                 may be registered directly into a Block.
-                However, <a href="#trees">Trees</a> may be later assigned to a
-                Block (must be in the same field) by recording the registered block name in the "Assign to block" input variable.
+                However, <a href="#trees">Trees</a> may be later assigned to a registered Block
+                (must be in the same field) by recording the registered block name in the
+                "Assign tree to block by name" property.
 			</p>
 		<h3 id="trees">Trees</h3>
 			<p>
@@ -54,31 +55,74 @@
                 to record details for later <a href="#upload">submission</a>. This same template can also be generated on the
                 <a href="#record">Record</a> page by selecting the "Registration" input group.
             </p>
-
 	<h2 id="samples">
         <a href="{{ url_for('collect') }}">
             <img src = "{{ url_for('static', filename='collect.svg') }}">
         </a>
 		Register samples
 	</h2>
+        <p>
+            The most common usage for Sample registration will be to represent phyiscal harvested specimens.
+            However, samples can also be used to describe nested statistical sampling strategies.
+        </p>
         <h3>
-            Items
+            Item level
         </h3>
             <p>
-                If each sample to be collected is representative of a <a href="#fields">Field</a>
-                or <a href="#trees">Tree</a> then select the corresponding level.
+                If each sample represents a single registered item then select the level of this item.
+                If each sample represents a group of items, then select the Field level
+                and later associate each sample with the specific Block(s), Tree(s) or Sample(s)
+                by recording the relevant property;
+                "Assign field sample to block by name", "Assign field sample to block(s) by ID",
+                "Assign field sample to tree(s) by ID" or
+                "Assign field sample to sample(s) by ID"
             </p>
-            <p>
-                If each sample is representative of a collection of <a href="#trees">Trees</a>
-                (i.e. pooled) then select "Field" and later associate each sample with a list of Tree IDs
-                by recording the "Assign to trees" condition.
-            </p>
-            <p>
-                For sub-sampling (i.e. splitting a sample into multiple representative samples),
-                select "Sample". This is designed to support distributing samples among labs
-                and where samples may be split for different post-harvest processing procedures.
-                New IDs are generated but the association with the original sample is preserved in the database.
-            </p>
+            <h4>
+                Some examples to help clarify the distinction between levels
+                for samples as either specimens or statistical units:
+            </h4>
+                <ul>
+                    <li>
+                        <p>
+                            In the case of harvested specimens, a Field level sample would correspond to
+                            tissue from the field for which the specific tree(s) identity is not known.
+                        </p>
+                        <p>
+                            In the case of statistical sampling, a Field level sample similarly corresponds
+                            to an identity to which other data may be associated. An example of this usage would be
+                            in recording data from trees for which only the Field is known. The tree could be registered
+                            as a sample and records for this tree associated with that sample.
+                        </p>
+                    </li>
+                    <li>
+                        A Block level sample can be used as for Field level samples, just that in this case the specific block
+                        that was sampled is known.
+                    </li>
+                    <li><p>
+                            In the case of a harvested specimen, a Tree level sample would correspond to tissue that
+                            was harvested from a registered tree or trees, for which the identity of the trees is known.
+                        </p>
+                        <p>
+                            In the case of statistical sampling, A Tree level sample similarly corresponds to an
+                            identity to which other data may be associated. An example of this usage would be in
+                            recording data from a branch. The branch could be registered as a sample and records
+                            for this branch associated with that sample.
+                        </p>
+                    </li>
+                    <li>
+                        <p>
+                            In the case of harvested specimens, Sample level sampling allow us to create sub-samples
+                            with unique identities to use following splitting of a sample either into multiple
+                            locations or following subdivision of tissues (e.g. separating cherry flesh from bean).
+                        </p>
+                        <p>
+                            In the case of statistical sampling, A Sample level sample allows us to model more complex
+                            statistical sampling strategies than would be supported by the more simple replicate codes.
+                            For example, in the provided case where a tree is registered as a Field level sample,
+                            further sub-samples could be created that represent individual branches of that tree.
+                        </p>
+                    </li>
+                </ul>
         <h3>
             Filters
         </h3>
@@ -99,7 +143,7 @@
                 When you register samples you are provided a BreedCAFS template detailing the sample UIDs
                 and allowing you to record details for later <a href="#upload">submission</a>.
                 This same template can also be generated on the
-                <a href="#record">Record</a> page by selecting the "Registration" input group.
+                <a href="#record">Record</a> page by selecting the appropriate "Registration" input group.
             </p>
     <h2 id="record">
         <a href="{{ url_for('record') }}">
@@ -108,7 +152,7 @@
         Record data
     </h2>
         <p>
-            This page allows users to either <a href="#direct">directly submit</a> records or
+            This page allows users to <!--either <a href="#direct">directly submit</a> records or-->
             generate templates to record data in <a href="#spreadsheet">spreadsheet software</a> such as Microsoft Excel,
             or alternatively generate files required for the <a href="#field book">Field Book</a> application.
         </p>
@@ -145,6 +189,44 @@
             If the group of variables you would like to select is not available then please contact an admin
             to create a new group.
         </p>
+        {% if ('global_admin' in session.access) or ('partner_admin' in session.access) %}
+        <h3>
+            Manage input groups
+        </h3>
+            <p>
+                Your users will only have access to the groups that you or another admin for your partner
+                have created through the
+                <a href="{{  url_for('input_group_management') }}">input group management page</a>.
+                This limitation is designed to prevent confusion between teams with different roles.
+            </p>
+            <h4>
+                Create an input group
+            </h4>
+                <p>
+                    If you wish to start by modifying a copy of an existing group then either select a partner
+                    from whom to copy or select "Default variable groups".
+                </p>
+                <p>
+                    Select the group to copy or leave this blank to create an empty group.
+                </p>
+                <p>
+                    Enter a name for the group in the text field and click '+' to add the group.
+                </p>
+            <h4>
+                Manage group members
+            </h4>
+                <p>
+                    Select the group to manage and drag input variables from the "Find input variables" box into the
+                    box below.
+                </p>
+            <h4>
+                <p>
+                    Input variables may be relevant to multiple levels of items,
+                    so it is necessary to further specify the levels of relevance for the group.
+                </p>
+            </h4>
+        {% endif %}
+
         <h3 id="spreadsheet">Spreadsheet software</h3>
             <p>
                 In most cases users are familiar with <a href="#spreadsheet">spreadsheet table templates</a>
@@ -157,15 +239,13 @@
                 If you are aggregating data from multiple periods of recording you may want a table that contains
                 rows for multiple records per selected item.
                 For convenience, the number of duplicated rows per item can be set by the "time points" value.
-                Time points is distinct from replicates which allow the submission and identification of multiple values
-                at a single time-point (see <a href="#traits">traits</a> description for details).
             </p>
             <p>
                 To generate spreadsheet table templates for the selected items and input variables,
                 simply select "Table (xlsx)" in the drop down box (selected by default)
                 and click "Generate template".
             </p>
-        <h3 id="direct">Direct submission</h3>
+       <!-- <h3 id="direct">Direct submission</h3>
             <p>
                 To easily make direct submissions of a single value for a set of items a web-form is provided.
                 Please ensure you have carefully selected the items as the same value will be recorded for the entire selection.
@@ -177,7 +257,7 @@
             <p>
                 With items, input variables and record type selected, simply enter values for all selected input variables and click submit.
                 You will receive a report in the browser window that will either confirm your submission or warn of errors and/or conflicts.
-            </p>
+            </p>-->
         <h3 id = "field book">Field Book application</h3>
             <p>
                 The Field Book application is designed to support data collection for simple traits.
@@ -199,20 +279,12 @@
             </p>
         <h4 id="traits">Traits</h4>
             <p>
-                Traits have a single value for each item at an assessed time point.
-
-                Replicates at a single time-point are supported and identifiable by replicate ID which is simply an integer (e.g. "1")
-                concatenated to the UID following a period ".".
-                For example, two replicate UIDs for 1_T1 would be "1_T1.1" and "1_T1.2".
-                Replicate codes are only guaranteed unique at a single time point.
+                Traits have a single (or <a href="replicates">replicated</a>) value for each item  at an assessed time point.
             </p>
         <h4 id="curves">Curves</h4>
             <p>
-                Curves have a paired list of independent ("X") and dependent ("Y") variables for each item at an assessed time point.
-            </p>
-            <p>
-                As for traits, replicates are supported through replicate codes
-                (see <a href="#traits">traits</a> description for details).
+                Curves have a paired list of independent ("X") and dependent ("Y") variables
+                (that may be <a href="replicates">replicated</a>) for each item at an assessed time point.
             </p>
             <p>
                 The templates for curve input variables are generated as a worksheet for each input variable.
@@ -222,7 +294,7 @@
             </p>
         <h4 id="conditions">Conditions</h4>
             <p>
-                Conditions have a single value for any given period.
+                Conditions have a single (or <a href="replicates">replicated</a>) value for any given period.
                 The start and end time of this period are optionally defined in each record,
                 however the following rules apply:
                 <ul>
@@ -244,6 +316,48 @@
             <p>
                 These rules can lead to a situation where to set a new value for an unbounded condition,
                 an existing record must be <a href="#correct">deleted</a>.
+                Be sure that new bounded conditions are set to replace these delete record!
+            </p>
+        <h3>Replicates</h3>
+            <p>
+                For trait, condition, and curve data, replicate codes may be used to submit multiple records for
+                a single input variable at a given time or period for the same item.
+            </p>
+            <p>
+                Replicate codes are simple integers appended to a UID, e.g. "1_T1.1" would be the first replicate for
+                Tree "1_T1".
+            </p>
+            <p>
+                Replicate codes are also considered in establishing simple identities for statistical analyses.
+                That is to say, if a record for a trait or curve input variable is submitted with a replicate code
+                then all other trait or curve records at that time for that item and with that replicate code
+                should be associated with the same sampling event. For conditions records, all trait/curve/condition
+                records associated with that item and replicate code in that period should be associated with that condition.
+            </p>
+            <p>
+                Further, when no replicate code (or a replicate code of '0') is associated with any trait/curve/conditon
+                record, then this record should be representative for all records (replicated or not) for that item,
+                at that time or in that period.
+            </p>
+            <p>Where more complex sampling procedures are needed
+                <b>
+                    or there is a risk of users submitting records for the same items for the same time or period
+                    with un-associated but identical replicate codes
+                </b>
+                then identities should be made more explicit by registering <a href="samples">Samples</a>.
+            </p>
+            <p>
+                <b>
+                    <!--NB: I have yet to develop a warning system for this but it should be possible upon submission to
+                    provide an opportunity for users to confirm that the records they are submitting
+                    are associated with any existing replicate codes in use at that time/period.
+                    The user could be presented with the name of the user/partner
+                    that first used these codes to help inform them of the decision.
+                    This may be challenging though as cases may be expected
+                    where separate groups at first are using the same replicate codes at distinct times
+                    but later a condition record may be submitted for a spanning period. This would need to addressed
+                    by changing replicate codes and/or fragmenting the condition record(s).-->
+                </b>
             </p>
     <h2 id="upload">
         <a href="{{ url_for('upload') }}">
@@ -350,7 +464,7 @@
 			You can also confirm/unconfirm registered users,
 			providing/denying access to the data through the download portal.
 		</p>
-	{% endif %}
+    {% endif %}
 	</div>
 
 

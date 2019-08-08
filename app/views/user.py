@@ -270,10 +270,8 @@ def admin():
 		flash('Please log in')
 		return redirect(url_for('login'))
 	else:
-		if 'global_admin' in session['access']:
+		if 'global_admin' in session['access'] or 'partner_admin' in session['access']:
 			return render_template('admin_choice.html')
-		elif 'partner_admin' in session['access']:
-			return redirect(url_for('user_admin'))
 		else:
 			flash('You attempted to access a restricted page')
 			return redirect(url_for('index'))

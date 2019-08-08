@@ -4,20 +4,13 @@
 	<h2>Collect Samples</h2>
     {% from "_formhelpers_location_fields.html" import render_field %}
 	<form>
+        <div id="sample_type">
+            <h3>Sampling activity</h3>
+            {{  render_field (collect_form.sampling_activity) }}
+        </div>
 		<div id="level_choice">
 		    <h3>Type of item to be sampled</h3>
 			{{ render_field (collect_form.item_level) }}
-            <p>
-                If the samples are representative of a field or tree
-                then select the corresponding level. <br><br>
-                If the samples are representative of a collection of trees or samples (i.e. pooled)
-                then select "Field" and later associate each sample with a list of tree or sample IDs.
-                This is done with a list of ID numbers in the "Assign to trees" or "Assign to samples" property. <br><br>
-                For sub-sampling (i.e. splitting a sample into multiple representative samples),  select "Sample".
-                This is designed to support distributing samples among labs and where samples may be
-                split for different post-harvest processing procedures. New IDs are generated but the association
-                with the original sample is preserved in the database.
-            </p>
 		</div>
         <div id="location">
             <h3>Filter to select specific item/s</h3>

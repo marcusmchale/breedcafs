@@ -14,13 +14,12 @@ update_group_to_copy_list = function() {
     const partner = (partner_to_copy.val() !== "") ? partner_to_copy.val() : false;
     $.ajax({
        type: 'GET',
-       url: '/input_groups',
+       url: '/record/input_groups',
        data: {
            partner: partner,
            username: false
        },
        success: function(response) {
-           console.log(response);
            const groups = response;
            for (let i = 0; i < groups.length; i++) {
                group_to_copy.append(
@@ -29,11 +28,47 @@ update_group_to_copy_list = function() {
                );
            }
            group_to_copy.prop( "disabled", false);
-       }
+       },
+        error: function(error) {
+           console.log('Error in update_group_to_copy_list');
+           console.log(error);
+        },
     });
 };
 
 partner_to_copy.change(update_group_to_copy_list);
+
+
+const group_to_copy_levels = $('#group_to_copy_levels');
+
+update_group_to_copy_levels = function() {
+    group_to_copy_levels.empty();
+    $.ajax({
+       type: 'GET',
+       url: '/record/input_group_levels',
+       data: {
+           input_group: group_to_copy.val(),
+           partner: partner_to_copy.val(),
+           username: false
+       },
+       success: function(response) {
+           const levels = response;
+           for (let i = 0; i < levels.length; i++) {
+               group_to_copy_levels.append(
+                        $("<li></li>").attr(
+                            "value", levels[i][0]).text(levels[i][1])
+                    );
+           }
+       },
+       error: function(error) {
+           console.log('Error in update_group_levels');
+           console.log(error);
+       },
+    });
+};
+
+group_to_copy.change(update_group_to_copy_levels);
+
 
 const group_to_copy_members= $('#group_to_copy_members');
 
@@ -43,14 +78,12 @@ update_group_to_copy_members = function() {
         const partner = (partner_to_copy.val() !== "") ? partner_to_copy.val() : false;
         $.ajax({
             type: 'GET',
-            url: '/inputs_selection',
+            url: '/record/inputs_selection',
             data: {
                 partner: partner,
                 input_group: group_to_copy.val()
             },
             success: function (response) {
-
-                console.log(response);
                 const groups = response;
                 for (let i = 0; i < groups.length; i++) {
                     group_to_copy_members.append(
@@ -58,7 +91,11 @@ update_group_to_copy_members = function() {
                             "value", groups[i][0]).text(groups[i][1])
                     );
                 }
-            }
+            },
+            error: function(error) {
+                console.log('Error in update_group_to_copy_members');
+                console.log(error);
+            },
         });
     }
 };
@@ -117,7 +154,11 @@ submit_input_group_button.click( function (e) {
                     }
                 }
             }
-        }
+        },
+        error: function(error) {
+           console.log('Error in add_input_group');
+           console.log(error);
+       },
     });
 });
 
@@ -129,7 +170,7 @@ update_group_select = function(set_group = "") {
     group_select.prop("disabled", true);
     $.ajax({
        type: 'GET',
-       url: '/input_groups',
+       url: '/record/input_groups',
         data: {
            username: true
        },
@@ -141,22 +182,55 @@ update_group_select = function(set_group = "") {
                        "value", groups[i][0]).text(groups[i][1])
                );
            }
-           group_select.prop( "disabled", false);
+           group_select.prop("disabled", false);
            group_select.val(set_group);
            update_group_inputs();
-       }
+       },
+       error: function(error) {
+           console.log(error);
+       },
     });
 };
+
+const group_levels = $('#group_levels_select');
+
+update_group_levels = function() {
+    //uncheck all group_levels;
+    group_levels.find(":checkbox").each(function () {
+        this.checked = false;
+    });
+    $.ajax({
+       type: 'GET',
+       url: '/record/input_group_levels',
+       data: {
+           input_group: group_select.val(),
+           username: true
+       },
+       success: function(response) {
+           const levels = response;
+           for (let i = 0; i < levels.length; i++) {
+               group_levels.find(":checkbox[value='" + levels[i][0] +"']").prop("checked", true);
+           }
+       },
+       error: function(error) {
+           console.log('Error in update_group_levels');
+           console.log(error);
+       },
+    });
+};
+
+group_select.change(update_group_levels);
+update_group_levels();
 
 const group_inputs = $('#group_inputs');
 
 update_group_inputs = function() {
-    remove_flash();
     group_inputs.empty();
+    group_inputs.css("min-height", "50px");
     group_inputs.prop("disabled", true);
     $.ajax({
        type: 'GET',
-       url: '/inputs_selection',
+       url: '/record/inputs_selection',
        data: {
            input_group: group_select.val(),
            username: true
@@ -179,27 +253,36 @@ update_group_inputs = function() {
            group_inputs.sortable( {
                 connectWith: all_inputs
             });
-           group_inputs.disableSelection();
+           //group_inputs.disableSelection();
            update_all_inputs(inputs);
-       }
+       },
+       error: function(error) {
+           console.log('Error in update_group_inputs');
+           console.log(error);
+       },
     });
 };
 
 group_select.change(update_group_inputs);
 update_group_inputs();
 
+const record_type_select = $('#record_type');
+const item_level_select = $('#item_level');
+
 const all_inputs = $('#all_inputs');
 
-update_all_inputs = function(group_inputs_list = []) {
+update_all_inputs = function() {
     all_inputs.empty();
     all_inputs.prop("disabled", true);
     $.ajax({
         type: 'GET',
-        url: '/inputs_selection',
+        url: '/record/inputs_selection',
         data: {
             input_group: group_select.val(),
             username: true,
-            inverse: true
+            inverse: true,
+            record_type: record_type_select.val(),
+            item_level: item_level_select.val()
         },
         success: function(response) {
             const inputs = response;
@@ -222,12 +305,14 @@ update_all_inputs = function(group_inputs_list = []) {
             all_inputs.disableSelection();
         },
         error: function (error) {
+           console.log('Error in update_all_inputs');
             console.log(error);
         }
-
     });
 };
 
+record_type_select.change(update_all_inputs);
+item_level_select.change(update_all_inputs);
 
 const commit = $('#commit_group_changes');
 
@@ -261,7 +346,7 @@ commit.click(function(e) {
            if (response.hasOwnProperty('submitted')) {
                const flash_submitted_message = response['submitted'];
                const flash_submitted = "<div id='commit_flash' class='flash'>" + flash_submitted_message + "</div>";
-               commit.after(flash_submitted)
+               $('#manage_group_members_div').after(flash_submitted)
            }
            else {
                 if (response.hasOwnProperty('errors')) {
@@ -276,7 +361,10 @@ commit.click(function(e) {
                     }
                 }
             }
-       }
+       },
+       error: function(error) {
+           console.log(error);
+       },
     })
 });
 

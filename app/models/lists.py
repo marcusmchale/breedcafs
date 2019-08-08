@@ -1,3 +1,5 @@
+from app import logging
+
 from neo4j_driver import (
 	get_driver,
 	bolt_result
@@ -11,149 +13,196 @@ class SelectionList:
 		pass
 
 	@staticmethod
+	def get_input_group_levels(
+			input_group,
+			partner=None,
+			username=None
+	):
+		parameters = {
+			"input_group": input_group,
+			"username": username,
+			"partner": partner
+		}
+		statement = (
+			' MATCH (ig:InputGroup {name_lower: toLower(trim($input_group))}) '
+		)
+		if partner or username:
+			if partner:
+				statement += (
+					' OPTIONAL MATCH (: Partner {name_lower: toLower(trim($partner))}) '
+
+				)
+			elif username:
+				statement += (
+					' MATCH (: User {username_lower: toLower(trim($username))}) '
+					'	-[: AFFILIATED {data_shared: True}]->(partner: Partner) '
+					' OPTIONAL MATCH (partner) '
+				)
+			statement += (
+				'	<-[: AFFILIATED {data_shared: True}]-(: User) '
+				'	-[: SUBMITTED]->(: Submissions) '
+				'	-[: SUBMITTED]->(: InputGroups) '
+				'	-[sub: SUBMITTED]->(ig) '
+				' WITH ig ORDER BY sub LIMIT 1 '
+			)
+		else:
+			statement += (
+				' OPTIONAL MATCH (ig)<-[sub:SUBMITTED]-() '
+				' WITH ig WHERE sub IS NULL '
+			)
+		statement += (
+			' MATCH (ig)-[: AT_LEVEL]->(level: ItemLevel) '
+			' RETURN DISTINCT [level.name_lower, level.name] '
+		)
+		with get_driver().session() as neo4j_session:
+			result = neo4j_session.read_transaction(
+				bolt_result,
+				statement,
+				parameters
+			)
+			result = [tuple(record[0]) for record in result]
+			return sorted(result, key=lambda x: ["field", "block", "tree", "sample"].index(x[0]))
+
+	@staticmethod
 	def get_inputs(
-			record_type=None,
-			item_level=None,
+			username=None,
+			partner=None,
 			input_group=None,
 			inputs=None,
-			partner=None,
-			username=None,
+			record_type=None,
+			item_level=None,
 			inverse=False,
 			details=False
 	):
-		import pdb;
-		pdb.set_trace()
 		parameters = {
-			"record_type": record_type,
-			"item_level": item_level,
+			"username": username,
+			"partner": partner,
 			"input_group": input_group,
 			"inputs": inputs,
-			"partner": partner,
-			"username": username
+			"record_type": record_type,
+			"item_level": item_level
 		}
-		if record_type and item_level:
+		if username or partner or input_group:
+			# these are used in relation to filtering groups
+			# but want to still provide default groups "un-submitted" for username/partner filters
 			statement = (
-				' MATCH '
-				'	(: RecordType {name_lower: toLower($record_type)})'
-				'	<-[:OF_TYPE]-(input: Input) '
-				'	-[:AT_LEVEL]->(: ItemLevel {name_lower: toLower($item_level)}) '
+				' MATCH (ig:InputGroup) '
 			)
-		elif record_type:
-			statement = (
+			if username or partner:
+				if username:
+					statement += (
+						' MATCH '
+						'	(: User { '
+						'		username_lower: toLower(trim($username)) '
+						'	})-[:AFFILIATED { '
+						'		data_shared: True '
+						'	}]->(partner: Partner) '
+					)
+				else:  # partner is defined
+					statement += (
+						' MATCH '
+						'	(partner: Partner { '
+						'		name_lower: toLower(trim($partner)) '
+						'	}) '
+					)
+				statement += (
+						' OPTIONAL MATCH '
+						'	(partner)<-[: AFFILIATED { '
+						'		data_shared: True '
+						'	}]-(: User) '
+						'	-[: SUBMITTED]->(: Submissions) '
+						'	-[: SUBMITTED]->(: InputGroups) '
+						'	-[sub: SUBMITTED]->(ig) '
+						' OPTIONAL MATCH '
+						'	(ig)<-[unsub: SUBMITTED]-() '
+						' WITH '
+						'	[x IN collect([ig, sub]) WHERE x[1] IS NOT NULL | x[0]] as submitted, '
+						'	[x IN collect([ig, sub]) WHERE x[1] IS NOT NULL | x[0].name_lower] as submitted_names, '
+						'	[x IN collect([ig, unsub]) WHERE x[1] IS NULL | x[0]] as defaults '
+						' WITH submitted + [x in defaults WHERE NOT x.name_lower IN submitted_names] as input_groups '
+						' UNWIND input_groups as ig '
+						' OPTIONAL MATCH (ig)<-[sub: SUBMITTED]-() '
+					)
+			else:
+				statement += (
+					' OPTIONAL MATCH '
+					' (ig)<-[sub: SUBMITTED]-() '
+				)
+			if input_group:  # prefer the unregistered one here so that don't get another partners registered group
+				statement += (
+					' WITH ig, sub '
+					' WHERE ig.name_lower = toLower(trim($input_group)) '
+					' WITH ig, sub '
+					' ORDER BY sub DESC LIMIT 1 '
+				)
+			statement += (
 				' MATCH '
-				'	(: RecordType {name_lower: toLower($record_type)})'
-				'	<-[:OF_TYPE]-(input: Input) '
-			)
-		elif item_level:
-			statement = (
-				' MATCH '
-				'	(input: Input) '
-				'	-[:AT_LEVEL]->(: ItemLevel { '
-				'		name_lower: toLower($item_level) '
-				'	}) '
+				'	(ig)<-[in_group:IN_GROUP]-(input:Input) '
 			)
 		else:
+			# in this case there is no association with groups requested
+			# so we don't match the group or the in-group rel for order
 			statement = (
-				' MATCH (input: Input) '
-			)
-		if partner and input_group:
-			statement += (
-				' MATCH '
-				'	(partner: Partner { '
-				'		name_lower: toLower(trim($partner)) '
-				'	}) '
-				'	<-[:AFFILIATED { '
-				'		data_shared: True '
-				'	}]-(: User) '
-				'	-[: SUBMITTED]->(:  Submissions) '
-				'	-[: SUBMITTED]->(: InputGroups) '
-				'	-[: SUBMITTED]->(: InputGroup {'
-				'		name_lower: toLower(trim($input_group)) '
-				'	}) '
-				'	<-[in_group:IN_GROUP]-(input) '
-			)
-		elif partner:
-			statement += (
-				' MATCH '
-				'	(partner: Partner {'
-				'		name_lower: toLower(trim($partner)) '
-				'	}) '
-				'	<-[:AFFILIATED { '
-				'		data_shared: True '
-				'	}]-(: User) '
-				'	-[: SUBMITTED]->(:  Submissions) '
-				'	-[: SUBMITTED]->(: InputGroups) '
-				'	-[: SUBMITTED]->(: InputGroup) '
-				'	<-[in_group:IN_GROUP]-(input) '
-			)
-		elif username and input_group:
-			# handle defaulting to generic "non-partner submitted" group where not found
-			statement += (
-				' MATCH '
-				'	(: User { '
-				'		username_lower: toLower(trim($username)) '
-				'	})-[:AFFILATED {data_shared: True})->(partner :Partner) '
-				' MATCH '
-				'	(input) '
-				'	-[in_group: IN_GROUP]->(ig:InputGroup {'
-				'		name_lower: toLower(trim($input_group)) '
-				'	}) '
-				' OPTIONAL MATCH '
-				'	(partner)<-[:AFFILIATED { '
-				'		data_shared:True'
-				'	}]-(:User) '
-				'	-[:SUBMITTED]->(:Submissions) '
-				'	-[:SUBMITTED]->(:InputGroups) '
-				'	-[:SUBMITTED]->(ig) '
-				' WITH '
-				'	input, '
-
-			)
-		elif username:
-			statement += (
-
-				# TODO this is broken , need to first find partner then the partner associated input groups
-				' MATCH '
-				'	(: User {username_lower: toLower(trim($username))}) '
-				'	-[: SUBMITTED]->(:  Submissions) '
-				'	-[: SUBMITTED]->(: InputGroups) '
-				'	-[: SUBMITTED]->(: InputGroup) '
-				'	<-[in_group:IN_GROUP]-(input) '
-			)
-		elif input_group:
-			statement += (
-				' MATCH '
-				'	(ig: InputGroup { '
-				'		name_lower: toLower(trim($input_group)) '
-				'	}) '
-				'	<-[in_group:IN_GROUP]-(input) '
-				' OPTIONAL MATCH '
-				'	()-[s:SUBMITTED]->(ig) '
-				' WITH input, in_group WHERE s IS NULL '
+				' MATCH (input:Input) '
 			)
 		if inputs:
-			parameters['inputs'] = inputs
 			statement += (
 				' WHERE input.name_lower IN extract(item IN $inputs | toLower(trim(item))) '
 			)
 		if inverse:
+			# also losing the in_group properties here
 			statement += (
 				' WITH collect(input) as selected_inputs '
-				' MATCH (input: Input) '
-				'	WHERE NOT input in selected_inputs '
+				' MATCH (input:Input) WHERE NOT input IN selected_inputs '
+
+			)
+		if record_type:
+			statement += (
+				' MATCH '
+				'	(input) '
+				'	-[:OF_TYPE]->(: RecordType { '
+				'		name_lower: toLower($record_type) '
+				'	}) '
+			)
+		if item_level:
+			statement += (
+				' MATCH '
+				'	(input) '
+				'	-[:AT_LEVEL]->(: ItemLevel { '
+				'		name_lower: toLower($item_level) '
+				'	}) '
 			)
 		if details:
+			if not inverse or (username or partner or input_group):
+				# Here there is no sense to order by group
+				statement += (
+					' WITH input, in_group '
+					' OPTIONAL MATCH '
+					'	(input)-[: AT_LEVEL]->(level: ItemLevel) '
+					' OPTIONAL MATCH '
+					'	(input)-[: OF_TYPE]->(rt: RecordType) '
+					' WITH input, in_group, level, rt '
+					' ORDER BY in_group.position, input.name_lower '
+					' WITH DISTINCT(input), collect(DISTINCT level.name_lower) as levels, rt '
+				)
+			else:
+				statement += (
+					' OPTIONAL MATCH '
+					'	(level: ItemLevel)<-[: AT_LEVEL]-(input)-[: OF_TYPE]->(rt: RecordType) '
+					' WITH DISTINCT input, collect(DISTINCT level.name_lower) as levels, rt '
+					' ORDER BY input.name_lower '
+				)
 			statement += (
-				' WITH input '
-				' MATCH '
-				'	(level: ItemLevel)<-[: AT_LEVEL]-(input)-[: OF_TYPE]->(rt: RecordType) '
 				' RETURN { '
 				'	name: input.name, '
 				'	name_lower: input.name_lower, '
 				'	format: input.format, '
+				'	minimum: input.minimum, '
+				'	maximum: input.maximum, '
 				'	details: input.details, '
 				'	record_type: rt.name_lower, '
-				'	levels: collect(level.name) '
+				'	levels: levels, '
+				'	category_list: input.category_list '
 				' } '
 			)
 		else:
@@ -163,14 +212,14 @@ class SelectionList:
 				'	input.name '
 				' ] '
 			)
-		if input_group and not inverse and not details:
-			statement += (
-				' ORDER BY in_group.position, input.name_lower '
-			)
-		elif not details:
-			statement += (
-				' ORDER BY input.name_lower '
-			)
+			if input_group and not inverse:
+				statement += (
+					' ORDER BY in_group.position, input.name_lower '
+				)
+			else:
+				statement += (
+					' ORDER BY input.name_lower '
+				)
 		with get_driver().session() as neo4j_session:
 			result = neo4j_session.read_transaction(
 				bolt_result,
@@ -668,8 +717,8 @@ class ItemList:
 			if "block_uid" not in parameters:
 				statement += (
 					' OPTIONAL MATCH '
-					'	(item)-[:IS_IN | FROM*]->(:BlockTrees) '
-					'	-[:IS_IN]->(block :Block) '
+					'	(item)-[:IS_IN | FROM*]->() '
+					'	-[:IS_IN | FROM]->(block :Block) '
 				)
 			if parameters['item_level'] == 'tree':
 				statement += (
@@ -725,7 +774,7 @@ class ItemList:
 					' Block: block.name, '
 					' `Block ID` : block.id, '
 					' `Tree ID`: item.id, '
-					' `Tree Custom ID`: item.custom_id '
+					' `Custom ID`: item.custom_id '
 				)
 			elif parameters['item_level'] == 'sample':
 				statement += (
@@ -733,7 +782,7 @@ class ItemList:
 					' `Block ID` : block_ids, '
 					' `Tree ID`: tree_ids, '
 					' `Tree Custom ID`: tree_custom_ids, '
-					' `Sample Custom ID`: item.custom_id, '
+					' `Custom ID`: item.custom_id, '
 					# first entry will be immediate parent sample value (item), subsequent are in no particular order
 					' `Source Sample IDs`: source_sample_ids, '
 					' Tissue: coalesce(item.tissue, source_sample_tissue), '

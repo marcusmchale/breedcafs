@@ -224,11 +224,18 @@ class RowParseResult:
 								formatted_cells[field] += 'Expected one of the following codes: \n'
 							elif field_input_name == 'fertiliser n:p:k ratio':
 								formatted_cells[field] += 'Expected N:P:K ratio format, e.g. 1:1:1'
-							elif field_input_name == 'assign to block':
+							elif field_input_name in [
+								'assign tree to block by name',
+								'assign field sample to block by name'
+							]:
 								formatted_cells[field] += (
 									'Expected a block name '
 								)
-							elif field_input_name == 'assign to trees':
+							elif field_input_name in [
+								'assign field sample to sample(s) by ID'
+								'assign field sample to tree(s) by ID'
+								'assign field sample to block(s) by ID'
+							]:
 								formatted_cells[field] += (
 									'Expected a comma separated list of integers corresponding to the ID within the field '
 								)
@@ -756,11 +763,13 @@ class SubmissionResult:
 		# todo rewrite property updates to happen during result consumption rather than storing in memory
 		self.property_updates = {
 			'custom_id': [],
-			'assign_to_block': [],
-			'assign_to_trees': [],
-			'assign_to_samples': [],
+			'assign_tree_to_block_by_name': [],
+			'assign_sample_to_block_by_name': [],
+			'assign_sample_to_block_by_id': [],
+			'assign_sample_to_tree_by_id': [],
+			'assign_sample_to_sample_by_id': [],
 			'planted': [],
-			'tissue': [],
+			'unit': [],
 			'variety': {},
 			'harvest_time': {}
 		}
@@ -792,18 +801,26 @@ class SubmissionResult:
 			# Since sometimes a record for assign to will be submitted before the item is registered
 			# To handle this, we collect all assign to submissions and set them whether found or not
 			# TODO it might be worth considering scanning for records assigning to the item on item creation
-			# but this would be very inefficient with trees and samples.
+			# but this may be too inefficient for user feedback though.
 			if self.record_type == 'property':
-				if submission_item.record['Input variable'].lower() == 'assign to block':
-					self.property_updates['assign_to_block'].append(
+				if submission_item.record['Input variable'].lower() == 'assign tree to block by name':
+					self.property_updates['assign_tree_to_block_by_name'].append(
 						[record['UID'], record['Value']]
 					)
-				if submission_item.record['Input variable'].lower() == 'assign to trees':
-					self.property_updates['assign_to_trees'].append(
+				if submission_item.record['Input variable'].lower() == 'assign field sample to block by name':
+					self.property_updates['assign_sample_to_block_by_name'].append(
 						[record['UID'], record['Value']]
 					)
-				if submission_item.record['Input variable'].lower() == 'assign to samples':
-					self.property_updates['assign_to_samples'].append(
+				if submission_item.record['Input variable'].lower() == 'assign field sample to block(s) by id':
+					self.property_updates['assign_sample_to_block_by_id'].append(
+						[record['UID'], record['Value']]
+					)
+				if submission_item.record['Input variable'].lower() == 'assign field sample to tree(s) by id':
+					self.property_updates['assign_sample_to_tree_by_id'].append(
+						[record['UID'], record['Value']]
+					)
+				if submission_item.record['Input variable'].lower() == 'assign field sample to sample(s) by id':
+					self.property_updates['assign_sample_to_sample_by_id'].append(
 						[record['UID'], record['Value']]
 					)
 			if submission_item.record['Found']:
@@ -815,8 +832,10 @@ class SubmissionResult:
 						self.property_updates['custom_id'].append(
 							[record['UID'], record['Value']]
 						)
-					if submission_item.record['Input variable'].lower() == 'specify tissue':
-						self.property_updates['tissue'].append(
+					if submission_item.record['Input variable'].lower() in [
+						'sample type (in situ)', 'sample type (harvest)', 'sample type (sub-sample)'
+					]:
+						self.property_updates['unit'].append(
 							[record['UID'], record['Value']]
 						)
 					if submission_item.record['Input variable'].lower() == 'planting date':
@@ -981,14 +1000,14 @@ class SubmissionResult:
 				'	SET item.custom_id = uid_value[1] ',
 				custom_ids=self.property_updates['custom_id']
 			)
-		if self.property_updates['tissue']:
+		if self.property_updates['unit']:
 			tx.run(
-				' UNWIND $tissue AS uid_value '
+				' UNWIND unit AS uid_value '
 				'	MATCH '
 				'		(item: Sample {uid: uid_value[0]}) '
-				'	WHERE item.tissue IS NULL '
-				'	SET item.tissue = uid_value[1] ',
-				tissue=self.property_updates['tissue']
+				'	WHERE item.unit IS NULL '
+				'	SET item.unit = uid_value[1] ',
+				unit=self.property_updates['unit']
 			)
 		if self.property_updates['planted']:
 			tx.run(
@@ -999,9 +1018,9 @@ class SubmissionResult:
 				'	SET item.planted = uid_value[1] ',
 				planted=self.property_updates['planted']
 			)
-		if self.property_updates['assign_to_block']:
+		if self.property_updates['assign_tree_to_block_by_name']:
 			statement = (
-				' UNWIND $assign_to_block AS uid_value '
+				' UNWIND $assign_tree_to_block_by_name AS uid_value '
 				'	MATCH '
 				'		(tree: Tree {uid: uid_value[0]}) '
 				'		-[:IS_IN]->(: FieldTrees) '
@@ -1026,10 +1045,44 @@ class SubmissionResult:
 				'	SET c.count = c.count + 1 '
 				'	REMOVE c._LOCK_ '
 			)
-			tx.run(statement, assign_to_block=self.property_updates['assign_to_block'])
-		if self.property_updates['assign_to_trees']:
+			tx.run(statement, assign_tree_to_block_by_name=self.property_updates['assign_tree_to_block_by_name'])
+		if self.property_updates['assign_sample_to_block_by_name']:
+			statement = (
+				' UNWIND assign_sample_to_block_by_name AS uid_value '
+				'	MATCH '
+				'		(sample: Sample {uid: uid_value[0]}) '
+				'		-[from:FROM]->(: ItemSamples) '
+				'		-[:FROM]->(: Field) '
+				'		<-[:IS_IN]-(: FieldBlocks) '
+				'		<-[:IS_IN]-(block: Block) '
+				'	WHERE trim(block.name_lower) = toLower(trim(uid_value[1])) '
+				'	MERGE '
+				'		(is:ItemSamples)'
+				'		-[:FROM]->(block) '
+				'	CREATE (sample)-[:FROM]->(is) '
+				'	DELETE from '
+			)
+			tx.run(statement, assign_sample_to_block_by_name=self.property_updates['assign_sample_to_block_by_name'])
+		if self.property_updates['assign_sample_to_block_by_id']:
+			statement = (
+				' UNWIND assign_sample_to_block_by_id AS uid_value '
+				'	MATCH '
+				'		(sample: Sample {uid: uid_value[0]}) '
+				'		-[from:FROM]->(: ItemSamples) '
+				'		-[:FROM]->(: Field) '
+				'		<-[:IS_IN]-(: FieldBlocks) '
+				'		<-[:IS_IN]-(block: Block) '
+				'	WHERE block.id IN extract(x in split(uid_value[1], ",") | toInteger(trim(x))) '
+				'	MERGE '
+				'		(is:ItemSamples)'
+				'		-[:FROM]->(block) '
+				'	CREATE (sample)-[:FROM]->(is) '
+				'	DELETE from '
+			)
+			tx.run(statement, assign_sample_to_block_by_id=self.property_updates['assign_sample_to_block_by_id'])
+		if self.property_updates['assign_sample_to_tree_by_id']:
 			tx.run(
-				' UNWIND $assign_to_trees AS uid_value '
+				' UNWIND assign_sample_to_tree_by_id AS uid_value '
 				'	MATCH '
 				'		(sample: Sample {uid: uid_value[0]}) '
 				'		-[from:FROM]->(: ItemSamples)'
@@ -1042,11 +1095,11 @@ class SubmissionResult:
 				'	CREATE '
 				'		(sample)-[:FROM]->(is) '
 				'	DELETE from ',
-				assign_to_trees=self.property_updates['assign_to_trees']
+				assign_sample_to_tree_by_id=self.property_updates['assign_sample_to_tree_by_id']
 			)
-		if self.property_updates['assign_to_samples']:
+		if self.property_updates['assign_sample_to_sample_by_id']:
 			tx.run(
-				' UNWIND $assign_to_samples AS uid_value '
+				' UNWIND assign_sample_to_sample_by_id AS uid_value '
 				'	MATCH '
 				'		(sample: Sample {uid: uid_value[0]}) '
 				'		-[from_field:FROM]->(: ItemSamples) '
@@ -1068,7 +1121,7 @@ class SubmissionResult:
 				'	FOREACH (n IN CASE WHEN cycle IS NOT NULL THEN [1] ELSE [] END | '
 				'		DELETE from_sample '				
 				'	) ',
-				assign_to_samples=self.property_updates['assign_to_samples']
+				assign_sample_to_sample_by_id=self.property_updates['assign_sample_to_sample_by_id']
 			)
 		if self.property_updates['harvest_time']:
 			harvest_time = [
@@ -1178,10 +1231,10 @@ class Upload:
 	def set_fieldnames(self):
 		record_type_sets = {
 			'mixed': {'uid'},
-			'property': {'uid', 'person'},
-			'trait': {'uid', 'person', 'date', 'time'},
-			'condition': {'uid', 'person', 'start date', 'start time', 'end date', 'end time'},
-			'curve': {'uid', 'person', 'date', 'time'},
+			'property': {'custom id', 'uid', 'person'},
+			'trait': {'custom id', 'uid', 'person', 'date', 'time'},
+			'condition': {'custom id', 'uid', 'person', 'start date', 'start time', 'end date', 'end time'},
+			'curve': {'custom id', 'uid', 'person', 'date', 'time'},
 		}
 		if self.file_extension == 'csv':
 			with open(self.file_path) as uploaded_file:
@@ -2277,13 +2330,29 @@ class Upload:
 				' REMOVE item.custom_id ',
 				uid_list=property_uid['assign custom id']
 			)
-		if property_uid['specify tissue']:
+		if property_uid['sample type (in situ)']:
 			tx.run(
 				' UNWIND $uid_list as uid'
 				' MATCH '
 				'	(sample: Sample {uid: uid}) '
-				' REMOVE sample.tissue ',
-				uid_list=property_uid['specify tissue']
+				' REMOVE sample.unit ',
+				uid_list=property_uid['sample type (in situ)']
+			)
+		if property_uid['sample type (harvest)']:
+			tx.run(
+				' UNWIND $uid_list as uid'
+				' MATCH '
+				'	(sample: Sample {uid: uid}) '
+				' REMOVE sample.unit ',
+				uid_list=property_uid['sample type (harvest)']
+			)
+		if property_uid['sample type (sub-sample)']:
+			tx.run(
+				' UNWIND $uid_list as uid'
+				' MATCH '
+				'	(sample: Sample {uid: uid}) '
+				' REMOVE sample.unit ',
+				uid_list=property_uid['sample type (sub-sample)']
 			)
 		if property_uid['planting date']:
 			tx.run(
@@ -2293,7 +2362,7 @@ class Upload:
 				' REMOVE item.planted ',
 				uid_list=property_uid['planting date']
 			)
-		if property_uid['assign to block']:
+		if property_uid['assign tree to block by name']:
 			tx.run(
 				' UNWIND $uid_list as uid '
 				' MATCH '
@@ -2305,9 +2374,43 @@ class Upload:
 				' DELETE is_in '
 				' SET c.count = c.count - 1 '
 				' REMOVE c._LOCK_ ',
-				uid_list=property_uid['assign to block']
+				uid_list=property_uid['assign tree to block by name']
 			)
-		if property_uid['assign to trees']:
+		if property_uid['assign field sample to block by name']:
+			tx.run(
+				' UNWIND $uid_list as uid '
+				' MATCH '
+				'	(sample: Sample {uid: uid}) '
+				'	-[from: FROM]->(: ItemSamples) '
+				'	-[: FROM]->(block: Block) '
+				'	-[: IS_IN]->(: FieldBlocks) '
+				'	-[: IS_IN]->(field: Field) '
+				'	'
+				' DELETE from '
+				' MERGE '
+				'	(fs: ItemSamples) '
+				'	-[:FROM]->(field) '
+				' MERGE (sample)-[:FROM]->(fs) ',
+				uid_list=property_uid['assign field sample to block by name']
+			)
+		if property_uid['assign field sample to block(s) by id']:
+			tx.run(
+				' UNWIND $uid_list as uid '
+				' MATCH '
+				'	(sample: Sample {uid: uid}) '
+				'	-[from: FROM]->(: ItemSamples) '
+				'	-[: FROM]->(block: Block) '
+				'	-[: IS_IN]->(: FieldBlocks) '
+				'	-[: IS_IN]->(field: Field) '
+				'	'
+				' DELETE from '
+				' MERGE '
+				'	(fs: ItemSamples) '
+				'	-[:FROM]->(field) '
+				' MERGE (sample)-[:FROM]->(fs) ',
+				uid_list=property_uid['assign field sample to block(s) by id']
+			)
+		if property_uid['assign field sample to tree(s) by id']:
 			tx.run(
 				' UNWIND $uid_list as uid '
 				' MATCH '
@@ -2323,9 +2426,9 @@ class Upload:
 				'	-[:FROM]->(field) '
 				' MERGE '
 				'	(sample)-[:FROM]->(fs) ',
-				uid_list=property_uid['assign to trees']
+				uid_list=property_uid['assign field sample to tree(s) by id']
 			)
-		if property_uid['assign to samples']:
+		if property_uid['assign field sample to sample(s) by id']:
 			tx.run(
 				' UNWIND $uid_list as uid '
 				' MATCH '
@@ -2339,7 +2442,7 @@ class Upload:
 				'	-[:FROM]->(field) '
 				' MERGE '
 				'	(sample)-[:FROM]->(fs) ',
-				uid_list=property_uid['assign to samples']
+				uid_list=property_uid['assign field sample to sample(s) by id']
 			)
 		if property_uid['variety name']:
 			tx.run(
@@ -2516,8 +2619,11 @@ class Upload:
 					# update properties where needed
 					property_uid = {
 						'assign custom id': [],
-						'assign to block': [],
-						'assign to trees': [],
+						'assign tree to block by name': [],
+						'assign field sample to block by name': [],
+						'assign field sample to block(s) by id': [],
+						'assign field sample to tree(s) by id': [],
+						'assign field sample to sample(s) by id': [],
 						'assign to samples': [],
 						'specify tissue': [],
 						'planting date': [],

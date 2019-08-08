@@ -443,7 +443,7 @@ class AddFieldItems:
 				'	uid: $block_uid'
 				' }) '
 				' MATCH '
-				'	(input: Input {name_lower: "assign to block"}) '
+				'	(input: Input {name_lower: "assign tree to block by name"}) '
 				' MERGE '
 				'	(input) '
 				'	<-[: FOR_INPUT]-(ff: FieldInput) '
@@ -691,7 +691,6 @@ class AddFieldItems:
 					' COLLECT(DISTINCT(variety.name)) as varieties, '
 					' country, region, farm, field '
 				)
-
 			if any([level == 'tree', tree_id_list]):
 				statement += (
 					' <-[: IS_IN]-'

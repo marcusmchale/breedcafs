@@ -33,14 +33,13 @@ group_select_update = function() {
     );
     $.ajax({
         url: (
-            "/input_groups"
+            "/record/input_groups"
             + "?record_type=" + record_type
             + "&item_level=" + item_level
-            + "&username=True"
+            + "&username=true"
         ),
         type: 'GET',
         success: function (response) {
-            console.log(response);
             const input_groups = response;
             for (let i = 0; i < input_groups.length; i++) {
                 input_group_select.append(
@@ -62,19 +61,22 @@ inputs_variables_update = function() {
     const input_group = input_group_select.val();
     let args = ("?record_type=" + record_type
             + "&item_level=" + item_level
+            + "&record_type=" + record_type
+            + "&username=false"
     );
     if (input_group !== '') {
         args = (args
             + "&input_group=" + input_group
-            + "&username=True"
+            + "&username=true"
         )
     }
     $.ajax({
         url: (
-            "/inputs" + args
+            "/record/inputs_selection" + args
         ),
         type: 'GET',
         success: function (response) {
+            console.log(response);
             $('#select_all_input_variables').change(function () {
                     const _this = this;
                     if (_this.checked) {
@@ -92,10 +94,10 @@ inputs_variables_update = function() {
                     "<li>" +
                     "<input id=select_inputs-" + i + " " +
                     "name='select_inputs' " +
-                    "type=checkbox value='" + response[i]['name_lower'] + "' " +
+                    "type=checkbox value='" + response[i][0] + "' " +
                     ">" +
-                    "<label for='checkbox_" + response[i]['name_lower'] + "'>" +
-                    response[i]['name'] +
+                    "<label for='checkbox_" + response[i][0] + "'>" +
+                    response[i][1] +
                     "</label>" +
                     "</li>"
                 );

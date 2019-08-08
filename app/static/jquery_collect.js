@@ -1,3 +1,4 @@
+const sampling_activity_select = $('#sampling_activity');
 const level_select = $('#item_level');
 const location_div = $('#location');
 const block_div = $('#block_div');
@@ -14,6 +15,26 @@ const block_select = $('#block');
 const tree_id_list_box = $('#tree_id_list');
 const sample_id_list_box = $('#sample_id_list');
 
+
+change_activity = function () {
+
+    //if (activity) {
+    //    sampling_activity_select.val(activity);
+    //}
+    const sampling_activity = sampling_activity_select.val();
+    console.log(sampling_activity);
+    if (sampling_activity === 'sample registration (sub-sample)') {
+        level_select.children('option').attr('disabled', true);
+        level_select.children('option[value="sample"]').attr('disabled', false);
+    } else if (sampling_activity == 'sample registration (harvest)') {
+        level_select.children('option').attr('disabled', false);
+        level_select.children('option[value="sample"]').attr('disabled', true);
+    } else {
+        level_select.children('option').attr('disabled', false);
+    }
+};
+
+sampling_activity_select.change(change_activity);
 
 update_item_count = function() {
 	const sel_level = level_select.find(":selected").val();

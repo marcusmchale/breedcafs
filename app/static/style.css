@@ -37,33 +37,53 @@ svg {
 	overflow: auto;
 }
 
+#group_to_copy_div {
+	display: flex;
+	flex-wrap: wrap;
+}
+
+#group_to_copy_select_div {
+	flex-direction: column;
+}
+
+#group_to_copy_members_div {
+	flex-direction: column;
+}
+#group_to_copy_levels_div {
+	flex-direction: column;
+}
+
+
 #manage_group_members_div {
-	max-height: 500px;
+	display: flex;
+	flex-wrap: wrap;
 }
 
 #group_inputs_div {
-	max-height:500px;
-	float: left
+	height: 700px;
+	display: flex;
+	width: 40%;
+	padding: 0.8em;
+	flex-direction: column;
 }
 
 #group_inputs_list_div {
-	max-height:400px;
+	max-height:600px;
 	overflow: auto;
 	border: 5px solid #6f4e37;
 	padding: 5px;
 }
 
-#group_inputs {
-	padding:10px
-}
-
 #all_inputs_div {
-	max-height:500px;
-	float: right
+	height:700px;
+	display: flex;
+	width: 40%;
+	padding: 0.8em;
+	flex-direction: column;
 }
 
 #all_inputs_list_div {
-	max-height:400px;
+	height:600px;
 	overflow: auto;
 	border: 5px solid #6f4e37;
 	padding: 5px;
@@ -253,4 +273,6 @@ table, th, td {
     border: 1px solid black;
     border-collapse: collapse;
 }
+
+
 

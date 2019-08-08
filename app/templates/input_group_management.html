@@ -15,45 +15,70 @@
                 or leave the filters blank to create a new empty input group and add input variables below.
             </p>
 			<dl>
-                <dd>Copy default variable groups or from a selected partner</dd>
-                <dt>{{ add_input_group_form.partner_to_copy }}</dt>
-                <dd>Select the group to copy</dd>
-                <dt>{{ add_input_group_form.group_to_copy }}</dt>
-                <dd>Group members:</dd>
-                <dt>
-                    <ul id="group_to_copy_members">
-                    </ul>
-                </dt>
+                <div id="group_to_copy_select">
+                        <dd>Copy default variable groups or from a selected partner</dd>
+                        <dt>{{ add_input_group_form.partner_to_copy }}</dt>
+                        <dd>Select the group to copy</dd>
+                        <dt>{{ add_input_group_form.group_to_copy }}</dt>
+                    </div>
+                <div id="group_to_copy_div">
+                    <div id = group_to_copy_members_div>
+                        <dd>Group members:</dd>
+                        <dt>
+                            <ul id="group_to_copy_members">
+                            </ul>
+                        </dt>
+                    </div>
+                    <div id = group_to_copy_levels_div>
+                        <dd>Group available at levels:</dd>
+                        <dt>
+                            <ul id="group_to_copy_levels">
+                            </ul>
+                        </dt>
+                    </div>
+                </div>
             </dl>
             <dl>
-                <dd>Enter a name for your new group </dd>
+                <dd>Enter a name to create a new group</dd>
 				<dt>{{ add_input_group_form.input_group_name }}
                 {{ add_input_group_form.submit_input_group_name }}</dt>
                 {{ add_input_group_form.csrf_token }}
             </dl>
             <div id="manage_group_members_div">
-                <p>
+                <div>
+                    <h3>Manage group</h3>
+                    <p>
                     Drag and drop between lists to add/remove items
                     or within the list to arrange their order of appearance.
                     Click commit to store these changes.
                 </p>
+                </div>
                 <div id="group_inputs_div">
-                    <h3>Manage group members</h3>
-                    {{ manage_input_group_form.input_group_select }}
-                    {{ manage_input_group_form.commit_group_changes }}
-                    {{ manage_input_group_form.csrf_token }}
-                    <div id="group_inputs_list_div">
-                        {{ manage_input_group_form.group_inputs }}
-                    </div>
+                    <h4>Manage selected group</h4>
+                        <dd>{{ manage_input_group_form.input_group_select }}</dd>
+                        <div id="group_inputs_list_div">
+                            {{ manage_input_group_form.group_inputs }}
+                        </div>
+                    <h4>Select levels for this group</h4>
+                        <p>
+                            Note: This does not affect the availability of the groups input variables at each level.
+                            It only affects the visibility of the input group.
+                        </p>
+                        <dd>{{ manage_input_group_form.group_levels_select }}</dd>
+                        <dd>{{ manage_input_group_form.commit_group_changes }}</dd>
+                        {{ manage_input_group_form.csrf_token }}
                 </div>
                 <div id="all_inputs_div">
-                    <h4>Other input variables</h4>
-                    <h3>Filter by type</h3>
-                        <dd>{{  manage_input_group_form.record_type }}</dd>
-                        <div id="all_inputs_list_div">
-                            {{ manage_input_group_form.all_inputs }}
-                        </div>
+                    <h4>Find input variables</h4>
+                    <dd>Record type:{{  manage_input_group_form.record_type }} Item level:{{  manage_input_group_form.item_level }}</dd>
+                    <div id="all_inputs_list_div">
+                        {{ manage_input_group_form.all_inputs }}
+                    </div>
                 </div>
+            </div>
+            <div id="manage group visibility">
+                <h3>
+                </h3>
             </div>
         </form>
     </div>

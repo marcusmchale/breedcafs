@@ -70,30 +70,34 @@ class Record:
 			'	(sub)-[:SUBMITTED]->(igs: InputGroups) '
 			' WITH igs '
 		)
-		if partner_to_copy and group_to_copy:
-			statement += (
-				' MATCH '
-				'	(source_partner: Partner { '
-				'		name_lower:toLower(trim($partner_to_copy)) '
-				'	}) '
-				'	<-[: AFFILIATED {'
-				'		data_shared: True'
-				'	}]-(: User)-[: SUBMITTED]->(: Submissions) '
-				'	-[:SUBMITTED]->(: InputGroups) '
-				'	-[:SUBMITTED]->(ig: InputGroup { '
-				'		name_lower: toLower(trim($group_to_copy)) '
-				'	}) '
-			)
-		elif group_to_copy and not partner_to_copy:
-			statement += (
-				' MATCH '
-				' (source_ig: InputGroup { '
-				'		name_lower: toLower(trim($group_to_copy)) '
-				' }) '
-				' OPTIONAL MATCH (source_ig)<-[s:SUBMITTED]-() '
-				# prioritise selection of the oldest if partner not specified 
-				# (including original 'unsubmitted' groups )
-				' WITH igs, source_ig ORDER BY s.time DESC LIMIT 1 '
+		if group_to_copy:
+			if partner_to_copy :
+				statement += (
+					' MATCH '
+					'	(source_partner: Partner { '
+					'		name_lower:toLower(trim($partner_to_copy)) '
+					'	}) '
+					'	<-[: AFFILIATED {'
+					'		data_shared: True'
+					'	}]-(: User)-[: SUBMITTED]->(: Submissions) '
+					'	-[:SUBMITTED]->(: InputGroups) '
+					'	-[:SUBMITTED]->(source_ig: InputGroup { '
+					'		name_lower: toLower(trim($group_to_copy)) '
+					'	}) '
+					' WITH igs, source_ig '
+				)
+			else:
+				statement += (
+					' MATCH '
+					' (source_ig: InputGroup { '
+					'		name_lower: toLower(trim($group_to_copy)) '
+					' }) '
+					' OPTIONAL MATCH (source_ig)<-[s:SUBMITTED]-() '
+					# prioritise selection of the oldest if partner not specified 
+					# (including original 'un-submitted' groups )
+					' WITH igs, source_ig ORDER BY s.time DESC LIMIT 1 '
+				)
+		statement += (
 				' CREATE '
 				'	(igs)-[: SUBMITTED { '
 				'		time: datetime.transaction().epochMillis '
@@ -102,29 +106,27 @@ class Record:
 				'		name: trim($input_group_name), '
 				'		found: False '
 				'	}) '
-				' WITH ig, source_ig '
-				' MATCH '
-				'	(source_ig) '
-				'	<-[in_rel: IN_GROUP]-(input: Input) '
-				' WITH '
-				'	ig, in_rel, input '
-				# we copy the in_rel as this is where we store the order of appearance
-				' CREATE (input)-[new_in_rel:IN_GROUP]->(ig) '
-				' SET new_in_rel = in_rel '
-			)
-		else:
+		)
+		if group_to_copy:
 			statement += (
-				' CREATE '
-				'	(igs)-[: SUBMITTED {'
-				'		time: datetime.transaction().epochMillis'
-				'	}]->(ig: InputGroup {'
-				'		name_lower: toLower(trim($input_group_name)), '
-				'		name: trim($input_group_name), '
-				'		found: False'
-				'	}) '
+					' WITH ig, source_ig '
+					' OPTIONAL MATCH '
+					'	(source_ig) '
+					'	-[: AT_LEVEL]->(level: ItemLevel) '
+					' WITH '
+					'	ig, source_ig, level '
+					' CREATE '
+					'	(ig)-[:AT_LEVEL]->(level) '
+					' WITH DISTINCT ig, source_ig '
+					' OPTIONAL MATCH '
+					'	(source_ig) '
+					'	<-[in_group: IN_GROUP]-(input: Input) '
+					' CREATE (input)-[new_in_group:IN_GROUP]->(ig) '
+					' SET new_in_group = in_group '
 			)
 		statement += (
-			' RETURN DISTINCT ['
+			' WITH DISTINCT ig '
+			' RETURN [ '
 			'	ig.found, '
 			'	ig.name_lower, '
 			'	ig.name '
@@ -138,11 +140,12 @@ class Record:
 			tx.commit()
 			return result[0]
 
-	def update_group(self, input_group, inputs):
+	def update_group(self, input_group, inputs, levels):
 		parameters = {
 			'username': self.username,
 			'input_group': input_group,
-			'inputs': inputs
+			'inputs': inputs,
+			'levels': levels
 		}
 		statement = (
 			' MATCH '
@@ -164,6 +167,14 @@ class Record:
 			'	(igs)-[mod:MODIFIED]->(ig) '
 			'	ON CREATE SET mod.times = [datetime.transaction().epochMillis] '
 			'	ON MATCH SET mod.times = mod.times + datetime.transaction().epochMillis '
+			' WITH user, ig '
+			' OPTIONAL MATCH '
+			'	(ig)-[at_level:AT_LEVEL]->(:ItemLevel) '
+			' DELETE at_level '
+			' WITH user, ig '
+			' MATCH (level:ItemLevel) '
+			'	WHERE level.name_lower in $levels '
+			' CREATE (ig)-[:AT_LEVEL]->(level) '
 			' WITH user, ig '
 			' OPTIONAL MATCH '
 			'	(ig)<-[in_rel:IN_GROUP]-(:Input) '
@@ -264,9 +275,11 @@ class Record:
 						'variety name',
 						'variety code',
 						'assign custom id',
-						'assign to block',
-						'assign to trees',
-						'assign to samples',
+						'assign tree to block by name',
+						'assign field sample to block by name',
+						'assign field sample to block(s) by ID',
+						'assign field sample to tree(s) by ID',
+						'assign field sample to sample(s) by ID',
 						'specify tissue',
 						'harvest date',
 						# 'harvest time'  # this only updates when set at same time as harvest date
@@ -397,15 +410,17 @@ class Record:
 							),
 							'class': 'conflicts'
 						})
-				if 'assign to block' in record_data['selected_inputs']:
+				if 'assign tree to block by name' in record_data['selected_inputs']:
 					update_block_statement = match_item_query[0]
 					update_block_parameters = match_item_query[1]
 					update_block_parameters['username'] = record_data['username']
-					update_block_parameters['assign_to_block'] = record_data['inputs_dict']['assign to block']
+					update_block_parameters['assign_tree_to_block_by_name'] = record_data['inputs_dict']['assign tree to block by name']
 					update_block_statement += (
 						' WITH DISTINCT item, field '
 						' MATCH '
-						'	(block_update: Block {name_lower: toLower(trim($assign_to_block))})-[:IS_IN]->(:FieldBlocks)-[:IS_IN]->(field) '
+						'	(block_update: Block { '
+						'		name_lower: toLower(trim($assign_tree_to_block_by_name)) '
+						'	})-[:IS_IN]->(:FieldBlocks)-[:IS_IN]->(field) '
 						' OPTIONAL MATCH '
 						'	(item)-[:IS_IN]->(bt: BlockTrees) '
 						' WITH '
@@ -433,11 +448,56 @@ class Record:
 						' 	block_tree_counter_update._LOCK_ '
 					)
 					tx.run(update_block_statement, update_block_parameters)
-				if 'assign to trees' in record_data['selected_inputs']:
+				if 'assign field sample to block by name' in record_data['selected_inputs']:
+					update_block_statement = match_item_query[0]
+					update_block_parameters = match_item_query[1]
+					update_block_parameters['username'] = record_data['username']
+					update_block_parameters[
+						'assign_sample_to_block_by_name'
+					] = record_data['inputs_dict']['assign field sample to block by name']
+					update_block_statement += (
+						' WITH DISTINCT item, field '
+						' MATCH '
+						'	(block: Block { '
+						'		name_lower: toLower(trim($assign_sample_to_block_by_name)) '
+						'	})-[:IS_IN]->(:FieldBlocks)-[:IS_IN]->(field) '
+						'	<-[:FROM]-(:ItemSamples)<-[from:FROM]-(item) '
+						' MERGE '
+						' 	(is: ItemSamples)-[:FROM]-> '
+						' 	(block) '
+						' CREATE '
+						' 	(item)-[:FROM]->(is) '
+						' DELETE from '
+					)
+					tx.run(update_block_statement, update_block_parameters)
+				if 'assign field sample to block(s) by id' in record_data['selected_inputs']:
+					update_block_statement = match_item_query[0]
+					update_block_parameters = match_item_query[1]
+					update_block_parameters['username'] = record_data['username']
+					update_block_parameters[
+						'assign_sample_to_block_by_id'
+					] = record_data['inputs_dict']['assign field sample to block(s) by id']
+					update_block_statement += (
+						' WITH DISTINCT item, field '
+						' MATCH '
+						'	(block: Block)-[:IS_IN]->(:FieldBlocks)-[:IS_IN]->(field) '
+						'	<-[:FROM]-(:ItemSamples)<-[from:FROM]-(item) '
+						' WHERE block.id IN extract(x in split($assign_sample_to_block_by_id, ",") | toInteger(trim(x))) '
+						' MERGE '
+						' 	(is: ItemSamples)-[:FROM]-> '
+						' 	(block) '
+						' CREATE '
+						' 	(item)-[:FROM]->(is) '
+						' DELETE from '
+					)
+					tx.run(update_block_statement, update_block_parameters)
+				if 'assign field sample to tree(s) by id' in record_data['selected_inputs']:
 					update_trees_statement = match_item_query[0]
 					update_trees_parameters = match_item_query[1]
 					update_trees_parameters['username'] = record_data['username']
-					update_trees_parameters['assign_to_trees'] = record_data['inputs_dict']['assign to trees']
+					update_trees_parameters[
+						'assign_sample_to_tree_by_id'
+					] = record_data['inputs_dict']['assign field sample to tree(s) by id']
 					update_trees_statement += (
 						' WITH DISTINCT item, field '
 						' MATCH '
@@ -446,7 +506,7 @@ class Record:
 						'	-[: FROM]->(field) '
 						'	<-[:IS_IN]-(: FieldTrees) '
 						'	<-[:IS_IN]-(tree: Tree) '
-						' WHERE tree.id IN extract(x in split($assign_to_trees, ",") | toInteger(trim(x))) '
+						' WHERE tree.id IN extract(x in split($assign_sample_to_tree_by_id, ",") | toInteger(trim(x))) '
 						' MERGE '
 						' 	(item_samples: ItemSamples)'
 						'	-[: FROM]->(tree) '
@@ -454,33 +514,23 @@ class Record:
 						' 	(item)-[:FROM]->(item_samples) '
 					)
 					tx.run(update_trees_statement, update_trees_parameters)
-				if 'assign_to_samples' in record_data['selected_inputs']:
+				if 'assign field sample to sample(s) by id' in record_data['selected_inputs']:
 					update_samples_statement = match_item_query[0]
 					update_samples_parameters = match_item_query[1]
 					update_samples_parameters['username'] = record_data['username']
-					update_samples_parameters['assign_to_samples'] = record_data['inputs_dict']['assign to samples']
+					update_samples_parameters[
+						'assign_sample_to_sample_by_id'
+					] = record_data['inputs_dict']['assign field sample to sample(s) by id']
 					update_samples_statement += (
 						' WITH DISTINCT item, field '
 						' MATCH '
 						'	(item)'
 						'	-[from_field: FROM]->(: ItemSamples) '
 						'	-[: FROM]->(field) '
-						' MATCH '
-						'	(field)'
-						'	<-[:FROM | IS_IN*]-(sample: Sample) '
-						' WHERE sample.id IN extract(x in split($assign_to_samples, ",") | toInteger(trim(x))) '
-						' AND item.id <> sample.id '
+						'	<-[: FROM | IS_IN*]-(sample: Sample) '
+						' WHERE sample.id IN extract(x in split($assign_sample_to_sample_by_id, ",") | toInteger(trim(x))) '
 						' CREATE '
 						' 	(item)-[from_sample:FROM]->(sample) '
-						' WITH item, sample, from_field, from_sample '
-						# prevent cycles 
-						'	OPTIONAL MATCH cycle = (sample)-[: FROM *]->(sample) '
-						'	FOREACH (n IN CASE WHEN cycle IS NULL THEN [1] ELSE [] END | '
-						'		DELETE from_field '
-						'	) '
-						'	FOREACH (n IN CASE WHEN cycle IS NOT NULL THEN [1] ELSE [] END | '
-						'		DELETE from_sample '
-						'	) '
 					)
 					tx.run(update_samples_statement, update_samples_parameters)
 				if 'assign custom id' in record_data['selected_inputs']:
@@ -808,13 +858,13 @@ class Record:
 			'	MERGE '
 			'		(if) '
 			'		<-[:RECORD_FOR]-(r: Record { '
-			'			time: $time '
+			'			time: $time, '
+			'			replicate = 0 '
 			'		})'
 		)
 		statement += (
 			' ON CREATE SET '
 			'	r.found = False, '
-			'	r.replicate = 1, '
 			'	r.value = value, '
 			'	r.person = $username '
 			' ON MATCH SET '
@@ -983,8 +1033,11 @@ class Record:
 			)
 		statement += (
 			' WHERE '
+			# if this is for another replicate then no conflict we can treat it like another item
+			'	r.replicate = replicate '
 			# If don't have access or if have access and values don't match then potential conflict 
 			# time parsing to allow reduced specificity in the relevant time range is below
+			'	AND '
 			' ( '
 			'		cu IS NULL '
 			'		OR '
@@ -1177,6 +1230,7 @@ class Record:
 			'	(r: Record { '
 			'		start: CASE WHEN $start_time IS NOT NULL THEN $start_time ELSE False END, '
 			'		end: CASE WHEN $end_time IS NOT NULL THEN $end_time ELSE False END, '
+			'		replicate: 0, '
 			'		value: value '
 			'	})-[:RECORD_FOR]->(if) '
 			' ON CREATE SET '

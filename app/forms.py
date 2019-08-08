@@ -540,6 +540,16 @@ class AddTrial(FlaskForm):
 class CollectForm(FlaskForm):
 	min = 1
 	max = 1000000
+	sampling_activity = SelectField(
+		'Sampling strategy',
+		[InputRequired()],
+		description="Sampling activity",
+		choices=[
+			("sample registration (in situ)", "In situ characterisation"),
+			("sample registration (harvest)", "Harvest tissues"),
+			("sample registration (sub-sample)", "Sub-sampling")
+		]
+	)
 	item_level = SelectField(
 		'Item Level',
 		[InputRequired()],
@@ -713,7 +723,7 @@ class DownloadForm(FlaskForm):
 			item_level=item_level,
 			record_type=record_type,
 			input_group=selected_input_group,
-			username=session['username']
+			username=False
 		)
 		form.select_inputs.choices = inputs_list
 		return form
@@ -763,6 +773,20 @@ class ManageInputGroupForm(FlaskForm):
 		choices=[],
 		description="Record Type"
 	)
+	group_levels_select = SelectMultipleField(
+		'Group levels',
+		[InputRequired()],
+		choices=SelectionList.get_item_levels(),
+		description='Select item levels for availability of input group',
+		option_widget=widgets.CheckboxInput(),
+		widget=widgets.ListWidget(prefix_label=False)
+	)
+	item_level = SelectField(
+		'Item Level',
+		[Optional()],
+		choices=[],
+		description="Item Level"
+	)
 	input_group_select = SelectField(
 		'Select input variable group to manage',
 		[
@@ -791,18 +815,21 @@ class ManageInputGroupForm(FlaskForm):
 	@staticmethod
 	def update():
 		form = ManageInputGroupForm()
+		form.item_level.choices = [('', 'Any')] + SelectionList.get_item_levels()
 		form.record_type.choices = [('', 'Any')] + SelectionList.get_record_types()
 		record_type = form.record_type.data if form.record_type.data not in ['', 'None'] else None
 		partner_groups = SelectionList.get_input_groups(username=session['username'])
 		form.input_group_select.choices = partner_groups
 		group_members = SelectionList.get_inputs(username=session['username'], input_group=form.input_group_select.data)
 		form.group_inputs.choices = group_members
-		form.all_inputs.choices = [i for i in SelectionList.get_inputs(record_type=record_type) if i not in group_members]
+		#form.all_inputs.choices = [i for i in SelectionList.get_inputs(record_type=record_type) if i not in group_members]
 		return form
 
 	@staticmethod
 	def commit():
 		form = ManageInputGroupForm()
+		form.item_level.choices = [('', 'Any')] + SelectionList.get_item_levels()
+		form.record_type.choices = [('', 'Any')] + SelectionList.get_record_types()
 		partner_groups = SelectionList.get_input_groups(username=session['username'])
 		form.input_group_select.choices = partner_groups
 		form.group_inputs.choices = SelectionList.get_inputs()

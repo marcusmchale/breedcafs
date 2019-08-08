@@ -43,11 +43,15 @@
                         <h4>Time points</h4>
                             <p>
                                 Number of values per item for each input.
-                                This is to support a single template for trait/condition values at multiple times/periods.
+                                This is to support a single template for multiple times/periods.
                             </p>
                             {{  render_field (record_form.time_points) }}<br>
                         <h4>Replicates</h4>
-                            <p>Number of replicated values from the same time point (for traits and curves only)</p>
+                            <p>
+                                Number of replicated measures from the same time/period.
+                                Replicate codes will be appended to the UID and can be used to differentiate
+                                the records and to associate between records from the same time.
+                            </p>
                             {{  render_field (record_form.replicates) }}
                 </div>
                 <div id="generate_template_div">

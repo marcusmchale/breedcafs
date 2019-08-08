@@ -2,7 +2,7 @@
 <html lang="en" charset="utf-8">
 	<head>
 		{% if title %}
-		<title>BreedCAFS database tools - {{ title }}</title>
+            <title>BreedCAFS database tools - {{ title }}</title>
 		{% else %}
 		<title>Welcome to BreedCAFS database tools</title>
 		{% endif %}
@@ -14,7 +14,7 @@
     {% endif %}
 	<div class="page">
         <a href="/index"><img src="/static/logo.png"></a>
-		<a href="/index"><h1>BreedCAFS <br> database tools</h1></a>
+		<a href="/index"><h1>BreedCAFS<br> database tools</h1></a>
 		<div class="metanav">
 			{% if session.username %}
 				<a href="{{ url_for('user_page') }}"><img src="{{ url_for('static', filename='user.svg') }}"></a>
