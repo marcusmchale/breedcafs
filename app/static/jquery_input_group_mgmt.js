@@ -136,12 +136,10 @@ submit_input_group_button.click( function (e) {
                 const flash_submitted = "<div id='add_input_group_flash' class='flash'> Added group: " + response.submitted[1] + "</div>";
                 submit_input_group_button.after(flash_submitted);
                 update_group_select(response.submitted[0]);
-                update_group_levels();
             } else if (response.hasOwnProperty('found')) {
                 const flash_submitted = "<div id='add_input_group_flash' class='flash'> Found group: " + response.found[1] + "</div>";
                 submit_input_group_button.after(flash_submitted);
                 update_group_select(response.found[0]);
-                update_group_levels();
             }
             else {
                 if (response.hasOwnProperty('errors')) {
@@ -187,6 +185,7 @@ update_group_select = function(set_group = "") {
            group_select.prop("disabled", false);
            group_select.val(set_group);
            update_group_inputs();
+           update_group_levels();
        },
        error: function(error) {
            console.log(error);
