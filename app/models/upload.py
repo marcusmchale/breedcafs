@@ -1002,7 +1002,7 @@ class SubmissionResult:
 			)
 		if self.property_updates['unit']:
 			tx.run(
-				' UNWIND unit AS uid_value '
+				' UNWIND $unit AS uid_value '
 				'	MATCH '
 				'		(item: Sample {uid: uid_value[0]}) '
 				'	WHERE item.unit IS NULL '
