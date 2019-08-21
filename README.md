@@ -1,6 +1,6 @@
 # breedcafs
 
-## Web portal and database for [BreedCAFS](www.breedcafs.eu) project
+## Portal to database for [BreedCAFS](www.breedcafs.eu) project
 
 ## Technology Stack
  * Python web framework ([Flask/Jinja2/Werkzeug/ItsDangerous](https://github.com/pallets))
@@ -8,18 +8,20 @@
    * [WTForms](https://github.com/wtforms/wtforms) validation
    
  * Graph database back-end with [Neo4J](https://github.com/neo4j/neo4j)
+   * also uses some [APOC](https://github.com/neo4j-contrib/neo4j-apoc-procedures) procedures
  * Javascript driven dynamic user interface
    * [jQuery](https://github.com/jquery/jquery) for dynamic content
-   * Resumable uploads ([Resumable.js](https://github.com/23/resumable.js/))
-   * [D3](https://github.com/d3/d3) visualisations
+   * [jQuery-ui](https://github.com/jquery/jquery-ui) for datepicker, drag and drop sortable lists
+   * Resumable uploads ([Resumable.js](https://github.com/23/resumable.js/)) to support large files and poor connections
+   * [D3](https://github.com/d3/d3) visualisations of database content
 
 ## Core nodes  (data model)
  * Locations:
-   - Heirarchical locations (Country > Region > Farm)
+   - Hierarchical locations (Country > Region > Farm)
    - These provide context for the highest order typical unit of analysis, the Field, which is associated with a Farm.
  * Items:
    - Typical units of analysis (Field > Blocks > Tree > Sample)
-   - Pseudo-heirarchical relationships 
+   - Pseudo-hierarchical relationships
      - Block provides optional grouping for trees
      - Samples can be representative of Fields, Trees or groups of Trees (i.e. pools)
      - Samples can further be representative of samples, i.e. sub-divided samples.
@@ -40,14 +42,17 @@
       - Missing values from Y are removed from X
       - Records are not accepted that differ in the value of Y at a given time, for a given replicate at a given X value.
    * Records are stored as nodes connected to the "ItemFeature" node on the path between an Item and a Feature
- * Features
-   * Standardised set of descriptions for properties, traits and conditions
+ * Inputs
+   * Standardised set of descriptions for properties, traits, conditions and curves
      * Record Type
      * Name
      * Description
      * Format (e.g. numeric, categorical, text)
      * Categories (optional)
-   * Currently these details are only available internally in the project
+   * Currently the details of these are only available internally in the project
+ * Input groups
+   * Grouping of inputs as related to a task for ease of template generation
+   * Partner level management with ability to copy from other partners or a set of default groups
 
 ## Services 
  * Web forms, spreadsheets and [Field-Book](https://github.com/PhenoApps/Field-Book) app for data collection
@@ -72,8 +77,9 @@
    * Users may request additional affiliations to other Partners 
  * Partner Admins 
    * Users may be elevated to "Partner Admins"
-   * Responsible for approving affiliations (approval can be revoked) 
+   * Responsible for approving affiliations to partner (approval can be revoked)
    * Able to add emails allowing new users to register
+   * Responsible for managing the partners input groups used for template generation
  
 ### Implementation
  * Access control
@@ -89,4 +95,4 @@
    
 ### Notes
   * Ensure feature names for "curve" record type features are not more than 31 characters 
-  and do not contain characters that excel does not allow in sheet names: []:*?/\
+  and do not contain characters that Excel does not allow in sheet names: []:*?/\
