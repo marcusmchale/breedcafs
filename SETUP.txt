@@ -1,15 +1,8 @@
-This all depends on a working neo4j install. For development we perform setup in a virtual environment. 
-An instance folder is required but not available in the github repo, this should contain:
-	config.py
-		SECRET-KEY 
-		ALLOWED_EMAILS
-		ADMINS
-		UPLOAD-FOLDER
-		DOWNLOAD-FOLDER
-		MAIL-SERVER (and associated values)
+This all depends on a working neo4j install
+  - Install neo4j, set-initial-password, create breedcafs user and set that accounts password
 
-Set the setgid bit on the UPLOAD-FOLDER (and make sure the group includes the webserver user and the celery user) 
-e.g.  chmod 2775 UPLOAD-FOLDER
+An instance folder is required but not available in the github repo, this should contain
+modified version of the config.py file (notes in the template in this folder).
 
 SETUP:
 
@@ -21,68 +14,68 @@ Set up neo4j:
 			yum install neo4j
 
 	Set initial password:
-		neo4j-admin set-initial-password SECURE-PASSWORD-HERE
-
-		- You may need to delete the auth folder if something is already created there
-
-		    rm /var/lib/neo4j/data/dbms/auth
-
-		Alternative for local install:
-			Visit neo4j in the browser at localhost:7474 and configure username password (default is neo4j:neo4j)
-
-	Run neo4j:
+	    service neo4j stop
+		neo4j-admin set-initial-password NEO4J_ROOT_USER-PASSWORD-HERE
 		service neo4j start
 
-		As startup service :
-			 - preconfigured to run on startup in Debian
-			 - on fedora: systemctl enable neo4j
+    Connect to db using cypher shell to create breedcafs user:
+        cypher-shell -u neo4j -p NEO4J_ROOT_USER-PASSWORD-HERE
+        CALL dbms.security.createUser('breedcafs', BREEDCAFS_USER-PASSWORD-HERE, false)
+        # the 3rd argument in the above call suppresses the request to change password
+
+        Other useful commands:
+        CALL dbms.security.changePassword(*password*)
+        CALL dbms.security.listUsers()
+        CALL dbms.security.deleteUser(*username*)
+
+    Add the breedcafs user and password as environment variables for the web-server and celery instances
 
 	Set import directory (for CSV uploads):
-		Edit /etc/neo4j/neo4j.conf as follows:
+		Edit /etc/neo4j/neo4j.conf to include the path for imports (use same path later in instance/config.py):
 			# `LOAD CSV` section of the manual for details.
-			dbms.directories.import=/var/www/breedcafs/instance/import
+			dbms.directories.import=/path/to/import
 
 	Add APOC plugin:
-		Download the latest version (jar file)and place it in the neo4j plugins directory.
-		APOC is currently used for date parsing during CSV import
+		Download the compatible version of APOC (jar file) and place it in the neo4j plugins directory.
+		  - https://github.com/neo4j-contrib/neo4j-apoc-procedures
+		APOC is currently used for date parsing during CSV import and for clearing schema on reset
+
+		For schema assert add the following to /etc/neo4j/neo4j.conf
+            dbms.security.procedures.unrestricted=apoc.schema.assert
 
 
+Set up the flask app:
+    Clone the breedcafs repository into the webserver directory:
+        cd /var/www
+        git clone https://github.com/marcusmchale/breedcafs
 
-Clone the breedcafs repository into the webserver directory:
-	cd /var/www
-	git clone https://github.com/marcusmchale/breedcafs
+    Add the instance folder, copy the config.py and modify to suit your environment:
+        mkdir breedcafs/instance
+        cp /var/www/breedcafs/config.py /var/www/breedcafs/instance/config.py
 
-Add the instance folder:
-	mkdir breedcafs/instance
-	cp /path/to/file/config.py breedcafs/instance/config.py
-	mkdir instance/import
-	mkdir instance/export
+    Set up virtual environment:
+        Install:
+            on ubuntu:
+                apt-get install virtualenv
+            on fedora (was already installed for me in v25 but otherwise:
+                yum install python-virtualenv
 
+        Initialise:
+            virtualenv /var/www/breedcafs/venv
+        Activate (from breedcafs folder):
+            . ./var/www/breedcafs/venv/bin/activate
+        Install requirements:
+            pip install -r REQUIREMENTS.txt
 
-Set up virtual environment:
-	Install:
-		on ubuntu:
-			sudo apt-get install virtualenv
-		on fedora (was already installed for me in v25 but otherwise:
-			sudo yum install python-virtualenv
+    Set permissions so that webserver user has group level read access:
+        chgrp -R www-data /var/www/breedcafs
+        chmod 755 /var/www/breedcafs
+        chmod 2775 /var/www/breedcafs/instance/import
+        chmod 2775 /var/www/breedcafs/instance/export
 
-	Initialise:
-		virtualenv /var/www/breedcafs/venv
-	Activate (from breedcafs folder):
-		. ./var/www/breedcafs/venv/bin/activate
-	Install requirements:
-		pip install -r REQUIREMENTS.txt 
-
-Set permissions:
-	chgrp -R www-data /var/www/breedcafs
-	chmod 755 /var/www/breedcafs
-	chmod 2775 /var/www/breedcafs/instance/import
-	chmod 2775 /var/www/breedcafs/instance/export
 
 Configure apache2:
-
 	Add the following virtual host to /etc/apache2/sites-available/breedcafs.conf
-
 		<VirtualHost *:80>
 			ServerName SERVERNAME-OR-IP
 			SetEnv NEO4J_USERNAME neo4j
@@ -117,10 +110,11 @@ Redis:
 			sudo systemctl start redis
 
 
-
 Celery: 
 	This is the python worker that schedules asynchronous jobs on the server
+	Install and run as service, modify the celeryd.conf file
 	#run for testing
 		celery -A app.models worker --loglevel info
+
 
 
