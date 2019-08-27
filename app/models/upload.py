@@ -232,9 +232,9 @@ class RowParseResult:
 									'Expected a block name '
 								)
 							elif field_input_name in [
-								'assign field sample to sample(s) by ID'
-								'assign field sample to tree(s) by ID'
-								'assign field sample to block(s) by ID'
+								'assign field sample to sample(s) by id',
+								'assign field sample to tree(s) by id',
+								'assign field sample to block(s) by id'
 							]:
 								formatted_cells[field] += (
 									'Expected a comma separated list of integers corresponding to the ID within the field '
@@ -1048,7 +1048,7 @@ class SubmissionResult:
 			tx.run(statement, assign_tree_to_block_by_name=self.property_updates['assign_tree_to_block_by_name'])
 		if self.property_updates['assign_sample_to_block_by_name']:
 			statement = (
-				' UNWIND assign_sample_to_block_by_name AS uid_value '
+				' UNWIND $assign_sample_to_block_by_name AS uid_value '
 				'	MATCH '
 				'		(sample: Sample {uid: uid_value[0]}) '
 				'		-[from:FROM]->(: ItemSamples) '
@@ -1065,49 +1065,56 @@ class SubmissionResult:
 			tx.run(statement, assign_sample_to_block_by_name=self.property_updates['assign_sample_to_block_by_name'])
 		if self.property_updates['assign_sample_to_block_by_id']:
 			statement = (
-				' UNWIND assign_sample_to_block_by_id AS uid_value '
+				' UNWIND $assign_sample_to_block_by_id AS uid_value '
 				'	MATCH '
 				'		(sample: Sample {uid: uid_value[0]}) '
 				'		-[from:FROM]->(: ItemSamples) '
 				'		-[:FROM]->(: Field) '
 				'		<-[:IS_IN]-(: FieldBlocks) '
 				'		<-[:IS_IN]-(block: Block) '
-				'	WHERE block.id IN extract(x in split(uid_value[1], ",") | toInteger(trim(x))) '
+				'	WHERE block.id IN uid_value[1] '
 				'	MERGE '
 				'		(is:ItemSamples)'
 				'		-[:FROM]->(block) '
 				'	CREATE (sample)-[:FROM]->(is) '
 				'	DELETE from '
 			)
+			for item in self.property_updates['assign_sample_to_block_by_id']:
+				item[1] = Parsers.parse_range_list(item[1])
 			tx.run(statement, assign_sample_to_block_by_id=self.property_updates['assign_sample_to_block_by_id'])
 		if self.property_updates['assign_sample_to_tree_by_id']:
-			tx.run(
-				' UNWIND assign_sample_to_tree_by_id AS uid_value '
+			statement = (
+				' UNWIND $assign_sample_to_tree_by_id AS uid_value '
 				'	MATCH '
 				'		(sample: Sample {uid: uid_value[0]}) '
 				'		-[from:FROM]->(: ItemSamples)'
 				'		-[:FROM]->(: Field) '
 				'		<-[:IS_IN]-(: FieldTrees) '
 				'		<-[:IS_IN]-(tree: Tree) '
-				'	WHERE tree.id IN extract(x in split(uid_value[1], ",") | toInteger(trim(x))) '
+				'	WHERE tree.id IN uid_value[1] '
 				'	MERGE '
 				'		(tree)<-[:FROM]-(is:ItemSamples) '
 				'	CREATE '
 				'		(sample)-[:FROM]->(is) '
-				'	DELETE from ',
+				'	DELETE from '
+			)
+			for item in self.property_updates['assign_sample_to_tree_by_id']:
+				item[1] = Parsers.parse_range_list(item[1])
+			tx.run(
+				statement,
 				assign_sample_to_tree_by_id=self.property_updates['assign_sample_to_tree_by_id']
 			)
 		if self.property_updates['assign_sample_to_sample_by_id']:
-			tx.run(
-				' UNWIND assign_sample_to_sample_by_id AS uid_value '
+			statement = (
+				' UNWIND $assign_sample_to_sample_by_id AS uid_value '
 				'	MATCH '
 				'		(sample: Sample {uid: uid_value[0]}) '
 				'		-[from_field:FROM]->(: ItemSamples) '
 				'		-[:FROM]->(field: Field) '
 				'	MATCH '
-				'		(field)'
+				'		(field) '
 				'		<-[: FROM | IS_IN *]-(source_sample: Sample) '
-				'	WHERE source_sample.id IN extract(x in split(uid_value[1], ",") | toInteger(trim(x))) '
+				'	WHERE source_sample.id IN uid_value[1] '
 				# prevent self targeting
 				'	AND sample.id <> source_sample.id '
 				'	CREATE '
@@ -1116,11 +1123,16 @@ class SubmissionResult:
 				# prevent cycles 
 				'	OPTIONAL MATCH cycle = (sample)-[: FROM *]->(sample) '
 				'	FOREACH (n IN CASE WHEN cycle IS NULL THEN [1] ELSE [] END | '
-				'		DELETE from_field '				
+				'		DELETE from_field '
 				'	) '
 				'	FOREACH (n IN CASE WHEN cycle IS NOT NULL THEN [1] ELSE [] END | '
-				'		DELETE from_sample '				
-				'	) ',
+				'		DELETE from_sample '
+				'	) '
+			)
+			for item in self.property_updates['assign_sample_to_sample_by_id']:
+				item[1] = Parsers.parse_range_list(item[1])
+			tx.run(
+				statement,
 				assign_sample_to_sample_by_id=self.property_updates['assign_sample_to_sample_by_id']
 			)
 		if self.property_updates['harvest_time']:
@@ -2619,6 +2631,9 @@ class Upload:
 					# update properties where needed
 					property_uid = {
 						'assign custom id': [],
+						'sample type (in situ)': [],
+						'sample type (harvest)': [],
+						'sample type (sub-sample)': [],
 						'assign tree to block by name': [],
 						'assign field sample to block by name': [],
 						'assign field sample to block(s) by id': [],
