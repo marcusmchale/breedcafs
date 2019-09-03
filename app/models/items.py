@@ -496,7 +496,7 @@ class AddFieldItems:
 			)
 		statement += (
 			' WITH '
-			'	user, '
+			'	user, uft '
 			'	country.name as country, '
 			'	region.name as region, '
 			'	farm.name as farm, '
