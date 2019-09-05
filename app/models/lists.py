@@ -135,6 +135,10 @@ class SelectionList:
 					' WITH ig, sub '
 					' ORDER BY sub DESC LIMIT 1 '
 				)
+			else:
+				statement += (
+					' WITH ig, sub '
+				)
 			statement += (
 				' MATCH '
 				'	(ig)<-[in_group:IN_GROUP]-(input:Input) '
@@ -447,15 +451,17 @@ class SelectionList:
 			statement += (
 				' MATCH '
 				'	(ig) '
-				'	<-[:IN_GROUP]-(input: Input) '
 				'	-[:AT_LEVEL]->(: ItemLevel {name_lower: toLower($item_level)}), '
-				'	(input)-[:OF_TYPE]->(: RecordType {name_lower: toLower($record_type)}) '
+				'	(ig)'
+				'	<-[:IN_GROUP]-(input: Input)'
+				'	-[:OF_TYPE]->(: RecordType { '
+				'		name_lower: toLower($record_type) '
+				'	}) '
 			)
 		elif item_level:
 			statement += (
 				' MATCH '
 				'	(ig) '
-				'	<-[:IN_GROUP]-(: Input) '
 				'	-[:AT_LEVEL]->(: ItemLevel {name_lower: toLower($item_level)}) '
 			)
 		elif record_type:

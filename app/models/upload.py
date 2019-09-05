@@ -760,19 +760,6 @@ class SubmissionResult:
 		self.conflicts_found = False
 		self.submission_count = 0
 		self.resubmission_count = 0
-		# todo rewrite property updates to happen during result consumption rather than storing in memory
-		self.property_updates = {
-			'custom_id': [],
-			'assign_tree_to_block_by_name': [],
-			'assign_sample_to_block_by_name': [],
-			'assign_sample_to_block_by_id': [],
-			'assign_sample_to_tree_by_id': [],
-			'assign_sample_to_sample_by_id': [],
-			'planted': [],
-			'unit': [],
-			'variety': {},
-			'harvest_time': {}
-		}
 
 	def close(self):
 		self.conflicts_file.close()
@@ -797,69 +784,265 @@ class SubmissionResult:
 				return
 			submission_item.lists_to_strings()
 			self.submissions_writer.writerow(submission_item.record)
-
-			# Since sometimes a record for assign to will be submitted before the item is registered
-			# To handle this, we collect all assign to submissions and set them whether found or not
-			# TODO it might be worth considering scanning for records assigning to the item on item creation
-			# but this may be too inefficient for user feedback though.
-			if self.record_type == 'property':
-				if submission_item.record['Input variable'].lower() == 'assign tree to block by name':
-					self.property_updates['assign_tree_to_block_by_name'].append(
-						[record['UID'], record['Value']]
-					)
-				if submission_item.record['Input variable'].lower() == 'assign field sample to block by name':
-					self.property_updates['assign_sample_to_block_by_name'].append(
-						[record['UID'], record['Value']]
-					)
-				if submission_item.record['Input variable'].lower() == 'assign field sample to block(s) by id':
-					self.property_updates['assign_sample_to_block_by_id'].append(
-						[record['UID'], record['Value']]
-					)
-				if submission_item.record['Input variable'].lower() == 'assign field sample to tree(s) by id':
-					self.property_updates['assign_sample_to_tree_by_id'].append(
-						[record['UID'], record['Value']]
-					)
-				if submission_item.record['Input variable'].lower() == 'assign field sample to sample(s) by id':
-					self.property_updates['assign_sample_to_sample_by_id'].append(
-						[record['UID'], record['Value']]
-					)
 			if submission_item.record['Found']:
 				self.resubmission_count += 1
 			else:
 				self.submission_count += 1
 				if self.record_type == 'property':
-					if submission_item.record['Input variable'].lower() == 'assign custom id':
-						self.property_updates['custom_id'].append(
-							[record['UID'], record['Value']]
-						)
-					if submission_item.record['Input variable'].lower() in [
-						'sample type (in situ)', 'sample type (harvest)', 'sample type (sub-sample)'
-					]:
-						self.property_updates['unit'].append(
-							[record['UID'], record['Value']]
-						)
-					if submission_item.record['Input variable'].lower() == 'planting date':
-						self.property_updates['planted'].append(
-							[record['UID'], record['Value']]
-						)
-					if submission_item.record['Input variable'].lower() == 'variety name':
-						if not record['UID'] in self.property_updates['variety']:
-							self.property_updates['variety'][record['UID']] = {}
-						self.property_updates['variety'][record['UID']]['name'] = record['Value']
-					if submission_item.record['Input variable'].lower() == 'variety code':
-						if not record['UID'] in self.property_updates['variety']:
-							self.property_updates['variety'][record['UID']] = {}
-						self.property_updates['variety'][record['UID']]['code'] = record['Value']
-					if submission_item.record['Input variable'].lower() == 'harvest date':
-						if not record['UID'] in self.property_updates['harvest_time']:
-							self.property_updates['harvest_time'][record['UID']] = {}
-						self.property_updates['harvest_time'][record['UID']]['date'] = record['Value']
-					if submission_item.record['Input variable'].lower() == 'harvest time':
-						if not record['UID'] in self.property_updates['harvest_time']:
-							self.property_updates['harvest_time'][record['UID']] = {}
-						self.property_updates['harvest_time'][record['UID']]['time'] = record['Value']
 
-	def update_properties(self, tx):
+class PropertyUpdateHandler:
+	def __init__(self, tx):
+		self.tx = tx
+		# We want to aggregate records from submission before processing these for updates
+		# rather than doing the update in new tx per update
+		self.updates = {}
+		# This is also in line with the policy of aggregating errors
+		# so the user has a chance to see the type of corrections they may need to make on the entire submission
+		# without the server needing to fully process the entire submission only to reject it.
+		# Threshold for aggregating records before processing the submission
+		# this is per update property function
+		self.update_threshold = 100
+		# we keep the errors in a dictionary grouped by property to then return them in this context
+		self.errors = {}
+		self.error_threshold = 10
+		self.function_dict = {
+			'assign custom id': self.assign_custom_id,
+			'planting date': self.assign_planting_date,
+			'sample type (in situ)': self.assign_unit,
+			'sample type (harvest)': self.assign_unit,
+			'sample type (sub-sample)': self.assign_unit,
+			'assign tree to block by name': self.assign_tree_to_block,
+			'assign tree to block by id': self.assign_tree_to_block,
+			'assign sample to block(s) by name': self.assign_sample_to_blocks,
+			'assign sample to block(s) by id': self.assign_sample_to_blocks,
+			'assign sample to tree(s) by id': self.assign_sample_to_trees_by_id,
+			'assign sample to sample(s) by id': self.assign_sample_to_samples_by_id,
+			'variety name': self.assign_variety_by_name,
+			'variety code': self.assign_variety_by_code,
+			'harvest date': self.assign_harvest_date,
+			'harvest time': self.assign_harvest_time
+		}
+
+	def process_record(
+			self,
+			record
+	):
+		input_variable = record['Input_variable'].lower()
+		if not input_variable in self.updates:
+			self.updates[input_variable] = []
+		self.updates[input_variable].append(record['UID'], record['Value'])
+		if len(self.updates[input_variable]) >= self.update_threshold:
+			self.update_collection(input_variable)
+			self.updates[input_variable] = []
+		if len(self.errors[input_variable]) >= self.error_threshold:
+			return True
+
+	def update_all(self):
+		for key in self.updates:
+			self.update_collection(key)
+
+	def format_error_list(self):
+		for key, value in self.errors:
+			if value:
+				self.errors[key].insert(
+					0,
+					'Errors in assigning properties from input variable "' + key + '":'
+				)
+
+	def update_collection(
+			self,
+			input_variable
+	):
+		if self.updates[input_variable]:
+			self.function_dict[input_variable](input_variable)
+
+	def error_check(
+			self,
+			result,
+			property_name='property',
+	):
+		if not property_name in self.errors:
+			self.errors[property_name] = []
+		errors = self.errors[property_name]
+		for record in result:
+			if not record[0]['item_uid']:
+				errors.append(
+					'Item not found (' + str(record[0]['UID']) + ')'
+				)
+			elif record[0]['existing']:
+				if isinstance(record[0]['existing'], list):
+					record[0]['existing'].sort()
+					existing = ', '.join(record[0]['existing'])
+				else:
+					existing = record[0]['existing']
+				if isinstance(record[0]['value'], list):
+					record[0]['value'].sort()
+					value = ','.join(record[0]['value'])
+				else:
+					value = record[0]['value']
+				if not record[0]['existing'] == record[0]['value']:
+					errors.append(
+						'Item (' +
+						record[0]['item_uid'] +
+						') already has a different ' +
+						property_name +
+						' assigned (' +
+						existing +
+						') so it cannot be set to ' +
+						value
+					)
+
+	def assign_custom_id(self, input_variable):
+		statement = (
+			' UNWIND $uid_value_list AS uid_value '
+			'	OPTIONAL MATCH '
+			'		(item: Item {uid: uid_value[0]}) '
+			'	WITH uid_value, item, item.custom_id as existing '
+			'	SET item.custom_id = CASE '
+			'		WHEN item.custom_id IS NULL THEN uid_value[1] '
+			'		ELSE item.custom_id '
+			'		END '
+			'	RETURN { '
+			'		UID: uid_value[0], '
+			'		value: uid_value[1], '
+			'		item_uid: item.uid, '
+			'		existing: existing '
+			'	} '
+		)
+		result = self.tx.run(
+			statement,
+			uid_value_list=self.updates[input_variable]
+		)
+		self.error_check(
+			result,
+			'custom ID'
+		)
+
+	def assign_planting_date(self, input_variable):
+		statement = (
+			' UNWIND uid_value_list AS uid_value '
+			'	OPTIONAL MATCH '
+			'		(item: Item {uid: uid_value[0]}) '
+			'	WITH uid_value, item, item.planted as existing '
+			'	SET item.planted = CASE '
+			'		WHEN item.planted IS NULL AND item IS NOT NULL '
+			'		THEN uid_value[1] '
+			'		ELSE item.planted '
+			'		END '
+			'	RETURN  { '
+			'		UID: uid_value[0], '
+			'		value: uid_value[1], '	
+			'		item_uid: item.uid, '
+			'		existing: existing '
+			'	} '
+		)
+		result = self.tx.run(
+			statement,
+			uid_value_list=self.updates[input_variable]
+		)
+		self.error_check(
+			result,
+			'planting date'
+		)
+
+	def assign_unit(self, input_variable):
+		statement = (
+			' UNWIND uid_value_list AS uid_value '
+			'	OPTIONAL MATCH '
+			'		(item: Sample {uid: uid_value[0]}) '
+			'	WITH uid_value, item, item.unit as existing'
+			'	SET item.unit = CASE '
+			'		WHEN item.unit IS NULL AND item IS NOT NULL '
+			'		THEN uid_value[1] '
+			'		ELSE item.unit '
+			'		END '
+			'	RETURN  { '
+			'		UID: uid_value[0], '
+			'		value: uid_value[1], '	
+			'		item_uid: item.uid, '
+			'		existing: existing '
+			'	} '
+		)
+		result = self.tx.run(
+			statement,
+			uid_value_list=self.updates[input_variable]
+		)
+		self.error_check(
+			result,
+			'sample type'
+		)
+
+	def assign_tree_to_block(self, input_variable):
+		statement = (
+			' UNWIND $uid_value_list AS uid_value '
+			'	OPTIONAL MATCH '
+			'		(tree: Tree {uid: uid_value[0]}) '
+			'	OPTIONAL MATCH '
+			'		(tree) '		
+			'		-[:IS_IN]->(: FieldTrees) '
+			'		-[:IS_IN]->(: Field) '
+			'		<-[:IS_IN]-(: FieldBlocks) '
+			'		<-[:IS_IN]-(block: Block) '
+		)
+		if 'by name' in input_variable:
+			statement += (
+				' WHERE trim(block.name_lower) = toLower(trim(uid_value[1])) '
+			)
+		else: # 'by id' in input_variable:
+			statement += (
+				' WHERE block.id = uid_value[1] '
+			)
+		statement += (
+			'	OPTIONAL MATCH (tree)-[:IS_IN]->(:BlockTrees)-[:IS_IN]->(existing:Block) '
+			'	FOREACH (n IN CASE WHEN '
+			'		existing IS NULL AND '
+			'		block IS NOT NULL AND '
+			'		tree IS NOT NULL '
+			'		THEN [1] ELSE [] END | '
+			'		MERGE '
+			'			(bt:BlockTrees)'
+			'			-[:IS_IN]->(block) '
+			'		MERGE '
+			'			(bt) '
+			'			<-[:FOR]-(c:Counter) '
+			'			ON CREATE SET '
+			'				c.count = 0, '
+			'				c.name = "tree", '
+			'				c.uid = (block.uid + "_tree") '
+			'		SET c._LOCK_ = True '
+			'		MERGE (tree)-[:IS_IN]->(bt) '
+			'		SET c.count = c.count + 1 '
+			'		REMOVE c._LOCK_ '
+			'	) '
+			'	RETURN  { '
+			'		UID: uid_value[0], '
+			'		value: uid_value[1], '	
+			'		item_uid: tree.uid, '
+		)
+		if 'by name' in input_variable:
+			statement += (
+				' existing: existing.name '
+			)
+		else:
+			statement += (
+				' existing: existing.id '
+			)
+		statement += (
+			' } '
+		)
+		result = self.tx.run(
+			statement,
+			uid_value_list=self.updates[input_variable]
+		)
+		self.error_check(
+			result
+		)
+
+	def assign_sample_to_blocks(self, input_variable):
+
+
+	def test():
+
 		if self.property_updates['variety']:
 			variety = [
 				[
@@ -950,7 +1133,7 @@ class SubmissionResult:
 			variety_update_errors = []
 			for record in result:
 				if len(variety_update_errors) >= 5:
-					variety_update_errors.insert(0, 'Only the first 5 variety update conflicts are being reported: <br>')
+					variety_update_errors.insert(0, 'Only the first 5 variety update errors are being reported: <br>')
 					break
 				if all([
 					record[0]['by_name_name'] and record[0]['by_code_name'],
@@ -990,97 +1173,174 @@ class SubmissionResult:
 							+ ')'
 						)
 			if variety_update_errors:
-				return variety_update_errors
-		if self.property_updates['custom_id']:
-			tx.run(
-				' UNWIND $custom_ids AS uid_value '
-				'	MATCH '
-				'		(item: Item {uid: uid_value[0]}) '
-				'	WHERE item.custom_id IS NULL '
-				'	SET item.custom_id = uid_value[1] ',
-				custom_ids=self.property_updates['custom_id']
-			)
-		if self.property_updates['unit']:
-			tx.run(
-				' UNWIND $unit AS uid_value '
-				'	MATCH '
-				'		(item: Sample {uid: uid_value[0]}) '
-				'	WHERE item.unit IS NULL '
-				'	SET item.unit = uid_value[1] ',
-				unit=self.property_updates['unit']
-			)
-		if self.property_updates['planted']:
-			tx.run(
-				' UNWIND $planted AS uid_value '
-				'	MATCH '
-				'		(item: Item {uid: uid_value[0]}) '
-				'	WHERE item.planted IS NULL '
-				'	SET item.planted = uid_value[1] ',
-				planted=self.property_updates['planted']
-			)
-		if self.property_updates['assign_tree_to_block_by_name']:
+				variety_update_errors.insert(
+					0, 'The following errors occurred in assigning varieties :<br>'
+				)
+				update_property_errors += variety_update_errors
+
+
+
+		if self.property_updates['assign_tree_to_block']:
 			statement = (
-				' UNWIND $assign_tree_to_block_by_name AS uid_value '
-				'	MATCH '
-				'		(tree: Tree {uid: uid_value[0]}) '
-				'		-[:IS_IN]->(: FieldTrees) '
-				'		-[:IS_IN]->(: Field) '
-				'		<-[:IS_IN]-(: FieldBlocks) '
-				'		<-[:IS_IN]-(block: Block) '
-				'	WHERE trim(block.name_lower) = toLower(trim(uid_value[1])) '
-				'	OPTIONAL MATCH (tree)-[:IS_IN]->(existing:BlockTrees) '
-				'	WITH block, tree WHERE existing IS NULL '
-				'	MERGE '
-				'		(bt:BlockTrees)'
-				'		-[:IS_IN]->(block) '
-				'	MERGE '
-				'		(bt) '
-				'		<-[:FOR]-(c:Counter) '
-				'		ON CREATE SET '
-				'			c.count = 0, '
-				'			c.name = "tree", '
-				'			c.uid = (block.uid + "_tree") '
-				'	SET c._LOCK_ = True '
-				'	MERGE (tree)-[:IS_IN]->(bt) '
-				'	SET c.count = c.count + 1 '
-				'	REMOVE c._LOCK_ '
+
 			)
-			tx.run(statement, assign_tree_to_block_by_name=self.property_updates['assign_tree_to_block_by_name'])
+			result = tx.run(
+				statement,
+				assign_tree_to_block_by_name=self.property_updates['assign_tree_to_block_by_name']
+			)
+			assign_tree_to_block_by_name_errors = []
+			for record in result:
+				if len(assign_tree_to_block_by_name_errors) >= 5:
+					assign_tree_to_block_by_name_errors.insert(0, 'Only the first 5 such errors are being reported: <br>')
+					break
+				if not record[0]['block']:
+					assign_tree_to_block_by_name_errors.append(
+						'Block not found (block: ' + record[0]['value'] +
+						', tree: ' + record[0]['UID'] + ').'
+					)
+			if assign_tree_to_block_by_name_errors:
+				assign_tree_to_block_by_name_errors.insert(
+					0, 'The following errors occurred in assigning tree to block by name :<br>'
+				)
+				update_property_errors += assign_tree_to_block_by_name_errors
 		if self.property_updates['assign_sample_to_block_by_name']:
+			# need to handle where assign_sample_to_block_by_id is already established
 			statement = (
 				' UNWIND $assign_sample_to_block_by_name AS uid_value '
-				'	MATCH '
-				'		(sample: Sample {uid: uid_value[0]}) '
-				'		-[from:FROM]->(: ItemSamples) '
-				'		-[:FROM]->(: Field) '
+				'	OPTIONAL MATCH '
+				'		(sample: Sample { '
+				'			uid: uid_value[0]'
+				'		})-[:FROM]->(: ItemSamples)'
+				'		-[:FROM]->(current_item: Item) '
+				'	OPTIONAL MATCH '
+				'		(sample) '
+				'		-[:FROM | IS_IN*]->(: Field) '
 				'		<-[:IS_IN]-(: FieldBlocks) '
 				'		<-[:IS_IN]-(block: Block) '
 				'	WHERE trim(block.name_lower) = toLower(trim(uid_value[1])) '
-				'	MERGE '
-				'		(is:ItemSamples)'
-				'		-[:FROM]->(block) '
-				'	CREATE (sample)-[:FROM]->(is) '
-				'	DELETE from '
+				'	FOREACH (n in CASE WHEN '
+				'		sample IS NOT NULL AND '
+				'		"Field" in labels(current_item) AND '
+				'		block IS NOT NULL '	
+				'		THEN [1] ELSE [] END | '	
+				'		MERGE '
+				'			(is:ItemSamples) '
+				'			-[:FROM]->(block) '
+				'		MERGE (sample)-[:FROM]->(is) '
+				'		DELETE from '
+				'	) '
+				'	RETURN { '
+				'		UID: uid_value[0], '
+				'		value: uid_value[1], '
+				'		block_name: block.name, '
+				'		block_uid: block.UID, '
+				'		current_item_level: collect([i in labels(current_item) where i <> "Item"][0])[0], '
+				'		current_item_uid: collect(current_item.uid) '
+				'	} '
 			)
-			tx.run(statement, assign_sample_to_block_by_name=self.property_updates['assign_sample_to_block_by_name'])
+			result = tx.run(
+				statement,
+				assign_sample_to_block_by_name=self.property_updates['assign_sample_to_block_by_name']
+			)
+			assign_sample_to_block_by_name_errors = []
+			for record in result:
+				if len(assign_sample_to_block_by_name_errors) >= 5:
+					assign_sample_to_block_by_name_errors.insert(0, 'Only the first 5 such errors are being reported')
+					break
+				if not record[0]['UID']:
+					assign_sample_to_block_by_name_errors.append(
+						'Sample UID was not found (' + record[0]['value'] + ')'
+					)
+				elif record[0]['current_item_level'] and record[0]['current_item_level'] != "Field":
+					if record[0]['current_item_level'] == "Block":
+						assign_sample_to_block_by_name_errors.append(
+							'Sample (' + record[0]['value'] +
+							') already has a block assignment (' +
+							'(' + ', '.join(record[0]['current_item_uid'])
+							+ ')'
+						)
+					else:
+						assign_sample_to_block_by_name_errors.append(
+							'Sample (' + record[0]['value'] +
+							') already has assigned to ' +
+							record[0]['current_item_level'] + 'item(s) ' +
+							'(' + ', '.join(record[0]['current_item_uid'])
+							+ ')'
+						)
+				elif not record[0]['block']:
+					assign_sample_to_block_by_name_errors.append(
+						'Block not found (block: ' + record[0]['value'] +
+						', sample: ' + record[0]['UID'] + ').'
+					)
 		if self.property_updates['assign_sample_to_block_by_id']:
+			for item in self.property_updates['assign_sample_to_block_by_id']:
+				item[1] = Parsers.parse_range_list(item[1])
 			statement = (
 				' UNWIND $assign_sample_to_block_by_id AS uid_value '
-				'	MATCH '
-				'		(sample: Sample {uid: uid_value[0]}) '
-				'		-[from:FROM]->(: ItemSamples) '
-				'		-[:FROM]->(: Field) '
+				'	OPTIONAL MATCH '
+				'		(sample: Sample { '
+				'			uid: uid_value[0]'
+				'		})-[:FROM]->(: ItemSamples)'
+				'		-[:FROM]->(current_item: Item) '
+				'	OPTIONAL MATCH '
+				'		(sample) '
+				'		-[:FROM | IS_IN*]->(: Field) '
 				'		<-[:IS_IN]-(: FieldBlocks) '
 				'		<-[:IS_IN]-(block: Block) '
 				'	WHERE block.id IN uid_value[1] '
-				'	MERGE '
-				'		(is:ItemSamples)'
-				'		-[:FROM]->(block) '
-				'	CREATE (sample)-[:FROM]->(is) '
-				'	DELETE from '
+				'	FOREACH (n in CASE WHEN '
+				'		sample IS NOT NULL AND '
+				'		"Field" in labels(current_item) AND '
+				'		block IS NOT NULL '	
+				'		THEN [1] ELSE [] END | '	
+				'		MERGE '
+				'			(is:ItemSamples) '
+				'			-[:FROM]->(block) '
+				'		MERGE (sample)-[:FROM]->(is) '
+				'		DELETE from '
+				'	) '
+				'	RETURN { '
+				'		UID: uid_value[0], '
+				'		value: uid_value[1], '
+				'		block: block.name, '
+				'		current_item_level: collect([i in labels(current_item) where i <> "Item"][0])[0], '
+				'		current_item_uid: collect(current_item.uid) '
+				'	} '
 			)
-			for item in self.property_updates['assign_sample_to_block_by_id']:
-				item[1] = Parsers.parse_range_list(item[1])
+			result = tx.run(
+				statement,
+				assign_sample_to_block_by_name=self.property_updates['assign_sample_to_block_by_name']
+			)
+			assign_sample_to_block_by_name_errors = []
+			for record in result:
+				if len(assign_sample_to_block_by_name_errors) >= 5:
+					assign_sample_to_block_by_name_errors.insert(0, 'Only the first 5 such errors are being reported')
+					break
+				if not record[0]['UID']:
+					assign_sample_to_block_by_name_errors.append(
+						'Sample UID was not found (' + record[0]['value'] + ')'
+					)
+				elif record[0]['current_item_level'] and record[0]['current_item_level'] != "Field":
+					if record[0]['current_item_level'] == "Block":
+						assign_sample_to_block_by_name_errors.append(
+							'Sample (' + record[0]['value'] +
+							') already has a block assignment (' +
+							'(' + ', '.join(record[0]['current_item_uid'])
+							+ ')'
+						)
+					else:
+						assign_sample_to_block_by_name_errors.append(
+							'Sample (' + record[0]['value'] +
+							') already has assigned to ' +
+							record[0]['current_item_level'] + 'item(s) ' +
+							'(' + ', '.join(record[0]['current_item_uid'])
+							+ ')'
+						)
+				elif not record[0]['block']:
+					assign_sample_to_block_by_name_errors.append(
+						'Block not found (block: ' + record[0]['value'] +
+						', sample: ' + record[0]['UID'] + ').'
+					)
 			tx.run(statement, assign_sample_to_block_by_id=self.property_updates['assign_sample_to_block_by_id'])
 		if self.property_updates['assign_sample_to_tree_by_id']:
 			statement = (
@@ -1165,6 +1425,8 @@ class SubmissionResult:
 				'		END '
 			)
 			tx.run(statement, harvest_time=harvest_time)
+		if update_property_errors:
+			return update_property_errors
 
 
 class Upload:
@@ -1185,6 +1447,7 @@ class Upload:
 		self.inputs = dict()
 		self.row_count = dict()
 		self.error_messages = []
+		self.property_updater = None
 
 	def file_save(self, file_data):
 		# create user upload path if not found
@@ -1327,7 +1590,9 @@ class Upload:
 					+ 'username: ' + self.username
 					+ 'filename: ' + self.file_path
 				)
-				return 'This file does not appear to be a valid xlsx file'
+				return (
+					'This file does not appear to be a valid xlsx file'
+				)
 			self.record_types = []
 			sheetname_to_record_type = {v.lower(): k for k, v in app.config['WORKSHEET_NAMES'].iteritems()}
 			for sheetname in wb.sheetnames:
@@ -1369,7 +1634,7 @@ class Upload:
 						self.required_fieldnames[sheetname] = record_type_sets['curve']
 					else:
 						return (
-							'This workbook contains an unsupported worksheet:<br> "' + sheetname + '"<br><br>'
+							' This workbook contains an unsupported worksheet:<br> "' + sheetname + '"<br><br>'
 							+ 'Other than worksheets named after curve input variables, only the following are accepted: '
 							+ '<ul><li>'
 							+ '</li><li>'.join(
@@ -1908,6 +2173,7 @@ class Upload:
 				)
 			else:  # submission_type == 'table':
 				if record_type == 'property':
+					self.property_updater = PropertyUpdateHandler()
 					statement = Cypher.upload_table_property
 					result = tx.run(
 						statement,
@@ -1951,6 +2217,10 @@ class Upload:
 			# create a submission result and update properties from result
 			for record in result:
 				submission_result.parse_record(record[0])
+				if record_type == 'property':
+					if self.property_updater.process_record(record[0]):
+						self.property_updater.format_error_list()
+						#todo handle return of error response
 
 	@celery.task(bind=True)
 	def async_submit(self, username, upload_object):
@@ -1969,7 +2239,10 @@ class Upload:
 					send_email(subject, app.config['ADMINS'][0], recipients, body, html)
 				return {
 					'status': 'ERRORS',
-					'result': fieldname_errors
+					'result': (
+							'Submission report for file: ' + upload_object.raw_filename + '\n<br>' +
+							fieldname_errors
+					)
 				}
 			with get_driver().session() as neo4j_session:
 				header_report = neo4j_session.read_transaction(
@@ -1979,16 +2252,26 @@ class Upload:
 					with app.app_context():
 						html = render_template(
 							'emails/upload_report.html',
-							response=header_report
+							response=(
+									'Submission report for file: ' + upload_object.raw_filename + '\n<br>'
+									+ header_report
+							)
 						)
 						subject = "BreedCAFS upload rejected"
 						recipients = [User(username).find('')['email']]
-						response = "Submission rejected due to unrecognised or missing fields:\n " + header_report
+						response = (
+							'Submission report for file: ' + upload_object.raw_filename + '\n<br>' +
+							'Submission rejected due to unrecognised or missing fields:\n ' +
+							header_report
+						)
 						body = response
 						send_email(subject, app.config['ADMINS'][0], recipients, body, html)
 					return {
 						'status': 'ERRORS',
-						'result': header_report
+						'result': (
+							'Submission report for file: ' + upload_object.raw_filename + '\n<br>' +
+							header_report
+						)
 					}
 				if upload_object.file_extension in ['csv', 'xlsx']:
 					with neo4j_session.begin_transaction() as tx:
@@ -2012,15 +2295,24 @@ class Upload:
 							with app.app_context():
 								html = render_template(
 									'emails/upload_report.html',
-									response=error_messages
+									response=(
+										'Submission report for file: ' + upload_object.raw_filename + '\n<br>' +
+										error_messages
+									)
 								)
 								subject = "BreedCAFS upload rejected"
 								recipients = [User(username).find('')['email']]
-								body = error_messages
+								body = (
+										'Submission report for file: ' + upload_object.raw_filename + '\n<br>'
+										+ error_messages
+								)
 								send_email(subject, app.config['ADMINS'][0], recipients, body, html)
 							return {
 								'status': 'ERRORS',
-								'result': error_messages
+								'result': (
+									'Submission report for file: ' + upload_object.raw_filename + '\n<br>' +
+									error_messages
+								)
 							}
 						conflict_files = []
 						submissions = []
@@ -2045,6 +2337,7 @@ class Upload:
 							tx.rollback()
 							with app.app_context():
 								response = (
+									'Submission report for file: ' + upload_object.raw_filename + '\n<br>' +
 									'<p>Conflicting records were either submitted concurrently '
 									'or are found within in the submitted file. '
 									'Your submission has been rejected. Please address the conflicts listed '
@@ -2065,16 +2358,25 @@ class Upload:
 								response += '</p>'
 								html = render_template(
 									'emails/upload_report.html',
-									response=response
+									response=(
+										'Submission report for file: ' + upload_object.raw_filename + '\n<br>' +
+										response
+									)
 								)
 								# send result of merger in an email
 								subject = "BreedCAFS upload rejected"
 								recipients = [User(username).find('')['email']]
-								body = response
+								body = (
+									'Submission report for file: ' + upload_object.raw_filename + '\n<br>' +
+									response
+								)
 								send_email(subject, app.config['ADMINS'][0], recipients, body, html)
 								return {
 									'status': 'ERRORS',
-									'result': response
+									'result': (
+											'Submission report for file: ' + upload_object.raw_filename + '\n<br>' +
+											response
+									)
 								}
 						# update properties where needed,
 						# todo should probably be handled when consuming the result rather than storing
@@ -2087,7 +2389,10 @@ class Upload:
 								tx.rollback()
 								return {
 									'status': 'ERRORS',
-									'result': error_messages
+									'result': (
+										'Submission report for file: ' + upload_object.raw_filename + '\n<br>' +
+										error_messages
+									)
 								}
 						tx.commit()
 						# now need app context for the following (this is running asynchronously)
@@ -2096,10 +2401,13 @@ class Upload:
 								response = 'No data submitted, please check that you uploaded a completed file'
 								return {
 									'status': 'ERRORS',
-									'result': response
+									'result': (
+										'Submission report for file: ' + upload_object.raw_filename + '\n<br>' +
+										response
+									)
 								}
 							else:
-								response = "<p> Submission report:\n "
+								response = "<p>"
 								for submission in submissions:
 									submission_url = url_for(
 										'download_file',
@@ -2126,16 +2434,25 @@ class Upload:
 								response += '</p>'
 								html = render_template(
 									'emails/upload_report.html',
-									response=response
+									response=(
+										'Submission report for file: ' + upload_object.raw_filename + '\n<br>' +
+										response
+									)
 								)
 								# send result of merger in an email
 								subject = "BreedCAFS upload summary"
 								recipients = [User(username).find('')['email']]
-								body = response
+								body = (
+									'Submission report for file: ' + upload_object.raw_filename + '\n<br>' +
+									response
+								)
 								send_email(subject, app.config['ADMINS'][0], recipients, body, html)
 								return {
 									'status': 'SUCCESS',
-									'result': response
+									'result': (
+										'Submission report for file: ' + upload_object.raw_filename + '\n<br>' +
+										response
+									)
 								}
 				else:
 					return {
@@ -2561,16 +2878,25 @@ class Upload:
 				with app.app_context():
 					html = render_template(
 						'emails/upload_report.html',
-						response=fieldname_errors
+						response=(
+							'Submission report for file: ' + upload_object.raw_filename + '\n<br>' +
+							fieldname_errors
+						)
 					)
 					subject = "BreedCAFS upload rejected"
 					recipients = [User(username).find('')['email']]
-					response = "Submission rejected due to invalid file:\n " + fieldname_errors
+					response = (
+							'Submission report for file: ' + upload_object.raw_filename + '\n<br>' +
+							"Submission rejected due to invalid file:\n " + fieldname_errors
+					)
 					body = response
 					send_email(subject, app.config['ADMINS'][0], recipients, body, html)
 				return {
 					'status': 'ERRORS',
-					'result': fieldname_errors
+					'result': (
+							'Submission report for file: ' + upload_object.raw_filename + '\n<br>' +
+							fieldname_errors
+					)
 				}
 			with get_driver().session() as neo4j_session:
 				header_report = neo4j_session.read_transaction(
@@ -2578,19 +2904,22 @@ class Upload:
 				)
 				if header_report:
 					with app.app_context():
-						response = header_report
+						response = (
+								'Submission report for file: ' + upload_object.raw_filename + '\n<br>' +
+								"Correction rejected due to unrecognised or missing fields.\n " +
+								header_report
+						)
 						html = render_template(
 							'emails/upload_report.html',
 							response=response
 						)
 						subject = "BreedCAFS correction rejected"
 						recipients = [User(username).find('')['email']]
-						response = "Correction rejected due to unrecognised or missing fields.\n "
 						body = response
 						send_email(subject, app.config['ADMINS'][0], recipients, body, html)
 					return {
 						'status': 'ERRORS',
-						'result': header_report
+						'result': response
 					}
 				with neo4j_session.begin_transaction() as tx:
 					# there should only be one record type here, "mixed", so no need to iterate
@@ -2601,7 +2930,10 @@ class Upload:
 						if 'Records' not in wb.sheetnames:
 							return {
 								'status': 'ERRORS',
-								'result': 'This workbook does not contain the expected "Records" worksheet'
+								'result': (
+									'Submission report for file: ' + upload_object.raw_filename + '\n<br>' +
+									'This workbook does not contain the expected "Records" worksheet'
+								)
 							}
 					upload_object.trim_file(record_type)
 					if not upload_object.row_count[record_type]:
@@ -2615,17 +2947,21 @@ class Upload:
 					if upload_object.error_messages:
 						error_messages = '<br>'.join(upload_object.error_messages)
 						with app.app_context():
+							response = (
+									'Submission report for file: ' + upload_object.raw_filename + '\n<br>' +
+									error_messages
+							)
 							html = render_template(
 								'emails/upload_report.html',
-								response=error_messages
+								response=response
 							)
 							subject = "BreedCAFS correction rejected"
 							recipients = [User(username).find('')['email']]
-							body = error_messages
+							body = response
 							send_email(subject, app.config['ADMINS'][0], recipients, body, html)
 						return {
 							'status': 'ERRORS',
-							'result': error_messages
+							'result': response
 						}
 					deletion_result = upload_object.correct(tx, access, record_type)
 					# update properties where needed
@@ -2682,7 +3018,10 @@ class Upload:
 							# send result of merger in an email
 							subject = 'BreedCAFS correction rejected'
 							recipients = [User(username).find('')['email']]
-							response = 'Correction rejected:\n '
+							response = (
+								'Submission report for file: ' + upload_object.raw_filename + '\n<br>' +
+								'Correction rejected:\n '
+							)
 							if missing_row_str:
 								response += (
 									'<p>Records from the following rows of the uploaded file were not found: '
@@ -2704,7 +3043,10 @@ class Upload:
 						# send result of merger in an email
 						subject = 'BreedCAFS correction summary'
 						recipients = [User(username).find('')['email']]
-						response = 'Correction report:\n '
+						response = (
+							'Submission report for file: ' + upload_object.raw_filename + '\n<br>' +
+							'Correction report:\n '
+						)
 						if record_tally:
 							response += '<p>The following records were deleted: \n</p>'
 							for key in record_tally:
