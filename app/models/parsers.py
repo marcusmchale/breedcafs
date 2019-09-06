@@ -27,6 +27,12 @@ class Parsers:
 		return sorted(set(chain(*[Parsers.parse_range(range_string) for range_string in range_list.split(',')])))
 
 	@staticmethod
+	def parse_name_list(
+			name_list
+	):
+		return sorted(set([i.lower().strip() for i in name_list.split(',')]))
+
+	@staticmethod
 	def db_time_format(time_string):
 		time_string = str(time_string).strip()
 		try:

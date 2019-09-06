@@ -813,8 +813,10 @@ class PropertyUpdateHandler:
 			'sample type (sub-sample)': self.assign_unit,
 			'assign tree to block by name': self.assign_tree_to_block,
 			'assign tree to block by id': self.assign_tree_to_block,
+
 			'assign sample to block(s) by name': self.assign_sample_to_blocks,
 			'assign sample to block(s) by id': self.assign_sample_to_blocks,
+
 			'assign sample to tree(s) by id': self.assign_sample_to_trees_by_id,
 			'assign sample to sample(s) by id': self.assign_sample_to_samples_by_id,
 			'variety name': self.assign_variety_by_name,
@@ -870,16 +872,6 @@ class PropertyUpdateHandler:
 					'Item not found (' + str(record[0]['UID']) + ')'
 				)
 			elif record[0]['existing']:
-				if isinstance(record[0]['existing'], list):
-					record[0]['existing'].sort()
-					existing = ', '.join(record[0]['existing'])
-				else:
-					existing = record[0]['existing']
-				if isinstance(record[0]['value'], list):
-					record[0]['value'].sort()
-					value = ','.join(record[0]['value'])
-				else:
-					value = record[0]['value']
 				if not record[0]['existing'] == record[0]['value']:
 					errors.append(
 						'Item (' +
@@ -887,10 +879,55 @@ class PropertyUpdateHandler:
 						') already has a different ' +
 						property_name +
 						' assigned (' +
-						existing +
+						str(record[0]['existing']) +
 						') so it cannot be set to ' +
-						value
+						str(record[0]['value'])
 					)
+
+	def item_source_error_check(
+			self,
+			result,
+			property_name,
+	):
+		if not property_name in self.errors:
+			self.errors[property_name] = []
+		errors = self.errors[property_name]
+		for record in result:
+			# If we don't find the item
+			if not record[0]['item_uid']:
+				errors.append(
+					'Item not found (' + str(record[0]['UID']) + ')'
+				)
+			# If we don't find the source
+			elif len(record[0]['new_source_id']) == 0:
+				errors.append(
+					'Item source not found (' + str(record[0]['value']) + ')'
+				)
+			# So now we have both item and source but we may already have a source defined:
+			# we also want to reject these cases unless we are re-assigning to a lower level
+			# we do not support re-assigning from sample to sample as this could create breaks/loops
+			elif len(record['existing_source_id']) >= 0:
+				# We only allow re-assigning to greater precision (higher index values)
+				new_source_level = app.config['ITEM_LEVELS'].index(record[0]['new_source_level'])
+				existing_source_level = app.config['ITEM_LEVELS'].index(record[0]['existing_source_level'])
+				if new_source_level < existing_source_level:
+					errors.append(
+						'Item is currently assigned to a ' +
+						record[0]['existing_source_level'] +
+						' so cannot be re-assigned to a ' +
+						record[0]['new_source_level'] +
+						' as this would be less precise. '
+					)
+				elif new_source_level == existing_source_level:
+					errors.append(
+						'Item is currently assigned to ' +
+						property_name +
+						' (' + ','.join(record[0]['existing_source_id']) + ')' +
+						' so cannot re-assign to the requested ' +
+						property_name +
+						' (' + ','.join(record[0]['new_source_id']) + ')' +
+					)
+
 
 	def assign_custom_id(self, input_variable):
 		statement = (
@@ -976,24 +1013,29 @@ class PropertyUpdateHandler:
 		statement = (
 			' UNWIND $uid_value_list AS uid_value '
 			'	OPTIONAL MATCH '
-			'		(tree: Tree {uid: uid_value[0]}) '
+			'		(tree: Tree { '
+			'			uid: uid_value[0] '
+			'	}) '
 			'	OPTIONAL MATCH '
 			'		(tree) '		
 			'		-[:IS_IN]->(: FieldTrees) '
-			'		-[:IS_IN]->(: Field) '
+			'		-[:IS_IN]->(field: Field) '
 			'		<-[:IS_IN]-(: FieldBlocks) '
 			'		<-[:IS_IN]-(block: Block) '
 		)
-		if 'by name' in input_variable:
+		if 'name' in input_variable:
 			statement += (
 				' WHERE trim(block.name_lower) = toLower(trim(uid_value[1])) '
 			)
-		else: # 'by id' in input_variable:
+		else:
 			statement += (
 				' WHERE block.id = uid_value[1] '
 			)
 		statement += (
-			'	OPTIONAL MATCH (tree)-[:IS_IN]->(:BlockTrees)-[:IS_IN]->(existing:Block) '
+			'	OPTIONAL MATCH '
+			'		(tree) '
+			'		-[:IS_IN]->(:BlockTrees) '
+			'		-[:IS_IN]->(existing:Block) '
 			'	FOREACH (n IN CASE WHEN '
 			'		existing IS NULL AND '
 			'		block IS NOT NULL AND '
@@ -1016,119 +1058,264 @@ class PropertyUpdateHandler:
 			'	) '
 			'	RETURN  { '
 			'		UID: uid_value[0], '
-			'		value: uid_value[1], '	
+			'		value: uid_value[1], '
 			'		item_uid: tree.uid, '
-		)
-		if 'by name' in input_variable:
-			statement += (
-				' existing: existing.name '
-			)
-		else:
-			statement += (
-				' existing: existing.id '
-			)
-		statement += (
+			'		new_source_level: "Block", '
+			'		new_source_id: collect(block.id), '
+			'		existing_source_level: CASE WHEN existing THEN "Block" ELSE "Field" END, '
+			'		existing_source_id: collect(coalesce(existing.id, field.uid) '
 			' } '
 		)
 		result = self.tx.run(
 			statement,
 			uid_value_list=self.updates[input_variable]
 		)
-		self.error_check(
-			result
+		self.item_source_error_check(
+			result,
+			'block'
 		)
 
 	def assign_sample_to_blocks(self, input_variable):
-
-
-	def test():
-
-		if self.property_updates['variety']:
-			variety = [
-				[
-					str(key),
-					value['name'] if 'name' in value else None,
-					value['code'] if 'code' in value else None
-				] for key, value in self.property_updates['variety'].iteritems()
-			]
-			statement = (
-				' UNWIND $variety AS uid_name_code '
-				'	WITH '
-				'		CASE '
-				'			WHEN size(split(uid_name_code[0], "_")) = 1 '
-				'			THEN toInteger(uid_name_code[0]) '
-				'			ELSE uid_name_code[0] '
-				'			END as uid, '
-				'		uid_name_code[1] as name, '
-				'		uid_name_code[2] as code '
-				'	MATCH '
-				'		(self: User {username_lower: toLower(trim($username))}) '
-				'		-[:AFFILIATED {data_shared:True}]->(self_partner:Partner), '
-				'		(item: Item {uid: uid}), '
-				'		(field: Field {uid: '
-				'			CASE '
-				'			WHEN toInteger(uid) IS NOT NULL '
-				'				THEN uid '
-				'			ELSE '
-				'				toInteger(split(uid, "_")[0]) '
-				'			END '
-				'		}), '
-				'		(variety: Variety) '
-				'			WHERE variety.name_lower = toLower(trim(name)) '
-				'			OR variety.code = toLower(trim(code)) '
-				'	OPTIONAL MATCH '
-				'		(name_variety: Variety {name_lower: toLower(trim(name))}) '
-				'	OPTIONAL MATCH '
-				'		(code_variety: Variety {code_lower: toLower(trim(code))}) '
-				'	OPTIONAL MATCH '
-				'		(item)-[:OF_VARIETY]->(:FieldVariety) '
-				'		-[:OF_VARIETY]->(current_variety: Variety) '
-				'	OPTIONAL MATCH '
-				'		(item)<-[:FOR_ITEM]-(ii:ItemInput) '
-				'		-[:FOR_INPUT]->(:FieldInput)-[:FOR_INPUT]->(input:Input), '
-				'		(ii)<-[:RECORD_FOR]-(record:Record) '
-				'		<-[s:SUBMITTED]-() '
-				'		<-[:SUBMITTED*..4]-(user:User) '
-				'		-[:AFFILIATED {data_shared: True}]->(p:Partner) '
-				'		WHERE input.name_lower CONTAINS "variety" '
-				'	OPTIONAL MATCH '
-				'		(self) '
-				'		-[access:AFFILIATED]->(p) '
-				'	WITH '
-				'		item, '
-				'		field, '
-				'		collect(variety)[0] as variety, '
-				'		name_variety, '
-				'		code_variety, '
-				'		current_variety, '
-				'		CASE '
-				'			WHEN access.confirmed THEN user.name + "(" + p.name + ")" '
-				'			ELSE p.name '
-				'		END as `Submitted by`, '
-				'		s.time as `Submitted at`, '
-				'		self.name + "(" + self_partner.name + ")" as tx_user '
-				'	ORDER BY field.uid, CASE WHEN toInteger(item.uid) IS NOT NULL THEN Null Else item.id END '
-				'	MERGE '
-				'		(field) '
-				'		-[: CONTAINS_VARIETY]->(fv:FieldVariety) '
-				'		-[: OF_VARIETY]->(variety) '
-				'	MERGE '
-				'		(item) '
-				'		-[: OF_VARIETY]->(fv) '
-				'	RETURN { '
-				'		UID: item.uid, '
-				'		by_name_name: name_variety.name, '
-				'		by_name_code: name_variety.code, '
-				'		by_code_name: code_variety.name, '
-				'		by_code_code: code_variety.code, '
-				'		set_variety: variety.name, '
-				'		current_variety: current_variety.name, '
-				'		`Submitted at`: `Submitted at`, '
-				'		`Submitted by`: `Submitted by`, '
-				'		tx_timestamp:  datetime.transaction().epochMillis, '
-				'		tx_user: tx_user '
-				'	} '
+		statement = (
+			' UNWIND $uid_value_list AS uid_value '
+			'	OPTIONAL MATCH '
+			'		(sample: Sample { '
+			'			uid: uid_value[0]'
+			'		}) '
+			'	OPTIONAL MATCH '
+			'		(sample) '
+			'		-[:FROM | IS_IN*]->(: Field) '
+			'		<-[:IS_IN]-(: FieldBlocks) '
+			'		<-[:IS_IN]-(block: Block) '
+		)
+		if 'name' in input_variable:
+			statement += (
+				'	WHERE block.name_lower IN uid_value[1] '
 			)
+		else:
+			statement += (
+				'	WHERE block.id IN uid_value[1] '
+			)
+		statement += (
+			'	OPTIONAL MATCH (sample)-[:FROM]->(:ItemSamples)-[:FROM]->(existing_item:Item) '
+			'	OPTIONAL MATCH (sample)-[:FROM]->(existing_sample:Sample) '
+			'	OPTIONAL MATCH (sample)-[from:FROM]->() '
+			'	FOREACH (n in CASE WHEN '
+			'		sample IS NOT NULL AND '
+			'		"Field" in labels(existing_item) AND '
+			'		block IS NOT NULL '
+			'		THEN [1] ELSE [] END | '
+			'		MERGE '
+			'			(is:ItemSamples) '
+			'			-[:FROM]->(block) '
+			'		MERGE (sample)-[:FROM]->(is) '
+			'		DELETE from '
+			'	) '
+			'	RETURN { '
+			'		UID: uid_value[0], '
+			'		value: uid_value[1], '
+			'		item_uid: sample.uid, '
+			'		new_source_level: "Block", '
+			'		new_source_id: collect(block.id), '
+			'		existing_source_level: collect([i in labels(coalesce(existing_item, existing_sample)) where i <> "Item"][0])[0], '
+			'		existing_source_id: collect(coalesce(existing_item.uid, existing_sample.uid)) '
+			'	} '
+		)
+		for item in self.updates[input_variable]:
+			if 'name' in input_variable:
+				item[1] = Parsers.parse_name_list(item[1])
+			else:
+				item[1] = Parsers.parse_range_list(item[1])
+		result = self.tx.run(
+			statement,
+			uid_value_list=self.updates[input_variable]
+		)
+		self.item_source_error_check(
+			result,
+			'block(s)'
+		)
+
+	def assign_sample_to_trees(self, input_variable):
+		statement = (
+			' UNWIND $uid_value_list AS uid_value '
+			'	OPTIONAL MATCH '
+			'		(sample: Sample { '
+			'			uid: uid_value[0]'
+			'		}) '
+			'	OPTIONAL MATCH '
+			'		(sample) '
+			'		-[:FROM | IS_IN*]->(: Field) '
+			'		<-[:IS_IN]-(: FieldTrees) '
+			'		<-[:IS_IN]-(tree: Tree) '
+			'	WHERE tree.id IN uid_value[1] '
+			)
+		statement += (
+			'	OPTIONAL MATCH (sample)-[:FROM]->(:ItemSamples)-[:FROM]->(existing_item:Item) '
+			'	OPTIONAL MATCH (sample)-[:FROM]->(existing_sample:Sample) '
+			'	OPTIONAL MATCH (sample)-[from:FROM]->() '
+			'	FOREACH (n in CASE WHEN '
+			'		sample IS NOT NULL AND '
+			'		("Field" in labels(existing_item) OR "Block" in labels(existing_item)) AND '
+			'		tree IS NOT NULL '
+			'		THEN [1] ELSE [] END | '
+			'		MERGE '
+			'			(is:ItemSamples) '
+			'			-[:FROM]->(tree) '
+			'		MERGE (sample)-[:FROM]->(is) '
+			'		DELETE from '
+			'	) '
+			'	RETURN { '
+			'		UID: uid_value[0], '
+			'		value: uid_value[1], '
+			'		item_uid: sample.uid, '
+			'		new_source_level: "Tree", '
+			'		new_source_id: collect(tree.id), '
+			'		existing_source_level: collect([i in labels(coalesce(existing_item, existing_sample)) where i <> "Item"][0])[0], '
+			'		existing_source_id: collect(coalesce(existing_item.uid, existing_sample.uid)) '
+			'	} '
+		)
+		for item in self.updates[input_variable]:
+			if 'name' in input_variable:
+				item[1] = Parsers.parse_name_list(item[1])
+			else:
+				item[1] = Parsers.parse_range_list(item[1])
+		result = self.tx.run(
+			statement,
+			uid_value_list=self.updates[input_variable]
+		)
+		self.item_source_error_check(
+			result,
+			'tree(s)'
+		)
+
+	def assign_sample_to_samples(self, input_variable):
+		statement = (
+			' UNWIND $uid_value_list AS uid_value '
+			'	OPTIONAL MATCH '
+			'		(sample: Sample { '
+			'			uid: uid_value[0]'
+			'		}) '
+			'	OPTIONAL MATCH '
+			'		(sample) '
+			'		-[:FROM | IS_IN*]->(: Field) '
+			'		<-[:FROM | IS_IN*]-(source_sample: Sample) '
+			'	WHERE source_sample.id IN uid_value[1] '
+			)
+		statement += (
+			'	OPTIONAL MATCH (sample)-[:FROM]->(:ItemSamples)-[:FROM]->(existing_item:Item) '
+			'	OPTIONAL MATCH (sample)-[:FROM]->(existing_sample:Sample) '
+			'	OPTIONAL MATCH (sample)-[from:FROM]->() '
+			'	FOREACH (n in CASE WHEN '
+			'		sample IS NOT NULL AND '
+			'		NOT "SAMPLE" IN labels(existing_item) AND '
+			'		source_sample IS NOT NULL '
+			'		THEN [1] ELSE [] END | '
+			'		MERGE (sample)-[:FROM]->(source_sample) '
+			'		DELETE from '
+			'	) '
+			'	RETURN { '
+			'		UID: uid_value[0], '
+			'		value: uid_value[1], '
+			'		item_uid: sample.uid, '
+			'		new_source_level: "Sample", '
+			'		new_source_id: collect(source_sample.id), '
+			'		existing_source_level: collect([i in labels(coalesce(existing_item, existing_sample)) where i <> "Item"][0])[0], '
+			'		existing_source_id: collect(coalesce(existing_item.uid, existing_sample.uid)) '
+			'	} '
+		)
+		for item in self.updates[input_variable]:
+			if 'name' in input_variable:
+				item[1] = Parsers.parse_name_list(item[1])
+			else:
+				item[1] = Parsers.parse_range_list(item[1])
+		result = self.tx.run(
+			statement,
+			uid_value_list=self.updates[input_variable]
+		)
+		self.item_source_error_check(
+			result,
+			'tree(s)'
+		)
+
+	def assign_variety(self, input_variable):
+		statement = (
+			' UNWIND $uid_value_list AS uid_value '
+			'	WITH '
+			'		CASE '
+			'			WHEN size(split(uid_name_code[0], "_")) = 1 '
+			'			THEN toInteger(uid_name_code[0]) '
+			'			ELSE uid_name_code[0] '
+			'			END as uid, '
+			'		uid_name_code[1] as name, '
+			'		uid_name_code[2] as code '
+			'	MATCH '
+			'		(self: User {username_lower: toLower(trim($username))}) '
+			'		-[:AFFILIATED {data_shared:True}]->(self_partner:Partner), '
+			'		(item: Item {uid: uid}), '
+			'		(field: Field {uid: '
+			'			CASE '
+			'			WHEN toInteger(uid) IS NOT NULL '
+			'				THEN uid '
+			'			ELSE '
+			'				toInteger(split(uid, "_")[0]) '
+			'			END '
+			'		}), '
+			'		(variety: Variety) '
+			'			WHERE variety.name_lower = toLower(trim(name)) '
+			'			OR variety.code = toLower(trim(code)) '
+			'	OPTIONAL MATCH '
+			'		(name_variety: Variety {name_lower: toLower(trim(name))}) '
+			'	OPTIONAL MATCH '
+			'		(code_variety: Variety {code_lower: toLower(trim(code))}) '
+			'	OPTIONAL MATCH '
+			'		(item)-[:OF_VARIETY]->(:FieldVariety) '
+			'		-[:OF_VARIETY]->(current_variety: Variety) '
+			'	OPTIONAL MATCH '
+			'		(item)<-[:FOR_ITEM]-(ii:ItemInput) '
+			'		-[:FOR_INPUT]->(:FieldInput)-[:FOR_INPUT]->(input:Input), '
+			'		(ii)<-[:RECORD_FOR]-(record:Record) '
+			'		<-[s:SUBMITTED]-() '
+			'		<-[:SUBMITTED*..4]-(user:User) '
+			'		-[:AFFILIATED {data_shared: True}]->(p:Partner) '
+			'		WHERE input.name_lower CONTAINS "variety" '
+			'	OPTIONAL MATCH '
+			'		(self) '
+			'		-[access:AFFILIATED]->(p) '
+			'	WITH '
+			'		item, '
+			'		field, '
+			'		collect(variety)[0] as variety, '
+			'		name_variety, '
+			'		code_variety, '
+			'		current_variety, '
+			'		CASE '
+			'			WHEN access.confirmed THEN user.name + "(" + p.name + ")" '
+			'			ELSE p.name '
+			'		END as `Submitted by`, '
+			'		s.time as `Submitted at`, '
+			'		self.name + "(" + self_partner.name + ")" as tx_user '
+			'	ORDER BY field.uid, CASE WHEN toInteger(item.uid) IS NOT NULL THEN Null Else item.id END '
+			'	MERGE '
+			'		(field) '
+			'		-[: CONTAINS_VARIETY]->(fv:FieldVariety) '
+			'		-[: OF_VARIETY]->(variety) '
+			'	MERGE '
+			'		(item) '
+			'		-[: OF_VARIETY]->(fv) '
+			'	RETURN { '
+			'		UID: item.uid, '
+			'		by_name_name: name_variety.name, '
+			'		by_name_code: name_variety.code, '
+			'		by_code_name: code_variety.name, '
+			'		by_code_code: code_variety.code, '
+			'		set_variety: variety.name, '
+			'		current_variety: current_variety.name, '
+			'		`Submitted at`: `Submitted at`, '
+			'		`Submitted by`: `Submitted by`, '
+			'		tx_timestamp:  datetime.transaction().epochMillis, '
+			'		tx_user: tx_user '
+			'	} '
+		)
 			result = tx.run(statement, variety=variety, username=self.username)
 			variety_update_errors = []
 			for record in result:
@@ -1180,168 +1367,6 @@ class PropertyUpdateHandler:
 
 
 
-		if self.property_updates['assign_tree_to_block']:
-			statement = (
-
-			)
-			result = tx.run(
-				statement,
-				assign_tree_to_block_by_name=self.property_updates['assign_tree_to_block_by_name']
-			)
-			assign_tree_to_block_by_name_errors = []
-			for record in result:
-				if len(assign_tree_to_block_by_name_errors) >= 5:
-					assign_tree_to_block_by_name_errors.insert(0, 'Only the first 5 such errors are being reported: <br>')
-					break
-				if not record[0]['block']:
-					assign_tree_to_block_by_name_errors.append(
-						'Block not found (block: ' + record[0]['value'] +
-						', tree: ' + record[0]['UID'] + ').'
-					)
-			if assign_tree_to_block_by_name_errors:
-				assign_tree_to_block_by_name_errors.insert(
-					0, 'The following errors occurred in assigning tree to block by name :<br>'
-				)
-				update_property_errors += assign_tree_to_block_by_name_errors
-		if self.property_updates['assign_sample_to_block_by_name']:
-			# need to handle where assign_sample_to_block_by_id is already established
-			statement = (
-				' UNWIND $assign_sample_to_block_by_name AS uid_value '
-				'	OPTIONAL MATCH '
-				'		(sample: Sample { '
-				'			uid: uid_value[0]'
-				'		})-[:FROM]->(: ItemSamples)'
-				'		-[:FROM]->(current_item: Item) '
-				'	OPTIONAL MATCH '
-				'		(sample) '
-				'		-[:FROM | IS_IN*]->(: Field) '
-				'		<-[:IS_IN]-(: FieldBlocks) '
-				'		<-[:IS_IN]-(block: Block) '
-				'	WHERE trim(block.name_lower) = toLower(trim(uid_value[1])) '
-				'	FOREACH (n in CASE WHEN '
-				'		sample IS NOT NULL AND '
-				'		"Field" in labels(current_item) AND '
-				'		block IS NOT NULL '	
-				'		THEN [1] ELSE [] END | '	
-				'		MERGE '
-				'			(is:ItemSamples) '
-				'			-[:FROM]->(block) '
-				'		MERGE (sample)-[:FROM]->(is) '
-				'		DELETE from '
-				'	) '
-				'	RETURN { '
-				'		UID: uid_value[0], '
-				'		value: uid_value[1], '
-				'		block_name: block.name, '
-				'		block_uid: block.UID, '
-				'		current_item_level: collect([i in labels(current_item) where i <> "Item"][0])[0], '
-				'		current_item_uid: collect(current_item.uid) '
-				'	} '
-			)
-			result = tx.run(
-				statement,
-				assign_sample_to_block_by_name=self.property_updates['assign_sample_to_block_by_name']
-			)
-			assign_sample_to_block_by_name_errors = []
-			for record in result:
-				if len(assign_sample_to_block_by_name_errors) >= 5:
-					assign_sample_to_block_by_name_errors.insert(0, 'Only the first 5 such errors are being reported')
-					break
-				if not record[0]['UID']:
-					assign_sample_to_block_by_name_errors.append(
-						'Sample UID was not found (' + record[0]['value'] + ')'
-					)
-				elif record[0]['current_item_level'] and record[0]['current_item_level'] != "Field":
-					if record[0]['current_item_level'] == "Block":
-						assign_sample_to_block_by_name_errors.append(
-							'Sample (' + record[0]['value'] +
-							') already has a block assignment (' +
-							'(' + ', '.join(record[0]['current_item_uid'])
-							+ ')'
-						)
-					else:
-						assign_sample_to_block_by_name_errors.append(
-							'Sample (' + record[0]['value'] +
-							') already has assigned to ' +
-							record[0]['current_item_level'] + 'item(s) ' +
-							'(' + ', '.join(record[0]['current_item_uid'])
-							+ ')'
-						)
-				elif not record[0]['block']:
-					assign_sample_to_block_by_name_errors.append(
-						'Block not found (block: ' + record[0]['value'] +
-						', sample: ' + record[0]['UID'] + ').'
-					)
-		if self.property_updates['assign_sample_to_block_by_id']:
-			for item in self.property_updates['assign_sample_to_block_by_id']:
-				item[1] = Parsers.parse_range_list(item[1])
-			statement = (
-				' UNWIND $assign_sample_to_block_by_id AS uid_value '
-				'	OPTIONAL MATCH '
-				'		(sample: Sample { '
-				'			uid: uid_value[0]'
-				'		})-[:FROM]->(: ItemSamples)'
-				'		-[:FROM]->(current_item: Item) '
-				'	OPTIONAL MATCH '
-				'		(sample) '
-				'		-[:FROM | IS_IN*]->(: Field) '
-				'		<-[:IS_IN]-(: FieldBlocks) '
-				'		<-[:IS_IN]-(block: Block) '
-				'	WHERE block.id IN uid_value[1] '
-				'	FOREACH (n in CASE WHEN '
-				'		sample IS NOT NULL AND '
-				'		"Field" in labels(current_item) AND '
-				'		block IS NOT NULL '	
-				'		THEN [1] ELSE [] END | '	
-				'		MERGE '
-				'			(is:ItemSamples) '
-				'			-[:FROM]->(block) '
-				'		MERGE (sample)-[:FROM]->(is) '
-				'		DELETE from '
-				'	) '
-				'	RETURN { '
-				'		UID: uid_value[0], '
-				'		value: uid_value[1], '
-				'		block: block.name, '
-				'		current_item_level: collect([i in labels(current_item) where i <> "Item"][0])[0], '
-				'		current_item_uid: collect(current_item.uid) '
-				'	} '
-			)
-			result = tx.run(
-				statement,
-				assign_sample_to_block_by_name=self.property_updates['assign_sample_to_block_by_name']
-			)
-			assign_sample_to_block_by_name_errors = []
-			for record in result:
-				if len(assign_sample_to_block_by_name_errors) >= 5:
-					assign_sample_to_block_by_name_errors.insert(0, 'Only the first 5 such errors are being reported')
-					break
-				if not record[0]['UID']:
-					assign_sample_to_block_by_name_errors.append(
-						'Sample UID was not found (' + record[0]['value'] + ')'
-					)
-				elif record[0]['current_item_level'] and record[0]['current_item_level'] != "Field":
-					if record[0]['current_item_level'] == "Block":
-						assign_sample_to_block_by_name_errors.append(
-							'Sample (' + record[0]['value'] +
-							') already has a block assignment (' +
-							'(' + ', '.join(record[0]['current_item_uid'])
-							+ ')'
-						)
-					else:
-						assign_sample_to_block_by_name_errors.append(
-							'Sample (' + record[0]['value'] +
-							') already has assigned to ' +
-							record[0]['current_item_level'] + 'item(s) ' +
-							'(' + ', '.join(record[0]['current_item_uid'])
-							+ ')'
-						)
-				elif not record[0]['block']:
-					assign_sample_to_block_by_name_errors.append(
-						'Block not found (block: ' + record[0]['value'] +
-						', sample: ' + record[0]['UID'] + ').'
-					)
-			tx.run(statement, assign_sample_to_block_by_id=self.property_updates['assign_sample_to_block_by_id'])
 		if self.property_updates['assign_sample_to_tree_by_id']:
 			statement = (
 				' UNWIND $assign_sample_to_tree_by_id AS uid_value '
@@ -1527,12 +1552,12 @@ class Upload:
 					# todo just y collecting the "Input" field entries as a set
 					# todo then finally check the types from this set.
 					self.record_types = ['mixed']
-					self.required_fieldnames = {'mixed': ['uid', 'input variable', 'submitted at']}
+					self.required_fieldnames = {'mixed': {'uid', 'input variable', 'submitted at'}}
 					self.fieldnames = {'mixed': file_dict.fieldnames}
 				elif self.submission_type == 'fb':
 					# Field Book csv exports
 					self.record_types = ['trait']
-					self.required_fieldnames = {'trait': ['uid', 'trait', 'value', 'timestamp', 'person', 'location']}
+					self.required_fieldnames = {'trait': {'uid', 'trait', 'value', 'timestamp', 'person', 'location'}}
 					if not (set(self.required_fieldnames['trait'])).issubset(set(file_dict.fieldnames)):
 						return (
 								'This file does not appear to contain a full set of required fieldnames for Field Book inputs'
