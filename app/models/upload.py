@@ -784,11 +784,7 @@ class SubmissionResult:
 				return
 			submission_item.lists_to_strings()
 			self.submissions_writer.writerow(submission_item.record)
-			if submission_item.record['Found']:
-				self.resubmission_count += 1
-			else:
-				self.submission_count += 1
-				if self.record_type == 'property':
+			self.submission_count += 1
 
 class PropertyUpdateHandler:
 	def __init__(self, tx):
@@ -802,41 +798,41 @@ class PropertyUpdateHandler:
 		# Threshold for aggregating records before processing the submission
 		# this is per update property function
 		self.update_threshold = 100
-		# we keep the errors in a dictionary grouped by property to then return them in this context
+		# we keep the errors in a dictionary grouped by property name to return them in this context
 		self.errors = {}
 		self.error_threshold = 10
 		self.function_dict = {
-			'assign custom id': self.assign_custom_id,
-			'planting date': self.assign_planting_date,
 			'sample type (in situ)': self.assign_unit,
 			'sample type (harvest)': self.assign_unit,
 			'sample type (sub-sample)': self.assign_unit,
+			'assign custom id': self.assign_custom_id,
+			# TODO the above are basically the same form
+			#  write a more generalised function rather than adding any more of this type
+			'harvest date': self.assign_time,
+			'harvest time': self.assign_time,
+			'planting date': self.assign_time,
 			'assign tree to block by name': self.assign_tree_to_block,
 			'assign tree to block by id': self.assign_tree_to_block,
-
 			'assign sample to block(s) by name': self.assign_sample_to_blocks,
 			'assign sample to block(s) by id': self.assign_sample_to_blocks,
-
-			'assign sample to tree(s) by id': self.assign_sample_to_trees_by_id,
-			'assign sample to sample(s) by id': self.assign_sample_to_samples_by_id,
-			'variety name': self.assign_variety_by_name,
-			'variety code': self.assign_variety_by_code,
-			'harvest date': self.assign_harvest_date,
-			'harvest time': self.assign_harvest_time
+			'assign sample to tree(s) by id': self.assign_sample_to_trees,
+			'assign sample to sample(s) by id': self.assign_sample_to_samples,
+			'variety name': self.assign_variety,
+			'variety code': self.assign_variety
 		}
 
 	def process_record(
 			self,
 			record
 	):
-		input_variable = record['Input_variable'].lower()
+		input_variable = record['Input variable'].lower()
 		if not input_variable in self.updates:
 			self.updates[input_variable] = []
-		self.updates[input_variable].append(record['UID'], record['Value'])
+		self.updates[input_variable].append([record['UID'], record['Value']])
 		if len(self.updates[input_variable]) >= self.update_threshold:
 			self.update_collection(input_variable)
 			self.updates[input_variable] = []
-		if len(self.errors[input_variable]) >= self.error_threshold:
+		if input_variable in self.errors and len(self.errors[input_variable]) >= self.error_threshold:
 			return True
 
 	def update_all(self):
@@ -844,11 +840,11 @@ class PropertyUpdateHandler:
 			self.update_collection(key)
 
 	def format_error_list(self):
-		for key, value in self.errors:
-			if value:
-				self.errors[key].insert(
+		for property_name, errors in self.errors.iteritems():
+			if errors:
+				errors.insert(
 					0,
-					'Errors in assigning properties from input variable "' + key + '":'
+					'Errors in assigning "' + property_name + '":'
 				)
 
 	def update_collection(
@@ -863,9 +859,7 @@ class PropertyUpdateHandler:
 			result,
 			property_name='property',
 	):
-		if not property_name in self.errors:
-			self.errors[property_name] = []
-		errors = self.errors[property_name]
+		errors = []
 		for record in result:
 			if not record[0]['item_uid']:
 				errors.append(
@@ -875,7 +869,7 @@ class PropertyUpdateHandler:
 				if not record[0]['existing'] == record[0]['value']:
 					errors.append(
 						'Item (' +
-						record[0]['item_uid'] +
+						str(record[0]['item_uid']) +
 						') already has a different ' +
 						property_name +
 						' assigned (' +
@@ -883,15 +877,17 @@ class PropertyUpdateHandler:
 						') so it cannot be set to ' +
 						str(record[0]['value'])
 					)
+		if errors:
+			if not property_name in self.errors:
+				self.errors[property_name] = []
+			self.errors[property_name] += errors
 
 	def item_source_error_check(
 			self,
 			result,
 			property_name,
 	):
-		if not property_name in self.errors:
-			self.errors[property_name] = []
-		errors = self.errors[property_name]
+		errors = []
 		for record in result:
 			# If we don't find the item
 			if not record[0]['item_uid']:
@@ -925,9 +921,12 @@ class PropertyUpdateHandler:
 						' (' + ','.join(record[0]['existing_source_id']) + ')' +
 						' so cannot re-assign to the requested ' +
 						property_name +
-						' (' + ','.join(record[0]['new_source_id']) + ')' +
+						' (' + ','.join(record[0]['new_source_id']) + ')'
 					)
-
+		if errors:
+			if not property_name in self.errors:
+				self.errors[property_name] = []
+			self.errors[property_name] += errors
 
 	def assign_custom_id(self, input_variable):
 		statement = (
@@ -936,7 +935,8 @@ class PropertyUpdateHandler:
 			'		(item: Item {uid: uid_value[0]}) '
 			'	WITH uid_value, item, item.custom_id as existing '
 			'	SET item.custom_id = CASE '
-			'		WHEN item.custom_id IS NULL THEN uid_value[1] '
+			'		WHEN item.custom_id IS NULL '
+			'		THEN uid_value[1] '
 			'		ELSE item.custom_id '
 			'		END '
 			'	RETURN { '
@@ -955,41 +955,14 @@ class PropertyUpdateHandler:
 			'custom ID'
 		)
 
-	def assign_planting_date(self, input_variable):
-		statement = (
-			' UNWIND uid_value_list AS uid_value '
-			'	OPTIONAL MATCH '
-			'		(item: Item {uid: uid_value[0]}) '
-			'	WITH uid_value, item, item.planted as existing '
-			'	SET item.planted = CASE '
-			'		WHEN item.planted IS NULL AND item IS NOT NULL '
-			'		THEN uid_value[1] '
-			'		ELSE item.planted '
-			'		END '
-			'	RETURN  { '
-			'		UID: uid_value[0], '
-			'		value: uid_value[1], '	
-			'		item_uid: item.uid, '
-			'		existing: existing '
-			'	} '
-		)
-		result = self.tx.run(
-			statement,
-			uid_value_list=self.updates[input_variable]
-		)
-		self.error_check(
-			result,
-			'planting date'
-		)
-
 	def assign_unit(self, input_variable):
 		statement = (
-			' UNWIND uid_value_list AS uid_value '
+			' UNWIND $uid_value_list AS uid_value '
 			'	OPTIONAL MATCH '
 			'		(item: Sample {uid: uid_value[0]}) '
 			'	WITH uid_value, item, item.unit as existing'
 			'	SET item.unit = CASE '
-			'		WHEN item.unit IS NULL AND item IS NOT NULL '
+			'		WHEN item.unit IS NULL '
 			'		THEN uid_value[1] '
 			'		ELSE item.unit '
 			'		END '
@@ -1148,15 +1121,13 @@ class PropertyUpdateHandler:
 			'		<-[:IS_IN]-(: FieldTrees) '
 			'		<-[:IS_IN]-(tree: Tree) '
 			'	WHERE tree.id IN uid_value[1] '
-			)
-		statement += (
 			'	OPTIONAL MATCH (sample)-[:FROM]->(:ItemSamples)-[:FROM]->(existing_item:Item) '
 			'	OPTIONAL MATCH (sample)-[:FROM]->(existing_sample:Sample) '
 			'	OPTIONAL MATCH (sample)-[from:FROM]->() '
 			'	FOREACH (n in CASE WHEN '
 			'		sample IS NOT NULL AND '
-			'		("Field" in labels(existing_item) OR "Block" in labels(existing_item)) AND '
-			'		tree IS NOT NULL '
+			'		tree IS NOT NULL AND '
+			'		("Field" in labels(existing_item) OR "Block" in labels(existing_item)) '
 			'		THEN [1] ELSE [] END | '
 			'		MERGE '
 			'			(is:ItemSamples) '
@@ -1200,15 +1171,13 @@ class PropertyUpdateHandler:
 			'		-[:FROM | IS_IN*]->(: Field) '
 			'		<-[:FROM | IS_IN*]-(source_sample: Sample) '
 			'	WHERE source_sample.id IN uid_value[1] '
-			)
-		statement += (
 			'	OPTIONAL MATCH (sample)-[:FROM]->(:ItemSamples)-[:FROM]->(existing_item:Item) '
 			'	OPTIONAL MATCH (sample)-[:FROM]->(existing_sample:Sample) '
 			'	OPTIONAL MATCH (sample)-[from:FROM]->() '
 			'	FOREACH (n in CASE WHEN '
 			'		sample IS NOT NULL AND '
-			'		NOT "SAMPLE" IN labels(existing_item) AND '
-			'		source_sample IS NOT NULL '
+			'		source_sample IS NOT NULL AND '
+			'		NOT existing_sample '
 			'		THEN [1] ELSE [] END | '
 			'		MERGE (sample)-[:FROM]->(source_sample) '
 			'		DELETE from '
@@ -1242,16 +1211,14 @@ class PropertyUpdateHandler:
 			' UNWIND $uid_value_list AS uid_value '
 			'	WITH '
 			'		CASE '
-			'			WHEN size(split(uid_name_code[0], "_")) = 1 '
-			'			THEN toInteger(uid_name_code[0]) '
-			'			ELSE uid_name_code[0] '
+			'			WHEN size(split(toString(uid_value[0]), "_")) = 1 '
+			'			THEN toInteger(uid_value[0]) '
+			'			ELSE uid_value[0] '
 			'			END as uid, '
-			'		uid_name_code[1] as name, '
-			'		uid_name_code[2] as code '
-			'	MATCH '
-			'		(self: User {username_lower: toLower(trim($username))}) '
-			'		-[:AFFILIATED {data_shared:True}]->(self_partner:Partner), '
-			'		(item: Item {uid: uid}), '
+			'		uid_value[1] as value '
+			'	OPTIONAL MATCH '
+			'		(item: Item {uid: uid}) '
+			'	OPTIONAL MATCH '
 			'		(field: Field {uid: '
 			'			CASE '
 			'			WHEN toInteger(uid) IS NOT NULL '
@@ -1259,199 +1226,92 @@ class PropertyUpdateHandler:
 			'			ELSE '
 			'				toInteger(split(uid, "_")[0]) '
 			'			END '
-			'		}), '
+			'		}) '
+			'	OPTIONAL MATCH '
 			'		(variety: Variety) '
-			'			WHERE variety.name_lower = toLower(trim(name)) '
-			'			OR variety.code = toLower(trim(code)) '
-			'	OPTIONAL MATCH '
-			'		(name_variety: Variety {name_lower: toLower(trim(name))}) '
-			'	OPTIONAL MATCH '
-			'		(code_variety: Variety {code_lower: toLower(trim(code))}) '
+		)
+		if 'name' in input_variable :
+			statement +=(
+				' WHERE variety.name_lower = toLower(trim(value)) '
+			)
+		else:  # input_variable contains 'code'
+			statement += (
+				' WHERE variety.code = toLower(trim(value)) '
+			)
+		statement += (
 			'	OPTIONAL MATCH '
 			'		(item)-[:OF_VARIETY]->(:FieldVariety) '
-			'		-[:OF_VARIETY]->(current_variety: Variety) '
-			'	OPTIONAL MATCH '
-			'		(item)<-[:FOR_ITEM]-(ii:ItemInput) '
-			'		-[:FOR_INPUT]->(:FieldInput)-[:FOR_INPUT]->(input:Input), '
-			'		(ii)<-[:RECORD_FOR]-(record:Record) '
-			'		<-[s:SUBMITTED]-() '
-			'		<-[:SUBMITTED*..4]-(user:User) '
-			'		-[:AFFILIATED {data_shared: True}]->(p:Partner) '
-			'		WHERE input.name_lower CONTAINS "variety" '
-			'	OPTIONAL MATCH '
-			'		(self) '
-			'		-[access:AFFILIATED]->(p) '
-			'	WITH '
-			'		item, '
-			'		field, '
-			'		collect(variety)[0] as variety, '
-			'		name_variety, '
-			'		code_variety, '
-			'		current_variety, '
-			'		CASE '
-			'			WHEN access.confirmed THEN user.name + "(" + p.name + ")" '
-			'			ELSE p.name '
-			'		END as `Submitted by`, '
-			'		s.time as `Submitted at`, '
-			'		self.name + "(" + self_partner.name + ")" as tx_user '
-			'	ORDER BY field.uid, CASE WHEN toInteger(item.uid) IS NOT NULL THEN Null Else item.id END '
-			'	MERGE '
-			'		(field) '
-			'		-[: CONTAINS_VARIETY]->(fv:FieldVariety) '
-			'		-[: OF_VARIETY]->(variety) '
-			'	MERGE '
-			'		(item) '
-			'		-[: OF_VARIETY]->(fv) '
+			'		-[:OF_VARIETY]->(existing: Variety) '
+			'	FOREACH (n IN CASE WHEN existing IS NULL THEN [1] ELSE [] END | '
+			'		MERGE '
+			'			(field) '
+			'			-[: CONTAINS_VARIETY]->(fv:FieldVariety) '
+			'			-[: OF_VARIETY]->(variety) '
+			'		MERGE '
+			'			(item) '
+			'			-[: OF_VARIETY]->(fv) '
+			'	) '
 			'	RETURN { '
-			'		UID: item.uid, '
-			'		by_name_name: name_variety.name, '
-			'		by_name_code: name_variety.code, '
-			'		by_code_name: code_variety.name, '
-			'		by_code_code: code_variety.code, '
-			'		set_variety: variety.name, '
-			'		current_variety: current_variety.name, '
-			'		`Submitted at`: `Submitted at`, '
-			'		`Submitted by`: `Submitted by`, '
-			'		tx_timestamp:  datetime.transaction().epochMillis, '
-			'		tx_user: tx_user '
+			'		UID: uid, '
+			'		value: value, '	
+			'		item_uid: item.uid, '
+			'		existing: existing.name '
 			'	} '
 		)
-			result = tx.run(statement, variety=variety, username=self.username)
-			variety_update_errors = []
-			for record in result:
-				if len(variety_update_errors) >= 5:
-					variety_update_errors.insert(0, 'Only the first 5 variety update errors are being reported: <br>')
-					break
-				if all([
-					record[0]['by_name_name'] and record[0]['by_code_name'],
-					record[0]['by_name_name'] != record[0]['by_code_name']
-					]):
-						variety_update_errors.append(
-							'For '
-							+ str(record[0]['UID'])
-							+ ' the variety name submitted ('
-							+ record[0]['by_name_name']
-							+ ') does not match the variety corresponding to the code submitted ( '
-							+ 'code: '
-							+ record[0]['by_code_code']
-							+ ', name: '
-							+ record[0]['by_code_name']
-							+ '). '
-						)
-				if all([
-					record[0]['current_variety'] and record[0]['set_variety'],
-					record[0]['current_variety'] != record[0]['set_variety']
-				]):
+		result = self.tx.run(
+			statement,
+			uid_value_list=self.updates[input_variable]
+		)
+		self.error_check(
+			result,
+			'variety'
+		)
 
-					if (record[0]['tx_user'], record[0]['tx_timestamp']) != (record[0]['Submitted by'], record[0]['Submitted at']):
-						variety_update_errors.append(
-							'For '
-							+ str(record[0]['UID'])
-							+ ' the variety submitted ('
-							+ record[0]['set_variety']
-							+ ') does not match an earlier submission ('
-							+ record[0]['current_variety']
-							+ ') by '
-							+ record[0]['Submitted by']
-							+ '('
-							+ datetime.datetime.utcfromtimestamp(
-								int(record[0]['Submitted at']) / 1000
-							).strftime("%Y-%m-%d %H:%M:%S")
-							+ ')'
-						)
-			if variety_update_errors:
-				variety_update_errors.insert(
-					0, 'The following errors occurred in assigning varieties :<br>'
-				)
-				update_property_errors += variety_update_errors
-
-
-
-		if self.property_updates['assign_sample_to_tree_by_id']:
-			statement = (
-				' UNWIND $assign_sample_to_tree_by_id AS uid_value '
-				'	MATCH '
-				'		(sample: Sample {uid: uid_value[0]}) '
-				'		-[from:FROM]->(: ItemSamples)'
-				'		-[:FROM]->(: Field) '
-				'		<-[:IS_IN]-(: FieldTrees) '
-				'		<-[:IS_IN]-(tree: Tree) '
-				'	WHERE tree.id IN uid_value[1] '
-				'	MERGE '
-				'		(tree)<-[:FROM]-(is:ItemSamples) '
-				'	CREATE '
-				'		(sample)-[:FROM]->(is) '
-				'	DELETE from '
+	def assign_time(self, input_variable):
+		statement = (
+			' UNWIND $uid_value_list AS uid_value '
+			'	OPTIONAL MATCH '
+			'		(item: Item {uid: uid_value[0]}) '
+			'	WITH '
+			'		uid_value, item, '
+		)
+		if 'date' in input_variable:
+			statement += (
+				' item.date as existing '
+				' SET item.date = CASE WHEN existing IS NULL THEN uid_value[1] ELSE existing END '
 			)
-			for item in self.property_updates['assign_sample_to_tree_by_id']:
-				item[1] = Parsers.parse_range_list(item[1])
-			tx.run(
-				statement,
-				assign_sample_to_tree_by_id=self.property_updates['assign_sample_to_tree_by_id']
+		else:  # 'time' in input variable
+			statement += (
+				' item.time_of_day as existing '
+				' SET item.time = CASE WHEN existing IS NULL THEN uid_value[1] ELSE existing END '
 			)
-		if self.property_updates['assign_sample_to_sample_by_id']:
-			statement = (
-				' UNWIND $assign_sample_to_sample_by_id AS uid_value '
-				'	MATCH '
-				'		(sample: Sample {uid: uid_value[0]}) '
-				'		-[from_field:FROM]->(: ItemSamples) '
-				'		-[:FROM]->(field: Field) '
-				'	MATCH '
-				'		(field) '
-				'		<-[: FROM | IS_IN *]-(source_sample: Sample) '
-				'	WHERE source_sample.id IN uid_value[1] '
-				# prevent self targeting
-				'	AND sample.id <> source_sample.id '
-				'	CREATE '
-				'		(sample)-[from_sample: FROM]->(source_sample) '
-				'	WITH sample, source_sample, from_field, from_sample '
-				# prevent cycles 
-				'	OPTIONAL MATCH cycle = (sample)-[: FROM *]->(sample) '
-				'	FOREACH (n IN CASE WHEN cycle IS NULL THEN [1] ELSE [] END | '
-				'		DELETE from_field '
-				'	) '
-				'	FOREACH (n IN CASE WHEN cycle IS NOT NULL THEN [1] ELSE [] END | '
-				'		DELETE from_sample '
-				'	) '
-			)
-			for item in self.property_updates['assign_sample_to_sample_by_id']:
-				item[1] = Parsers.parse_range_list(item[1])
-			tx.run(
-				statement,
-				assign_sample_to_sample_by_id=self.property_updates['assign_sample_to_sample_by_id']
-			)
-		if self.property_updates['harvest_time']:
-			harvest_time = [
-				[
-					str(key),
-					value['date'] if 'date' in value else None,
-					value['time'] if 'time' in value else None
-				] for key, value in self.property_updates['harvest_time'].iteritems()
-			]
-			statement = (
-				' UNWIND $harvest_time AS uid_date_time '
-				'	WITH '
-				'		uid_date_time[0] as uid, '
-				'		uid_date_time[1] as date, '
-				'		uid_date_time[2] as time '
-				'	MATCH '
-				'		(item: Sample { '
-				'			uid: uid '
-				'		})-[:FROM]->(:ItemSamples) '
-				# this match only finds primary samples, others inherit the harvest time from this node
-				'	WHERE '
-				'		item.time IS NULL  '
-				'		AND '
-				'		date IS NOT NULL '
-				'	SET item.time = CASE '
-				'		WHEN time IS NOT NULL '
-				'		THEN apoc.date.parse(date + " " + time, "ms", "yyyy-MM-dd HH:mm") '
-				'		ELSE apoc.date.parse(date + " 12:00", "ms", "yyyy-MM-dd HH:mm") '
-				'		END '
-			)
-			tx.run(statement, harvest_time=harvest_time)
-		if update_property_errors:
-			return update_property_errors
+		statement += (
+			'	SET item.time = CASE '
+			'		WHEN item.date IS NOT NULL AND item.time_of_day IS NOT NULL '
+			'		THEN '
+			'			apoc.date.parse(item.date + " " + item.time, "ms", "yyyy-MM-dd HH:mm") '
+			'		WHEN item.date IS NOT NULL AND item.time_of_day IS NULL '
+			'		THEN '
+			'			apoc.date.parse(item.date + " 12:00", "ms", "yyyy-MM-dd HH:mm") '
+			'		WHEN item.date IS NULL '
+			'		THEN '
+			'			Null '
+			'		END '
+			'	RETURN  { '
+			'		UID: uid_value[0], '
+			'		value: uid_value[1], '
+			'		item_uid: item.uid, '
+			'		existing: existing '
+			'	} '
+		)
+		result = self.tx.run(
+			statement,
+			uid_value_list=self.updates[input_variable]
+		)
+		self.error_check(
+			result,
+			input_variable
+		)
 
 
 class Upload:
@@ -2198,7 +2058,6 @@ class Upload:
 				)
 			else:  # submission_type == 'table':
 				if record_type == 'property':
-					self.property_updater = PropertyUpdateHandler()
 					statement = Cypher.upload_table_property
 					result = tx.run(
 						statement,
@@ -2240,12 +2099,17 @@ class Upload:
 				else:
 					logging.warn('Record type not recognised')
 			# create a submission result and update properties from result
+			if record_type == 'property':
+				self.property_updater = PropertyUpdateHandler(tx)
 			for record in result:
 				submission_result.parse_record(record[0])
-				if record_type == 'property':
+				if self.property_updater:
 					if self.property_updater.process_record(record[0]):
-						self.property_updater.format_error_list()
-						#todo handle return of error response
+						break
+			# As we are collecting property updates we need to run the updater at the end
+			if not result.peek():
+				if self.property_updater:
+					self.property_updater.update_all()
 
 	@celery.task(bind=True)
 	def async_submit(self, username, upload_object):
@@ -2403,14 +2267,15 @@ class Upload:
 											response
 									)
 								}
-						# update properties where needed,
-						# todo should probably be handled when consuming the result rather than storing
-						# todo :and later updating, consider why I did it this way, likely just an artifact
-						# todo :of my early failure to consume results properly.
 						if 'property' in upload_object.record_types:
-							property_update_errors = upload_object.submission_results['property'].update_properties(tx)
-							if property_update_errors:
-								error_messages = '<br>'.join(property_update_errors)
+							property_updater = upload_object.property_updater
+							if property_updater.errors:
+								property_updater.format_error_list()
+								error_messages = [
+									item for errors in property_updater.errors.values() for item in errors
+								]
+								from celery.contrib import rdb; rdb.set_trace()
+								error_messages = '<br>'.join(error_messages)
 								tx.rollback()
 								return {
 									'status': 'ERRORS',
@@ -2689,7 +2554,15 @@ class Upload:
 				' UNWIND $uid_list as uid'
 				' MATCH '
 				'	(sample: Sample {uid: uid}) '
-				' REMOVE sample.unit ',
+				' OPTIONAL MATCH '
+				'	(sample) '
+				'	<-[: FOR_ITEM]-(ii: ItemInput) '
+				'	-[: FOR_INPUT*2]-(input:Input), '
+				'	(ii)<-[:RECORD_FOR]-(:Record) '
+				'	WHERE input.name_lower CONTAINS "sample type" '
+				' FOREACH (n IN CASE WHEN ii IS NULL THEN [1] ELSE [] END | '
+				'	REMOVE sample.unit '
+				' ) ',
 				uid_list=property_uid['sample type (in situ)']
 			)
 		if property_uid['sample type (harvest)']:
@@ -2697,7 +2570,15 @@ class Upload:
 				' UNWIND $uid_list as uid'
 				' MATCH '
 				'	(sample: Sample {uid: uid}) '
-				' REMOVE sample.unit ',
+				' OPTIONAL MATCH '
+				'	(sample) '
+				'	<-[: FOR_ITEM]-(ii: ItemInput) '
+				'	-[: FOR_INPUT*2]-(input:Input) '
+				'	(ii)<-[:RECORD_FOR]-(:Record) '
+				'	WHERE input.name_lower CONTAINS "sample type" '
+				' FOREACH (n IN CASE WHEN ii IS NULL THEN [1] ELSE [] END | '
+				'	REMOVE sample.unit '
+				' ) ',
 				uid_list=property_uid['sample type (harvest)']
 			)
 		if property_uid['sample type (sub-sample)']:
@@ -2705,7 +2586,15 @@ class Upload:
 				' UNWIND $uid_list as uid'
 				' MATCH '
 				'	(sample: Sample {uid: uid}) '
-				' REMOVE sample.unit ',
+				' OPTIONAL MATCH '
+				'	(sample) '
+				'	<-[: FOR_ITEM]-(ii: ItemInput) '
+				'	-[: FOR_INPUT*2]-(input:Input), '
+				'	(ii)<-[:RECORD_FOR]-(:Record) '
+				'	WHERE input.name_lower CONTAINS "sample type" '
+				' FOREACH (n IN CASE WHEN ii IS NULL THEN [1] ELSE [] END | '
+				'	REMOVE sample.unit '
+				' ) ',
 				uid_list=property_uid['sample type (sub-sample)']
 			)
 		if property_uid['planting date']:
@@ -2713,7 +2602,7 @@ class Upload:
 				' UNWIND $uid_list as uid'
 				' MATCH '
 				'	(item: Item {uid: uid}) '
-				' REMOVE item.planted ',
+				' REMOVE item.date, item.time ',
 				uid_list=property_uid['planting date']
 			)
 		if property_uid['assign tree to block by name']:
@@ -2724,13 +2613,45 @@ class Upload:
 				'	-[is_in:IS_IN]->(bt:BlockTrees) '
 				'	<-[:FOR]-(c:Counter), '
 				'	(bt)-[:IS_IN]->(block:Block) '
-				' SET c._LOCK_ = True '
-				' DELETE is_in '
-				' SET c.count = c.count - 1 '
-				' REMOVE c._LOCK_ ',
+				' OPTIONAL MATCH '
+				'	(tree) '
+				'	<-[:FOR_ITEM]-(ii:ItemInput) '
+				'	-[:FOR_INPUT*2]->(:Input { '
+				'		name_lower: "assign tree to block by id" '
+				'	}), '
+				'	(ii)<-[:RECORD_FOR]-(:Record) '
+				' FOREACH (n IN CASE WHEN ii IS NULL THEN [1] ELSE [] END | '
+				'	SET c._LOCK_ = True '
+				'	DELETE is_in '
+				'	SET c.count = c.count - 1 '
+				'	REMOVE c._LOCK_ '
+				' ) ',
 				uid_list=property_uid['assign tree to block by name']
 			)
-		if property_uid['assign field sample to block by name']:
+		if property_uid['assign tree to block by id']:
+			tx.run(
+				' UNWIND $uid_list as uid '
+				' MATCH '
+				'	(tree: Tree {uid: uid}) '
+				'	-[is_in:IS_IN]->(bt:BlockTrees) '
+				'	<-[:FOR]-(c:Counter), '
+				'	(bt)-[:IS_IN]->(block:Block) '
+				' OPTIONAL MATCH '
+				'	(tree) '
+				'	<-[:FOR_ITEM]-(ii:ItemInput) '
+				'	-[:FOR_INPUT*2]->(:Input { '
+				'		name_lower: "assign tree to block by name" '
+				'	}), '
+				'	(ii)<-[:RECORD_FOR]-(:Record) '
+				' FOREACH (n IN CASE WHEN ii IS NULL THEN [1] ELSE [] END | '
+				'	SET c._LOCK_ = True '
+				'	DELETE is_in '
+				'	SET c.count = c.count - 1 '
+				'	REMOVE c._LOCK_ '
+				' ) ',
+				uid_list=property_uid['assign tree to block by id']
+			)
+		if property_uid['assign sample to block(s) by name']:
 			tx.run(
 				' UNWIND $uid_list as uid '
 				' MATCH '
@@ -2739,15 +2660,22 @@ class Upload:
 				'	-[: FROM]->(block: Block) '
 				'	-[: IS_IN]->(: FieldBlocks) '
 				'	-[: IS_IN]->(field: Field) '
-				'	'
-				' DELETE from '
-				' MERGE '
-				'	(fs: ItemSamples) '
-				'	-[:FROM]->(field) '
-				' MERGE (sample)-[:FROM]->(fs) ',
-				uid_list=property_uid['assign field sample to block by name']
+				' OPTIONAL MATCH '
+				'	(sample)<-[:FOR_ITEM]-(ii:ItemInput) '
+				'	<-[:FOR_INPUT*2]->(:Input { '
+				'		name_lower: "assign sample to block(s) by id" '
+				'	}), '
+				'	(ii)<-[:RECORD_FOR]-(:Record) '
+				' FOREACH (n IN CASE WHEN ii IS NULL THEN [1] ELSE [] END | '
+				' 	DELETE from '
+				'	MERGE '
+				'		(fs: ItemSamples) '
+				'		-[:FROM]->(field) '
+				'	 MERGE (sample)-[:FROM]->(fs) '
+				' ) ',
+				uid_list=property_uid['assign sample to block(s) by name']
 			)
-		if property_uid['assign field sample to block(s) by id']:
+		if property_uid['assign sample to block(s) by id']:
 			tx.run(
 				' UNWIND $uid_list as uid '
 				' MATCH '
@@ -2756,15 +2684,22 @@ class Upload:
 				'	-[: FROM]->(block: Block) '
 				'	-[: IS_IN]->(: FieldBlocks) '
 				'	-[: IS_IN]->(field: Field) '
-				'	'
-				' DELETE from '
-				' MERGE '
-				'	(fs: ItemSamples) '
-				'	-[:FROM]->(field) '
-				' MERGE (sample)-[:FROM]->(fs) ',
-				uid_list=property_uid['assign field sample to block(s) by id']
+				' OPTIONAL MATCH '
+				'	(sample)<-[:FOR_ITEM]-(ii:ItemInput) '
+				'	<-[:FOR_INPUT*2]->(:Input { '
+				'		name_lower: "assign sample to block(s) by name" '
+				'	}), '
+				'	(ii)<-[:RECORD_FOR]-(:Record) '
+				' FOREACH (n IN CASE WHEN ii IS NULL THEN [1] ELSE [] END | '
+				' 	DELETE from '
+				'	MERGE '
+				'		(fs: ItemSamples) '
+				'		-[:FROM]->(field) '
+				'	 MERGE (sample)-[:FROM]->(fs) '
+				' ) ',
+				uid_list=property_uid['assign sample to block(s) by id']
 			)
-		if property_uid['assign field sample to tree(s) by id']:
+		if property_uid['assign sample to tree(s) by id']:
 			tx.run(
 				' UNWIND $uid_list as uid '
 				' MATCH '
@@ -2774,29 +2709,125 @@ class Upload:
 				'	-[: FROM]-(tree: Tree) '
 				'	-[: IS_IN]->(: FieldTrees) '
 				'	-[: IS_IN]->(field: Field) '
+				' OPTIONAL MATCH '
+				'	(sample) '
+				'	<-[: FOR_ITEM]-(ii_block_name: ItemInput) '
+				'	-[: FOR_INPUT*2]->(input_block_name: Input), '
+				'	(ii_block_name)<-[: RECORD_FOR]-(r_block_name: Record) '
+				'	WHERE input_block_name.name_lower = "assign sample to block(s) by name" '
+				' OPTIONAL MATCH '
+				'	(block_by_name: Block) '
+				'	-[: IS_IN]->(: FieldBlocks) '
+				'	-[: IS_IN]->(field) '
+				'	WHERE block_by_name.name_lower = toLower(trim(r_block_name.value)) '
+				' OPTIONAL MATCH '
+				'	(sample) '
+				'	<-[: FOR_ITEM]-(ii_block_id: ItemInput) '
+				'	-[: FOR_INPUT*2]->(input_block_id: Input), '
+				'	(ii_block_id)<-[: RECORD_FOR]-(r_block_id: Record) '
+				'	WHERE input_block_id.name_lower = "assign sample to block(s) by id" '
+				' OPTIONAL MATCH '
+				'	(block_by_id: Block) '
+				'	-[:IS_IN]->(: FieldBlocks) '
+				'	-[:IS_IN]->(field) '
+				'	WHERE block_by_id.id = toInteger(r_block_id.value) '
 				' DELETE from_tree '
-				' MERGE '
-				'	(fs: ItemSamples) '
-				'	-[:FROM]->(field) '
-				' MERGE '
-				'	(sample)-[:FROM]->(fs) ',
-				uid_list=property_uid['assign field sample to tree(s) by id']
+				' FOREACH (n in CASE WHEN block_by_name IS NULL AND block_by_id IS NULL THEN [1] ELSE [] END | '
+				'	MERGE '
+				'		(fs: ItemSamples) '
+				'		-[:FROM]->(field) '
+				'	MERGE '
+				'		(sample)-[:FROM]->(fs) '
+				' ) '
+				' FOREACH (n IN CASE WHEN block_by_name IS NOT NULL THEN [1] ELSE [] END | '
+				'	MERGE '
+				'		(is:ItemSamples)-[:FROM]->(block_by_name) '
+				'	MERGE (sample)-[:FROM)->(is) '
+				' ) '
+				' FOREACH (n IN CASE WHEN block_by_id IS NOT NULL THEN [1] ELSE [] END | '
+				'	MERGE '
+				'		(is:ItemSamples)-[:FROM]->(block_by_id) '
+				'	MERGE (sample)-[:FROM)->(is) '
+				' ) ',
+				uid_list=property_uid['assign sample to tree(s) by id']
 			)
-		if property_uid['assign field sample to sample(s) by id']:
+		if property_uid['assign sample to sample(s) by id']:
 			tx.run(
 				' UNWIND $uid_list as uid '
 				' MATCH '
-				'	(sample: Sample {'
+				'	(sample: Sample { '
 				'		uid: uid'
-				'	})-[from_sample: FROM]->(: Sample) '
-				'	-[:FROM | IS_IN *]->(field: Field) '
+				'	})-[from_sample: FROM]->(source_sample: Sample) '
+				'	-[: FROM | IS_IN*]->(field: Field) '
+				' OPTIONAL MATCH '
+				'	(sample) '
+				'	<-[: FOR_ITEM]-(ii_block_name: ItemInput) '
+				'	-[: FOR_INPUT*2]->(input_block_name: Input), '
+				'	(ii_block_name)<-[: RECORD_FOR]-(r_block_name: Record) '
+				'	WHERE input_block_name.name_lower = "assign sample to block(s) by name" '
+				' OPTIONAL MATCH '
+				'	(block_by_name: Block) '
+				'	-[: IS_IN]->(: FieldBlocks) '
+				'	-[: IS_IN]->(field) '
+				'	WHERE block_by_name.name_lower = toLower(trim(r_block_name.value)) '
+				' OPTIONAL MATCH '
+				'	(sample) '
+				'	<-[: FOR_ITEM]-(ii_block_id: ItemInput) '
+				'	-[: FOR_INPUT*2]->(input_block_id: Input), '
+				'	(ii_block_id)<-[: RECORD_FOR]-(r_block_id: Record) '
+				'	WHERE input_block_id.name_lower = "assign sample to block(s) by id" '
+				' OPTIONAL MATCH '
+				'	(block_by_id: Block) '
+				'	-[:IS_IN]->(: FieldBlocks) '
+				'	-[:IS_IN]->(field) '
+				'	WHERE block_by_id.id = toInteger(r_block_id.value) '
+				' OPTIONAL MATCH '
+				'	(sample) '
+				'	<-[: FOR_ITEM]-(ii_tree_id: ItemInput) '
+				'	-[: FOR_INPUT*2]->(input_tree_id: Input), '
+				'	(ii_tree_id)<-[: RECORD_FOR]-(r_tree_id: Record) '
+				'	WHERE input_tree_id.name_lower = "assign sample to tree(s) by id" '
+				' OPTIONAL MATCH '
+				'	(tree_by_id: Tree) '
+				'	-[:IS_IN]->(: FieldTrees) '
+				'	-[:IS_IN]->(field) '
+				'	WHERE tree_by_id.id = toInteger(r_tree_id.value) '
 				' DELETE from_sample '
-				' MERGE '
-				'	(fs: ItemSamples) '
-				'	-[:FROM]->(field) '
-				' MERGE '
-				'	(sample)-[:FROM]->(fs) ',
-				uid_list=property_uid['assign field sample to sample(s) by id']
+				' FOREACH (n IN CASE WHEN '
+				'		tree_by_id IS NOT NULL '
+				'		THEN [1] ELSE [] END | '
+				'	MERGE '
+				'		(is:ItemSamples)-[:FROM]->(tree_by_id) '
+				'	MERGE '
+				'		(sample)-[:FROM]->(is) '
+				' ) '
+				' FOREACH (n IN CASE WHEN '
+				'		tree_by_id IS NULL AND '
+				'		block_by_name IS NOT NULL '
+				'		THEN [1] ELSE [] END | '
+				'	MERGE '
+				'		(is:ItemSamples)-[:FROM]->(block_by_name) '
+				'	MERGE (sample)-[:FROM)->(is) '
+				' ) '
+				' FOREACH (n IN CASE WHEN '
+				'		tree_by_id IS NULL AND '
+				'		block_by_id IS NOT NULL '
+				'		THEN [1] ELSE [] END | '
+				'	MERGE '
+				'		(is:ItemSamples)-[:FROM]->(block_by_id) '
+				'	MERGE (sample)-[:FROM)->(is) '
+				' ) '
+				' FOREACH (n in CASE WHEN '
+				'		tree_by_id IS NULL AND '	
+				'		block_by_name IS NULL AND '
+				'		block_by_id IS NULL THEN [1] ELSE [] END | '
+				'	MERGE '
+				'		(fs: ItemSamples) '
+				'		-[:FROM]->(field) '
+				'	MERGE '
+				'		(sample)-[:FROM]->(fs) '
+				' ) ',
+				uid_list=property_uid['assign sample to sample(s) by id']
 			)
 		if property_uid['variety name']:
 			tx.run(
@@ -2806,30 +2837,23 @@ class Upload:
 				'		uid: uid '
 				'	})-[of_variety:OF_VARIETY]->(fv:FieldVariety) '
 				'	<-[contains_variety:CONTAINS_VARIETY]-(field:Field) '
-				' DELETE of_variety '
+				' OPTIONAL MATCH '
+				'	(item) '
+				'	<-[:FOR_ITEM]-(ii: ItemInput) '
+				'	-[:FOR_INPUT*2]->(: Input { '
+				'		name_lower: "variety code" '
+				'	}), '
+				'	(ii)<-[:RECORD_FOR]-(:Record) '
+				' FOREACH (n IN CASE WHEN ii IS NULL THEN [1] ELSE [] END | '
+				'	DELETE of_variety '
+				' ) '
 				' WITH '
-				' item, fv, field, contains_variety '
+				' fv, contains_variety '
 				' OPTIONAL MATCH '
 				' (:Item)-[of_variety:OF_VARIETY]->(fv) '
 				' FOREACH (n IN CASE WHEN of_variety IS NULL THEN [1] ELSE [] END | '
 				'	DELETE contains_variety '
-				' ) '	
-				' WITH item, field '
-				' MATCH '
-				'	(item) '
-				'	<-[:FOR_ITEM]-(if:ItemInput) '
-				'	-[:FOR_INPUT*..2]->(:Input { '
-				'		name_lower: "variety code"'
-				'	}), '
-				'	(if)<-[:RECORD_FOR]-(record:Record) '
-				' MATCH '
-				'	(variety:Variety {code_lower: toLower(record.value)}) '
-				' MERGE '
-				'	(field) '
-				'	-[:CONTAINS_VARIETY]->(fv:FieldVariety) '
-				' MERGE '
-				'	(item) '
-				'	-[:OF_VARIETY]->(fv) ',
+				' ) ',
 				uid_list=property_uid['variety name']
 			)
 		if property_uid['variety code']:
@@ -2840,31 +2864,24 @@ class Upload:
 				'		uid: uid '
 				'	})-[of_variety:OF_VARIETY]->(fv:FieldVariety) '
 				'	<-[contains_variety:CONTAINS_VARIETY]-(field:Field) '
-				' DELETE of_variety '
+				' OPTIONAL MATCH '
+				'	(item) '
+				'	<-[:FOR_ITEM]-(ii: ItemInput) '
+				'	-[:FOR_INPUT*2]->(: Input { '
+				'		name_lower: "variety name" '
+				'	}), '
+				'	(ii)<-[:RECORD_FOR]-(:Record) '
+				' FOREACH (n IN CASE WHEN ii IS NULL THEN [1] ELSE [] END | '
+				'	DELETE of_variety '
+				' ) '
 				' WITH '
-				' item, fv, field, contains_variety '
+				' fv, contains_variety '
 				' OPTIONAL MATCH '
 				' (:Item)-[of_variety:OF_VARIETY]->(fv) '
 				' FOREACH (n IN CASE WHEN of_variety IS NULL THEN [1] ELSE [] END | '
 				'	DELETE contains_variety '
-				' ) '	
-				' WITH item, field '
-				' MATCH '
-				'	(item) '
-				'	<-[:FOR_ITEM]-(if:ItemInput) '
-				'	-[:FOR_INPUT*..2]->(:Input { '
-				'		name_lower: "variety name"'
-				'	}), '
-				'	(if)<-[:RECORD_FOR]-(record:Record) '
-				' MATCH '
-				'	(variety:Variety {name_lower: toLower(record.value)}) '
-				' MERGE '
-				'	(field) '
-				'	-[:CONTAINS_VARIETY]->(fv:FieldVariety) '
-				' MERGE '
-				'	(item) '
-				'	-[:OF_VARIETY]->(fv) ',
-				uid_list=property_uid['variety code']
+				' ) ',
+				uid_list=property_uid['variety name']
 			)
 		if property_uid['harvest date']:
 			tx.run(
@@ -2872,7 +2889,7 @@ class Upload:
 				' MATCH (item: Item { '
 				'	uid: uid '
 				' }) '
-				' REMOVE item.time ',
+				' REMOVE item.date, item.time ',
 				uid_list=property_uid['harvest date']
 			)
 		if property_uid['harvest time']:
@@ -2881,17 +2898,18 @@ class Upload:
 				' MATCH (item: Item { '
 				'	uid: uid '
 				' }) '
-				' WHERE item.time IS NOT NULL '
-				' WITH '
-				'	item, '
-				# round time to the date then set to 12:00
-				'	datetime.truncate('
-				'		"day", '
-				'		date( '
-				'			datetime({epochmillis: item.time})'
-				'		)'
-				'	) + duration({ hours: 12 }) as time '
-				' SET item.time = time.epochMillis ',
+				' REMOVE item.time_of_day '
+				' SET item.time = CASE '
+				'	WHEN item.date IS NOT NULL AND item.time_of_day IS NOT NULL '
+				'	THEN '
+				'		apoc.date.parse(item.date + " " + item.time, "ms", "yyyy-MM-dd HH:mm") '
+				'	WHEN item.date IS NOT NULL AND item.time_of_day IS NULL '
+				'	THEN '
+				'		apoc.date.parse(item.date + " 12:00", "ms", "yyyy-MM-dd HH:mm") '
+				'	WHEN item.date IS NULL '
+				'	THEN '
+				'		Null '
+				'	END ',
 				uid_list=property_uid['harvest date']
 			)
 
