@@ -747,7 +747,7 @@ class ItemList:
 					' collect(DISTINCT block.id) as block_ids, '
 					' collect(DISTINCT block.name) as blocks, '
 					' collect(DISTINCT tree.id) as tree_ids, '
-					' collect(DISTINCT tree.custom_id) as tree_custom_ids, '
+					' collect(DISTINCT tree.name) as tree_names, '
 					' collect(DISTINCT source_sample.id) as source_sample_ids, '
 					' collect(DISTINCT source_sample.storage_condition) as source_sample_storage_conditions, '
 					# need to ensure these values are consistent in submission. taking first entry anyway
@@ -764,7 +764,8 @@ class ItemList:
 		)
 		if parameters['item_level'] == 'field':
 			statement += (
-				' Field: item.name '
+				' Field: item.name, '
+				' Name: item.name '
 			)
 		else:
 			statement += (
@@ -773,22 +774,23 @@ class ItemList:
 			)
 			if parameters['item_level'] == 'block':
 				statement += (
-					' Block: item.name '
+					' Block: item.name, '
+					' Name: item.name '
 				)
 			elif parameters['item_level'] == 'tree':
 				statement += (
 					' Block: block.name, '
 					' `Block ID` : block.id, '
 					' `Tree ID`: item.id, '
-					' `Custom ID`: item.custom_id '
+					' Name: item.name '
 				)
 			elif parameters['item_level'] == 'sample':
 				statement += (
 					' Block: blocks, '
 					' `Block ID` : block_ids, '
 					' `Tree ID`: tree_ids, '
-					' `Tree Custom ID`: tree_custom_ids, '
-					' `Custom ID`: item.custom_id, '
+					' `Tree Name(s)`: tree_names, '
+					' Name: item.name, '
 					# first entry will be immediate parent sample value (item), subsequent are in no particular order
 					' `Source Sample IDs`: source_sample_ids, '
 					' Tissue: coalesce(item.tissue, source_sample_tissue), '

@@ -274,15 +274,15 @@ class Record:
 					{
 						'variety name',
 						'variety code',
-						'assign custom id',
+						'assign name',
 						'assign tree to block by name',
-						'assign field sample to block by name',
-						'assign field sample to block(s) by ID',
-						'assign field sample to tree(s) by ID',
-						'assign field sample to sample(s) by ID',
+						'assign sample to block by name',
+						'assign sample to block(s) by ID',
+						'assign sample to tree(s) by ID',
+						'assign sample to sample(s) by ID',
 						'specify tissue',
 						'harvest date',
-						# 'harvest time'  # this only updates when set at same time as harvest date
+						'harvest time',
 						'planting date'
 					} & set(record_data['selected_inputs'])
 			):
@@ -533,17 +533,17 @@ class Record:
 						' 	(item)-[from_sample:FROM]->(sample) '
 					)
 					tx.run(update_samples_statement, update_samples_parameters)
-				if 'assign custom id' in record_data['selected_inputs']:
-					update_custom_id_statement = match_item_query[0] + ' WITH DISTINCT item '
-					update_custom_id_parameters = match_item_query[1]
-					update_custom_id_parameters['assign custom_id'] = record_data['inputs_dict']['assign custom id']
-					update_custom_id_statement += (
-						' SET item.custom_id = CASE WHEN item.custom_id IS NULL '
-						'	THEN $custom_id '
-						'	ELSE item.custom_id '
+				if 'assign name' in record_data['selected_inputs']:
+					update_name_statement = match_item_query[0] + ' WITH DISTINCT item '
+					update_name_parameters = match_item_query[1]
+					update_name_parameters['assign name'] = record_data['inputs_dict']['assign name']
+					update_name_statement += (
+						' SET item.name = CASE WHEN item.name IS NULL '
+						'	THEN $name '
+						'	ELSE item.name '
 						'	END '
 					)
-					tx.run(update_custom_id_statement, update_custom_id_parameters)
+					tx.run(update_name_statement, update_name_parameters)
 				if 'specify tissue' in record_data['selected_inputs']:
 					update_tissue_statement = match_item_query[0] + ' WITH DISTINCT item '
 					update_tissue_parameters = match_item_query[1]
@@ -558,31 +558,64 @@ class Record:
 				if 'planting date' in record_data['selected_inputs']:
 					update_planted_statement = match_item_query[0] + ' WITH DISTINCT item '
 					update_planted_parameters = match_item_query[1]
-					update_planted_parameters['planted'] = record_data['inputs_dict']['planting date']
+					update_planted_parameters['date'] = record_data['inputs_dict']['planting date']
 					update_planted_statement += (
-						' SET item.planted = CASE WHEN item.planted IS NULL '
-						'	THEN $planted '
-						'	ELSE item.planted '
+						' SET item.date = CASE WHEN item.date IS NULL '
+						'	THEN $date '
+						'	ELSE item.date '
+						'	END '
+						' SET item.time = CASE WHEN item.date IS NOT NULL THEN '
+						'	apoc.date.parse(item.date + " 12:00", "ms", "yyyy-MM-dd HH:mm") '
 						'	END '
 					)
 					tx.run(update_planted_statement, update_planted_parameters)
 				if 'harvest date' in record_data['selected_inputs']:
+					update_harvest_date_statement = match_item_query[0] + ' WITH DISTINCT item '
+					update_harvest_date_parameters = match_item_query[1]
+					update_harvest_date_parameters['date'] = record_data['inputs_dict']['harvest date']
+					update_harvest_date_statement += (
+						' MATCH '
+						'	(item)-[:FROM]->(:ItemSamples) '
+						'	SET item.date = CASE '
+						'		WHEN item.date IS NULL '
+						'			THEN $date '
+						'			ELSE item.date '
+						'			END '
+						'	SET item.time = CASE '
+						'		WHEN item.date IS NOT NULL AND item.time_of_day IS NOT NULL '
+						'		THEN '
+						'			apoc.date.parse(item.date + " " + item.time, "ms", "yyyy-MM-dd HH:mm") '
+						'		WHEN item.date IS NOT NULL AND item.time_of_day IS NULL '
+						'		THEN '
+						'			apoc.date.parse(item.date + " 12:00", "ms", "yyyy-MM-dd HH:mm") '
+						'		WHEN item.date IS NULL '
+						'		THEN '
+						'			Null '
+						'		END '
+					)
+					tx.run(update_harvest_date_statement, update_harvest_date_parameters)
+				if 'harvest time' in record_data['selected_inputs']:
 					update_harvest_time_statement = match_item_query[0] + ' WITH DISTINCT item '
 					update_harvest_time_parameters = match_item_query[1]
-					update_harvest_time_parameters['harvest_date'] = record_data['inputs_dict']['harvest date']
-					if 'harvest time' in record_data['selected_inputs']:
-						update_harvest_time_parameters['harvest_time'] = record_data['inputs_dict']['harvest time']
-					else:
-						update_harvest_time_parameters['harvest_time'] = None
+					update_harvest_time_parameters['time'] = record_data['inputs_dict']['harvest time']
 					update_harvest_time_statement += (
 						' MATCH '
 						'	(item)-[:FROM]->(:ItemSamples) '
-						'	WHERE '
-						'		item.time IS NULL  '
+						'	SET item.time_of_day = CASE '
+						'		WHEN item.time_of_day IS NULL '
+						'			THEN $time '
+						'			ELSE item.time_of_day '
+						'			END '
 						'	SET item.time = CASE '
-						'		WHEN $harvest_time IS NOT NULL '
-						'		THEN apoc.date.parse(uid_date_time[1] + " " + uid_date_time[2], "ms", "yyyy-MM-dd HH:mm") '
-						'		ELSE apoc.date.parse(uid_date_time[1] + " 12:00, "ms", "yyyy-MM-dd HH:mm") '
+						'		WHEN item.date IS NOT NULL AND item.time_of_day IS NOT NULL '
+						'		THEN '
+						'			apoc.date.parse(item.date + " " + item.time_of_day, "ms", "yyyy-MM-dd HH:mm") '
+						'		WHEN item.date IS NOT NULL AND item.time_of_day IS NULL '
+						'		THEN '
+						'			apoc.date.parse(item.date + " 12:00", "ms", "yyyy-MM-dd HH:mm") '
+						'		WHEN item.date IS NULL '
+						'		THEN '
+						'			Null '
 						'		END '
 					)
 					tx.run(update_harvest_time_statement, update_harvest_time_parameters)

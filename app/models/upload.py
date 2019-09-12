@@ -805,7 +805,7 @@ class PropertyUpdateHandler:
 			'sample type (in situ)': self.assign_unit,
 			'sample type (harvest)': self.assign_unit,
 			'sample type (sub-sample)': self.assign_unit,
-			'assign custom id': self.assign_custom_id,
+			'assign name': self.assign_name,
 			# TODO the above are basically the same form
 			#  write a more generalised function rather than adding any more of this type
 			'harvest date': self.assign_time,
@@ -928,16 +928,16 @@ class PropertyUpdateHandler:
 				self.errors[property_name] = []
 			self.errors[property_name] += errors
 
-	def assign_custom_id(self, input_variable):
+	def assign_name(self, input_variable):
 		statement = (
 			' UNWIND $uid_value_list AS uid_value '
 			'	OPTIONAL MATCH '
 			'		(item: Item {uid: uid_value[0]}) '
-			'	WITH uid_value, item, item.custom_id as existing '
-			'	SET item.custom_id = CASE '
-			'		WHEN item.custom_id IS NULL '
+			'	WITH uid_value, item, item.name as existing '
+			'	SET item.name = CASE '
+			'		WHEN item.name IS NULL '
 			'		THEN uid_value[1] '
-			'		ELSE item.custom_id '
+			'		ELSE item.name '
 			'		END '
 			'	RETURN { '
 			'		UID: uid_value[0], '
@@ -952,7 +952,7 @@ class PropertyUpdateHandler:
 		)
 		self.error_check(
 			result,
-			'custom ID'
+			'name'
 		)
 
 	def assign_unit(self, input_variable):
@@ -1289,7 +1289,7 @@ class PropertyUpdateHandler:
 			'	SET item.time = CASE '
 			'		WHEN item.date IS NOT NULL AND item.time_of_day IS NOT NULL '
 			'		THEN '
-			'			apoc.date.parse(item.date + " " + item.time, "ms", "yyyy-MM-dd HH:mm") '
+			'			apoc.date.parse(item.date + " " + item.time_of_day, "ms", "yyyy-MM-dd HH:mm") '
 			'		WHEN item.date IS NOT NULL AND item.time_of_day IS NULL '
 			'		THEN '
 			'			apoc.date.parse(item.date + " 12:00", "ms", "yyyy-MM-dd HH:mm") '
@@ -1391,10 +1391,10 @@ class Upload:
 	def set_fieldnames(self):
 		record_type_sets = {
 			'mixed': {'uid'},
-			'property': {'custom id', 'uid', 'person'},
-			'trait': {'custom id', 'uid', 'person', 'date', 'time'},
-			'condition': {'custom id', 'uid', 'person', 'start date', 'start time', 'end date', 'end time'},
-			'curve': {'custom id', 'uid', 'person', 'date', 'time'},
+			'property': {'name', 'uid', 'person'},
+			'trait': {'name', 'uid', 'person', 'date', 'time'},
+			'condition': {'name', 'uid', 'person', 'start date', 'start time', 'end date', 'end time'},
+			'curve': {'name', 'uid', 'person', 'date', 'time'},
 		}
 		if self.file_extension == 'csv':
 			with open(self.file_path) as uploaded_file:
@@ -2541,13 +2541,13 @@ class Upload:
 
 	@staticmethod
 	def remove_properties(tx, property_uid):
-		if property_uid['assign custom id']:
+		if property_uid['assign name']:
 			tx.run(
 				' UNWIND $uid_list as uid'
 				' MATCH '
 				'	(item: Item {uid: uid}) '
-				' REMOVE item.custom_id ',
-				uid_list=property_uid['assign custom id']
+				' REMOVE item.name ',
+				uid_list=property_uid['assign name']
 			)
 		if property_uid['sample type (in situ)']:
 			tx.run(
@@ -3009,7 +3009,7 @@ class Upload:
 					deletion_result = upload_object.correct(tx, access, record_type)
 					# update properties where needed
 					property_uid = {
-						'assign custom id': [],
+						'assign name': [],
 						'sample type (in situ)': [],
 						'sample type (harvest)': [],
 						'sample type (sub-sample)': [],

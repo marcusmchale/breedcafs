@@ -801,9 +801,9 @@ class AddFieldItems:
 					' collect(DISTINCT block.uid) as block_ids, '
 					' collect(DISTINCT block.name) as blocks, '
 					' collect(DISTINCT tree.id) as tree_ids, '
-					' collect(DISTINCT tree.custom_id) as tree_custom_ids, '
+					' collect(DISTINCT tree.name) as tree_names, '
 					' collect(DISTINCT source_sample.id) as source_sample_ids, '
-					' collect(DISTINCT source_sample.custom_id) as source_sample_custom_ids, '
+					' collect(DISTINCT source_sample.name) as source_sample_names, '
 					' collect(DISTINCT(COALESCE(tree_variety.name, field_variety.name))) as varieties, '
 					# need to ensure these values are consistent in submission. taking first entry anyway
 					' collect(source_sample.tissue)[0] as sample_tissue, '
@@ -816,7 +816,8 @@ class AddFieldItems:
 			)
 		statement += (
 			' MERGE '
-			'	(user_samples)-[: SUBMITTED]->(user_item_samples: UserItemSamples)'
+			'	(user_samples) '
+			'	-[: SUBMITTED]->(user_item_samples: UserItemSamples)'
 			'	-[:CONTRIBUTED]->(item_samples) '
 			' MERGE '
 		)
@@ -881,9 +882,9 @@ class AddFieldItems:
 				' WITH '
 				' country, region, farm, field, '
 				' block_ids, blocks, '
-				' tree_ids, tree_custom_ids, '
+				' tree_ids, tree_names, '
 				' source_sample_ids, '
-				' source_sample_custom_ids, '
+				' source_sample_names, '
 				' varieties, '
 				' sample_tissue, sample_time, '
 				' item, item_samples, user_item_samples, '
@@ -942,19 +943,19 @@ class AddFieldItems:
 					' Block: block.name, '
 					' `Block ID` : block.id, '
 					' `Tree ID`: item.id, '
-					' `Tree Custom ID`: item.custom_id '
+					' `Tree Name`: item.name '
 					)
 			elif level == 'sample':
 				statement += (
 					' Blocks: blocks, '
 					' `Block IDs` : block_ids, '
 					' `Tree IDs`: tree_ids, '
-					' `Tree Custom IDs`: tree_custom_ids, '
+					' `Tree Names`: tree_names, '
 					# first entry will be immediate parent sample value (item), subsequent are in no particular order
 					' `Source Sample IDs`: item.id + source_sample_ids, '
-					' `Source Sample Custom IDs`: item.custom_id + source_sample_ids, '
+					' `Source Sample Names`: item.name + source_sample_names, '
 					' Tissue: coalesce(item.tissue, sample_tissue), '
-					' `Harvest Time`: apoc.date.format(coalesce(item.harvest_time, sample_time), "ms", "yyyy-MM-dd HH:mm") '
+					' `Harvest Time`: apoc.date.format(coalesce(item.time, sample_time), "ms", "yyyy-MM-dd HH:mm") '
 				)
 		statement += (
 			' } '

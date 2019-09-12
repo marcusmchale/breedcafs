@@ -108,15 +108,15 @@ class Download:
 			'Block IDs',
 			'Tree ID',
 			'Tree IDs',
-			'Tree Custom ID',
-			'Tree Custom IDs',
+			'Tree Name',
+			'Tree Names',
 			'Source Sample IDs',
-			'Source Sample Custom IDs',
-			'Sample Custom ID',
+			'Sample Name',
+			'Source Sample Names',
 			'Harvest Time',
 			'Tissue',
 			'Variety',
-			'Custom ID',
+			'Name',
 			'UID'
 		]
 		self.item_fieldnames = [i for i in fieldnames_order if i in self.id_list.peek()[0].keys()]
@@ -216,11 +216,11 @@ class Download:
 			worksheet,
 			row_num,
 			uid,
-			custom_id=None
+			name=None
 	):
-		if custom_id:
+		if name:
 			worksheet.write(
-				row_num, 0, custom_id
+				row_num, 0, name
 			)
 		worksheet.write(
 			row_num, 1, uid
@@ -246,7 +246,7 @@ class Download:
 					worksheet,
 					row_num,
 					uid,
-					custom_id=item_details['Custom ID'] if 'Custom ID' in item_details else None
+					name=item_details['Name'] if 'Name' in item_details else None,
 				)
 				row_num += 1
 
@@ -288,19 +288,19 @@ class Download:
 		# core field name and format tuple in dictionary by record type
 		core_fields_formats = {
 			'property': [
-				('Custom ID', right_border),
+				('Name', right_border),
 				('UID', right_border),
 				('Person', right_border)
 				],
 			'trait': [
-				('Custom ID', right_border),
+				('Name', right_border),
 				('UID', right_border),
 				('Date', date_lb_format),
 				('Time', time_format),
 				('Person', right_border)
 			],
 			'condition': [
-				('Custom ID', right_border),
+				('Name', right_border),
 				('UID', right_border),
 				('Start Date', date_lb_format),
 				('Start Time', time_format),
@@ -309,7 +309,7 @@ class Download:
 				('Person', right_border)
 			],
 			'curve': [
-				('Custom ID', right_border),
+				('Name', right_border),
 				('UID', right_border),
 				('Date', date_lb_format),
 				('Time', time_format),
@@ -432,15 +432,15 @@ class Download:
 		# so we need the 'Variety name' and 'Tissue' columns if found
 		variety_name_column = None
 		tissue_column = None
-		custom_id_column = None
+		name_column = None
 		for i, input_type in enumerate(self.inputs['property']):
 			if input_type['name_lower'] == 'variety name':
 				variety_name_column = i + 3  # the 3 comes from the number of columns before the inputs;
-			# i.e. custom id, uid and person
+			# i.e. name, uid and person
 			if input_type['name_lower'] == 'specify tissue':
 				tissue_column = i + 3
-			if input_type['name_lower'] == 'assign custom id':
-				tissue_column = i + 3
+			if input_type['name_lower'] == 'assign name':
+				name_column = i + 3
 		# iterate through id_list and write to worksheets
 		item_num = 0
 		for record in self.id_list:
@@ -470,87 +470,6 @@ class Download:
 								record[0],
 								item_num
 							)
-					#if all([
-					#	record_type in ['trait', 'curve'],
-					#	self.replicates > 1
-					#]):
-					#	replicate_ids = [str(i) for i in range(1, self.replicates + 1)]
-					#	replicates_row_number = ((item_num - 1) * (self.replicates * self.time_points)) + 1
-					#	for rep in replicate_ids:
-					#		if self.time_points > 1:
-					#			for j in range(0, self.time_points):
-					#				if record_type == 'curve':
-					#					for input_type in self.inputs[record_type]:
-					#						ws_dict[input_type['name_lower']].write(
-					#							replicates_row_number, 0, '.'.join([record[0]['Custom ID'], str(rep)])
-					#						)
-					#						ws_dict[input_type['name_lower']].write(
-					#							replicates_row_number, 1, '.'.join([record[0]['UID'], str(rep)])
-					#						)
-					#				else:
-					#					ws_dict[input_type['name_lower']].write(
-					#						replicates_row_number, 0, '.'.join([record[0]['Custom ID'], str(rep)])
-					#					)
-					#					ws_dict[record_type].write(
-					#						replicates_row_number, 1, '.'.join([record[0]['UID'], str(rep)])
-					#					)
-					#				replicates_row_number += 1
-					#		else:
-					#			if record_type == 'curve':
-					#				for input_type in self.inputs[record_type]:
-					#					ws_dict[input_type['name_lower']].write(
-					#						replicates_row_number, 0, '.'.join([record[0]['Custom ID'], str(rep)])
-					#					)
-					#					ws_dict[input_type['name_lower']].write(
-					#						replicates_row_number, 1, '.'.join([record[0]['UID'], str(rep)])
-					#					)
-					#			else:
-					#				ws_dict[record_type].write(
-					#					replicates_row_number, 0, '.'.join([record[0]['Custom ID'], str(rep)])
-					#				)
-					#				ws_dict[record_type].write(
-					#					replicates_row_number, 1, '.'.join([record[0]['UID'], str(rep)])
-					#				)
-					#			replicates_row_number += 1
-					#else:
-					#	if record_type in ['trait', 'condition', 'curve'] and self.time_points > 1:
-					#		for i in range(0, self.time_points):
-					#			time_points_row_number = ((item_num - 1) * self.time_points) + 1 + i
-					#			if record_type == 'curve':
-					#				for input_type in self.inputs[record_type]:
-					#					ws_dict[input_type['name_lower']].write(
-					#						time_points_row_number,
-					#						0,
-					#						str(record[0]['Custom ID'])
-					#					)
-					#					ws_dict[input_type['name_lower']].write(
-					#						time_points_row_number,
-					#						1,
-					#						str(record[0]['UID'])
-					#					)
-					#			else:
-					#				ws_dict[record_type].write(
-					#					time_points_row_number, 0, str(record[0]['Custom ID'])
-					#				)
-					#				ws_dict[record_type].write(
-					#					time_points_row_number, 1, str(record[0]['UID'])
-					#				)
-					#	else:
-					#		if record_type == 'curve':
-					#			for input_type in self.inputs[record_type]:
-					#				ws_dict[input_type['name_lower']].write(
-					#					item_num,
-					#					0,
-					#					str(record[0]['Custom ID'])
-					#				)
-					#				ws_dict[input_type['name_lower']].write(
-					#					item_num,
-					#					1,
-					#					str(record[0]['UID'])
-					#				)
-					#		else:
-					#			ws_dict[record_type].write(item_num, 0, str(record[0]['Custom ID']))
-					#			ws_dict[record_type].write(item_num, 1, str(record[0]['UID']))
 					# to handle inheritance
 					# todo consider generalising for all properties?
 					# Variety.
@@ -570,13 +489,13 @@ class Download:
 						tissue_column
 					]):
 						ws_dict[record_type].write(item_num, tissue_column, record[0]['Tissue'])
-					# we are writing the retrieved custom ID value to the input field.
+					# we are writing the retrieved name value to the input field.
 					if all([
 						record_type == 'property',
-						'Custom ID' in record[0] and record[0]['Custom ID'],
-						custom_id_column
+						'Name' in record[0] and record[0]['Name'],
+						name_column
 					]):
-						ws_dict[record_type].write(item_num, custom_id_column, record[0]['Custom ID'])
+						ws_dict[record_type].write(item_num, name_column, record[0]['Name'])
 		# now that we know the item_num we can add the validation
 		# currently no validation for curves as no definite columns
 		for record_type in self.inputs.keys():
@@ -860,7 +779,7 @@ class Download:
 			'	item, '
 			'	item.uid as UID, '
 			'	item.id as ID, '
-			'	item.custom_id as `Custom ID`,'
+			'	item.name as Name,'
 			'	COLLECT(DISTINCT sample_sample.id) as `Source samples`, '
 			'	COLLECT(DISTINCT sample_tree.id) as `Source trees`, '
 			'	COALESCE( '
@@ -963,7 +882,7 @@ class Download:
 				'	Period: [Start, End], '
 				'	`Recorded by`: `Recorded by`, '
 				'	UID: UID, '
-				'	`Custom ID`: `Custom ID`,'
+				'	Name: Name,'
 				'	Replicate: Replicate, '
 				'	`Source samples`: `Source samples`, '
 				'	`Source trees`: `Source trees`, '
@@ -994,7 +913,7 @@ class Download:
 				'		values: Values '
 				'	}), '
 				'	UID: UID, '
-				'	`Custom ID`: `Custom ID`,'
+				'	Name: Name,'
 				'	`Source samples`: `Source samples`, '
 				'	`Source trees`: `Source trees`, '
 				'	Block: Block, '
@@ -1133,7 +1052,7 @@ class Download:
 			'Block ID',
 			'Source trees',
 			'Source samples',
-			'Custom ID',
+			'Name',
 			'UID',
 			'Replicate'
 		]
