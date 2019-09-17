@@ -106,7 +106,7 @@ class Cypher:
 		'			name_lower: toLower(trim(partner)) '
 		'		}) '
 		' 	WHERE '
-		'		size(a.confirm_timestamp = 0 '
+		'		size(a.confirm_timestamp) = 0 '
 		' 	DELETE '
 		'		a '
 		' 	RETURN p.name '

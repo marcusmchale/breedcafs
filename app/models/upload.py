@@ -786,6 +786,7 @@ class SubmissionResult:
 			self.submissions_writer.writerow(submission_item.record)
 			self.submission_count += 1
 
+
 class PropertyUpdateHandler:
 	def __init__(self, tx):
 		self.tx = tx
@@ -859,33 +860,110 @@ class PropertyUpdateHandler:
 			result,
 			property_name='property',
 	):
-		errors = []
+		row_errors = []
 		for record in result:
 			if not record[0]['item_uid']:
-				errors.append(
+				row_errors.append(
 					'Item not found (' + str(record[0]['UID']) + ')'
 				)
-			elif record[0]['existing']:
-				if not record[0]['existing'] == record[0]['value']:
-					errors.append(
+			else:
+				if record[0]['existing']:
+					if not record[0]['existing'] == record[0]['value']:
+						row_errors.append(
+							'Item (' +
+							str(record[0]['item_uid']) +
+							') cannot be assigned this' +
+							property_name +
+							' (' +
+							str(record[0]['value']) +
+							') as it already has a different value assigned (' +
+							str(record[0]['existing']) +
+							')'
+						)
+				if record[0]['conflicts']:
+					row_errors.append(
 						'Item (' +
 						str(record[0]['item_uid']) +
-						') already has a different ' +
+						') cannot be assigned this' +
 						property_name +
-						' assigned (' +
-						str(record[0]['existing']) +
-						') so it cannot be set to ' +
-						str(record[0]['value'])
+						' (' +
+						str(record[0]['value']) +
+						') as directly linked items already have a different value assigned: ' +
+						','.join([
+							'(uid: ' + i[0] + ', ' + property_name + ':' + i[1] + ')' for i in record[0]['conflicts']
+						])
 					)
-		if errors:
-			if not property_name in self.errors:
+		if row_errors:
+			if property_name not in self.errors:
 				self.errors[property_name] = []
-			self.errors[property_name] += errors
+			self.errors[property_name] += row_errors
+
+	def variety_error_check(
+			self,
+			result,
+			property_name='variety',
+	):
+		row_errors = []
+		for record in result:
+			if not record[0]['item_uid']: # this shouldn't happen as uids are already checked
+				logging.debug(
+					'A variety assignment was attempted but item was not found: ' + str(record[0]['UID'])
+				)
+				row_errors.append(
+					'Item not found (' + str(record[0]['UID']) + ')'
+				)
+			elif not record[0]['assigned_variety']:  # this shouldn't happen as values are already checked
+				logging.debug(
+					'A variety assignment was attempted but variety was not found: ' + str(record[0]['value'])
+				)
+				row_errors.append(
+					'Variety not found (' + str(record[0]['value']) + ')'
+				)
+			else:
+				if record[0]['existing_variety']:
+					if not record[0]['existing_variety'] == record[0]['assigned_variety']:
+						row_errors.append(
+							'Item (' +
+							str(record[0]['item_uid']) +
+							') cannot be assigned this variety '
+							' (' +
+							str(record[0]['assigned_variety']) +
+							') as it is already assigned a different variety (' +
+							str(record[0]['existing_variety']) +
+							')'
+						)
+				elif record[0]['item_dependant_conflicts']:
+					row_errors.append(
+						'Item (' +
+						str(record[0]['item_uid']) +
+						') cannot be assigned this variety '
+						' (' +
+						str(record[0]['assigned_variety']) +
+						') as directly linked items already have a different variety assigned (' +
+						','.join(['(UID:' + i[0] + ', variety:' + i[1] + ')' for i in record[0]['item_dependant_conflicts']]) +
+						')'
+					)
+				elif record[0]['dependant_tree_dependant_conflicts']:
+					row_errors.append(
+						'Sample (' +
+						str(record[0]['item_uid']) +
+						') cannot be assigned this variety '
+						' (' +
+						str(record[0]['assigned_variety']) +
+						') as another sample from the same tree already has a different variety assigned (' +
+						','.join(['(UID:' + i[0] + ', variety:' + i[1] + ')' for i in
+								  record[0]['dependant_tree_dependant_conflicts']]) +
+						')'
+					)
+		if row_errors:
+			if property_name not in self.errors:
+				self.errors[property_name] = []
+			self.errors[property_name] += row_errors
 
 	def item_source_error_check(
 			self,
 			result,
-			property_name,
+			property_name='source',
 	):
 		errors = []
 		for record in result:
@@ -988,7 +1066,7 @@ class PropertyUpdateHandler:
 			'	OPTIONAL MATCH '
 			'		(tree: Tree { '
 			'			uid: uid_value[0] '
-			'	}) '
+			'		}) '
 			'	OPTIONAL MATCH '
 			'		(tree) '		
 			'		-[:IS_IN]->(: FieldTrees) '
@@ -1008,11 +1086,29 @@ class PropertyUpdateHandler:
 			'	OPTIONAL MATCH '
 			'		(tree) '
 			'		-[:IS_IN]->(:BlockTrees) '
-			'		-[:IS_IN]->(existing:Block) '
+			'		-[:IS_IN]->(existing: Block) '
+			# if this trees samples have a variety specified it must match the block (if also specified)
+			'	OPTIONAL MATCH '
+			'		(tree)<-[:FROM*]-(sample:Sample) '
+			'		WHERE sample.variety IS NOT NULL AND sample.variety <> block.variety '
+			'	WITH '
+			'		uid_value, '
+			'		tree, block, field, existing, '
+			'		CASE '
+			'			WHEN '
+			'				block.variety IS NOT NULL '
+			'				AND tree.variety IS NOT NULL '
+			'				AND block.variety <> tree.variety '
+			' 			THEN collect(block.uid, block.variety)  '
+			'			WHEN sample IS NOT NULL '
+			'				THEN collect(distinct (sample.uid, sample.variety)) '
+			'			ELSE Null '
+			'		as variety_conflicts '
 			'	FOREACH (n IN CASE WHEN '
 			'		existing IS NULL AND '
 			'		block IS NOT NULL AND '
-			'		tree IS NOT NULL '
+			'		tree IS NOT NULL AND '
+			'		variety_conflicts IS NULL '
 			'		THEN [1] ELSE [] END | '
 			'		MERGE '
 			'			(bt:BlockTrees)'
@@ -1036,7 +1132,8 @@ class PropertyUpdateHandler:
 			'		new_source_level: "Block", '
 			'		new_source_id: collect(block.id), '
 			'		existing_source_level: CASE WHEN existing THEN "Block" ELSE "Field" END, '
-			'		existing_source_id: collect(coalesce(existing.id, field.uid) '
+			'		existing_source_id: collect(coalesce(existing.id, field.uid), '
+			'		variety_conflicts: variety_conflicts '
 			' } '
 		)
 		result = self.tx.run(
@@ -1070,7 +1167,9 @@ class PropertyUpdateHandler:
 				'	WHERE block.id IN uid_value[1] '
 			)
 		statement += (
-			'	OPTIONAL MATCH (sample)-[:FROM]->(:ItemSamples)-[:FROM]->(existing_item:Item) '
+			'	OPTIONAL MATCH '
+			'		(sample)-[:FROM]->(:ItemSamples)-[:FROM]->(existing_item:Item) '
+			'	'
 			'	OPTIONAL MATCH (sample)-[:FROM]->(existing_sample:Sample) '
 			'	OPTIONAL MATCH (sample)-[from:FROM]->() '
 			'	FOREACH (n in CASE WHEN '
@@ -1179,8 +1278,8 @@ class PropertyUpdateHandler:
 			'		source_sample IS NOT NULL AND '
 			'		NOT existing_sample '
 			'		THEN [1] ELSE [] END | '
-			'		MERGE (sample)-[:FROM]->(source_sample) '
-			'		DELETE from '
+			'			MERGE (sample)-[:FROM]->(source_sample) '
+			'			DELETE from '
 			'	) '
 			'	RETURN { '
 			'		UID: uid_value[0], '
@@ -1207,6 +1306,19 @@ class PropertyUpdateHandler:
 		)
 
 	def assign_variety(self, input_variable):
+		# item.varieties is collection (and reflected in relationships to the FieldVariety node)
+		# item.variety is a single value matching a known variety that is set from a record submission
+		#  - This may come from different properties (variety name/variety code)
+		#    so we do need to handle cases where variety is already set
+		#
+		# When assigning new item.variety (i.e. existing_variety is null) we update varieties for all dependants:
+		#  dependants = ancestors and descendents of item = items connected to item in path with single direction
+		#  dependant_dependants = ancestors and descendents of dependants = items connected to dependants in path with single direction
+		#  dependant.varieties = collect(distinct dependant_dependant.variety)
+		#
+		# Errors to be raised (check all items and dependants):
+		#  - item.variety IS NOT NULL and (item.varieties <> [item.variety])
+		#  - size(tree.varieties) > 1
 		statement = (
 			' UNWIND $uid_value_list AS uid_value '
 			'	WITH '
@@ -1230,8 +1342,8 @@ class PropertyUpdateHandler:
 			'	OPTIONAL MATCH '
 			'		(variety: Variety) '
 		)
-		if 'name' in input_variable :
-			statement +=(
+		if 'name' in input_variable:
+			statement += (
 				' WHERE variety.name_lower = toLower(trim(value)) '
 			)
 		else:  # input_variable contains 'code'
@@ -1239,10 +1351,12 @@ class PropertyUpdateHandler:
 				' WHERE variety.code = toLower(trim(value)) '
 			)
 		statement += (
-			'	OPTIONAL MATCH '
-			'		(item)-[:OF_VARIETY]->(:FieldVariety) '
-			'		-[:OF_VARIETY]->(existing: Variety) '
-			'	FOREACH (n IN CASE WHEN existing IS NULL THEN [1] ELSE [] END | '
+			'	WITH '
+			'		uid, value, item, field, variety, '
+			'		item.variety as existing_variety '
+			'	FOREACH (n IN CASE '
+			'		WHEN item.variety IS NULL '
+			'		THEN [1] ELSE [] END | '
 			'		MERGE '
 			'			(field) '
 			'			-[: CONTAINS_VARIETY]->(fv:FieldVariety) '
@@ -1250,21 +1364,78 @@ class PropertyUpdateHandler:
 			'		MERGE '
 			'			(item) '
 			'			-[: OF_VARIETY]->(fv) '
+			'		SET item.variety = variety.name '
 			'	) '
+			'	WITH '
+			'		uid, value, item, existing_variety, variety'
+			'	OPTIONAL MATCH '
+			'		(item)-[:IS_IN | FROM *]->(item_parent: Item) '
+			'	WITH '
+			'		uid, value, item, existing_variety, variety, '
+			'		collect(distinct item_parent) as item_parents '
+			'	OPTIONAL MATCH '
+			'		(item)<-[:IS_IN | FROM *]-(item_child: Item) '
+			'	WITH  '
+			'		uid, value, item, existing_variety, variety, '
+			'		item_parents + collect(distinct item_child) as dependants '
+			'	UNWIND dependants AS dependant '
+			'		OPTIONAL MATCH '
+			'			(dependant)-[:IS_IN | FROM *]->(dependant_parent: Item) '
+			'		WITH '
+			'			uid, value, item, existing_variety, variety, '
+			'			dependant, '
+			'			collect(distinct dependant_parent) as dependant_parents '
+			'		OPTIONAL MATCH '
+			'			(dependant)<-[:IS_IN | FROM *]-(dependant_child: Item) '
+			'		WITH '
+			'			uid, value, item, existing_variety, variety, '
+			'			dependant, '			
+			'			dependant_parents + collect(dependant_child) as dependant_dependants '
+			'		UNWIND '
+			'			dependant_dependants as dependant_dependant '
+			'		WITH '
+			'			uid, value, item, existing_variety, variety, '
+			'			dependant, '
+			'			collect(distinct dependant_dependant.variety) as dependant_varieties, '
+			# If dependant is a Tree we need to record dependant_dependant UID and variety if it differs from variety.name
+			# as we can have a conflict where two samples from same tree have different variety
+			# For fields/blocks/samples we accept cases of multiple varieties
+			# Among this list will also be direct dependant conflicts 
+			#   so only provide this error response when no dependant conflicts
+			'			[ '
+			'				x IN collect([dependant_dependant.uid, dependant_dependant.variety, labels(dependant)]) '
+			'				WHERE "Tree" in x[2] and x[1] <> variety.name '
+			'				| [x[0], x[1]] '
+			'			] as dependant_tree_dependant_conflicts '
+			'		SET dependant.varieties = dependant_varieties '
+			'	WITH '
+			'		uid, value, item, existing_variety, variety, '
+			'		collect(distinct dependant.variety) as varieties, '
+			'		[ '
+			'			x in collect( '
+			'				distinct [dependant.uid, dependant.variety] '
+			'			) WHERE x[1] IS NOT NULL AND x[1] <> variety.name '
+			'		] as item_dependant_conflicts, '
+			'	SET item.varieties = varieties '
 			'	RETURN { '
 			'		UID: uid, '
 			'		value: value, '	
 			'		item_uid: item.uid, '
-			'		existing: existing.name '
+			'		existing_variety: existing_variety, '
+			'		assigned_variety: variety.name, '
+			'		item_variety: item.variety, '
+			'		item_varieties: item.varieties, '
+			'		dependant_tree_dependant_conflicts: dependant_tree_dependant_conflicts,'
+			'		item_dependant_conflicts: item_dependant_conflicts '
 			'	} '
 		)
 		result = self.tx.run(
 			statement,
 			uid_value_list=self.updates[input_variable]
 		)
-		self.error_check(
+		self.variety_error_check(
 			result,
-			'variety'
+			input_variable
 		)
 
 	def assign_time(self, input_variable):
@@ -2846,6 +3017,7 @@ class Upload:
 				'	(ii)<-[:RECORD_FOR]-(:Record) '
 				' FOREACH (n IN CASE WHEN ii IS NULL THEN [1] ELSE [] END | '
 				'	DELETE of_variety '
+				'	REMOVE item.variety '
 				' ) '
 				' WITH '
 				' fv, contains_variety '

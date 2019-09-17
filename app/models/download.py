@@ -459,50 +459,9 @@ class Download:
 								record[0],
 								item_num
 							)
-					# We pre-fill templates with values to:
-					#  - prevent confusion around already submitted data
-					#  - present existing records to users to demonstrate which records are already registered
-					#  - confirm inheritance on submission of pre-filled values.
-					#    - New records are created with pre-filled information
-					#    - Allows users to easily "confirm" our assumptions, specifically:
-					#
-					# Source inheritance:
-					#  - N/A
-					# Time inheritance:
-					#  - If time is set for a field:
-					#    - inherit time (planted) for blocks in this field
-					#    - inherit time (planted) for trees in this field (unless tree is in block and time is set for this block)
-					#  - If time is set for a block:
-					#    - inherit time (planted) for trees in this block
-					# Elevation inheritance:
-					#  - If elevation is set for a field:
-					#    - set elevation for blocks in this field
-					# Name inheritance:
-					#  - NONE
-					# Unit inheritance:
-					#  - if a unit is set for a sample or a common unit is set for a collection of samples:
-					#    - we can inherit that value for any sample representing this sample or collection
-					#
-					# Variety inheritance:
-					#  - if a variety is set for a field:
-					#    - we inherit that value for any block/tree/sample in this field
-					#  - if a variety is set for a block or a single variety is set for a collection of blocks:
-					#    - we inherit that value for any tree in this block or sample representing the block or collection
-					#  - if a variety is set for a tree or a single variety is set for a collection of trees:
-					#    - we inherit that value for any sample representing this tree or collection
-					#  - if a variety is set for a sample or a single variety is set for a collection of samples:
-					#    - we inherit that value for any sample representing this sample or collection
-					#  NOTE: "contains_variety" is not considered in inheritance, only OF_VARIETY
-					# TODO consider preventing unexpected assignments:
-					#  - i.e. if source(s) contain(s) defined variety(ies)
-					#    - only allow item specification to this (one of these)
+					# We pre-fill templates with found values to present existing records to users
+					#TODO RE_REWRITE ALL OF THIS AS SEPARATE QUERY RATHER SPECIFIC TO PREFILLING THAN FETCHING FOR ALL IDs
 
-
-					#
-
-					# todo consider generalising for all properties?
-					# Variety.
-					# we are writing the retrieved Variety value (if singular) to the input field.
 					property_column = property_names_lower.index(input_variable['name_lower']) + 3  # [Name/UID/Person]
 					if all([
 						record_type == 'property',

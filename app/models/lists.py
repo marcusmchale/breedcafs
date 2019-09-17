@@ -597,7 +597,7 @@ class ItemList:
 				' {name_lower: toLower($country)} '
 			)
 		statement += (
-			' )<-[:IS_IN]-(region: Region '
+			' )<-[: IS_IN]-(region: Region '
 		)
 		if record_data['region']:
 			parameters['region'] = record_data['region']
@@ -605,7 +605,7 @@ class ItemList:
 				' {name_lower: toLower($region)} '
 			)
 		statement += (
-			' )<-[:IS_IN]-(farm: Farm '
+			' )<-[: IS_IN]-(farm: Farm '
 		)
 		if record_data['farm']:
 			parameters['farm'] = record_data['farm']
@@ -618,7 +618,7 @@ class ItemList:
 			)
 		else:
 			statement += (
-				' )<-[:IS_IN]-(field: Field '
+				' )<-[: IS_IN]-(field: Field '
 			)
 		if record_data['field_uid']:
 			parameters['field_uid'] = record_data['field_uid']
@@ -633,15 +633,15 @@ class ItemList:
 			record_data['block_uid']
 		]):
 			statement += (
-				' <-[:IS_IN]-(:FieldBlocks) '
+				' <-[: IS_IN]-(:FieldBlocks) '
 			)
 			if record_data['item_level'] == 'block':
 				statement += (
-					' <-[:IS_IN]-(item :Block '
+					' <-[: IS_IN]-(item: Block '
 				)
 			else:
 				statement += (
-					' <-[:IS_IN]-(block: Block '
+					' <-[: IS_IN]-(block: Block '
 				)
 			if record_data['block_uid']:
 				parameters['block_uid'] = record_data['block_uid']
@@ -649,7 +649,7 @@ class ItemList:
 					' {uid: $block_uid} '
 				)
 			statement += (
-				')'
+				' ) '
 			)
 		if any([
 			record_data['item_level'] == 'tree',
@@ -658,15 +658,15 @@ class ItemList:
 			if record_data['block_uid']:
 				parameters['block_uid'] = record_data['block_uid']
 				statement += (
-					' <-[:IS_IN]-(:BlockTrees)<-[IS_IN]- '
+					' <-[: IS_IN]-(: BlockTrees)<-[: IS_IN]- '
 				)
 			else:
 				statement += (
-					' <-[:IS_IN]-(:FieldTrees)<-[:IS_IN]- '
+					' <-[ :IS_IN]-(: FieldTrees)<-[: IS_IN]- '
 				)
 			if record_data['item_level'] == 'tree':
 				statement += (
-					' (item :Tree) '
+					' (item: Tree) '
 				)
 				if record_data['tree_id_list']:
 					parameters['tree_id_list'] = record_data['tree_id_list']
@@ -681,7 +681,7 @@ class ItemList:
 		if record_data['item_level'] == 'sample':
 			statement += (
 				' <-[: FROM | IS_IN* ]-(: ItemSamples) '
-				' <-[: FROM*]-(item: Sample) '
+				' <-[: FROM* ]-(item: Sample) '
 			)
 			if record_data['tree_id_list']:
 				parameters['tree_id_list'] = record_data['tree_id_list']
@@ -701,62 +701,212 @@ class ItemList:
 				statement += (
 					' item.id IN $sample_id_list '
 				)
-		return statement, parameters
-
-	def generate_id_list(self, record_data):
-		statement, parameters = self.build_match_item_statement(record_data)
-		if parameters['item_level'] == 'field':
-			statement += (
-				' OPTIONAL MATCH '
-				'	(item)-[: OF_VARIETY | CONTAINS_VARIETY]->(variety:Variety) '
-				' WITH '
-				'	country, region, farm, item, '
-				'	collect(DISTINCT variety.name) as varieties '
-			)
-		if parameters['item_level'] in ['tree', 'sample']:
-			statement += (
-				' OPTIONAL MATCH '
-				'	(item)-[: FROM | OF_VARIETY *]->(variety: Variety) '
-				' OPTIONAL MATCH '
-				'	(item)-[: IS_IN | OF_VARIETY *]->(field_variety: Variety) '
-			)
-			if "block_uid" not in parameters:
+		# Optional matches
+		if record_data['item_level'] in ['tree', 'sample']:
+			if not record_data['block_uid']:
 				statement += (
 					' OPTIONAL MATCH '
-					'	(item)-[:IS_IN | FROM*]->() '
-					'	-[:IS_IN | FROM]->(block :Block) '
+					'	(item)-[: FROM | IS_IN*]->(block: Block) '
 				)
-			if parameters['item_level'] == 'tree':
+			if record_data['item_level'] == 'sample':
 				statement += (
-					' WITH country, region, farm, field, block, item, '
-					' collect(DISTINCT coalesce(variety.name, field_variety.name)) as varieties '
+					' WITH '
+					'	item, '
+					'	country, region, farm, '
+					'	field, collect(distinct block) as blocks '
 				)
-			if parameters['item_level'] == 'sample':
-				if 'tree_id_list' not in parameters:
+				if not record_data['tree_id_list']:
 					statement += (
 						' OPTIONAL MATCH '
-						'	(item)-[:FROM*]->(tree: Tree) '
+						'	(item)-[:FROM*]->(tree:Tree) '
+						' WITH '
+						' 	item, '
+						'	country, region, farm, '
+						'	field, blocks, '
+						'	collect(distinct tree) as trees '
 					)
 				statement += (
 					' OPTIONAL MATCH '
-					'	(item)-[:FROM*]->(source_sample: Sample) '
-					' WITH DISTINCT '
-					' item, '
-					' country, region, farm, field, '
-					' collect(DISTINCT coalesce(variety.name, field_variety.name)) as varieties, '
-					' collect(DISTINCT block.id) as block_ids, '
-					' collect(DISTINCT block.name) as blocks, '
-					' collect(DISTINCT tree.id) as tree_ids, '
-					' collect(DISTINCT tree.name) as tree_names, '
-					' collect(DISTINCT source_sample.id) as source_sample_ids, '
-					' collect(DISTINCT source_sample.storage_condition) as source_sample_storage_conditions, '
-					# need to ensure these values are consistent in submission. taking first entry anyway
-					' collect(source_sample.tissue)[0] as source_sample_tissue, '
-					' collect(source_sample.harvest_time)[0] as source_sample_harvest_time '
+					'	(item)-[:FROM*]->(sample: Sample) '
+					' WITH '
+					'	item, '
+					'	country, region, farm, '
+					'	field, blocks, trees, '
+					'	collect(distinct sample) as samples '
 				)
+		return statement, parameters
+
+	def generate_id_list(self, record_data):
+		# Some properties are thought to be particularly relevant to the user so are presented in item_details
+		#  - Sources (where relevant): Country, Region, Farm, Field, Block, Tree, Sample
+		# Further, some are retrieved along with inheritance from sources (e.g. Variety) and coalesced for item_details
+		#  - Variety:
+		#    Variety inheritance (unless set for item):
+		#    - if a variety is set for a field:
+		#      - inherit that value for any block/tree/sample in this field
+		#    - if a variety is set for a block or a single variety is set for a collection of blocks:
+		#      - inherit that value for any tree in this block or sample representing the block or collection
+		#    - if a variety is set for a tree or a single variety is set for a collection of trees:
+		#      - inherit that value for any sample representing this tree or collection
+		#    - if a variety is set for a sample or a single variety is set for a collection of samples:
+		#      - inherit that value for any sample representing this sample or collection
+		# TODO consider preventing unexpected assignments in assign property *Upload models:
+		#  - i.e. if source(s) contain(s) defined variety(ies)
+		#    - only allow item specification to this (one of these)
+		#
+		# Time inheritance:
+		#  - If time is set for a field:
+		#    - inherit time (planted) for blocks in this field
+		#    - inherit time (planted) for trees in this field (unless tree is in block and time is set for this block)
+		#  - If time is set for a block or a single time is set for a collection of blocks:
+		#    - inherit time (planted) for trees in this block or collection
+		#  - If time is set for a sample or a single time is set for a collection of samples:
+		#    - inherit time (harvest) for sub-samples from this sample
+		#
+		# Unit inheritance (samples only):
+		#  - if a unit is set for a sample or a common unit is set for a collection of samples:
+		#    - inherit that value for any sample representing this sample or collection
+		statement, parameters = self.build_match_item_statement(record_data)
+		statement += (
+			' OPTIONAL MATCH '
+			'	(item) '
+			'	-[: OF_VARIETY]->(: FieldVariety) '
+			'	-[: OF_VARIETY]->(variety: Variety) '
+		)
+		if parameters['item_level'] == 'block':
+			statement += (
+				' OPTIONAL MATCH '
+				'	(item) '
+				'	-[: OF_VARIETY]->(:FieldVariety) '
+				'	-[: OF_VARIETY]->(variety:Variety) '
+				' OPTIONAL MATCH '
+				'	(field) '
+				'	-[:OF_VARIETY]->(:FieldVariety) '
+				'	-[:OF_VARIETY]->(field_variety: Variety) '
+			)
+			statement += (
+				' WITH country, region, farm, field, item, '
+				' coalesce(variety, field_variety) as variety '
+			)
+		if parameters['item_level'] == 'tree':
+			statement += (
+				' OPTIONAL MATCH '
+				'	(item) '
+				'	-[: OF_VARIETY]->(:FieldVariety) '
+				'	-[: OF_VARIETY]->(variety:Variety) '
+				' OPTIONAL MATCH '
+				'	(block) '
+				'	-[:OF_VARIETY]->(:FieldVariety) '
+				'	-[:OF_VARIETY]->(block_variety: Variety) '
+				' OPTIONAL MATCH '
+				'	(field) '
+				'	-[:OF_VARIETY]->(:FieldVariety) '
+				'	-[:OF_VARIETY]->(field_variety: Variety) '
+			)
+			statement += (
+				' WITH country, region, farm, field, block, item, '
+				' coalesce(variety, block_variety, field_variety) as variety '
+			)
+		elif parameters['item_level'] == 'sample':
+			statement += (
+				' OPTIONAL MATCH '
+				'	(item) '
+				'	-[: OF_VARIETY]->(:FieldVariety) '
+				'	-[: OF_VARIETY]->(variety:Variety) '
+				' OPTIONAL MATCH '
+				'	(tree) '
+				'	-[:OF_VARIETY]->(:FieldVariety) '
+				'	-[:OF_VARIETY]->(block_variety: Variety) '
+				' OPTIONAL MATCH '
+				'	(block) '
+				'	-[:OF_VARIETY]->(:FieldVariety) '
+				'	-[:OF_VARIETY]->(block_variety: Variety) '
+				' OPTIONAL MATCH '
+				'	(field) '
+				'	-[:OF_VARIETY]->(:FieldVariety) '
+				'	-[:OF_VARIETY]->(field_variety: Variety) '
+			)
+
+
+
+			statement += (
+				' OPTIONAL MATCH '
+				'	(item)-[:FROM*]->(source_sample: Sample) '
+				''
+				' OPTIONAL MATCH '
+				'	(item) '
+				'	<-[:FOR_ITEM]-(location_input: ItemInput) '
+				'	-[:FOR_INPUT*]->(:Input {name_lower: "location"}), '
+				'	(location_input) '
+				'	<-[:RECORD_FOR]-(location_record: Record) '
+				'	WHERE ( '
+				'		location_record.start <= timestamp() '
+				'		OR location_record.start IS NULL '
+				'	) AND ( '
+				'		location_record.end >= timestamp() '
+				'		OR location_record.end IS NULL '
+				'	) '
+				' OPTIONAL MATCH '
+				'	(item) '
+				'	<-[:FOR_ITEM]-(coordinate_input: ItemInput) '
+				'	-[:FOR_INPUT*]->(:Input {name_lower: "location (gps)"}), '
+				'	(coordinate_input) '
+				'	<-[:RECORD_FOR]-(coordinate_record: Record) '
+				'	WHERE ( '
+				'		coordinate_record.start <= timestamp() '
+				'		OR coordinate_record.start IS NULL '
+				'	) AND ( '
+				'		coordinate_record.end >= timestamp() '
+				'		OR coordinate_record.end IS NULL '
+				'	) '
+				' OPTIONAL MATCH '
+				'	(item) '
+				'	<-[:FOR_ITEM]-(temperature_input: ItemInput) '
+				'	-[:FOR_INPUT*]->(:Input {name_lower: "storage temperature"}), '
+				'	(temperature_input) '
+				'	<-[:RECORD_FOR]-(temperature_record: Record) '
+				'	WHERE ( '
+				'		temperature_record.start <= timestamp() '
+				'		OR temperature_record.start IS NULL '
+				'	) AND ( '
+				'		temperature_record.end >= timestamp() '
+				'		OR temperature_record.end IS NULL '
+				'	) '
+				' OPTIONAL MATCH '
+				'	(item) '
+				'	<-[:FOR_ITEM]-(processing_input: ItemInput) '
+				'	-[:FOR_INPUT*]->(:Input {name_lower: "processed state"}), '
+				'	(processing_input) '
+				'	<-[:RECORD_FOR]-(processing_record: Record) '
+				'	WHERE ( '
+				'		processing_record.start <= timestamp() '
+				'		OR processing_record.start IS NULL '
+				'	) AND ( '
+				'		processing_record.end >= timestamp() '
+				'		OR processing_record.end IS NULL '
+				'	) '
+				' WITH DISTINCT '
+				' item, '
+				' country, region, farm, field, '
+				' collect(DISTINCT coalesce(variety.name, field_variety.name)) as varieties, '
+				' collect(DISTINCT block.id) as block_ids, '
+				' collect(DISTINCT block.name) as blocks, '
+				' collect(DISTINCT tree.id) as tree_ids, '
+				' collect(DISTINCT tree.name) as tree_names, '
+				' collect(DISTINCT source_sample.id) as source_sample_ids, '
+				
+				
+				
+				
+				
+				# need to ensure these values are consistent in submission. taking first entry anyway
+				' collect(source_sample.unit)[0] as source_sample_unit, '
+				' collect(source_sample.time)[0] as source_sample_time '
+			)
 		statement += (
 			' RETURN { '
 			'	UID: item.uid, '
+			'	Name: item.name, '
 			'	Country: country.name, '
 			'	Region: region.name, '
 			'	Farm: farm.name, '
@@ -764,25 +914,22 @@ class ItemList:
 		)
 		if parameters['item_level'] == 'field':
 			statement += (
-				' Field: item.name, '
-				' Name: item.name '
+				' Field: item.name '
 			)
 		else:
 			statement += (
-				'	Field: field.name, '
-				'	`Field UID`: field.uid, '
+				' Field: field.name, '
+				' `Field UID`: field.uid, '
 			)
 			if parameters['item_level'] == 'block':
 				statement += (
-					' Block: item.name, '
-					' Name: item.name '
+					' Block: item.name '
 				)
 			elif parameters['item_level'] == 'tree':
 				statement += (
 					' Block: block.name, '
 					' `Block ID` : block.id, '
-					' `Tree ID`: item.id, '
-					' Name: item.name '
+					' `Tree ID`: item.id '
 				)
 			elif parameters['item_level'] == 'sample':
 				statement += (
@@ -790,10 +937,9 @@ class ItemList:
 					' `Block ID` : block_ids, '
 					' `Tree ID`: tree_ids, '
 					' `Tree Name(s)`: tree_names, '
-					' Name: item.name, '
 					# first entry will be immediate parent sample value (item), subsequent are in no particular order
 					' `Source Sample IDs`: source_sample_ids, '
-					' Tissue: coalesce(item.tissue, source_sample_tissue), '
+					' Unit: coalesce(item.unit, source_sample_unit), '
 					' `Harvest Time`: apoc.date.format(coalesce(item.harvest_time, source_sample_harvest_time)) '
 				)
 		statement += (
