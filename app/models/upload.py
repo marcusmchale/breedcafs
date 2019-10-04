@@ -784,7 +784,10 @@ class SubmissionResult:
 				return
 			submission_item.lists_to_strings()
 			self.submissions_writer.writerow(submission_item.record)
-			self.submission_count += 1
+			if 'Found' in record and record['Found']:
+				self.resubmission_count += 1
+			else:
+				self.submission_count += 1
 
 
 class PropertyUpdateHandler:
@@ -803,23 +806,25 @@ class PropertyUpdateHandler:
 		self.errors = {}
 		self.error_threshold = 10
 		self.function_dict = {
-			'sample type (in situ)': self.assign_unit,
-			'sample type (harvest)': self.assign_unit,
-			'sample type (sub-sample)': self.assign_unit,
-			'assign name': self.assign_name,
+			'set sample unit (in situ)': self.set_unit,
+			'set sample unit (harvest)': self.set_unit,
+			'set sample unit (sub-sample)': self.set_unit,
+			'set custom name': self.set_name,
+			'set elevation': self.set_elevation,
 			# TODO the above are basically the same form
 			#  write a more generalised function rather than adding any more of this type
-			'harvest date': self.assign_time,
-			'harvest time': self.assign_time,
-			'planting date': self.assign_time,
+			'set harvest date': self.set_time,
+			'set harvest time': self.set_time,
+			'set planting date': self.set_time,
+			# The below modify relationships , call these "assign" updates rather than "set"
 			'assign tree to block by name': self.assign_tree_to_block,
 			'assign tree to block by id': self.assign_tree_to_block,
-			'assign sample to block(s) by name': self.assign_sample_to_blocks,
-			'assign sample to block(s) by id': self.assign_sample_to_blocks,
-			'assign sample to tree(s) by id': self.assign_sample_to_trees,
-			'assign sample to sample(s) by id': self.assign_sample_to_samples,
-			'variety name': self.assign_variety,
-			'variety code': self.assign_variety
+			'assign sample to block(s) by name': self.assign_sample_to_sources,
+			'assign sample to block(s) by id': self.assign_sample_to_sources,
+			'assign sample to tree(s) by id': self.assign_sample_to_sources,
+			'assign sample to sample(s) by id': self.assign_sample_to_sources,
+			'assign variety name': self.assign_variety,
+			'assign variety (el frances code)': self.assign_variety
 		}
 
 	def process_record(
@@ -827,7 +832,7 @@ class PropertyUpdateHandler:
 			record
 	):
 		input_variable = record['Input variable'].lower()
-		if not input_variable in self.updates:
+		if input_variable not in self.updates:
 			self.updates[input_variable] = []
 		self.updates[input_variable].append([record['UID'], record['Value']])
 		if len(self.updates[input_variable]) >= self.update_threshold:
@@ -845,7 +850,7 @@ class PropertyUpdateHandler:
 			if errors:
 				errors.insert(
 					0,
-					'Errors in assigning "' + property_name + '":'
+					'Errors in assigning "' + property_name + '":<br>'
 				)
 
 	def update_collection(
@@ -867,7 +872,7 @@ class PropertyUpdateHandler:
 					'Item not found (' + str(record[0]['UID']) + ')'
 				)
 			else:
-				if record[0]['existing']:
+				if 'existing' in record[0] and record[0]['existing']:
 					if not record[0]['existing'] == record[0]['value']:
 						row_errors.append(
 							'Item (' +
@@ -880,7 +885,7 @@ class PropertyUpdateHandler:
 							str(record[0]['existing']) +
 							')'
 						)
-				if record[0]['conflicts']:
+				if 'conflicts' in record[0] and record[0]['conflicts']:
 					row_errors.append(
 						'Item (' +
 						str(record[0]['item_uid']) +
@@ -890,7 +895,7 @@ class PropertyUpdateHandler:
 						str(record[0]['value']) +
 						') as directly linked items already have a different value assigned: ' +
 						','.join([
-							'(uid: ' + i[0] + ', ' + property_name + ':' + i[1] + ')' for i in record[0]['conflicts']
+							'(uid: ' + str(i[0]) + ', ' + property_name + ':' + str(i[1]) + ')' for i in record[0]['conflicts']
 						])
 					)
 		if row_errors:
@@ -920,19 +925,21 @@ class PropertyUpdateHandler:
 					'Variety not found (' + str(record[0]['value']) + ')'
 				)
 			else:
-				if record[0]['existing_variety']:
-					if not record[0]['existing_variety'] == record[0]['assigned_variety']:
-						row_errors.append(
-							'Item (' +
-							str(record[0]['item_uid']) +
-							') cannot be assigned this variety '
-							' (' +
-							str(record[0]['assigned_variety']) +
-							') as it is already assigned a different variety (' +
-							str(record[0]['existing_variety']) +
-							')'
-						)
-				elif record[0]['item_dependant_conflicts']:
+				if all([
+					record[0]['existing_variety'],
+					record[0]['existing_variety'] != record[0]['assigned_variety']
+				]):
+					row_errors.append(
+						'Item (' +
+						str(record[0]['item_uid']) +
+						') cannot be assigned this variety '
+						' (' +
+						str(record[0]['assigned_variety']) +
+						') as it is already assigned a different variety (' +
+						str(record[0]['existing_variety']) +
+						')'
+					)
+				elif record[0]['kin_conflicts']:
 					row_errors.append(
 						'Item (' +
 						str(record[0]['item_uid']) +
@@ -940,10 +947,17 @@ class PropertyUpdateHandler:
 						' (' +
 						str(record[0]['assigned_variety']) +
 						') as directly linked items already have a different variety assigned (' +
-						','.join(['(UID:' + i[0] + ', variety:' + i[1] + ')' for i in record[0]['item_dependant_conflicts']]) +
-						')'
+						','.join(
+							[
+								'(UID:' +
+								str(i[0]) +
+								', variety:' +
+								str(i[1]) +
+								')' for i in record[0]['kin_conflicts']
+							]
+						) + ')'
 					)
-				elif record[0]['dependant_tree_dependant_conflicts']:
+				elif record[0]['tree_varieties_error']:
 					row_errors.append(
 						'Sample (' +
 						str(record[0]['item_uid']) +
@@ -951,9 +965,10 @@ class PropertyUpdateHandler:
 						' (' +
 						str(record[0]['assigned_variety']) +
 						') as another sample from the same tree already has a different variety assigned (' +
-						','.join(['(UID:' + i[0] + ', variety:' + i[1] + ')' for i in
-								  record[0]['dependant_tree_dependant_conflicts']]) +
-						')'
+						','.join([
+							'(uid: ' + str(j[0]) + ', variety: ' + str(j[1]) + ')'
+							for j in i[1][0:5]  # silently only reporting the first 5 items
+						]) for i in record[0]['tree_varieties_error'][0:2]
 					)
 		if row_errors:
 			if property_name not in self.errors:
@@ -970,43 +985,182 @@ class PropertyUpdateHandler:
 			# If we don't find the item
 			if not record[0]['item_uid']:
 				errors.append(
-					'Item not found (' + str(record[0]['UID']) + ')'
+					'Item source assignment failed. The item (' + str(record[0]['UID']) + ')' + ') was not found.'
 				)
 			# If we don't find the source
-			elif len(record[0]['new_source_id']) == 0:
+			elif len(record[0]['new_source_details']) == 0:
 				errors.append(
-					'Item source not found (' + str(record[0]['value']) + ')'
+					'Item (' +
+					'UID: ' + record[0]['item_uid']
 				)
-			# So now we have both item and source but we may already have a source defined:
-			# we also want to reject these cases unless we are re-assigning to a lower level
-			# we do not support re-assigning from sample to sample as this could create breaks/loops
-			elif len(record['existing_source_id']) >= 0:
-				# We only allow re-assigning to greater precision (higher index values)
-				new_source_level = app.config['ITEM_LEVELS'].index(record[0]['new_source_level'])
-				existing_source_level = app.config['ITEM_LEVELS'].index(record[0]['existing_source_level'])
-				if new_source_level < existing_source_level:
-					errors.append(
-						'Item is currently assigned to a ' +
-						record[0]['existing_source_level'] +
-						' so cannot be re-assigned to a ' +
-						record[0]['new_source_level'] +
-						' as this would be less precise. '
+				if record[0]['item_name']:
+					errors[-1] += ', name: ' + record[0]['item_name']
+				if len(record[0]['value']) >= 1:
+					errors[-1] += (
+							') source assignment failed. The sources were not found: '
 					)
-				elif new_source_level == existing_source_level:
-					errors.append(
-						'Item is currently assigned to ' +
-						property_name +
-						' (' + ','.join(record[0]['existing_source_id']) + ')' +
-						' so cannot re-assign to the requested ' +
-						property_name +
-						' (' + ','.join(record[0]['new_source_id']) + ')'
+				else:
+					errors[-1] += (
+						') source assignment failed. The source was not found: '
 					)
+				errors[-1] += (
+					', '.join([
+						str(i) for i in record[0]['value']
+					])
+				)
+			elif record[0]['unmatched_sources']:
+				errors.append(
+					'Item (' +
+					'UID: ' + record[0]['item_uid']
+				)
+				if record[0]['item_name']:
+					errors[-1] += ', name: ' + record[0]['item_name']
+				if len(record[0]['unmatched_sources']) >= 1:
+					errors[-1] += (
+						') source assignment failed. Some sources were not found: '
+					)
+				else:
+					errors[-1] += (
+						') source assignment failed. A source was not found: '
+					)
+				errors[-1] += (
+					', '.join([
+						str(i) for i in record[0]['unmatched_sources']
+					])
+				)
+			elif record[0]['invalid_sources']:
+				errors.append(
+					'Item (' +
+					'UID: ' + record[0]['item_uid']
+				)
+				if record[0]['item_name']:
+					errors[-1] += ', name: ' + record[0]['item_name']
+				if len(record[0]['invalid_sources']) >= 1:
+					errors[-1] += ') source assignment failed. Proposed sources ['
+				else:
+					errors[-1] += ') source assignment failed. Proposed source '
+				errors[-1] += ', '.join([
+					'(uid: ' + str(i[0]) + ', name: ' + str(i[1]) + ')' if i[1]
+					else '(uid: ' + str(i[0]) + ')'
+					for i in record[0]['invalid_sources']
+				])
+				if len(record[0]['invalid_sources']) >= 1:
+					errors[-1] += (
+						'] are not themselves sourced (either directly or indirectly) from '
+					)
+				else:
+					errors[-1] += (
+						' is not itself sourced (either directly or indirectly) from '
+					)
+				if len(record[0]['prior_source_details']) >= 1:
+					errors[-1] += (
+						'any of the existing assigned sources: '
+					)
+				else:
+					errors[-1] += (
+						'the existing assigned source: '
+					)
+				errors[-1] += ', '.join([
+					'(uid: ' + str(i[0]) + ', name: ' + str(i[1]) + ')' if i[1]
+					else '(uid: ' + str(i[0]) + ')'
+					for i in record[0]['prior_source_details']
+				])
+			elif record[0]['unrepresented_sources']:
+				# this occurs when not all prior sources are represented by the new sources
+				# this occurs in the case of attempting to re-assign to new block(s)/tree(s) without deleting an existing record
+				# and also in re-assigning pooled samples with greater detail
+				errors.append(
+					'Item (' +
+					'UID: ' + record[0]['item_uid']
+				)
+				if record[0]['item_name']:
+					errors[-1] += ', name: ' + record[0]['item_name']
+				if len(record[0]['unrepresented_sources']) >= 1:
+					errors[-1] += ') source assignment failed. Existing sources ['
+				else:
+					errors[-1] += ') source assignment failed. Existing source '
+				errors[-1] += ', '.join([
+					'(uid: ' + str(i[0]) + ', name: ' + str(i[1]) + ')' if i[1]
+					else '(uid: ' + str(i[0]) + ')'
+					for i in record[0]['unrepresented_sources']
+				])
+				if len(record[0]['unrepresented_sources']) >= 1:
+					errors[-1] += (
+						'] would not be represented (either directly or indirectly) by '
+					)
+				else:
+					errors[-1] += (
+						' would not be represented (either directly or indirectly) by '
+					)
+				if len(record[0]['new_source_details']) >= 1:
+					errors[-1] += (
+						'the proposed sources: '
+					)
+				else:
+					errors[-1] += (
+						'the proposed source: '
+					)
+				errors[-1] += ', '.join([
+					'(uid: ' + str(i[0]) + ', name: ' + str(i[1]) + ')' if i[1]
+					else '(uid: ' + str(i[0]) + ')'
+					for i in record[0]['new_source_details']
+				])
+			elif record[0]['variety_conflicts']:
+				errors.append(
+					'Item (' +
+					'UID: ' + record[0]['item_uid']
+				)
+				if record[0]['item_name']:
+					errors[-1] += ', name: ' + record[0]['item_name']
+				errors[-1] += (
+					') source assignment failed. '
+				)
+				errors[-1] += (
+					'The variety assigned to '
+					'proposed source(s) conflicts with the variety that is specified for the item '
+					'or its samples: '
+				)
+				if len(record[0]['variety_conflicts']) >= 2:
+					errors[-1] += (
+						'The assignment would create many such conflicts so '
+						'only the first two are being reported. '
+					)
+				errors[-1] += ', '.join([
+					'(source uid: ' + str(i['ancestor']) + ', source variety:' + str(i['ancestor_variety']) + ', ' +
+					'dependent item: ' + str(i['descendant']) + ', ' + 'dependant variety: ' + str(i['dependant_variety']) +
+					')'
+					for i in record[0]['variety_conflicts'][0:2]
+				])
+			elif record[0]['tree_varieties_error']:
+				errors.append(
+					'Item (' +
+					'UID: ' + record[0]['item_uid']
+				)
+				if record[0]['item_name']:
+					errors[-1] += ', name: ' + record[0]['item_name']
+				errors[-1] += (
+					') source assignment failed. '
+				)
+				if len(record[0]['tree_varieties_error']) >= 2:
+					errors[-1] += (
+						'The proposed source assignment would create ambiguous definitions for many trees, '
+						'only the first two are being reported. '
+					)
+				errors[-1] += '. '.join([
+					'The proposed source assignment would create an ambiguous definition '
+					'for the variety of a tree (' + str(i[0]) + '). ' +
+					'The conflicts are between varieties assigned to the following items: ' +
+					','.join([
+						'(uid: ' + str(j[0]) + ', variety: ' + str(j[1]) + ')'
+						for j in i[1][0:5]  # silently only reporting the first 5 items
+					]) for i in record[0]['tree_varieties_error'][0:2]
+				])
 		if errors:
-			if not property_name in self.errors:
+			if property_name not in self.errors:
 				self.errors[property_name] = []
 			self.errors[property_name] += errors
 
-	def assign_name(self, input_variable):
+	def set_name(self, input_variable):
 		statement = (
 			' UNWIND $uid_value_list AS uid_value '
 			'	OPTIONAL MATCH '
@@ -1033,7 +1187,7 @@ class PropertyUpdateHandler:
 			'name'
 		)
 
-	def assign_unit(self, input_variable):
+	def set_unit(self, input_variable):
 		statement = (
 			' UNWIND $uid_value_list AS uid_value '
 			'	OPTIONAL MATCH '
@@ -1057,84 +1211,188 @@ class PropertyUpdateHandler:
 		)
 		self.error_check(
 			result,
-			'sample type'
+			'sample unit'
 		)
+
+	def set_elevation(self, input_variable):
+		statement = (
+			' UNWIND $uid_value_list AS uid_value '
+			'	OPTIONAL MATCH '
+			'		(item: Field {uid: toInteger(uid_value[0])}) '
+			'	WITH uid_value, item, item.elevation as existing'
+			'	SET item.elevation = CASE '
+			'		WHEN item.elevation IS NULL '
+			'		THEN toInteger(uid_value[1]) '
+			'		ELSE item.elevation '
+			'		END '
+			'	RETURN  { '
+			'		UID: uid_value[0], '
+			'		value: uid_value[1], '	
+			'		item_uid: item.uid, '
+			'		existing: existing '
+			'	} '
+		)
+		result = self.tx.run(
+			statement,
+			uid_value_list=self.updates[input_variable]
+		)
+		self.error_check(
+			result,
+			'elevation'
+		)
+
+# Notes for assign source functions
+	# In all assign to source functions we need to consider inheritance updates.
+	# Ensure match for variety property between source (and its ancestors) and item (and its descendants)
+	# Need to update varieties property for all members of new item lineage (including item)
+	#  don't have to update prior lineage:
+	#  - item prior ancestors are still included in new item ancestors
+	#    - We enforce this by only allowing reassignments to descendents of a prior source
+	#  - item prior descendants are included in new lineage
+	#  - source prior ancestors are included in new lineage
+	#  - source prior descendants are unaffected as they were not in the prior lineage
+	# Ensure any tree in new lineage has size(varieties) <= 1
 
 	def assign_tree_to_block(self, input_variable):
 		statement = (
 			' UNWIND $uid_value_list AS uid_value '
+			'	WITH '
+			'		uid_value[0] as uid,'
+			'		uid_value[1] as value '
 			'	OPTIONAL MATCH '
 			'		(tree: Tree { '
-			'			uid: uid_value[0] '
+			'			uid: uid '
 			'		}) '
 			'	OPTIONAL MATCH '
-			'		(tree) '		
-			'		-[:IS_IN]->(: FieldTrees) '
-			'		-[:IS_IN]->(field: Field) '
-			'		<-[:IS_IN]-(: FieldBlocks) '
-			'		<-[:IS_IN]-(block: Block) '
-		)
-		if 'name' in input_variable:
-			statement += (
-				' WHERE trim(block.name_lower) = toLower(trim(uid_value[1])) '
-			)
-		else:
-			statement += (
-				' WHERE block.id = uid_value[1] '
-			)
-		statement += (
+			'		(field: Field {uid: '
+			'			CASE '
+			'			WHEN toInteger(uid) IS NOT NULL '
+			'				THEN uid '
+			'			ELSE '
+			'				toInteger(split(uid, "_")[0]) '
+			'			END '
+			'		}) '
 			'	OPTIONAL MATCH '
 			'		(tree) '
 			'		-[:IS_IN]->(:BlockTrees) '
-			'		-[:IS_IN]->(existing: Block) '
-			# if this trees samples have a variety specified it must match the block (if also specified)
+			'		-[:IS_IN]->(prior_block: Block) '
 			'	OPTIONAL MATCH '
-			'		(tree)<-[:FROM*]-(sample:Sample) '
-			'		WHERE sample.variety IS NOT NULL AND sample.variety <> block.variety '
+			'		(new_block: Block) '
+			'		-[:IS_IN]->(:FieldBlocks) '
+			'		-[:IS_IN]->(field) '
+		)
+		if 'name' in input_variable:
+			statement += (
+				' WHERE new_block.name_lower = toLower(trim(value)) '
+			)
+		else:
+			statement += (
+				' WHERE new_block.id = toInteger(value) '
+			)
+		statement += (
+			# check for variety conflicts
+			'	OPTIONAL MATCH '
+			'		(tree)<-[: FROM*]-(sample: Sample) '
 			'	WITH '
-			'		uid_value, '
-			'		tree, block, field, existing, '
-			'		CASE '
-			'			WHEN '
-			'				block.variety IS NOT NULL '
-			'				AND tree.variety IS NOT NULL '
-			'				AND block.variety <> tree.variety '
-			' 			THEN collect(block.uid, block.variety)  '
-			'			WHEN sample IS NOT NULL '
-			'				THEN collect(distinct (sample.uid, sample.variety)) '
-			'			ELSE Null '
-			'		as variety_conflicts '
+			'		uid, value, '
+			'		tree, field, '
+			'		prior_block, '
+			'		new_block, '
+			' 		CASE WHEN tree.variety IS NOT NULL AND new_block.variety IS NOT NULL AND tree.variety <> new_block.variety '
+			'			THEN [{ '
+			'				ancestor: new_block.uid,'
+			'				ancestor_variety: new_block.variety, '
+			'				descendant: tree.uid, '
+			'				descendant_variety: tree.variety '
+			'			}] '
+			'			ELSE [] END + ' 
+			'		[ '
+			'			x in collect({ '
+			'				ancestor: new_block.uid,'
+			'				ancestor_variety: new_block.variety, '
+			'				descendant: sample.uid, '
+			'				descendant_variety: sample.variety '
+			'			}) WHERE '
+			'				x["descendant_variety"] IS NOT NULL '
+			'				AND x["ancestor_variety"] IS NOT NULL '
+			'				AND  x["descendant_variety"] <> x["ancestor_variety"] '
+			'		] as variety_conflicts '
 			'	FOREACH (n IN CASE WHEN '
-			'		existing IS NULL AND '
-			'		block IS NOT NULL AND '
-			'		tree IS NOT NULL AND '
-			'		variety_conflicts IS NULL '
+			'			prior_block IS NULL AND '
+			'			new_block IS NOT NULL AND '
+			'			size(variety_conflicts) = 0 '
 			'		THEN [1] ELSE [] END | '
 			'		MERGE '
-			'			(bt:BlockTrees)'
-			'			-[:IS_IN]->(block) '
+			'			(bt:BlockTrees) '
+			'			-[:IS_IN]->(new_block) '
 			'		MERGE '
 			'			(bt) '
 			'			<-[:FOR]-(c:Counter) '
 			'			ON CREATE SET '
 			'				c.count = 0, '
 			'				c.name = "tree", '
-			'				c.uid = (block.uid + "_tree") '
+			'				c.uid = (new_block.uid + "_tree") '
 			'		SET c._LOCK_ = True '
 			'		MERGE (tree)-[:IS_IN]->(bt) '
 			'		SET c.count = c.count + 1 '
 			'		REMOVE c._LOCK_ '
 			'	) '
+			'	WITH '
+			'		uid, value, tree, field, prior_block, new_block, variety_conflicts '
+			'		OPTIONAL MATCH '
+			'			(tree)-[:IS_IN*]->(ancestor: Item) '
+			'	WITH '
+			'		uid, value, tree, field, prior_block, new_block, variety_conflicts, '
+			'		collect(ancestor) as ancestors '
+			'		OPTIONAL MATCH '
+			'			(tree)<-[:FROM*]-(descendant: Item) '
+			'	WITH '
+			'		uid, value, tree, field, prior_block, new_block, variety_conflicts, '
+			'		ancestors + collect(descendant) as lineage '
+			'		UNWIND lineage as kin '
+			'			OPTIONAL MATCH '
+			'				(kin)-[:IS_IN | FROM *]->(kin_ancestor: Item) '
+			'			WITH '
+			'				uid, value, tree, field, prior_block, new_block, variety_conflicts, '
+			'				kin, collect(kin_ancestor) as kin_ancestors '
+			'			OPTIONAL MATCH '
+			'				(kin)<-[:IS_IN | FROM *]-(kin_descendant: Item) '
+			'			WITH '
+			'				uid, value, tree, field, prior_block, new_block, variety_conflicts, '
+			'				kin, kin_ancestors + collect(kin_descendant) as kin_lineage '
+			'			UNWIND kin_lineage as kin_of_kin '
+			'			WITH '
+			'				uid, value, tree, field, prior_block, new_block, variety_conflicts, '
+			'				kin, collect(distinct kin_of_kin.variety) as kin_varieties '
+			'			SET kin.varieties = CASE WHEN kin.variety IS NOT NULL THEN [kin.variety] ELSE kin_varieties END '
+			'	WITH '
+			'		uid, value, tree, field, prior_block, new_block, variety_conflicts, '
+			'		collect(distinct kin.variety) as varieties, '
+			'		collect(distinct [kin.uid, kin.variety]) as variety_sources '
+			'	SET tree.varieties = CASE WHEN tree.variety IS NOT NULL THEN [tree.variety] ELSE varieties END '
 			'	RETURN  { '
-			'		UID: uid_value[0], '
-			'		value: uid_value[1], '
+			'		UID: uid, '
+			'		value: value, '
+			'		item_name: tree.name, '
 			'		item_uid: tree.uid, '
-			'		new_source_level: "Block", '
-			'		new_source_id: collect(block.id), '
-			'		existing_source_level: CASE WHEN existing THEN "Block" ELSE "Field" END, '
-			'		existing_source_id: collect(coalesce(existing.id, field.uid), '
-			'		variety_conflicts: variety_conflicts '
-			' } '
+			'		prior_source_details: [[prior_block.uid, prior_block.name]], '
+			'		new_source_details: [[new_block.uid, new_block.name]], '
+			'		unmatched_sources:	CASE WHEN new_block IS NULL THEN [value] END, '
+			'		invalid_sources: CASE '
+			'			WHEN prior_block IS NOT NULL AND prior_block <> new_block '
+			'			THEN [[new_block.uid, new_block.name]] '
+			'			END, '
+			'		unrepresented_sources: CASE '
+			'			WHEN prior_block IS NOT NULL AND prior_block <> new_block '
+			'			THEN [[prior_block.uid, prior_block.name]] '
+			'			END, '
+			'		variety_conflicts: variety_conflicts, '
+			'		tree_varieties_error: CASE '
+			'			WHEN size(tree.varieties) > 1 '
+			'			THEN '
+			'				collect([tree.uid,variety_sources]) '
+			'			END '
+			'	} '
 		)
 		result = self.tx.run(
 			statement,
@@ -1145,52 +1403,230 @@ class PropertyUpdateHandler:
 			'block'
 		)
 
-	def assign_sample_to_blocks(self, input_variable):
+	def assign_sample_to_sources(self, input_variable, source_level):
 		statement = (
 			' UNWIND $uid_value_list AS uid_value '
+			'	WITH '
+			'		uid_value[0] as uid,'
+			'		uid_value[1] as value '
 			'	OPTIONAL MATCH '
 			'		(sample: Sample { '
-			'			uid: uid_value[0]'
+			'			uid: uid '
 			'		}) '
 			'	OPTIONAL MATCH '
-			'		(sample) '
-			'		-[:FROM | IS_IN*]->(: Field) '
-			'		<-[:IS_IN]-(: FieldBlocks) '
-			'		<-[:IS_IN]-(block: Block) '
+			'		(field: Field {uid: '
+			'			CASE '
+			'			WHEN toInteger(uid) IS NOT NULL '
+			'				THEN uid '
+			'			ELSE '
+			'				toInteger(split(uid, "_")[0]) '
+			'			END '
+			'		}) '
+			'	WITH '
+			'		uid, value, sample, field '
+			'	OPTIONAL MATCH '
+			'		(sample)-[prior_primary_sample_from: FROM]->(:ItemSamples)-[: FROM]->(prior_primary_source: Item) '
+			'	OPTIONAL MATCH '
+			'		(sample)-[prior_secondary_sample_from: FROM]->(prior_secondary_source: Sample) '
+			'	WITH '
+			'		uid, value, sample, field, '
+			'		collect(coalesce(prior_primary_source, prior_secondary_source)) as prior_sources, '
+			'		collect(coalesce(prior_primary_sample_from, prior_secondary_sample_from)) as prior_source_rels '
+			'	UNWIND value as source_identifier '
+			'		OPTIONAL MATCH '
+			'			(new_source:Item)-[:IS_IN | FROM*]->(field) '
 		)
 		if 'name' in input_variable:
 			statement += (
-				'	WHERE block.name_lower IN uid_value[1] '
+				'		WHERE new_source.name_lower = source_identifier '
 			)
 		else:
 			statement += (
-				'	WHERE block.id IN uid_value[1] '
+				'		WHERE new_source.id = source_identifier '
 			)
 		statement += (
-			'	OPTIONAL MATCH '
-			'		(sample)-[:FROM]->(:ItemSamples)-[:FROM]->(existing_item:Item) '
-			'	'
-			'	OPTIONAL MATCH (sample)-[:FROM]->(existing_sample:Sample) '
-			'	OPTIONAL MATCH (sample)-[from:FROM]->() '
-			'	FOREACH (n in CASE WHEN '
-			'		sample IS NOT NULL AND '
-			'		"Field" in labels(existing_item) AND '
-			'		block IS NOT NULL '
+			'		UNWIND prior_sources as prior_source '
+			'			OPTIONAL MATCH '
+			'				lineage_respected = (new_source)-[:IS_IN | FROM*]->(prior_source) '
+			'	WITH  '
+			'	uid, value, sample, '
+			'	prior_source_rels, '
+			'	collect(distinct new_source) as new_sources, '
+			'	collect(distinct [prior_source.uid, prior_source.name]) as prior_source_details, '
+			'	[ '
+			'		x in collect(distinct [source_identifier, new_source]) '
+			'		WHERE x[1] IS NULL | x[0] '
+			'	] as unmatched_sources, '
+			'	[ '
+			'		x in collect(distinct new_source) '
+			'		WHERE '
+			'			 x not in [ '
+			'				i in collect(distinct [new_source, lineage_respected]) '
+			'				WHERE i[1] IS NOT NULL | i[0] '
+			'			] AND '
+			'			x not in collect(distinct prior_source) '		
+			'			| [x.uid, x.name] '
+			'	]  as invalid_sources, '
+			'	[ '
+			'		x in collect(distinct prior_source) '
+			'		WHERE '
+			'			x not in [ '
+			'				i in collect(distinct [prior_source, lineage_respected]) '
+			'				WHERE i[1] IS NOT NULL | i[0] '
+			'			] AND '
+			'			x not in collect(distinct new_source) '
+			'			| [x.uid, x.name] '
+			'	]  as unrepresented_sources '
+			# Need to check for variety conflicts that would be created in new lineage 
+			# we also want to update varieties property in all members of new lineage
+			' 	UNWIND new_sources as new_source '
+			'		OPTIONAL MATCH '
+			'			(new_source)-[:IS_IN | FROM *]->(ancestor: Item) '
+			'		OPTIONAL MATCH '
+			'			(sample)<-[:IS_IN | FROM *]-(descendant: Item) '
+			# The above matches make a cartesian product 
+			# this may be reasonable as we want to check for any conflict among these products
+			'	WITH '
+			'		uid, value, sample, '
+			'		prior_source_rels, '
+			'		collect(new_source) as new_sources, '
+			'		prior_source_details, '
+			'		unmatched_sources, invalid_sources, unrepresented_sources, '
+			'		collect(ancestor) + collect(descendant) + collect(new_source) as lineage, '	
+			'		CASE '
+			'		WHEN sample.variety IS NOT NULL AND source.variety IS NOT NULL AND sample.variety <> source.variety '
+			'			THEN collect(distinct { '
+			'				ancestor: new_source.uid,'
+			'				ancestor_variety: new_source.variety, '
+			'				descendant: sample.uid, '
+			'				descendant_variety: sample.variety '
+			'			}) '
+			'			ELSE []'
+			'		END + ' 
+			'		[ '	
+			'			x in collect(distinct { '
+			'				ancestor: ancestor.uid,'
+			'				ancestor_variety: ancestor.variety, '
+			'				descendant: sample.uid, '
+			'				descendant_variety: sample.variety'
+			'			}) WHERE '
+			'				x["descendant_variety"] IS NOT NULL '
+			'				x["ancestor_variety"] IS NOT NULL '
+			'				AND  x["descendant_variety"] <> x["ancestor_variety"] '
+			'		] + '
+			'		[ '	
+			'			x in collect(distinct { '
+			'				ancestor: new_source.uid,'
+			'				ancestor_variety: new_source.variety, '
+			'				descendant: descendant.uid, '
+			'				descendant_variety: descendant.variety'
+			'			}) WHERE '
+			'				x["descendant_variety"] IS NOT NULL '
+			'				x["ancestor_variety"] IS NOT NULL '
+			'				AND  x["descendant_variety"] <> x["ancestor_variety"] '
+			'		] + '
+			'		[ '	
+			'			x in collect(distinct { '
+			'				ancestor: ancestor.uid,'
+			'				ancestor_variety: ancestor.variety, '
+			'				descendant: descendant.uid, '
+			'				descendant_variety: descendant.variety '
+			'			}) WHERE '
+			'				x["descendant_variety"] IS NOT NULL '
+			'				x["ancestor_variety"] IS NOT NULL '
+			'				AND  x["descendant_variety"] <> x["ancestor_variety"] '
+			'		] '
+			'			as variety_conflicts  '
+			'	UNWIND '
+			'		new_sources as new_source '
+			'		FOREACH (n IN CASE WHEN '
+			'			new_source IS NOT NULL AND '
+			'			sample IS NOT NULL AND '
+			'			size(unmatched_sources) = 0 AND '
+			'			size(invalid_sources) = 0 AND '
+			'			size(unrepresented_sources) = 0 AND '
+			'			size(variety_conflicts) = 0 '
 			'		THEN [1] ELSE [] END | '
-			'		MERGE '
-			'			(is:ItemSamples) '
-			'			-[:FROM]->(block) '
-			'		MERGE (sample)-[:FROM]->(is) '
-			'		DELETE from '
+		)
+		if source_level == "sample":
+			statement += (
+				'		MERGE (item)-[:FROM]->(new_source) '
+			)
+		else:
+			statement += (
+				'		MERGE (is:ItemSamples)-[:FROM]->(source) '
+				'		MERGE (item)-[:FROM]->(is) '
+			)
+		statement += (
+			'		) '
+			'	WITH '
+			'		uid, value, sample, '
+			'		prior_source_rels, '
+			'		prior_source_details, collect([new_source.uid, new_source.name]) as new_source_details, '
+			'		unmatched_sources, invalid_sources, unrepresented_sources, variety_conflicts, '
+			'		lineage '
+			'	FOREACH (n IN CASE WHEN '
+			'		sample IS NOT NULL AND '
+			'		size(new_source_details) > 0 AND '
+			'		size(unmatched_sources) = 0 AND '
+			'		size(invalid_sources) = 0 AND '
+			'		size(unrepresented_sources) = 0 AND '
+			'		size(variety_conflicts) = 0 '
+			'	THEN [1] ELSE [] END | '
+			'		FOREACH (n in prior_source_rels | delete n) '
 			'	) '
-			'	RETURN { '
-			'		UID: uid_value[0], '
-			'		value: uid_value[1], '
+			'	WITH '
+			'		uid, value, sample, '
+			'		prior_source_details, new_source_details, '
+			'		unmatched_sources, invalid_sources, unrepresented_sources, variety_conflicts, '
+			'		lineage '
+			'	UNWIND lineage as kin '
+			'		OPTIONAL MATCH '
+			'			(kin)-[:IS_IN | FROM *]->(kin_ancestor: Item) '
+			'		WITH '
+			'			uid, value, sample, '
+			'			prior_source_details, new_source_details, '
+			'			unmatched_sources, invalid_sources, unrepresented_sources, variety_conflicts, '
+			'			kin, collect(distinct kin_ancestor) as kin_ancestors '
+			'		OPTIONAL MATCH '
+			'			(kin)<-[:IS_IN | FROM *]-(kin_descendant: Item) '
+			'		WITH '
+			'			uid, value, sample, '
+			'			prior_source_details, new_source_details, '
+			'			unmatched_sources, invalid_sources, unrepresented_sources, variety_conflicts, '
+			'			kin, kin_ancestors + collect(distinct kin_descendant) as kin_lineage '
+			'		UNWIND kin_lineage as kin_of_kin '
+			'		WITH '
+			'			uid, value, sample, '
+			'			prior_source_details, new_source_details, '
+			'			unmatched_sources, invalid_sources, unrepresented_sources, variety_conflicts, '
+			'			kin, collect(distinct kin_of_kin.variety) as kin_of_kin_varieties, '
+			'			[ '
+			'				x in collect(distinct [kin_of_kin.uid, kin_of_kin.variety]) WHERE x[1] IS NOT NULL'
+			'			] as kin_variety_sources, '
+			'		SET kin.varieties = CASE WHEN kin.variety IS NOT NULL THEN [kin.variety] ELSE kin_of_kin_varieties END '
+			'	WITH '
+			'		uid, value, sample, '
+			'		prior_source_details, new_source_details, '
+			'		unmatched_sources, invalid_sources, unrepresented_sources, variety_conflicts, '
+			'		collect(distinct kin.variety) as kin_varieties, '
+			'		[x in collect(distinct [[kin.uid, kin_variety_sources], labels(kin), kin.varieties]) '
+			'			WHERE "Tree" IN x[1] AND size(x[2] > 1) '
+			'			| [x[0]] '
+			'		] as tree_varieties_error '
+			'	SET sample.varieties = CASE WHEN sample.variety IS NOT NULL THEN [sample.variety] ELSE kin_varieties END '
+			'	RETURN  { '
+			'		UID: uid, '
+			'		value: value, '
+			'		item_name: sample.name, '
 			'		item_uid: sample.uid, '
-			'		new_source_level: "Block", '
-			'		new_source_id: collect(block.id), '
-			'		existing_source_level: collect([i in labels(coalesce(existing_item, existing_sample)) where i <> "Item"][0])[0], '
-			'		existing_source_id: collect(coalesce(existing_item.uid, existing_sample.uid)) '
+			'		prior_source_details: prior_source_details,'
+			'		new_source_details: new_source_details, '
+			'		unmatched_sources: unmatched_sources, '
+			'		invalid_sources: invalid_sources, '
+			'		unrepresented_sources: unrepresented_sources, '
+			'		variety_conflicts: variety_conflicts, '
+			'		tree_varieties_error: tree_varieties_error '
 			'	} '
 		)
 		for item in self.updates[input_variable]:
@@ -1200,125 +1636,68 @@ class PropertyUpdateHandler:
 				item[1] = Parsers.parse_range_list(item[1])
 		result = self.tx.run(
 			statement,
-			uid_value_list=self.updates[input_variable]
+			uid_value_list=self.updates[input_variable],
+			source_level=source_level.lower()
 		)
 		self.item_source_error_check(
 			result,
-			'block(s)'
-		)
-
-	def assign_sample_to_trees(self, input_variable):
-		statement = (
-			' UNWIND $uid_value_list AS uid_value '
-			'	OPTIONAL MATCH '
-			'		(sample: Sample { '
-			'			uid: uid_value[0]'
-			'		}) '
-			'	OPTIONAL MATCH '
-			'		(sample) '
-			'		-[:FROM | IS_IN*]->(: Field) '
-			'		<-[:IS_IN]-(: FieldTrees) '
-			'		<-[:IS_IN]-(tree: Tree) '
-			'	WHERE tree.id IN uid_value[1] '
-			'	OPTIONAL MATCH (sample)-[:FROM]->(:ItemSamples)-[:FROM]->(existing_item:Item) '
-			'	OPTIONAL MATCH (sample)-[:FROM]->(existing_sample:Sample) '
-			'	OPTIONAL MATCH (sample)-[from:FROM]->() '
-			'	FOREACH (n in CASE WHEN '
-			'		sample IS NOT NULL AND '
-			'		tree IS NOT NULL AND '
-			'		("Field" in labels(existing_item) OR "Block" in labels(existing_item)) '
-			'		THEN [1] ELSE [] END | '
-			'		MERGE '
-			'			(is:ItemSamples) '
-			'			-[:FROM]->(tree) '
-			'		MERGE (sample)-[:FROM]->(is) '
-			'		DELETE from '
-			'	) '
-			'	RETURN { '
-			'		UID: uid_value[0], '
-			'		value: uid_value[1], '
-			'		item_uid: sample.uid, '
-			'		new_source_level: "Tree", '
-			'		new_source_id: collect(tree.id), '
-			'		existing_source_level: collect([i in labels(coalesce(existing_item, existing_sample)) where i <> "Item"][0])[0], '
-			'		existing_source_id: collect(coalesce(existing_item.uid, existing_sample.uid)) '
-			'	} '
-		)
-		for item in self.updates[input_variable]:
-			if 'name' in input_variable:
-				item[1] = Parsers.parse_name_list(item[1])
-			else:
-				item[1] = Parsers.parse_range_list(item[1])
-		result = self.tx.run(
-			statement,
-			uid_value_list=self.updates[input_variable]
-		)
-		self.item_source_error_check(
-			result,
-			'tree(s)'
-		)
-
-	def assign_sample_to_samples(self, input_variable):
-		statement = (
-			' UNWIND $uid_value_list AS uid_value '
-			'	OPTIONAL MATCH '
-			'		(sample: Sample { '
-			'			uid: uid_value[0]'
-			'		}) '
-			'	OPTIONAL MATCH '
-			'		(sample) '
-			'		-[:FROM | IS_IN*]->(: Field) '
-			'		<-[:FROM | IS_IN*]-(source_sample: Sample) '
-			'	WHERE source_sample.id IN uid_value[1] '
-			'	OPTIONAL MATCH (sample)-[:FROM]->(:ItemSamples)-[:FROM]->(existing_item:Item) '
-			'	OPTIONAL MATCH (sample)-[:FROM]->(existing_sample:Sample) '
-			'	OPTIONAL MATCH (sample)-[from:FROM]->() '
-			'	FOREACH (n in CASE WHEN '
-			'		sample IS NOT NULL AND '
-			'		source_sample IS NOT NULL AND '
-			'		NOT existing_sample '
-			'		THEN [1] ELSE [] END | '
-			'			MERGE (sample)-[:FROM]->(source_sample) '
-			'			DELETE from '
-			'	) '
-			'	RETURN { '
-			'		UID: uid_value[0], '
-			'		value: uid_value[1], '
-			'		item_uid: sample.uid, '
-			'		new_source_level: "Sample", '
-			'		new_source_id: collect(source_sample.id), '
-			'		existing_source_level: collect([i in labels(coalesce(existing_item, existing_sample)) where i <> "Item"][0])[0], '
-			'		existing_source_id: collect(coalesce(existing_item.uid, existing_sample.uid)) '
-			'	} '
-		)
-		for item in self.updates[input_variable]:
-			if 'name' in input_variable:
-				item[1] = Parsers.parse_name_list(item[1])
-			else:
-				item[1] = Parsers.parse_range_list(item[1])
-		result = self.tx.run(
-			statement,
-			uid_value_list=self.updates[input_variable]
-		)
-		self.item_source_error_check(
-			result,
-			'tree(s)'
+			source_level
 		)
 
 	def assign_variety(self, input_variable):
-		# item.varieties is collection (and reflected in relationships to the FieldVariety node)
-		# item.variety is a single value matching a known variety that is set from a record submission
-		#  - This may come from different properties (variety name/variety code)
-		#    so we do need to handle cases where variety is already set
+		#  Variety assignment can come from multiple properties (variety name/variety code)
+		#    so we need to handle cases where variety is already set
 		#
-		# When assigning new item.variety (i.e. existing_variety is null) we update varieties for all dependants:
-		#  dependants = ancestors and descendents of item = items connected to item in path with single direction
-		#  dependant_dependants = ancestors and descendents of dependants = items connected to dependants in path with single direction
-		#  dependant.varieties = collect(distinct dependant_dependant.variety)
+		# Properties affected:
+		#  variety: a single value matching a known variety that is set from a record submission
+		#  varieties: a collection (and reflected in relationships to the FieldVariety node)
 		#
-		# Errors to be raised (check all items and dependants):
-		#  - item.variety IS NOT NULL and (item.varieties <> [item.variety])
-		#  - size(tree.varieties) > 1
+		# Relationships affected:
+		#  OF_VARIETY: a definite specification of a single variety for an item
+		#  CONTAINS_VARIETY:
+		#    a relationship between a Field item and a given FieldVariety container node
+		#    exists when any item with direct (single direction) path of IS_IN and/or FROM relationships to field
+		#      has relationship OF_VARIETY to the relevant Variety
+		#
+		# Inheritance:
+		#  when assigning new variety we update varieties for affected kin (see below):
+		#
+		# Terms:
+		#    item: the primary subject of the query to which the property is being assigned
+		#    ancestor:
+		#      = direct lineal source of item
+		#      = (item)-[:FROM | IS_IN*]->(ancestor)
+		#    ancestors:
+		#      = all ancestors of item
+		#      = collect(ancestor)
+		#    descendant:
+		#      = direct lineal product of item
+		#      = (descendant)-[:FROM | IS_IN*]->(item)
+		#    descendants:
+		#      = all descendants of item
+		#      = collect(descendant)
+		#    lineage: (NB: here this term excludes item)
+		#      = ancestors + descendants
+		#      = items connected to item by any path consisting of IS_IN or FROM relationships with single direction
+		#    kin:
+		#      = lineal kinsman
+		#      = member of lineage
+		#    kin_lineage:
+		#      = lineage of kin
+		#      i.e.:
+		#        kin_ancestor = (kin)-[:FROM | IS_IN*]->(ancestor)
+		#        kin_descendant = (descendant)-[:FROM | IS_IN*]->(kin)
+		#        kin_lineage = collect(kin_ancestor) + collect(kin_descendant)
+		#    kin_of_kin:
+		#      = member of kin_lineage
+		#
+		# Updates:
+		#  kin.varieties = collect(distinct kin_of_kin.variety)
+		#  item.varieties = collect(distinct kin.variety)
+		#
+		# Errors to be raised:
+		#  - kin.variety IS NOT NULL and (kin.varieties <> [kin.variety])
+		#  - size(kin.varieties) > 1 WHERE "Tree" in labels(kin)
 		statement = (
 			' UNWIND $uid_value_list AS uid_value '
 			'	WITH '
@@ -1364,59 +1743,61 @@ class PropertyUpdateHandler:
 			'		MERGE '
 			'			(item) '
 			'			-[: OF_VARIETY]->(fv) '
-			'		SET item.variety = variety.name '
+			'		SET '
+			'			item.variety = variety.name,  '
+			'			item.varieties = [variety.name] '
 			'	) '
 			'	WITH '
 			'		uid, value, item, existing_variety, variety'
 			'	OPTIONAL MATCH '
-			'		(item)-[:IS_IN | FROM *]->(item_parent: Item) '
+			'		(item)-[:IS_IN | FROM *]->(ancestor: Item) '
 			'	WITH '
 			'		uid, value, item, existing_variety, variety, '
-			'		collect(distinct item_parent) as item_parents '
+			'		collect(distinct ancestor) as ancestors '
 			'	OPTIONAL MATCH '
-			'		(item)<-[:IS_IN | FROM *]-(item_child: Item) '
+			'		(item)<-[:IS_IN | FROM *]-(descendant: Item) '
 			'	WITH  '
 			'		uid, value, item, existing_variety, variety, '
-			'		item_parents + collect(distinct item_child) as dependants '
-			'	UNWIND dependants AS dependant '
+			'		ancestors + collect(distinct descendant) as lineage '
+			'	UNWIND lineage AS kin '
 			'		OPTIONAL MATCH '
-			'			(dependant)-[:IS_IN | FROM *]->(dependant_parent: Item) '
+			'			(kin)-[:IS_IN | FROM *]->(kin_ancestor: Item) '
 			'		WITH '
 			'			uid, value, item, existing_variety, variety, '
-			'			dependant, '
-			'			collect(distinct dependant_parent) as dependant_parents '
+			'			kin, '
+			'			collect(distinct kin_ancestor) as kin_ancestors '
 			'		OPTIONAL MATCH '
-			'			(dependant)<-[:IS_IN | FROM *]-(dependant_child: Item) '
+			'			(kin)<-[:IS_IN | FROM *]-(kin_descendant: Item) '
 			'		WITH '
 			'			uid, value, item, existing_variety, variety, '
-			'			dependant, '			
-			'			dependant_parents + collect(dependant_child) as dependant_dependants '
+			'			kin, '			
+			'			kin_ancestors + collect(distinct kin_descendant) as kin_lineage '
 			'		UNWIND '
-			'			dependant_dependants as dependant_dependant '
+			'			kin_lineage as kin_of_kin '
 			'		WITH '
 			'			uid, value, item, existing_variety, variety, '
-			'			dependant, '
-			'			collect(distinct dependant_dependant.variety) as dependant_varieties, '
-			# If dependant is a Tree we need to record dependant_dependant UID and variety if it differs from variety.name
-			# as we can have a conflict where two samples from same tree have different variety
-			# For fields/blocks/samples we accept cases of multiple varieties
-			# Among this list will also be direct dependant conflicts 
-			#   so only provide this error response when no dependant conflicts
+			'			kin, '
+			'			collect(distinct kin_of_kin.variety) as kin_varieties, '
+			# If kin is a Tree we need to record kin_of_kin UID and variety if it differs from variety.name
+			# as we could have a conflict where two samples from same tree have different variety assigned
+			# For fields/blocks/samples we accept cases of multiple varieties 
+			# Among this list will also be direct kin conflicts
+			#   so only include these errors in response when no direct kin conflicts
 			'			[ '
-			'				x IN collect([dependant_dependant.uid, dependant_dependant.variety, labels(dependant)]) '
-			'				WHERE "Tree" in x[2] and x[1] <> variety.name '
-			'				| [x[0], x[1]] '
-			'			] as dependant_tree_dependant_conflicts '
-			'		SET dependant.varieties = dependant_varieties '
+			'				x in collect(distinct [kin_of_kin.uid, kin_of_kin.variety]) WHERE x[1] IS NOT NULL'
+			'			] as kin_variety_sources '
+			'		SET kin.varieties = CASE WHEN kin.variety IS NOT NULL THEN [kin.variety] ELSE kin_varieties END '
 			'	WITH '
 			'		uid, value, item, existing_variety, variety, '
-			'		collect(distinct dependant.variety) as varieties, '
 			'		[ '
 			'			x in collect( '
-			'				distinct [dependant.uid, dependant.variety] '
+			'				distinct [kin.uid, kin.variety] '
 			'			) WHERE x[1] IS NOT NULL AND x[1] <> variety.name '
-			'		] as item_dependant_conflicts, '
-			'	SET item.varieties = varieties '
+			'		] as kin_conflicts, '
+			'		[x in collect(distinct [[kin.uid, kin_variety_sources], labels(kin), kin.varieties]) '
+			'			WHERE "Tree" IN x[1] AND size(x[2]) > 1 '
+			'			| x[0] '
+			'		] as tree_varieties_error '
 			'	RETURN { '
 			'		UID: uid, '
 			'		value: value, '	
@@ -1425,8 +1806,8 @@ class PropertyUpdateHandler:
 			'		assigned_variety: variety.name, '
 			'		item_variety: item.variety, '
 			'		item_varieties: item.varieties, '
-			'		dependant_tree_dependant_conflicts: dependant_tree_dependant_conflicts,'
-			'		item_dependant_conflicts: item_dependant_conflicts '
+			'		tree_varieties_error: tree_varieties_error, '
+			'		kin_conflicts: kin_conflicts '
 			'	} '
 		)
 		result = self.tx.run(
@@ -1438,7 +1819,7 @@ class PropertyUpdateHandler:
 			input_variable
 		)
 
-	def assign_time(self, input_variable):
+	def set_time(self, input_variable):
 		statement = (
 			' UNWIND $uid_value_list AS uid_value '
 			'	OPTIONAL MATCH '
@@ -1516,14 +1897,14 @@ class Upload:
 		file_data.save(self.file_path)
 
 	def file_format_errors(self):
-		if self.file_extension == 'csv':
+		if self.file_extension.lower() == 'csv':
 			with open(self.file_path) as uploaded_file:
 				# TODO implement CSV kit checks - in particular csvstat to check field length (avoid stray quotes)
 				# now get the dialect and check it conforms to expectations
 				dialect = csv.Sniffer().sniff(uploaded_file.read())
 				if not all((dialect.delimiter == ',', dialect.quotechar == '"')):
 					return 'Please upload comma (,) separated file with quoted (") fields'
-		elif self.file_extension == 'xlsx':
+		elif self.file_extension.lower() == 'xlsx':
 			try:
 				wb = load_workbook(self.file_path, read_only=True)
 			except BadZipfile:
@@ -2274,12 +2655,12 @@ class Upload:
 				self.property_updater = PropertyUpdateHandler(tx)
 			for record in result:
 				submission_result.parse_record(record[0])
-				if self.property_updater:
+				if record_type == 'property':
 					if self.property_updater.process_record(record[0]):
 						break
 			# As we are collecting property updates we need to run the updater at the end
 			if not result.peek():
-				if self.property_updater:
+				if record_type == 'property':
 					self.property_updater.update_all()
 
 	@celery.task(bind=True)
@@ -2300,7 +2681,7 @@ class Upload:
 				return {
 					'status': 'ERRORS',
 					'result': (
-							'Submission report for file: ' + upload_object.raw_filename + '\n<br>' +
+							'Submission report for file: ' + upload_object.raw_filename + '<br><br>' +
 							fieldname_errors
 					)
 				}
@@ -2313,14 +2694,14 @@ class Upload:
 						html = render_template(
 							'emails/upload_report.html',
 							response=(
-									'Submission report for file: ' + upload_object.raw_filename + '\n<br>'
+									'Submission report for file: ' + upload_object.raw_filename + '<br><br>'
 									+ header_report
 							)
 						)
 						subject = "BreedCAFS upload rejected"
 						recipients = [User(username).find('')['email']]
 						response = (
-							'Submission report for file: ' + upload_object.raw_filename + '\n<br>' +
+							'Submission report for file: ' + upload_object.raw_filename + '<br><br>' +
 							'Submission rejected due to unrecognised or missing fields:\n ' +
 							header_report
 						)
@@ -2329,7 +2710,7 @@ class Upload:
 					return {
 						'status': 'ERRORS',
 						'result': (
-							'Submission report for file: ' + upload_object.raw_filename + '\n<br>' +
+							'Submission report for file: ' + upload_object.raw_filename + '<br><br>' +
 							header_report
 						)
 					}
@@ -2356,21 +2737,21 @@ class Upload:
 								html = render_template(
 									'emails/upload_report.html',
 									response=(
-										'Submission report for file: ' + upload_object.raw_filename + '\n<br>' +
+										'Submission report for file: ' + upload_object.raw_filename + '<br><br>' +
 										error_messages
 									)
 								)
 								subject = "BreedCAFS upload rejected"
 								recipients = [User(username).find('')['email']]
 								body = (
-										'Submission report for file: ' + upload_object.raw_filename + '\n<br>'
+										'Submission report for file: ' + upload_object.raw_filename + '<br><br>'
 										+ error_messages
 								)
 								send_email(subject, app.config['ADMINS'][0], recipients, body, html)
 							return {
 								'status': 'ERRORS',
 								'result': (
-									'Submission report for file: ' + upload_object.raw_filename + '\n<br>' +
+									'Submission report for file: ' + upload_object.raw_filename + '<br><br>' +
 									error_messages
 								)
 							}
@@ -2397,7 +2778,7 @@ class Upload:
 							tx.rollback()
 							with app.app_context():
 								response = (
-									'Submission report for file: ' + upload_object.raw_filename + '\n<br>' +
+									'Submission report for file: ' + upload_object.raw_filename + '<br><br>' +
 									'<p>Conflicting records were either submitted concurrently '
 									'or are found within in the submitted file. '
 									'Your submission has been rejected. Please address the conflicts listed '
@@ -2419,7 +2800,7 @@ class Upload:
 								html = render_template(
 									'emails/upload_report.html',
 									response=(
-										'Submission report for file: ' + upload_object.raw_filename + '\n<br>' +
+										'Submission report for file: ' + upload_object.raw_filename + '<br><br>' +
 										response
 									)
 								)
@@ -2427,14 +2808,14 @@ class Upload:
 								subject = "BreedCAFS upload rejected"
 								recipients = [User(username).find('')['email']]
 								body = (
-									'Submission report for file: ' + upload_object.raw_filename + '\n<br>' +
+									'Submission report for file: ' + upload_object.raw_filename + '<br><br>' +
 									response
 								)
 								send_email(subject, app.config['ADMINS'][0], recipients, body, html)
 								return {
 									'status': 'ERRORS',
 									'result': (
-											'Submission report for file: ' + upload_object.raw_filename + '\n<br>' +
+											'Submission report for file: ' + upload_object.raw_filename + '<br><br>' +
 											response
 									)
 								}
@@ -2445,16 +2826,25 @@ class Upload:
 								error_messages = [
 									item for errors in property_updater.errors.values() for item in errors
 								]
-								from celery.contrib import rdb; rdb.set_trace()
 								error_messages = '<br>'.join(error_messages)
 								tx.rollback()
-								return {
-									'status': 'ERRORS',
-									'result': (
-										'Submission report for file: ' + upload_object.raw_filename + '\n<br>' +
-										error_messages
+								with app.app_context():
+									response = (
+											'Submission report for file: ' + upload_object.raw_filename + '<br><br>' +
+											error_messages
 									)
-								}
+									html = render_template(
+										'emails/upload_report.html',
+										response=response
+									)
+									subject = "BreedCAFS upload rejected"
+									recipients = [User(username).find('')['email']]
+									body = response
+									send_email(subject, app.config['ADMINS'][0], recipients, body, html)
+									return {
+										'status': 'ERRORS',
+										'result': response
+									}
 						tx.commit()
 						# now need app context for the following (this is running asynchronously)
 						with app.app_context():
@@ -2463,7 +2853,7 @@ class Upload:
 								return {
 									'status': 'ERRORS',
 									'result': (
-										'Submission report for file: ' + upload_object.raw_filename + '\n<br>' +
+										'Submission report for file: ' + upload_object.raw_filename + '<br><br>' +
 										response
 									)
 								}
@@ -2496,7 +2886,7 @@ class Upload:
 								html = render_template(
 									'emails/upload_report.html',
 									response=(
-										'Submission report for file: ' + upload_object.raw_filename + '\n<br>' +
+										'Submission report for file: ' + upload_object.raw_filename + '<br><br>' +
 										response
 									)
 								)
@@ -2504,14 +2894,14 @@ class Upload:
 								subject = "BreedCAFS upload summary"
 								recipients = [User(username).find('')['email']]
 								body = (
-									'Submission report for file: ' + upload_object.raw_filename + '\n<br>' +
+									'Submission report for file: ' + upload_object.raw_filename + '<br><br>' +
 									response
 								)
 								send_email(subject, app.config['ADMINS'][0], recipients, body, html)
 								return {
 									'status': 'SUCCESS',
 									'result': (
-										'Submission report for file: ' + upload_object.raw_filename + '\n<br>' +
+										'Submission report for file: ' + upload_object.raw_filename + '<br><br>' +
 										response
 									)
 								}
@@ -2712,378 +3102,294 @@ class Upload:
 
 	@staticmethod
 	def remove_properties(tx, property_uid):
-		if property_uid['assign name']:
-			tx.run(
-				' UNWIND $uid_list as uid'
-				' MATCH '
-				'	(item: Item {uid: uid}) '
-				' REMOVE item.name ',
-				uid_list=property_uid['assign name']
-			)
-		if property_uid['sample type (in situ)']:
-			tx.run(
-				' UNWIND $uid_list as uid'
-				' MATCH '
-				'	(sample: Sample {uid: uid}) '
-				' OPTIONAL MATCH '
-				'	(sample) '
-				'	<-[: FOR_ITEM]-(ii: ItemInput) '
-				'	-[: FOR_INPUT*2]-(input:Input), '
-				'	(ii)<-[:RECORD_FOR]-(:Record) '
-				'	WHERE input.name_lower CONTAINS "sample type" '
-				' FOREACH (n IN CASE WHEN ii IS NULL THEN [1] ELSE [] END | '
-				'	REMOVE sample.unit '
-				' ) ',
-				uid_list=property_uid['sample type (in situ)']
-			)
-		if property_uid['sample type (harvest)']:
-			tx.run(
-				' UNWIND $uid_list as uid'
-				' MATCH '
-				'	(sample: Sample {uid: uid}) '
-				' OPTIONAL MATCH '
-				'	(sample) '
-				'	<-[: FOR_ITEM]-(ii: ItemInput) '
-				'	-[: FOR_INPUT*2]-(input:Input) '
-				'	(ii)<-[:RECORD_FOR]-(:Record) '
-				'	WHERE input.name_lower CONTAINS "sample type" '
-				' FOREACH (n IN CASE WHEN ii IS NULL THEN [1] ELSE [] END | '
-				'	REMOVE sample.unit '
-				' ) ',
-				uid_list=property_uid['sample type (harvest)']
-			)
-		if property_uid['sample type (sub-sample)']:
-			tx.run(
-				' UNWIND $uid_list as uid'
-				' MATCH '
-				'	(sample: Sample {uid: uid}) '
-				' OPTIONAL MATCH '
-				'	(sample) '
-				'	<-[: FOR_ITEM]-(ii: ItemInput) '
-				'	-[: FOR_INPUT*2]-(input:Input), '
-				'	(ii)<-[:RECORD_FOR]-(:Record) '
-				'	WHERE input.name_lower CONTAINS "sample type" '
-				' FOREACH (n IN CASE WHEN ii IS NULL THEN [1] ELSE [] END | '
-				'	REMOVE sample.unit '
-				' ) ',
-				uid_list=property_uid['sample type (sub-sample)']
-			)
-		if property_uid['planting date']:
-			tx.run(
-				' UNWIND $uid_list as uid'
-				' MATCH '
-				'	(item: Item {uid: uid}) '
-				' REMOVE item.date, item.time ',
-				uid_list=property_uid['planting date']
-			)
-		if property_uid['assign tree to block by name']:
-			tx.run(
-				' UNWIND $uid_list as uid '
-				' MATCH '
-				'	(tree: Tree {uid: uid}) '
-				'	-[is_in:IS_IN]->(bt:BlockTrees) '
-				'	<-[:FOR]-(c:Counter), '
-				'	(bt)-[:IS_IN]->(block:Block) '
-				' OPTIONAL MATCH '
-				'	(tree) '
-				'	<-[:FOR_ITEM]-(ii:ItemInput) '
-				'	-[:FOR_INPUT*2]->(:Input { '
-				'		name_lower: "assign tree to block by id" '
-				'	}), '
-				'	(ii)<-[:RECORD_FOR]-(:Record) '
-				' FOREACH (n IN CASE WHEN ii IS NULL THEN [1] ELSE [] END | '
-				'	SET c._LOCK_ = True '
-				'	DELETE is_in '
-				'	SET c.count = c.count - 1 '
-				'	REMOVE c._LOCK_ '
-				' ) ',
-				uid_list=property_uid['assign tree to block by name']
-			)
-		if property_uid['assign tree to block by id']:
-			tx.run(
-				' UNWIND $uid_list as uid '
-				' MATCH '
-				'	(tree: Tree {uid: uid}) '
-				'	-[is_in:IS_IN]->(bt:BlockTrees) '
-				'	<-[:FOR]-(c:Counter), '
-				'	(bt)-[:IS_IN]->(block:Block) '
-				' OPTIONAL MATCH '
-				'	(tree) '
-				'	<-[:FOR_ITEM]-(ii:ItemInput) '
-				'	-[:FOR_INPUT*2]->(:Input { '
-				'		name_lower: "assign tree to block by name" '
-				'	}), '
-				'	(ii)<-[:RECORD_FOR]-(:Record) '
-				' FOREACH (n IN CASE WHEN ii IS NULL THEN [1] ELSE [] END | '
-				'	SET c._LOCK_ = True '
-				'	DELETE is_in '
-				'	SET c.count = c.count - 1 '
-				'	REMOVE c._LOCK_ '
-				' ) ',
-				uid_list=property_uid['assign tree to block by id']
-			)
-		if property_uid['assign sample to block(s) by name']:
-			tx.run(
-				' UNWIND $uid_list as uid '
-				' MATCH '
-				'	(sample: Sample {uid: uid}) '
-				'	-[from: FROM]->(: ItemSamples) '
-				'	-[: FROM]->(block: Block) '
-				'	-[: IS_IN]->(: FieldBlocks) '
-				'	-[: IS_IN]->(field: Field) '
-				' OPTIONAL MATCH '
-				'	(sample)<-[:FOR_ITEM]-(ii:ItemInput) '
-				'	<-[:FOR_INPUT*2]->(:Input { '
-				'		name_lower: "assign sample to block(s) by id" '
-				'	}), '
-				'	(ii)<-[:RECORD_FOR]-(:Record) '
-				' FOREACH (n IN CASE WHEN ii IS NULL THEN [1] ELSE [] END | '
-				' 	DELETE from '
-				'	MERGE '
-				'		(fs: ItemSamples) '
-				'		-[:FROM]->(field) '
-				'	 MERGE (sample)-[:FROM]->(fs) '
-				' ) ',
-				uid_list=property_uid['assign sample to block(s) by name']
-			)
-		if property_uid['assign sample to block(s) by id']:
-			tx.run(
-				' UNWIND $uid_list as uid '
-				' MATCH '
-				'	(sample: Sample {uid: uid}) '
-				'	-[from: FROM]->(: ItemSamples) '
-				'	-[: FROM]->(block: Block) '
-				'	-[: IS_IN]->(: FieldBlocks) '
-				'	-[: IS_IN]->(field: Field) '
-				' OPTIONAL MATCH '
-				'	(sample)<-[:FOR_ITEM]-(ii:ItemInput) '
-				'	<-[:FOR_INPUT*2]->(:Input { '
-				'		name_lower: "assign sample to block(s) by name" '
-				'	}), '
-				'	(ii)<-[:RECORD_FOR]-(:Record) '
-				' FOREACH (n IN CASE WHEN ii IS NULL THEN [1] ELSE [] END | '
-				' 	DELETE from '
-				'	MERGE '
-				'		(fs: ItemSamples) '
-				'		-[:FROM]->(field) '
-				'	 MERGE (sample)-[:FROM]->(fs) '
-				' ) ',
-				uid_list=property_uid['assign sample to block(s) by id']
-			)
-		if property_uid['assign sample to tree(s) by id']:
-			tx.run(
-				' UNWIND $uid_list as uid '
-				' MATCH '
-				'	(sample: Sample {'
-				'		uid: uid'
-				'	})-[from_tree: FROM]->(: ItemSamples) '
-				'	-[: FROM]-(tree: Tree) '
-				'	-[: IS_IN]->(: FieldTrees) '
-				'	-[: IS_IN]->(field: Field) '
-				' OPTIONAL MATCH '
-				'	(sample) '
-				'	<-[: FOR_ITEM]-(ii_block_name: ItemInput) '
-				'	-[: FOR_INPUT*2]->(input_block_name: Input), '
-				'	(ii_block_name)<-[: RECORD_FOR]-(r_block_name: Record) '
-				'	WHERE input_block_name.name_lower = "assign sample to block(s) by name" '
-				' OPTIONAL MATCH '
-				'	(block_by_name: Block) '
-				'	-[: IS_IN]->(: FieldBlocks) '
-				'	-[: IS_IN]->(field) '
-				'	WHERE block_by_name.name_lower = toLower(trim(r_block_name.value)) '
-				' OPTIONAL MATCH '
-				'	(sample) '
-				'	<-[: FOR_ITEM]-(ii_block_id: ItemInput) '
-				'	-[: FOR_INPUT*2]->(input_block_id: Input), '
-				'	(ii_block_id)<-[: RECORD_FOR]-(r_block_id: Record) '
-				'	WHERE input_block_id.name_lower = "assign sample to block(s) by id" '
-				' OPTIONAL MATCH '
-				'	(block_by_id: Block) '
-				'	-[:IS_IN]->(: FieldBlocks) '
-				'	-[:IS_IN]->(field) '
-				'	WHERE block_by_id.id = toInteger(r_block_id.value) '
-				' DELETE from_tree '
-				' FOREACH (n in CASE WHEN block_by_name IS NULL AND block_by_id IS NULL THEN [1] ELSE [] END | '
-				'	MERGE '
-				'		(fs: ItemSamples) '
-				'		-[:FROM]->(field) '
-				'	MERGE '
-				'		(sample)-[:FROM]->(fs) '
-				' ) '
-				' FOREACH (n IN CASE WHEN block_by_name IS NOT NULL THEN [1] ELSE [] END | '
-				'	MERGE '
-				'		(is:ItemSamples)-[:FROM]->(block_by_name) '
-				'	MERGE (sample)-[:FROM)->(is) '
-				' ) '
-				' FOREACH (n IN CASE WHEN block_by_id IS NOT NULL THEN [1] ELSE [] END | '
-				'	MERGE '
-				'		(is:ItemSamples)-[:FROM]->(block_by_id) '
-				'	MERGE (sample)-[:FROM)->(is) '
-				' ) ',
-				uid_list=property_uid['assign sample to tree(s) by id']
-			)
-		if property_uid['assign sample to sample(s) by id']:
-			tx.run(
-				' UNWIND $uid_list as uid '
-				' MATCH '
-				'	(sample: Sample { '
-				'		uid: uid'
-				'	})-[from_sample: FROM]->(source_sample: Sample) '
-				'	-[: FROM | IS_IN*]->(field: Field) '
-				' OPTIONAL MATCH '
-				'	(sample) '
-				'	<-[: FOR_ITEM]-(ii_block_name: ItemInput) '
-				'	-[: FOR_INPUT*2]->(input_block_name: Input), '
-				'	(ii_block_name)<-[: RECORD_FOR]-(r_block_name: Record) '
-				'	WHERE input_block_name.name_lower = "assign sample to block(s) by name" '
-				' OPTIONAL MATCH '
-				'	(block_by_name: Block) '
-				'	-[: IS_IN]->(: FieldBlocks) '
-				'	-[: IS_IN]->(field) '
-				'	WHERE block_by_name.name_lower = toLower(trim(r_block_name.value)) '
-				' OPTIONAL MATCH '
-				'	(sample) '
-				'	<-[: FOR_ITEM]-(ii_block_id: ItemInput) '
-				'	-[: FOR_INPUT*2]->(input_block_id: Input), '
-				'	(ii_block_id)<-[: RECORD_FOR]-(r_block_id: Record) '
-				'	WHERE input_block_id.name_lower = "assign sample to block(s) by id" '
-				' OPTIONAL MATCH '
-				'	(block_by_id: Block) '
-				'	-[:IS_IN]->(: FieldBlocks) '
-				'	-[:IS_IN]->(field) '
-				'	WHERE block_by_id.id = toInteger(r_block_id.value) '
-				' OPTIONAL MATCH '
-				'	(sample) '
-				'	<-[: FOR_ITEM]-(ii_tree_id: ItemInput) '
-				'	-[: FOR_INPUT*2]->(input_tree_id: Input), '
-				'	(ii_tree_id)<-[: RECORD_FOR]-(r_tree_id: Record) '
-				'	WHERE input_tree_id.name_lower = "assign sample to tree(s) by id" '
-				' OPTIONAL MATCH '
-				'	(tree_by_id: Tree) '
-				'	-[:IS_IN]->(: FieldTrees) '
-				'	-[:IS_IN]->(field) '
-				'	WHERE tree_by_id.id = toInteger(r_tree_id.value) '
-				' DELETE from_sample '
-				' FOREACH (n IN CASE WHEN '
-				'		tree_by_id IS NOT NULL '
-				'		THEN [1] ELSE [] END | '
-				'	MERGE '
-				'		(is:ItemSamples)-[:FROM]->(tree_by_id) '
-				'	MERGE '
-				'		(sample)-[:FROM]->(is) '
-				' ) '
-				' FOREACH (n IN CASE WHEN '
-				'		tree_by_id IS NULL AND '
-				'		block_by_name IS NOT NULL '
-				'		THEN [1] ELSE [] END | '
-				'	MERGE '
-				'		(is:ItemSamples)-[:FROM]->(block_by_name) '
-				'	MERGE (sample)-[:FROM)->(is) '
-				' ) '
-				' FOREACH (n IN CASE WHEN '
-				'		tree_by_id IS NULL AND '
-				'		block_by_id IS NOT NULL '
-				'		THEN [1] ELSE [] END | '
-				'	MERGE '
-				'		(is:ItemSamples)-[:FROM]->(block_by_id) '
-				'	MERGE (sample)-[:FROM)->(is) '
-				' ) '
-				' FOREACH (n in CASE WHEN '
-				'		tree_by_id IS NULL AND '	
-				'		block_by_name IS NULL AND '
-				'		block_by_id IS NULL THEN [1] ELSE [] END | '
-				'	MERGE '
-				'		(fs: ItemSamples) '
-				'		-[:FROM]->(field) '
-				'	MERGE '
-				'		(sample)-[:FROM]->(fs) '
-				' ) ',
-				uid_list=property_uid['assign sample to sample(s) by id']
-			)
-		if property_uid['variety name']:
-			tx.run(
-				' UNWIND $uid_list as uid '
-				' MATCH '
-				'	(item: Item { '
-				'		uid: uid '
-				'	})-[of_variety:OF_VARIETY]->(fv:FieldVariety) '
-				'	<-[contains_variety:CONTAINS_VARIETY]-(field:Field) '
-				' OPTIONAL MATCH '
-				'	(item) '
-				'	<-[:FOR_ITEM]-(ii: ItemInput) '
-				'	-[:FOR_INPUT*2]->(: Input { '
-				'		name_lower: "variety code" '
-				'	}), '
-				'	(ii)<-[:RECORD_FOR]-(:Record) '
-				' FOREACH (n IN CASE WHEN ii IS NULL THEN [1] ELSE [] END | '
-				'	DELETE of_variety '
-				'	REMOVE item.variety '
-				' ) '
-				' WITH '
-				' fv, contains_variety '
-				' OPTIONAL MATCH '
-				' (:Item)-[of_variety:OF_VARIETY]->(fv) '
-				' FOREACH (n IN CASE WHEN of_variety IS NULL THEN [1] ELSE [] END | '
-				'	DELETE contains_variety '
-				' ) ',
-				uid_list=property_uid['variety name']
-			)
-		if property_uid['variety code']:
-			tx.run(
-				' UNWIND $uid_list as uid '
-				' MATCH '
-				'	(item: Item { '
-				'		uid: uid '
-				'	})-[of_variety:OF_VARIETY]->(fv:FieldVariety) '
-				'	<-[contains_variety:CONTAINS_VARIETY]-(field:Field) '
-				' OPTIONAL MATCH '
-				'	(item) '
-				'	<-[:FOR_ITEM]-(ii: ItemInput) '
-				'	-[:FOR_INPUT*2]->(: Input { '
-				'		name_lower: "variety name" '
-				'	}), '
-				'	(ii)<-[:RECORD_FOR]-(:Record) '
-				' FOREACH (n IN CASE WHEN ii IS NULL THEN [1] ELSE [] END | '
-				'	DELETE of_variety '
-				' ) '
-				' WITH '
-				' fv, contains_variety '
-				' OPTIONAL MATCH '
-				' (:Item)-[of_variety:OF_VARIETY]->(fv) '
-				' FOREACH (n IN CASE WHEN of_variety IS NULL THEN [1] ELSE [] END | '
-				'	DELETE contains_variety '
-				' ) ',
-				uid_list=property_uid['variety name']
-			)
-		if property_uid['harvest date']:
-			tx.run(
-				' UNWIND $uid_list as uid '
-				' MATCH (item: Item { '
-				'	uid: uid '
-				' }) '
-				' REMOVE item.date, item.time ',
-				uid_list=property_uid['harvest date']
-			)
-		if property_uid['harvest time']:
-			tx.run(
-				' UNWIND $uid_list as uid '
-				' MATCH (item: Item { '
-				'	uid: uid '
-				' }) '
-				' REMOVE item.time_of_day '
-				' SET item.time = CASE '
-				'	WHEN item.date IS NOT NULL AND item.time_of_day IS NOT NULL '
-				'	THEN '
-				'		apoc.date.parse(item.date + " " + item.time, "ms", "yyyy-MM-dd HH:mm") '
-				'	WHEN item.date IS NOT NULL AND item.time_of_day IS NULL '
-				'	THEN '
-				'		apoc.date.parse(item.date + " 12:00", "ms", "yyyy-MM-dd HH:mm") '
-				'	WHEN item.date IS NULL '
-				'	THEN '
-				'		Null '
-				'	END ',
-				uid_list=property_uid['harvest date']
-			)
+		inputs_properties = app.config['INPUTS_PROPERTIES']
+		properties_inputs = app.config['PROPERTIES_INPUTS']
+		for input_variable, item_uids in property_uid.iteritems()
+			if property_uid[input_variable]:
+				if inputs_properties[input_variable] == 'name':
+					tx.run(
+						' UNWIND $uid_list as uid'
+						' MATCH '
+						'	(item: Item {uid: uid}) '
+						' REMOVE item.name ',
+						uid_list=property_uid[input_variable]
+					)
+				elif inputs_properties[input_variable] == 'variety':
+					tx.run(
+						' UNWIND $uid_list as uid '
+						' MATCH '
+						'	(item: Item { '
+						'		uid: uid '
+						'	}) '
+						' OPTIONAL MATCH '
+						'	(item) '
+						'	<-[:FOR_ITEM]-(ii: ItemInput) '
+						'	-[:FOR_INPUT*2]->(i: Input}), '
+						'	(ii)<-[:RECORD_FOR]-(:Record) '
+						' WHERE i.name_lower IN $property_inputs '
+						' WITH '
+						'	item '
+						' WHERE ii IS NULL '
+						' MATCH '
+						'	(item)-[of_variety:OF_VARIETY]->(fv:FieldVariety) '
+						'	<-[contains_variety:CONTAINS_VARIETY]-(field:Field) '
+						' DELETE of_variety '
+						' REMOVE item.variety '
+						' WITH '
+						'	item, fv, contains_variety '
+						'	OPTIONAL MATCH '
+						'		(item)-[:IS_IN | FROM *]->(ancestor: Item) '
+						' WITH '
+						'	item, fv, contains_variety, '
+						'	collect(distinct ancestor) as ancestors '
+						' OPTIONAL MATCH '
+						'	(item)<-[:IS_IN | FROM *]-(descendant: Item) '
+						' WITH  '
+						'	item, fv, contains_variety, '
+						'	ancestors + collect(distinct descendant) as lineage '
+						' UNWIND lineage AS kin '
+						'	OPTIONAL MATCH '
+						'		(kin)-[:IS_IN | FROM *]->(kin_ancestor: Item) '
+						'	WITH '
+						'		item, fv, contains_variety, '
+						'		kin, '
+						'		collect(distinct kin_ancestor) as kin_ancestors '
+						'	OPTIONAL MATCH '
+						'		(kin)<-[:IS_IN | FROM *]-(kin_descendant: Item) '
+						'	WITH '
+						'		item, fv, contains_variety, '
+						'		kin, '			
+						'		kin_ancestors + collect(distinct kin_descendant) as kin_lineage '
+						'	UNWIND '
+						'		kin_lineage as kin_of_kin '
+						'	WITH '
+						'		item, fv, contains_variety, '
+						'		kin, '
+						'		collect(distinct kin_of_kin.variety) as kin_varieties, '
+						'	SET kin.varieties = CASE WHEN kin.variety IS NOT NULL THEN [kin.variety] ELSE kin_varieties END '
+						' WITH '
+						'	item, fv, contains_variety, '
+						'	kin, '
+						'	collect(kin.variety) as varieties '
+						' SET item.varieties = CASE WHEN item.variety IS NOT NULL THEN [item.variety] ELSE varieties END '
+						' WITH DISTINCT '
+						'	fv, contains_variety '
+						' OPTIONAL MATCH '
+						'	(:Item)-[of_variety:OF_VARIETY]->(fv) '
+						' FOREACH (n IN CASE WHEN of_variety IS NULL THEN [1] ELSE [] END | '
+						'	DELETE contains_variety '
+						' ) ',
+						uid_list=property_uid[input_variable],
+						property_inputs=properties_inputs[input_variable]
+					)
+				elif inputs_properties[input_variable] == 'unit':
+					# There are multiple inputs for unit
+					# we only need to update the property if there is no other record
+					tx.run(
+						' UNWIND $uid_list as uid'
+						' MATCH '
+						'	(item: Item {uid: uid}) '
+						' OPTIONAL MATCH '
+						'	(item) '
+						'	<-[:FOR_ITEM]-(ii: ItemInput) '
+						'	-[:FOR_INPUT*2]->(i: Input}), '
+						'	(ii)<-[:RECORD_FOR]-(:Record) '
+						' WHERE i.name_lower IN $property_inputs '
+						' WITH item WHERE ii IS NULL '
+						' REMOVE item.unit ',
+						uid_list=property_uid[input_variable],
+						property_inputs=properties_inputs[input_variable]
+					)
+				elif inputs_properties[input_variable] == 'source':
+					# There may be multiple inputs for tree/sample item sources (by id, by name)
+					#  and multiple contributions with variable specificity for samples
+					#  but conflicts are prevented between assignments at same level and
+					#  only assigment to greater specificity is allowed so
+					#  we only need to update if the deleted record is the latest "source" submission for this item
+					#  we could check this by comparing the latest record 'value' against the current assignments
+					#  but it might be sensible to just always update to assignment from latest record submission
+					# we do also need to update the varieties for new item lineage and prior ancestors
+					statement = (
+						' UNWIND $uid_list as uid '
+						' MATCH '
+						'	(item: Item {uid: uid}) '
+						'	-[:FROM | IS_IN]->(ancestor:Item) '
+						' WITH item, collect(ancestor) as prior_ancestors '
+						' OPTIONAL MATCH '
+						'	(item) '
+						'	<-[:FOR_ITEM]-(ii: ItemInput) '
+						'	-[:FOR_INPUT*2]->(input: Input}), '
+						'	(ii)<-[:RECORD_FOR]-(record:Record) '
+						'	<-[s:SUBMITTED]-() '
+						' WHERE i.name_lower IN $property_inputs '
+					)
+					if 'to block' in input_variable:
+						# these will revert to field level if no records
+						# but remain unchanged if existing source assignment records
+						statement += (
+							' AND ii IS NULL '
+						)
+						if 'assign tree' in input_variable:
+							# these are trees so can just be deleted and the counter decremented
+							# if no other records specifying and assignment
+							# The IS_IN field relationship is retained when assigning tree to block
+							statement += (
+								' MATCH (item)-[is_in:IS_IN]->(:BlockTrees)<-[:FOR]-(c:Counter) '
+								' SET c._LOCK_ = True '
+								' DELETE is_in '
+								' SET c.count = c.count - 1 '
+								' REMOVE c._LOCK_ '
+								' WITH '
+								'	item, prior_ancestors '
+							)
+						else: # assign sample
+							# these must be reattached to field ItemSamples container
+							statement += (
+								' MATCH (item)-[from:FROM]->(:ItemSamples) '
+								' MATCH (item)-[:FROM | IS_IN]->(field: Field) '
+								' DELETE from '
+								' MERGE (is:ItemSamples)-[:FROM]->(field) '
+								' CREATE (item)-[:FROM]->(is) '
+								' WITH DISTINCT '
+								'	item, prior_ancestors '
+							)
+					else: # to tree or to sample (these are all samples)
+						# for these we need to find the most recent record and update accordingly,
+						# if no record then we re-attach to the Field ItemSamples
+						# we only need to assess one record since if they are submitted concurrently they must agree
+						# we also don't need to check for variety conflicts as the update will be to
+						# either the same items, a subset thereof or an ancestor
+						statement += (
+							' WITH '
+							'	item, prior_ancestors, '
+							'	collect(input.name_lower, record.value, s.time) as records '
+							'	max(s.time) as latest '
+							' WITH '
+							'	item, prior_ancestors, '
+							'	[x IN records WHERE x[2] = latest | [x[0], x[1]][0][0] as value, '
+							'	[x IN records WHERE x[2] = latest | [x[0], x[1]][0][1] as input_name_lower '
+							' MATCH '
+							'	(item)-[:FROM | IS_IN*]->(field: Field) '
+							' WITH item, prior_ancestors, field, value, input_name_lower '
+							' OPTIONAL MATCH '
+							'	(new_source: Item)-[:FROM | IS_IN*]->(field) '
+							'	WHERE '
+							'		CASE '
+							'			WHEN "by name" IN input_name_lower ' 
+							'			THEN new_source.name_lower IN [x in split(value, ",") | toLower(x) '
+							'			ELSE new_source.id IN [x in split(value, ",") | toInteger(x)] '
+							'		END '
+							'	AND CASE ' 
+							'		WHEN "to block" IN input_name_lower '
+							'		THEN "Block" in labels(new_source) '
+							'		WHEN "to tree" IN input_name_lower '
+							'		THEN "Tree" in labels(new_source) '
+							'		ELSE "Sample" in labels(new_source) '
+							' WITH '
+							'	item, prior_ancestors, '
+							'	coalesce(new_source, field) as new_source '
+							' MERGE '
+							'	(is:ItemSamples)-[:FROM]->(new_source) '
+							' MERGE '
+							'	(item)-[:FROM]->(is) '
+							' ) '
+							' WITH DISTINCT item, prior_ancestors '
+						)
+					statement += (
+						' OPTIONAL MATCH '
+						'	(item)-[:FROM | IS_IN*]->(ancestor: Item) '
+						' WITH '
+						'	item, '
+						'	[x IN prior_ancestors WHERE x NOT IN collect(ancestor)] as removed_ancestors,'
+						'	collect(ancestor) as ancestors '
+						' OPTIONAL MATCH '
+						'	(item)<-[:FROM | IS_IN *]-(descendant: Item) '
+						' WITH '
+						'	item, '
+						'	removed_ancestors, '
+						'	ancestors + collect(descendant) as lineage '
+						' UNWIND lineage AS kin '
+						'	OPTIONAL MATCH '
+						'		(kin)-[:FROM | IS_IN*]->(kin_ancestor: Item) '
+						'	WITH '
+						'		item, removed_ancestors,'
+						'		kin,'
+						'		collect(kin_ancestor) as kin_ancestors '
+						'	OPTIONAL MATCH '
+						'		(kin)<-[:FROM | IS_IN*]-(kin_descendant: Item) '
+						'	WITH '
+						'		item, removed_ancestors,'
+						'		kin, '
+						'		kin_ancestors + collect(kin_descendant) as kin_lineage '
+						'	UNWIND kin_lineage AS kin_of_kin '
+						'	WITH '
+						'		item, removed_ancestors, '
+						'		kin, collect(distinct kin_of_kin.variety) as kin_varieties '
+						'	SET kin.varieties = CASE WHEN kin.variety IS NOT NULL THEN [kin.variety] ELSE kin_varieties END '
+						' WITH '
+						'	item, removed_ancestors, '
+						'	collect(distinct kin.variety) as varieties '
+						' SET item.varieties = CASE WHEN item.variety IS NOT NULL THEN [item.variety] ELSE varieties END '
+						' WITH item, removed_ancestors '
+						' UNWIND removed_ancestors AS removed_ancestor '
+						'	OPTIONAL MATCH '
+						'		(removed_ancestor)-[: FROM | IS_IN]->(descendant: Item) '
+						'	WITH '
+						'		item, removed_ancestor, '
+						'		collect(descendant) as removed_ancestor_descendants '
+						'	OPTIONAL MATCH '
+						'		(removed_ancestor)<-[:FROM | IS_IN]-(ancestor: Item) '
+						'	WITH '
+						'		item, removed_ancestor, '
+						'		removed_ancestor_descendants + collect(ancestor) as removed_ancestor_lineage '
+						'	UNWIND removed_ancestor_lineage AS removed_ancestor_kin '
+						'	WITH '
+						'		item, removed_ancestor, '
+						'		collect(removed_ancestor_kin.variety) as removed_ancestor_varieties '
+						'	SET removed_ancestor.varieties = '
+						'		CASE '
+						'			WHEN removed_ancestor.variety IS NOT NULL THEN [removed_ancestor.variety] '
+						'			ELSE removed_ancestor_varieties '
+						'		END '
+					)
+					tx.run(
+						statement,
+						uid_list=property_uid[input_variable],
+						property_inputs=properties_inputs[input_variable]
+					)
+				elif inputs_properties[input_variable] == 'time':
+					# There is only one input for date and possibly one for time for each level of item.
+					# so we always update on delete and can just check the set values
+					statement = (
+						' UNWIND $uid_list as uid'
+						' MATCH '
+						'	(item: Item {uid: uid}) '
+					)
+					if 'date' in input_variable:
+						statement += (
+							' DELETE item.date, item.time '
+						)
+					else:
+						statement += (
+							' DELETE item.time_of_day'
+							'	 SET item.time = CASE '
+							'		WHEN item.date IS NOT NULL '
+							'		THEN '
+							'			apoc.date.parse(item.date + " 12:00", "ms", "yyyy-MM-dd HH:mm") '
+							'		END '
+						)
+					tx.run(
+						statement,
+						uid_list=property_uid[input_variable],
+					)
+				elif inputs_properties[input_variable] == 'elevation':
+					tx.run(
+						' UNWIND $uid_list as uid'
+						' MATCH '
+						'	(item: Item {uid: uid}) '
+						' REMOVE item.elevation ',
+						uid_list=property_uid[input_variable]
+					)
 
 	@celery.task(bind=True)
 	def async_correct(self, username, access, upload_object):
@@ -3181,22 +3487,21 @@ class Upload:
 					deletion_result = upload_object.correct(tx, access, record_type)
 					# update properties where needed
 					property_uid = {
-						'assign name': [],
-						'sample type (in situ)': [],
-						'sample type (harvest)': [],
-						'sample type (sub-sample)': [],
+						'set custom name': [],
+						'set sample unit (in situ)': [],
+						'set sample unit (harvest)': [],
+						'set sample unit (sub-sample)': [],
 						'assign tree to block by name': [],
-						'assign field sample to block by name': [],
-						'assign field sample to block(s) by id': [],
-						'assign field sample to tree(s) by id': [],
-						'assign field sample to sample(s) by id': [],
-						'assign to samples': [],
-						'specify tissue': [],
-						'planting date': [],
-						'variety name': [],
-						'variety code': [],
-						'harvest date': [],
-						'harvest time': []
+						'assign tree to block by id': [],
+						'assign sample to block(s) by name': [],
+						'assign sample to block(s) by id': [],
+						'assign sample to tree(s) by id': [],
+						'assign sample to sample(s) by id': [],
+						'set harvest date': [],
+						'set planting date': [],
+						'set harvest time': [],
+						'assign variety name': [],
+						'assign variety (el frances code)': []
 					}
 					# just grab the UID where records are deleted and do the update from any remaining records
 					record_tally = {}

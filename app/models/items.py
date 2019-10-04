@@ -393,7 +393,8 @@ class AddFieldItems:
 				'		counter.count = counter.count + 1, '
 				'		block.name = trim($block_name), '
 				'		block.uid = (field.uid + "_B" + counter.count), '
-				'		block.id = counter.count '
+				'		block.id = counter.count, '
+				'		block.varieties = CASE WHEN field.variety IS NOT NULL THEN [field.variety] END '
 				' REMOVE '
 				'	counter._LOCK_ '
 				' FOREACH (n IN CASE WHEN block.found = False THEN [1] ELSE [] END | '
@@ -405,28 +406,7 @@ class AddFieldItems:
 				'		(ui)-[:SUBMITTED]->(ub:Blocks) '
 				'	CREATE '
 				'		(ub)-[s:SUBMITTED {time: datetime.transaction().epochMillis}]->(block) '
-				# find existing assign to block records for trees with matching name and create link
-				# INSTEAD OF THIS WE WANT TO GIVE PROPER ERRORS FROM FAILED PROPERTY UPDATES
-				#' WITH block '
-				#' 	MERGE '
-				#'		(bt: BlockTrees)'
-				#'		-[:IS_IN]-> (block) '
-				#'	OPTIONAL MATCH '
-				#'		(block)'
-				#'		-[: IS_IN]->(: FieldBlocks) '
-				#'		-[: IS_IN]->(: Field) '
-				#'		<-[: IS_IN]-(: FieldTrees) '
-				#'		<-[: IS_IN]-(tree: Tree) '
-				#'		<-[: FOR_ITEM]-(ii: ItemInput) '
-				#'		-[: FOR_INPUT*..2]->(: Input { '
-				#'			name_lower: "assign tree to block by name" '
-				#'		}), '		
-				#'		(ii)<-[: RECORD_FOR]-(r: Record) '
-				#'	WHERE toLower(r.value) = block.name_lower '
-				#'	OPTIONAL MATCH '
-				#'		(tree)-[: IS_IN]->(existing_bt: BlockTrees) '	
-				#'	FOREACH (n IN CASE WHEN tree IS NOT NULL AND existing_bt IS NULL THEN [1] ELSE [] END | '
-				#'		MERGE (t:Tree)-[:IS_IN]->(bt) '
+				' ) '
 				' RETURN [ '
 				'	block.uid, '
 				'	block.name '
@@ -450,9 +430,9 @@ class AddFieldItems:
 			'		username_lower: toLower(trim($username)) '
 			'	}) '
 			'  MATCH '
-			'	(country:Country) '
-			'	<-[:IS_IN]-(region:Region) '
-			'	<-[:IS_IN]-(farm:Farm) '
+			'	(country: Country) '
+			'	<-[:IS_IN]-(region: Region) '
+			'	<-[:IS_IN]-(farm: Farm) '
 			'	<-[:IS_IN]-(field: Field { '
 			'		uid: $field_uid '	
 			'	}) '
@@ -517,7 +497,7 @@ class AddFieldItems:
 			)
 		statement += (
 			' WITH '
-			'	user, uft '
+			'	user, uft, '
 			'	country.name as country, '
 			'	region.name as region, '
 			'	farm.name as farm, '
@@ -526,11 +506,24 @@ class AddFieldItems:
 		)
 		if block_uid:
 			statement += (
-				' , block, block_tree_counter, block_trees, ff, uff '
+				' , block, block_tree_counter, block_trees, ff, uff, '
+				' collect(field) + collect(block) as ancestors'
+				' UNWIND ancestors as ancestor '
+				' WITH '
+				'	user, uft, '
+				'	country, '
+				'	region, '
+				'	farm, '
+				'	field, '
+				'	field_tree_counter, field_trees, '
+				'	block, block_tree_counter, block_trees, ff, uff, '
+				'	COLLECT(DISTINCT ancestor.variety) as varieties '
+			)
+		else:
+			statement += (
+				' , collect(field.variety) as varieties '
 			)
 		statement += (
-			' OPTIONAL MATCH '
-			'	(field)-[:OF_VARIETY]->(:FieldVariety)-[:OF_VARIETY]->(variety:Variety) '
 			' UNWIND range(1, $tree_count) as tree_count '
 			'	SET '
 			'		field_tree_counter.count = field_tree_counter.count + 1 '
@@ -538,7 +531,8 @@ class AddFieldItems:
 			'		(uft)-[:SUBMITTED {time: datetime.transaction().epochMillis}]-> '
 			'		(tree: Tree: Item { '
 			'			uid: (field.uid + "_T" + field_tree_counter.count), '
-			'			id: field_tree_counter.count '
+			'			id: field_tree_counter.count , '
+			'			varieties: varieties '
 			'		})-[:IS_IN]-> '
 			'		(field_trees) '
 			'	SET '
@@ -580,7 +574,7 @@ class AddFieldItems:
 		)
 		statement += (
 			'	UID: tree.uid,	'
-			'	Variety: [variety.name] '
+			'	Varieties: tree.varieties '
 			' } '
 		)
 		with get_driver().session() as neo4j_session:
@@ -680,12 +674,10 @@ class AddFieldItems:
 		)
 		if level == 'field':
 			statement += (
-				' OPTIONAL MATCH (field) '
-				'	-[:OF_VARIETY*2]->(variety: Variety) '
 				' WITH '
 				' field AS item, '
 				' user_samples, '
-				' COLLECT(DISTINCT(variety.name)) as varieties, '
+				' COLLECT(field.variety) as varieties, '
 				' country, region, farm '
 			)
 		else:
@@ -704,13 +696,18 @@ class AddFieldItems:
 				)
 			if level == 'block':
 				statement += (
-					' OPTIONAL MATCH (field) '
-					'	-[:OF_VARIETY*2]->(variety: Variety) '
 					' WITH '
-					' block AS item, '
-					' user_samples, '
-					' COLLECT(DISTINCT(variety.name)) as varieties, '
-					' country, region, farm, field '
+					'	block AS item, '
+					'	user_samples, '
+					'	country, region, farm, field '
+					'	COLLECT(field) + COLLECT(block) as ancestors '
+					' UNWIND '
+					'	ancestors as ancestor '
+					' WITH '
+					' 	item, '
+					' 	user_samples, '
+					' 	country, region, farm, field, '
+					'	COLLECT(DISTINCT ancestor.variety) as varieties '
 				)
 			if any([level == 'tree', tree_id_list]):
 				statement += (
@@ -742,21 +739,24 @@ class AddFieldItems:
 							'	(tree)-[:IS_IN*2]->(block: Block) '
 						)
 					statement += (
-						' OPTIONAL MATCH (tree) '
-						'	-[:OF_VARIETY*2]->(tree_variety: Variety)'
-						' OPTIONAL MATCH (field) '
-						'	-[:OF_VARIETY*2]->(field_variety: Variety)'
 						' WITH '
-						' tree AS item,  '
-						' user_samples, '
-						' COLLECT(DISTINCT(COALESCE(tree_variety.name, field_variety.name))) as varieties, '
-						' country, region, farm, field, '
-						' block '
+						'	tree AS item,  '
+						'	user_samples, '
+						'	country, region, farm, field, '
+						'	block, '
+						'	COLLECT(field) + COLLECT(block) + COLLECT(tree) as ancestors, '
+						' UNWIND '
+						'	ancestors as ancestor '
+						' WITH '
+						'	item,  '
+						'	user_samples, '
+						'	COLLECT(DISTINCT ancestor.variety) as varieties, '
+						'	country, region, farm, field, block '
 					)
 			if level == 'sample':
 				statement += (
 					' <-[: FROM | IS_IN* ]-(: ItemSamples) '
-					' <-[: FROM*]-(sample: Sample) '
+					' <-[: FROM*]-(source_sample: Sample) '
 				)
 				if tree_id_list:
 					parameters['tree_id_list'] = tree_id_list
@@ -774,51 +774,51 @@ class AddFieldItems:
 							' WHERE '
 						)
 					statement += (
-						' sample.id IN $sample_id_list '
+						' source_sample.id IN $sample_id_list '
 					)
 				if not block_uid:
 					statement += (
 						' OPTIONAL MATCH '
-						'	(sample)-[:FROM | IS_IN*]->(block: Block) '
+						'	(source_sample)-[:FROM | IS_IN*]->(block: Block) '
 					)
 				if not tree_id_list:
 					statement += (
 						' OPTIONAL MATCH '
-						'	(sample)-[:FROM*]->(tree: Tree) '
+						'	(source_sample)-[:FROM*]->(tree: Tree) '
 					)
 				statement += (
-					' OPTIONAL MATCH '
-					'	(sample)-[:FROM*]->(source_sample: Sample) '
-					' OPTIONAL MATCH '
-					'	(sample)-[:FROM*]->(:Field)-[OF_VARIETY*2]->(field_variety: Variety)'
-					' OPTIONAL MATCH '
-					'	(sample)-[:FROM*]->(:Tree)-[OF_VARIETY*2]->(tree_variety: Variety)'
+				#	' OPTIONAL MATCH '
+				#	'	p = (source_sample)-[:FROM*]->(source_sample_source_sample: Sample) '
 					' WITH DISTINCT '
-					' sample AS item, '
-					' sample as item_samples, '
-					' user_samples, '
-					' country, region, farm, field, '
-					' collect(DISTINCT block.uid) as block_ids, '
-					' collect(DISTINCT block.name) as blocks, '
-					' collect(DISTINCT tree.id) as tree_ids, '
-					' collect(DISTINCT tree.name) as tree_names, '
-					' collect(DISTINCT source_sample.id) as source_sample_ids, '
-					' collect(DISTINCT source_sample.name) as source_sample_names, '
-					' collect(DISTINCT(COALESCE(tree_variety.name, field_variety.name))) as varieties, '
-					# need to ensure these values are consistent in submission. taking first entry anyway
-					' collect(source_sample.tissue)[0] as sample_tissue, '
-					' collect(source_sample.time)[0] as sample_time '
+					'	source_sample AS item, '
+					'	source_sample as item_samples, '
+					'	user_samples, '
+					'	country, region, farm, field, '
+					'	COLLECT(DISTINCT block) as blocks, '
+					'	COLLECT(DISTINCT tree) as trees '
+					#'	COLLECT(DISTINCT source_sample) + COLLECT(DISTINCT source_sample_source_sample) as source_samples, '
+					#'	COLLECT(field) '
+					#'	+ COLLECT(DISTINCT block) '
+					#'	+ COLLECT(DISTINCT tree) '
+					#'	+ COLLECT(DISTINCT source_sample) '
+					#'	+ COLLECT(DISTINCT source_sample_source_sample) as ancestors '
+					#' UNWIND ancestors as ancestor '
+					#' WITH '
+					#'	item, item_samples, user_samples, '
+					#'	country, region, farm, field, '
+					#'	blocks, trees, source_samples '
+					#'	COLLECT(DISTINCT ancestor.variety) as varieties '
 				)
 		if level != 'sample':
 			statement += (
 				' MERGE '
-				'	(item)<-[:FROM]-(item_samples: ItemSamples) '
+				'	(item)<-[: FROM]-(item_samples: ItemSamples) '
 			)
 		statement += (
 			' MERGE '
 			'	(user_samples) '
 			'	-[: SUBMITTED]->(user_item_samples: UserItemSamples)'
-			'	-[:CONTRIBUTED]->(item_samples) '
+			'	-[: CONTRIBUTED]->(item_samples) '
 			' MERGE '
 		)
 		if level == 'field':
@@ -831,7 +831,7 @@ class AddFieldItems:
 			)
 		statement += (
 			'	<-[:FOR]-(field_sample_counter: Counter { '
-			'		name :"sample", '
+			'		name: "sample", '
 		)
 		if level == 'field':
 			statement += (
@@ -850,8 +850,8 @@ class AddFieldItems:
 			statement += (
 				' WITH '
 				' country, region, farm, '
-				' varieties, '
 				' item, '
+				' varieties, '
 				' user_item_samples, '
 				' item_samples, '
 				' field_sample_counter '
@@ -860,8 +860,8 @@ class AddFieldItems:
 			statement += (
 				' WITH '
 				' country, region, farm, field, '
-				' varieties, '
 				' item, '
+				' varieties, '
 				' user_item_samples, '
 				' item_samples, '
 				' field_sample_counter '
@@ -869,10 +869,9 @@ class AddFieldItems:
 		elif level == 'tree':
 			statement += (
 				' WITH '
-				' country, region, farm, field, '
-				' varieties, '
-				' block, '
+				' country, region, farm, field, block, '
 				' item, '
+				' varieties, '
 				' user_item_samples, '
 				' item_samples, '
 				' field_sample_counter '
@@ -881,13 +880,10 @@ class AddFieldItems:
 			statement += (
 				' WITH '
 				' country, region, farm, field, '
-				' block_ids, blocks, '
-				' tree_ids, tree_names, '
-				' source_sample_ids, '
-				' source_sample_names, '
-				' varieties, '
-				' sample_tissue, sample_time, '
-				' item, item_samples, user_item_samples, '
+				' blocks, trees, '
+				' item, '
+				' user_item_samples, '
+				' item_samples, '
 				' field_sample_counter '
 			)
 		if level == 'field':
@@ -913,16 +909,51 @@ class AddFieldItems:
 				' uid: (field.uid + "_S" + field_sample_counter.count), '
 			)
 		statement += (
-				'			id: field_sample_counter.count '
-				'		})-[:FROM]->(item_samples) '
-				'	SET field_sample_counter._LOCK_ = false '
-				' RETURN { '
-				'	UID: sample.uid, '
-				'	Country: country.name, '
-				'	Region: region.name, '
-				'	Farm: farm.name, '
-				'	Variety: varieties, '
+			'			id: field_sample_counter.count '
+			'		})-[:FROM]->(item_samples) '
+			'	SET field_sample_counter._LOCK_ = false '
+		)
+		if level == 'sample':
+			statement += (
+				' WITH '
+				'	country, region, farm, field, '
+				'	blocks, trees, '
+				'	item, '
+				'	sample '
+				' OPTIONAL MATCH '
+				'	p = (sample)-[:FROM*]->(source_sample:Sample) '
+				' WITH '
+				'	country, region, farm, field, '
+				'	blocks, trees, '
+				'	item, '
+				'	sample, '
+				' 	source_sample '
+				' ORDER BY length(p) '
+				' WITH '
+				'	country, region, farm, field, '
+				'	blocks, trees, '
+				'	item, '
+				'	sample, '
+				'	field + blocks + trees + COLLECT(DISTINCT source_sample) as ancestors, '
+				'	COLLECT(DISTINCT source_sample) as source_samples '
+				' UNWIND ancestors as ancestor '
+				' WITH '
+				'	country, region, farm, field, '
+				'	blocks, trees, '
+				'	item, '
+				'	sample, '
+				'	source_samples, '
+				'	collect(ancestor.variety) as varieties '
+				' SET sample.varieties = varieties '
 			)
+		statement += (
+			' RETURN { '
+			'	UID: sample.uid, '
+			'	Country: country.name, '
+			'	Region: region.name, '
+			'	Farm: farm.name, '
+			'	Varieties: varieties, '
+		)
 		if level == 'field':
 			statement += (
 				' Field: item.name, '
@@ -947,15 +978,13 @@ class AddFieldItems:
 					)
 			elif level == 'sample':
 				statement += (
-					' Blocks: blocks, '
-					' `Block IDs` : block_ids, '
-					' `Tree IDs`: tree_ids, '
-					' `Tree Names`: tree_names, '
-					# first entry will be immediate parent sample value (item), subsequent are in no particular order
-					' `Source Sample IDs`: item.id + source_sample_ids, '
-					' `Source Sample Names`: item.name + source_sample_names, '
-					' Tissue: coalesce(item.tissue, sample_tissue), '
-					' `Harvest Time`: apoc.date.format(coalesce(item.time, sample_time), "ms", "yyyy-MM-dd HH:mm") '
+					' Blocks: [x IN blocks | x.name], '
+					' `Block IDs` : [x IN blocks | x.id], '
+					' `Tree IDs`: [x IN trees | x.id], '
+					' `Tree Names`: [x IN trees | x.name], '
+					' `Source Sample IDs` : [x IN source_samples | x.id], '
+					' `Source Sample Names` : [x IN source_samples | x.name], ' 
+					' Unit: item.unit '
 				)
 		statement += (
 			' } '

@@ -324,7 +324,7 @@ def create_trials(tx, trials):
 	# also creates the variety name input and list of varieties as its categories
 	# as well as a number of known locations (from trial information)
 	tx.run(
-		' MATCH (input: Input {name_lower: "variety name"}) '
+		' MATCH (input: Input {name_lower: "assign variety name"}) '
 		' SET input.category_list = [] '
 	)
 	for trial in trials:
@@ -421,7 +421,7 @@ def create_trials(tx, trials):
 		tx.run(
 			' MATCH '
 			'	(trial: Trial {uid:$uid}), '
-			'	(input: Input {name_lower: "variety name"}) '
+			'	(input: Input {name_lower: "assign variety name"}) '
 			' MERGE '
 			'	(trial)'
 			'		<-[recorded_in: RECORDED_IN]-(input) '
@@ -439,7 +439,7 @@ def create_trials(tx, trials):
 					'	(trial: Trial { '
 					'		uid: $trial '
 					'	})<-[recorded_in:RECORDED_IN]-(input: Input { '
-					'		name_lower: "variety name" '
+					'		name_lower: "assign variety name" '
 					'	}) '
 					' SET '
 					'	recorded_in.category_list = CASE '
@@ -536,7 +536,7 @@ def create_trials(tx, trials):
 	)
 	# now sort the list of variety names (this sorting will handle numbers better than a simple string sort does)
 	tx.run(
-		' MATCH (input: Input {name_lower: "variety name"}) '
+		' MATCH (input: Input {name_lower: "assign variety name"}) '
 		' WITH input, input.category_list as L '
 		' UNWIND L as l '
 		' WITH input, coalesce(toInteger(l), l) as L ORDER BY L '
@@ -545,15 +545,16 @@ def create_trials(tx, trials):
 	)
 
 
-def create_variety_codes(tx, variety_codes):
+def create_variety_codes(tx, variety_codes, input_name):
 	tx.run(
-		' MATCH (input: Input {name_lower: "variety code"}) '
-		' SET input.category_list = [] '
+		' MATCH (input: Input {name_lower: $input_name}) '
+		' SET input.category_list = [] ',
+		input_name=input_name
 	)
 	for item in variety_codes:
 		if item[1].lower() == item[2].lower():  # if inbred
 			result = tx.run(
-				' MATCH (input: Input {name_lower: "variety code"}) '
+				' MATCH (input: Input {name_lower: toLower($input_name)}) '
 				' MERGE (var:Variety {name_lower: toLower($variety)}) '
 				'	ON CREATE SET '
 				'		var.name = $variety, '
@@ -561,16 +562,15 @@ def create_variety_codes(tx, variety_codes):
 				'	ON MATCH SET '
 				'		var.found = True '
 				' SET '
-				'	var.code = $code, '
-				'	var.code_lower = toLower($code), '
 				'	input.category_list = input.category_list + $code'
 				' RETURN var.found ',
 				code=str(item[0]),
-				variety=str(item[1])
+				variety=str(item[1]),
+				input_name=input_name
 			)
 		else:  # hybrid
 			result = tx.run(
-				' MATCH (input: Input {name_lower: "variety code"}) '
+				' MATCH (input: Input {name_lower: toLower($input_name)}) '
 				' MERGE (mat:Variety {name_lower: toLower($maternal)}) '
 				'	ON CREATE SET '
 				'		mat.name = $maternal '
@@ -586,29 +586,29 @@ def create_variety_codes(tx, variety_codes):
 				' ON MATCH SET '
 				'	var.found = True '
 				' SET '
-				'	var.code = $code, '
-				'	var.code_lower = toLower($code), '
 				'	input.category_list = input.category_list + $code '
 				' RETURN var.found ',
 				code=str(item[0]).lower(),
 				maternal=str(item[1]).lower(),
-				paternal=str(item[2]).lower()
+				paternal=str(item[2]).lower(),
+				input_name=input_name
 			)
 		print str(item[0]).lower(), str(item[1]).lower(), str(item[2]).lower()
 		for record in result:
-			print "Merging variety codes"
+			print "Merging variety codes for " + str(input_name)
 			if record[0]:
 				print "Existing variety, code set"
 			else:
 				print "New variety created"
 	# now sort that list of codes (this sorting will handle numbers better than a simple string sort does)
 	tx.run(
-		' MATCH (input: Input {name_lower: "variety code"}) '
+		' MATCH (input: Input {name_lower: $input_name}) '
 		' WITH input, input.category_list as L '
 		' UNWIND L as l '
 		' WITH input, coalesce(toInteger(l), l) as L ORDER BY L '
 		' WITH input, collect(toString(L)) as l '
-		' SET input.category_list = l '
+		' SET input.category_list = l ',
+		input_name=input_name
 	)
 
 
@@ -654,7 +654,7 @@ else:
 			session.write_transaction(create_item_levels, app.config['ITEM_LEVELS'])
 			session.write_transaction(create_inputs, './instance/inputs.csv')
 			session.write_transaction(create_trials, varieties.trials)
-			session.write_transaction(create_variety_codes, varieties.variety_codes)
+			session.write_transaction(create_variety_codes, varieties.el_frances_variety_codes, "Variety (El Frances code)")
 			session.write_transaction(create_start_email)
 	else:
 		print('Nothing done')

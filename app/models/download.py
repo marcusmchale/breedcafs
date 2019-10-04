@@ -111,11 +111,9 @@ class Download:
 			'Tree Name',
 			'Tree Names',
 			'Source Sample IDs',
-			'Sample Name',
 			'Source Sample Names',
-			'Harvest Time',
-			'Tissue',
-			'Variety',
+			'Varieties',
+			'Unit',
 			'Name',
 			'UID'
 		]
@@ -349,6 +347,8 @@ class Download:
 		# write the core fields to the input details page
 		input_details_row_num = 0
 		core_fields_details = [
+			("name", "Pre-filled: If a name is registered for the item it will be here "),
+			("uid", "Pre-filled: Unique identifier for the item"),
 			("person", "Optional: Person responsible for determining these values")
 		]
 		if self.inputs['trait'] or self.inputs['curve']:
@@ -429,7 +429,7 @@ class Download:
 							ws_dict['input_details'].write(input_details_row_num, j, input_type[field])
 		if self.inputs['property']:
 			inputs_properties = app.config['INPUTS_PROPERTIES']
-			property_names_lower = [input_variable['name_lower'] for input_variable in enumerate(self.inputs['property'])]
+			input_names_lower = [input_variable['name_lower'] for input_variable in self.inputs['property']]
 		# iterate through id_list and write to worksheets
 		item_num = 0
 		for record in self.id_list:
@@ -451,6 +451,79 @@ class Download:
 							record[0],
 							item_num
 						)
+						if record_type == 'property':
+							# We can pre-fill property templates with found values to present existing records to users
+							# and also allow them to confirm inferred values
+							for input_variable in self.inputs[record_type]:
+								if input_variable['name_lower'] in inputs_properties:
+									input_column = input_names_lower.index(input_variable['name_lower']) + 3
+									# +3 for [Name/UID/Person] offset
+									if inputs_properties[input_variable['name_lower']] == 'name':
+										if 'Name' in record[0] and record[0]['Name']:
+											name = record[0]['Name']
+											ws_dict[record_type].write(item_num, input_column, name)
+									elif inputs_properties[input_variable['name_lower']] == "variety":
+										if 'Varieties' in record[0] and record[0]['Varieties'] and len(record[0]['Varieties']) == 1:
+											variety = record[0]['Varieties'][0]
+											if 'name' in input_variable['name_lower']:
+												ws_dict[record_type].write(item_num, input_column, variety)
+											else:
+												if 'el frances' in input_variable['name_lower']:
+													code_system = 'el frances'
+												else:
+													code_system = None
+												if code_system and code_system in app.config['SYSTEM_VARIETY_CODE']:
+													if variety in app.config['SYSTEM_VARIETY_CODE'][code_system]:
+														ws_dict[record_type].write(
+															item_num,
+															input_column,
+															app.config['SYSTEM_VARIETY_CODE'][code_system][variety]
+														)
+									elif inputs_properties[input_variable['name_lower']] == "unit":
+										if 'Unit' in record[0] and record[0]['Unit']:
+											unit = record[0]['Unit']
+											ws_dict[record_type].write(item_num, input_column, unit)
+									elif inputs_properties[input_variable['name_lower']] == "elevation":
+										if 'Elevation' in record[0] and record[0]['Elevation']:
+											elevation = record[0]['Elevation']
+											ws_dict[record_type].write(item_num, input_column, elevation)
+									elif inputs_properties[input_variable['name_lower']] == "time":
+										if 'Time' in record[0] and record[0]['Time']:
+											time = record[0]['Time']
+											if 'date' in input_variable['name_lower']:
+												date = time.split(' ')[0]
+												ws_dict[record_type].write(item_num, input_column, date)
+											else:  # time
+												time = time.split(' ')[1]
+												ws_dict[record_type].write(item_num, input_column, time)
+									elif inputs_properties[input_variable['name_lower']] == "source":
+										if 'assign tree' in input_variable['name_lower']:
+											if 'by name' in input_variable['name_lower']:
+												if 'Block' in record[0] and record[0]['Block']:
+													block = record[0]['Block']
+													ws_dict[record_type].write(item_num, input_column, block)
+											else:   # by code in input variable['name_lower']:
+												if 'Block ID' in record[0] and record[0]['Block ID']:
+													block = record[0]['Block ID']
+													ws_dict[record_type].write(item_num, input_column, block)
+										else:  # 'assign sample' in input_variable['name_lower']
+											if 'by name' in input_variable['name_lower']:
+												if 'Blocks' in record[0] and record[0]['Blocks']:
+													blocks = ', '.join(record[0]['Blocks'])
+													ws_dict[record_type].write(item_num, input_column, blocks)
+											else:  # by id
+												if 'to block' in input_variable['name_lower']:
+													if 'Block IDs' in record[0] and record[0]['Block IDs']:
+														blocks = ', '.join(record[0]['Block IDs'])
+														ws_dict[record_type].write(item_num, input_column, blocks)
+												elif 'to tree' in input_variable['name_lower']:
+													if 'Tree IDs' in record[0] and record[0]['Tree IDs']:
+														trees = ', '.join(record[0]['Tree IDs'])
+														ws_dict[record_type].write(item_num, input_column, trees)
+												elif 'to sample' in input_variable['name_lower']:
+													if 'Source Sample IDs' in record[0] and record[0]['Source Sample IDs']:
+														source_samples = ', '.join(record[0]['Source Sample IDs'])
+														ws_dict[record_type].write(item_num, input_column, source_samples)
 					else:  # i.e. record_type == 'curve', where worksheet is named after input
 						for input_variable in self.inputs[record_type]:
 							self.write_item_to_worksheet(
@@ -459,32 +532,6 @@ class Download:
 								record[0],
 								item_num
 							)
-					# We pre-fill templates with found values to present existing records to users
-					#TODO RE_REWRITE ALL OF THIS AS SEPARATE QUERY RATHER SPECIFIC TO PREFILLING THAN FETCHING FOR ALL IDs
-
-					property_column = property_names_lower.index(input_variable['name_lower']) + 3  # [Name/UID/Person]
-					if all([
-						record_type == 'property',
-						'Variety' in record[0] and record[0]['Variety'] and len(record[0]['Variety']) == 1,
-						variety_name_column
-						]):
-							ws_dict[record_type].write(item_num, variety_name_column, record[0]['Variety'][0])
-					# Tissue.
-					# we are writing the retrieved tissue value (if singular) to the input field.
-					if all([
-						record_type == 'property',
-						self.item_level == 'sample',
-						'Tissue' in record[0] and record[0]['Tissue'],
-						tissue_column
-					]):
-						ws_dict[record_type].write(item_num, tissue_column, record[0]['Tissue'])
-					# we are writing the retrieved name value to the input field.
-					if all([
-						record_type == 'property',
-						'Name' in record[0] and record[0]['Name'],
-						name_column
-					]):
-						ws_dict[record_type].write(item_num, name_column, record[0]['Name'])
 		# now that we know the item_num we can add the validation
 		# currently no validation for curves as no definite columns
 		for record_type in self.inputs.keys():
