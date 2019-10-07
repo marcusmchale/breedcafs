@@ -571,7 +571,14 @@ class AddFieldItems:
 			statement += (
 				'	Block: block.name, '
 				'	`Block ID`: block.id, '
+				'	source_level: "Block", '
+				'	source_id: block.id, '
 		)
+		else:
+			statement += (
+				'	source_level: "Field", '
+				'	source_id: field.uid, '
+			)
 		statement += (
 			'	UID: tree.uid,	'
 			'	Varieties: tree.varieties '
@@ -928,7 +935,7 @@ class AddFieldItems:
 				'	item, '
 				'	sample, '
 				' 	source_sample '
-				' ORDER BY length(p) '
+				' ORDER BY field.uid, item.id, length(p) '
 				' WITH '
 				'	country, region, farm, field, '
 				'	blocks, trees, '
@@ -957,7 +964,9 @@ class AddFieldItems:
 		if level == 'field':
 			statement += (
 				' Field: item.name, '
-				' `Field UID`: item.uid '
+				' `Field UID`: item.uid, '
+				' source_level: "Field", '
+				' source_id: item.uid '
 			)
 		else:
 			statement += (
@@ -967,14 +976,18 @@ class AddFieldItems:
 			if level == 'block':
 				statement += (
 					' Block: item.name, '
-					' `Block ID`: item.id '
+					' `Block ID`: item.id, '
+					' source_level: "Block", '
+					' source_id: item.id '
 				)
 			elif level == 'tree':
 				statement += (
 					' Block: block.name, '
 					' `Block ID` : block.id, '
 					' `Tree ID`: item.id, '
-					' `Tree Name`: item.name '
+					' `Tree Name`: item.name, '
+					' source_level: "Tree", '
+					' source_id: item.id '
 					)
 			elif level == 'sample':
 				statement += (
@@ -984,6 +997,8 @@ class AddFieldItems:
 					' `Tree Names`: [x IN trees | x.name], '
 					' `Source Sample IDs` : [x IN source_samples | x.id], '
 					' `Source Sample Names` : [x IN source_samples | x.name], ' 
+					' source_level: "Sample", '
+					' source_id: item.id, '
 					' Unit: item.unit '
 				)
 		statement += (

@@ -232,9 +232,9 @@ class RowParseResult:
 									'Expected a block name '
 								)
 							elif field_input_name in [
-								'assign field sample to sample(s) by id',
-								'assign field sample to tree(s) by id',
-								'assign field sample to block(s) by id'
+								'assign sample to sample(s) by id',
+								'assign sample to tree(s) by id',
+								'assign sample to block(s) by id'
 							]:
 								formatted_cells[field] += (
 									'Expected a comma separated list of integers corresponding to the ID within the field '
@@ -1403,7 +1403,13 @@ class PropertyUpdateHandler:
 			'block'
 		)
 
-	def assign_sample_to_sources(self, input_variable, source_level):
+	def assign_sample_to_sources(self, input_variable):
+		if 'to block' in input_variable:
+			source_level = "Block"
+		elif 'to tree' in input_variable:
+			source_level = "Tree"
+		elif 'to sample' in input_variable:
+			source_level = "Sample"
 		statement = (
 			' UNWIND $uid_value_list AS uid_value '
 			'	WITH '
@@ -1434,49 +1440,56 @@ class PropertyUpdateHandler:
 			'		collect(coalesce(prior_primary_sample_from, prior_secondary_sample_from)) as prior_source_rels '
 			'	UNWIND value as source_identifier '
 			'		OPTIONAL MATCH '
-			'			(new_source:Item)-[:IS_IN | FROM*]->(field) '
+			'			(new_source: Item)-[: IS_IN | FROM*]->(field) '
+			'		WHERE $source_level in labels(new_source) AND '
 		)
 		if 'name' in input_variable:
 			statement += (
-				'		WHERE new_source.name_lower = source_identifier '
+				'		new_source.name_lower = source_identifier '
 			)
 		else:
 			statement += (
-				'		WHERE new_source.id = source_identifier '
+				'		new_source.id = toInteger(source_identifier) '
 			)
 		statement += (
 			'		UNWIND prior_sources as prior_source '
 			'			OPTIONAL MATCH '
-			'				lineage_respected = (new_source)-[:IS_IN | FROM*]->(prior_source) '
+			'				lineage_respected = (new_source)-[: IS_IN | FROM*]->(prior_source) '
 			'	WITH  '
-			'	uid, value, sample, '
-			'	prior_source_rels, '
-			'	collect(distinct new_source) as new_sources, '
-			'	collect(distinct [prior_source.uid, prior_source.name]) as prior_source_details, '
-			'	[ '
-			'		x in collect(distinct [source_identifier, new_source]) '
-			'		WHERE x[1] IS NULL | x[0] '
-			'	] as unmatched_sources, '
-			'	[ '
-			'		x in collect(distinct new_source) '
-			'		WHERE '
-			'			 x not in [ '
-			'				i in collect(distinct [new_source, lineage_respected]) '
-			'				WHERE i[1] IS NOT NULL | i[0] '
-			'			] AND '
-			'			x not in collect(distinct prior_source) '		
+			'		uid, value, sample, '
+			'		prior_source_rels, '
+			'		collect(distinct new_source) as new_sources, '
+			'		collect(distinct prior_source) as prior_sources, '
+			'		[ '
+			'			x in collect(distinct [source_identifier, new_source]) '
+			'			WHERE x[1] IS NULL | x[0] '
+			'		] as unmatched_sources, '  # where the new source was not found by name/id in this field
+			'		[ '
+			'			x in collect(distinct [new_source, lineage_respected]) '
+			'			WHERE x[1] IS NOT NULL | x[0] '
+			'		] as valid_sources, '  # where the new source is a direct descendant of a prior source
+			'		[ '
+			'			x in collect(distinct [prior_source, lineage_respected])'
+			'			WHERE x[1] IS NOT NULL | x[0] '
+			'		] as represented_sources '  # where the prior source has a direct descendant among the new sources
+			'	WITH '
+			'		uid, value, sample, '
+			'		prior_source_rels, '
+			'		new_sources, '
+			'		prior_sources, '
+			'		unmatched_sources, '
+			'		[ '
+			'			x in new_sources '
+			'			WHERE NOT x IN valid_sources '
+			'			AND NOT x IN prior_sources '
 			'			| [x.uid, x.name] '
-			'	]  as invalid_sources, '
-			'	[ '
-			'		x in collect(distinct prior_source) '
-			'		WHERE '
-			'			x not in [ '
-			'				i in collect(distinct [prior_source, lineage_respected]) '
-			'				WHERE i[1] IS NOT NULL | i[0] '
-			'			] AND '
-			'			x not in collect(distinct new_source) '
+			'		]  as invalid_sources, '
+			'		[ '
+			'			x in prior_sources '
+			'			WHERE NOT x IN represented_sources '
+			'			AND NOT x IN new_sources '
 			'			| [x.uid, x.name] '
-			'	]  as unrepresented_sources '
+			'		]  as unrepresented_sources '
 			# Need to check for variety conflicts that would be created in new lineage 
 			# we also want to update varieties property in all members of new lineage
 			' 	UNWIND new_sources as new_source '
@@ -1489,12 +1502,15 @@ class PropertyUpdateHandler:
 			'	WITH '
 			'		uid, value, sample, '
 			'		prior_source_rels, '
-			'		collect(new_source) as new_sources, '
-			'		prior_source_details, '
+			'		collect(distinct new_source) as new_sources, '
+			'		prior_sources, '
 			'		unmatched_sources, invalid_sources, unrepresented_sources, '
-			'		collect(ancestor) + collect(descendant) + collect(new_source) as lineage, '	
+			'		collect(distinct ancestor) + collect(distinct descendant) + collect(distinct new_source) as lineage, '	
 			'		CASE '
-			'		WHEN sample.variety IS NOT NULL AND source.variety IS NOT NULL AND sample.variety <> source.variety '
+			'			WHEN '
+			'				sample.variety IS NOT NULL AND '
+			'				new_source.variety IS NOT NULL AND '
+			'				sample.variety <> new_source.variety '
 			'			THEN collect(distinct { '
 			'				ancestor: new_source.uid,'
 			'				ancestor_variety: new_source.variety, '
@@ -1510,9 +1526,9 @@ class PropertyUpdateHandler:
 			'				descendant: sample.uid, '
 			'				descendant_variety: sample.variety'
 			'			}) WHERE '
-			'				x["descendant_variety"] IS NOT NULL '
-			'				x["ancestor_variety"] IS NOT NULL '
-			'				AND  x["descendant_variety"] <> x["ancestor_variety"] '
+			'				x["descendant_variety"] IS NOT NULL AND '
+			'				x["ancestor_variety"] IS NOT NULL AND '
+			'				x["descendant_variety"] <> x["ancestor_variety"] '
 			'		] + '
 			'		[ '	
 			'			x in collect(distinct { '
@@ -1521,9 +1537,9 @@ class PropertyUpdateHandler:
 			'				descendant: descendant.uid, '
 			'				descendant_variety: descendant.variety'
 			'			}) WHERE '
-			'				x["descendant_variety"] IS NOT NULL '
-			'				x["ancestor_variety"] IS NOT NULL '
-			'				AND  x["descendant_variety"] <> x["ancestor_variety"] '
+			'				x["descendant_variety"] IS NOT NULL AND '
+			'				x["ancestor_variety"] IS NOT NULL AND '
+			'				x["descendant_variety"] <> x["ancestor_variety"] '
 			'		] + '
 			'		[ '	
 			'			x in collect(distinct { '
@@ -1532,52 +1548,45 @@ class PropertyUpdateHandler:
 			'				descendant: descendant.uid, '
 			'				descendant_variety: descendant.variety '
 			'			}) WHERE '
-			'				x["descendant_variety"] IS NOT NULL '
-			'				x["ancestor_variety"] IS NOT NULL '
-			'				AND  x["descendant_variety"] <> x["ancestor_variety"] '
+			'				x["descendant_variety"] IS NOT NULL AND '
+			'				x["ancestor_variety"] IS NOT NULL AND '
+			'				x["descendant_variety"] <> x["ancestor_variety"] '
 			'		] '
 			'			as variety_conflicts  '
 			'	UNWIND '
 			'		new_sources as new_source '
 			'		FOREACH (n IN CASE WHEN '
 			'			new_source IS NOT NULL AND '
+			'			NOT new_source IN prior_sources AND '
 			'			sample IS NOT NULL AND '
 			'			size(unmatched_sources) = 0 AND '
 			'			size(invalid_sources) = 0 AND '
 			'			size(unrepresented_sources) = 0 AND '
 			'			size(variety_conflicts) = 0 '
 			'		THEN [1] ELSE [] END | '
+			'			FOREACH (n in prior_source_rels | delete n) '
 		)
 		if source_level == "sample":
 			statement += (
-				'		MERGE (item)-[:FROM]->(new_source) '
+				'		MERGE (sample)-[:FROM]->(new_source) '
 			)
 		else:
 			statement += (
-				'		MERGE (is:ItemSamples)-[:FROM]->(source) '
-				'		MERGE (item)-[:FROM]->(is) '
+				'		MERGE (is:ItemSamples)-[:FROM]->(new_source) '
+				'		MERGE (sample)-[:FROM]->(is) '
 			)
 		statement += (
 			'		) '
 			'	WITH '
 			'		uid, value, sample, '
 			'		prior_source_rels, '
-			'		prior_source_details, collect([new_source.uid, new_source.name]) as new_source_details, '
+			'		prior_sources, collect(new_source) as new_sources, '
 			'		unmatched_sources, invalid_sources, unrepresented_sources, variety_conflicts, '
 			'		lineage '
-			'	FOREACH (n IN CASE WHEN '
-			'		sample IS NOT NULL AND '
-			'		size(new_source_details) > 0 AND '
-			'		size(unmatched_sources) = 0 AND '
-			'		size(invalid_sources) = 0 AND '
-			'		size(unrepresented_sources) = 0 AND '
-			'		size(variety_conflicts) = 0 '
-			'	THEN [1] ELSE [] END | '
-			'		FOREACH (n in prior_source_rels | delete n) '
-			'	) '
 			'	WITH '
 			'		uid, value, sample, '
-			'		prior_source_details, new_source_details, '
+			'		[x in prior_sources | [x.uid, x.name]] as prior_source_details, '
+			'		[x in new_sources | [x.uid, x.name]] as new_source_details, '
 			'		unmatched_sources, invalid_sources, unrepresented_sources, variety_conflicts, '
 			'		lineage '
 			'	UNWIND lineage as kin '
@@ -1603,7 +1612,7 @@ class PropertyUpdateHandler:
 			'			kin, collect(distinct kin_of_kin.variety) as kin_of_kin_varieties, '
 			'			[ '
 			'				x in collect(distinct [kin_of_kin.uid, kin_of_kin.variety]) WHERE x[1] IS NOT NULL'
-			'			] as kin_variety_sources, '
+			'			] as kin_variety_sources '
 			'		SET kin.varieties = CASE WHEN kin.variety IS NOT NULL THEN [kin.variety] ELSE kin_of_kin_varieties END '
 			'	WITH '
 			'		uid, value, sample, '
@@ -1611,7 +1620,7 @@ class PropertyUpdateHandler:
 			'		unmatched_sources, invalid_sources, unrepresented_sources, variety_conflicts, '
 			'		collect(distinct kin.variety) as kin_varieties, '
 			'		[x in collect(distinct [[kin.uid, kin_variety_sources], labels(kin), kin.varieties]) '
-			'			WHERE "Tree" IN x[1] AND size(x[2] > 1) '
+			'			WHERE "Tree" IN x[1] AND size(x[2]) > 1 '
 			'			| [x[0]] '
 			'		] as tree_varieties_error '
 			'	SET sample.varieties = CASE WHEN sample.variety IS NOT NULL THEN [sample.variety] ELSE kin_varieties END '
@@ -1637,7 +1646,7 @@ class PropertyUpdateHandler:
 		result = self.tx.run(
 			statement,
 			uid_value_list=self.updates[input_variable],
-			source_level=source_level.lower()
+			source_level=source_level
 		)
 		self.item_source_error_check(
 			result,
@@ -3300,7 +3309,7 @@ class Upload:
 						'	(item)-[:FROM | IS_IN*]->(ancestor: Item) '
 						' WITH '
 						'	item, '
-						'	[x IN prior_ancestors WHERE x NOT IN collect(ancestor)] as removed_ancestors,'
+						'	[x IN prior_ancestors WHERE NOT x IN collect(ancestor)] as removed_ancestors,'
 						'	collect(ancestor) as ancestors '
 						' OPTIONAL MATCH '
 						'	(item)<-[:FROM | IS_IN *]-(descendant: Item) '

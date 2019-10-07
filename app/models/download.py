@@ -508,22 +508,25 @@ class Download:
 													ws_dict[record_type].write(item_num, input_column, block)
 										else:  # 'assign sample' in input_variable['name_lower']
 											if 'by name' in input_variable['name_lower']:
-												if 'Blocks' in record[0] and record[0]['Blocks']:
-													blocks = ', '.join(record[0]['Blocks'])
+												if 'source_level' in record[0] and record[0]['source_level'] == 'Block':
+													blocks = ', '.join([str(i) for i in record[0]['Blocks']])
 													ws_dict[record_type].write(item_num, input_column, blocks)
 											else:  # by id
 												if 'to block' in input_variable['name_lower']:
-													if 'Block IDs' in record[0] and record[0]['Block IDs']:
-														blocks = ', '.join(record[0]['Block IDs'])
-														ws_dict[record_type].write(item_num, input_column, blocks)
+													if 'source_level' in record[0] and record[0]['source_level'] == 'Block':
+														if 'Block IDs' in record[0] and record[0]['Block IDs']:
+															blocks = ', '.join([str(i) for i in record[0]['Block IDs']])
+															ws_dict[record_type].write(item_num, input_column, blocks)
 												elif 'to tree' in input_variable['name_lower']:
-													if 'Tree IDs' in record[0] and record[0]['Tree IDs']:
-														trees = ', '.join(record[0]['Tree IDs'])
-														ws_dict[record_type].write(item_num, input_column, trees)
+													if 'source_level' in record[0] and record[0]['source_level'] == 'Tree':
+														if 'Tree IDs' in record[0] and record[0]['Tree IDs']:
+															trees = ', '.join([str(i) for i in record[0]['Tree IDs']])
+															ws_dict[record_type].write(item_num, input_column, trees)
 												elif 'to sample' in input_variable['name_lower']:
-													if 'Source Sample IDs' in record[0] and record[0]['Source Sample IDs']:
-														source_samples = ', '.join(record[0]['Source Sample IDs'])
-														ws_dict[record_type].write(item_num, input_column, source_samples)
+													if 'source_level' in record[0] and record[0]['source_level'] == 'Sample':
+														if 'source_ids' in record[0] and record[0]['Source Sample IDs']:
+															source_samples = ', '.join([str(i) for i in record[0]['source_ids']])
+															ws_dict[record_type].write(item_num, input_column, source_samples)
 					else:  # i.e. record_type == 'curve', where worksheet is named after input
 						for input_variable in self.inputs[record_type]:
 							self.write_item_to_worksheet(

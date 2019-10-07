@@ -27,7 +27,7 @@ def resources():
 		flash('Please log in')
 		return redirect(url_for('login'))
 	else:
-		variety_codes = varieties.variety_codes
+		variety_codes = varieties.el_frances_variety_codes
 		return render_template(
 			'resources.html',
 			title='Resources',

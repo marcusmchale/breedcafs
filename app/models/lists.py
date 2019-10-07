@@ -713,7 +713,14 @@ class ItemList:
 					' WITH '
 					'	item, '
 					'	country, region, farm, '
-					'	field, collect(distinct block) as blocks '
+					'	field,'
+					'	block '
+					' ORDER BY field.uid, block.id '
+					' WITH '
+					'	item, '
+					'	country, region, farm, '
+					'	field, '
+					'	collect(distinct block) as blocks '
 				)
 				if not record_data['tree_id_list']:
 					statement += (
@@ -723,115 +730,46 @@ class ItemList:
 						' 	item, '
 						'	country, region, farm, '
 						'	field, blocks, '
+						'	tree '
+						' ORDER BY field.uid, tree.id '
+						' WITH '
+						' 	item, '
+						'	country, region, farm, '
+						'	field, blocks, '
 						'	collect(distinct tree) as trees '
 					)
 				statement += (
 					' OPTIONAL MATCH '
-					'	(item)-[:FROM*]->(sample: Sample) '
+					'	p = (item)-[:FROM*]->(sample: Sample) '
+					' WITH '
+					'	item, '
+					'	country, region, farm,'
+					'	field, blocks, trees,'
+					'	sample '
+					' ORDER BY field.uid, item.id, length(p), sample.id '
 					' WITH '
 					'	item, '
 					'	country, region, farm, '
 					'	field, blocks, trees, '
 					'	collect(distinct sample) as samples '
+					' OPTIONAL MATCH '
+					'	(item)-[:FROM]->(source_sample: Sample) '
+					' WITH '
+					'	item, '
+					'	country, region, farm, '
+					'	field, blocks, trees, samples, '
+					'	source_sample '
+					' ORDER BY field.uid, item.id, source_sample.id '
+					' WITH '
+					'	item, '
+					'	country, region, farm, '
+					'	field, blocks, trees, samples, '
+					'	collect(distinct source_sample) as source_samples '
 				)
 		return statement, parameters
 
 	def generate_id_list(self, record_data):
-		# Some properties are thought to be particularly relevant to the user so are presented in item_details
-		#  - Sources (where relevant): Country, Region, Farm, Field, Block, Tree, Sample
-		# Further, some are retrieved along with inheritance from sources (e.g. Variety) and coalesced for item_details
-		#  - Variety:
-		#    Variety inheritance (unless set for item):
-		#    - if a variety is set for a field:
-		#      - inherit that value for any block/tree/sample in this field
-		#    - if a variety is set for a block or a single variety is set for a collection of blocks:
-		#      - inherit that value for any tree in this block or sample representing the block or collection
-		#    - if a variety is set for a tree or a single variety is set for a collection of trees:
-		#      - inherit that value for any sample representing this tree or collection
-		#    - if a variety is set for a sample or a single variety is set for a collection of samples:
-		#      - inherit that value for any sample representing this sample or collection
-		#
-		# Time inheritance:
-		#  - If time is set for a field:
-		#    - inherit time (planted) for blocks in this field
-		#    - inherit time (planted) for trees in this field (unless tree is in block and time is set for this block)
-		#  - If time is set for a block or a single time is set for a collection of blocks:
-		#    - inherit time (planted) for trees in this block or collection
-		#  - If time is set for a sample or a single time is set for a collection of samples:
-		#    - inherit time (harvest) for sub-samples from this sample
-		#
-		# Unit inheritance (samples only):
-		#  - if a unit is set for a sample or a common unit is set for a collection of samples:
-		#    - inherit that value for any sample representing this sample or collection
 		statement, parameters = self.build_match_item_statement(record_data)
-		if parameters['item_level'] == 'sample':
-			statement += (
-				' OPTIONAL MATCH '
-				'	(item)-[:FROM*]->(source_sample: Sample) '
-				#  ' OPTIONAL MATCH '
-				#  '	(item) '
-				#  '	<-[:FOR_ITEM]-(location_input: ItemInput) '
-				#  '	-[:FOR_INPUT*]->(:Input {name_lower: "location"}), '
-				#  '	(location_input) '
-				#  '	<-[:RECORD_FOR]-(location_record: Record) '
-				#  '	WHERE ( '
-				#  '		location_record.start <= timestamp() '
-				#  '		OR location_record.start IS NULL '
-				#  '	) AND ( '
-				#  '		location_record.end >= timestamp() '
-				#  '		OR location_record.end IS NULL '
-				#  '	) '
-				#  ' OPTIONAL MATCH '
-				#  '	(item) '
-				#  '	<-[:FOR_ITEM]-(coordinate_input: ItemInput) '
-				#  '	-[:FOR_INPUT*]->(:Input {name_lower: "location (gps)"}), '
-				#  '	(coordinate_input) '
-				#  '	<-[:RECORD_FOR]-(coordinate_record: Record) '
-				#  '	WHERE ( '
-				#  '		coordinate_record.start <= timestamp() '
-				#  '		OR coordinate_record.start IS NULL '
-				#  '	) AND ( '
-				#  '		coordinate_record.end >= timestamp() '
-				#  '		OR coordinate_record.end IS NULL '
-				#  '	) '
-				#  ' OPTIONAL MATCH '
-				#  '	(item) '
-				#  '	<-[:FOR_ITEM]-(temperature_input: ItemInput) '
-				#  '	-[:FOR_INPUT*]->(:Input {name_lower: "storage temperature"}), '
-				#  '	(temperature_input) '
-				#  '	<-[:RECORD_FOR]-(temperature_record: Record) '
-				#  '	WHERE ( '
-				#  '		temperature_record.start <= timestamp() '
-				#  '		OR temperature_record.start IS NULL '
-				#  '	) AND ( '
-				#  '		temperature_record.end >= timestamp() '
-				#  '		OR temperature_record.end IS NULL '
-				#  '	) '
-				#  ' OPTIONAL MATCH '
-				#  '	(item) '
-				#  '	<-[:FOR_ITEM]-(processing_input: ItemInput) '
-				#  '	-[:FOR_INPUT*]->(:Input {name_lower: "processed state"}), '
-				#  '	(processing_input) '
-				#  '	<-[:RECORD_FOR]-(processing_record: Record) '
-				#  '	WHERE ( '
-				#  '		processing_record.start <= timestamp() '
-				#  '		OR processing_record.start IS NULL '
-				#  '	) AND ( '
-				#  '		processing_record.end >= timestamp() '
-				#  '		OR processing_record.end IS NULL '
-				#  '	) '
-				#  ' WITH DISTINCT '
-				#  ' item, '
-				#  ' country, region, farm, field, '
-				#  ' collect(DISTINCT block.id) as block_ids, '
-				#  ' collect(DISTINCT block.name) as blocks, '
-				#  ' collect(DISTINCT tree.id) as tree_ids, '
-				#  ' collect(DISTINCT tree.name) as tree_names, '
-				#  ' collect(DISTINCT source_sample.id) as source_sample_ids, '
-				#  # need to ensure these values are consistent in submission. taking first entry anyway
-				#  ' collect(source_sample.unit)[0] as source_sample_unit, '
-				#  ' collect(source_sample.time)[0] as source_sample_time '
-			)
 		statement += (
 			' RETURN { '
 			'	UID: item.uid, '
@@ -863,13 +801,25 @@ class ItemList:
 				)
 			elif parameters['item_level'] == 'sample':
 				statement += (
-					' Blocks: collect(block.name), '
-					' `Block IDs` : collect(block.id), '
-					' `Tree IDs`: collect(tree.id), '
-					' `Tree Names`: collect(tree.name), '
-					' `Source Sample IDs`: collect(source_sample.id), '
-					' `Source Sample Names`: collect(source_sample.name), '
-					' Unit: item.unit '
+					' Blocks: [x in blocks | x.name], '
+					' `Block IDs` : [x in blocks | x.id], '
+					' `Tree IDs`: [x in trees | x.id], '
+					' `Tree Names`: [x in trees | x.name], '
+					' `Source Sample IDs`: [x in samples | x.id], '
+					' `Source Sample Names`: [x in samples | x.name], '
+					' Unit: item.unit, '
+					' source_level: CASE '
+					'	WHEN size(source_samples) <> 0 THEN "Sample" '
+					'	WHEN size(trees) <> 0 THEN "Tree" '
+					'	WHEN size(blocks) <> 0 THEN "Block" '
+					'	ELSE "Field" '
+					'	END, '
+					' source_ids: CASE '
+					'	WHEN size(source_samples) <> 0 THEN [x in source_samples | x.id ] '
+					'	WHEN size(trees) <> 0 THEN [x in trees | x.id ] '
+					'	WHEN size(blocks) <> 0 THEN [x in blocks | x.id ] '
+					'	ELSE [field.uid]  '
+					'	END '
 				)
 		statement += (
 			' } '
@@ -889,117 +839,3 @@ class ItemList:
 				statement,
 				parameters)
 		return result
-
-	#  @staticmethod
-	#  def get_fields(
-	#  		country=None,
-	#  		region=None,
-	#  		farm=None
-	#  ):
-	#  	parameters = {}
-	#  	query = 'MATCH (country:Country '
-	#  	if country:
-	#  		query += '{name_lower: toLower($country)}'
-	#  		parameters['country'] = country
-	#  	query += ')<-[:IS_IN]-(region:Region '
-	#  	if region:
-	#  		query += '{name_lower: toLower($region)}'
-	#  		parameters['region'] = region
-	#  	query += ')<-[:IS_IN]-(farm:Farm '
-	#  	if farm:
-	#  		query += '{name_lower: toLower($farm)}'
-	#  		parameters['farm'] = farm
-	#  	query += (
-	#  		' )<-[IS_IN]-(field:Field) '
-	#  		' OPTIONAL MATCH '
-	#  		'	(field) '
-	#  		'	<-[: FROM_FIELD]-(fit: FieldItemTreatment) '
-	#  		'	-[: FOR_TREATMENT]->(treatment:Treatment), '
-	#  		'	(fit)<-[: FOR_TREATMENT]-(tc:TreatmentCategory) '
-	#  		' WITH '
-	#  		'	country, region, farm, field, '
-	#  		'	treatment, '
-	#  		'	collect(tc.category) as categories '
-	#  		' WITH { '
-	#  		'	Country : country.name, '
-	#  		'	Region : region.name, '
-	#  		'	Farm : farm.name, '
-	#  		'	Field : field.name, '
-	#  		'	UID : field.uid, '
-	#  		'	Treatments : collect({ '
-	#  		'		name: treatment.name, '
-	#  		'		categories: categories '
-	#  		'	})'
-	#  		' } as result '
-	#  		' RETURN result '
-	#  		' ORDER BY result["UID"] '
-	#  	)
-	#  	with get_driver().session() as neo4j_session:
-	#  		result = neo4j_session.read_transaction(
-	#  			bolt_result,
-	#  			query,
-	#  			parameters)
-	#  	return [record[0] for record in result]
-
-	#  @staticmethod
-	#  def get_blocks(
-	#  		country=None,
-	#  		region=None,
-	#  		farm=None,
-	#  		field_uid=None
-	#  ):
-	#  	parameters = {}
-	#  	query = 'MATCH (country:Country '
-	#  	if country:
-	#  		query += '{name_lower: toLower($country)}'
-	#  		parameters['country'] = country
-	#  	query += ')<-[:IS_IN]-(region:Region '
-	#  	if region:
-	#  		query += '{name_lower: toLower($region)}'
-	#  		parameters['region'] = region
-	#  	query += ')<-[:IS_IN]-(farm:Farm '
-	#  	if farm:
-	#  		query += '{name_lower: toLower($farm)}'
-	#  		parameters['farm'] = farm
-	#  	query += ')<-[:IS_IN]-(field:Field '
-	#  	if field_uid:
-	#  		query += '{uid: toInteger($field_uid)}'
-	#  		parameters['field_uid'] = field_uid
-	#  	query += (
-	#  		' )<-[:IS_IN]-(:FieldBlocks) '
-	#  		' <-[:IS_IN]-(block:Block) '
-	#  		' OPTIONAL MATCH '
-	#  		'	(field) '
-	#  		'	<-[: FROM_FIELD]-(fit: FieldItemTreatment) '
-	#  		'	-[: FOR_TREATMENT]->(treatment:Treatment), '
-	#  		'	(fit)<-[: FOR_TREATMENT]-(tc:TreatmentCategory), '
-	#  		'	(block) '
-	#  		'	<-[:IS_IN]-(:BlockTrees) '
-	#  		'	<-[:IS_IN]-(:Tree) '
-	#  		'	-[:IN_TREATMENT_CATEGORY]->(tc) '
-	#  		' WITH '
-	#  		'	country, region, farm, field, block, '
-	#  		'	treatment, '
-	#  		'	collect (distinct tc.category) as categories '
-	#  		' WITH { '
-	#  		'	UID: block.uid, '
-	#  		'	Block: block.name, '
-	#  		'	`Field UID` : field.uid, '
-	#  		'	Field: field.name, '
-	#  		'	Farm: farm.name, '
-	#  		'	Region: region.name, '
-	#  		'	Country: country.name, '
-	#  		'	Treatments: collect({ '
-	#  		'		name: treatment.name, '
-	#  		'		categories: categories '
-	#  		'	}) '
-	#  		' } as result, field.uid as field_uid, block.id as block_id  '
-	#  		' RETURN result '
-	#  		' ORDER BY field_uid, block_id '
-	#  	)
-	#  	with get_driver().session() as neo4j_session:
-	#  		result = neo4j_session.read_transaction(
-	#  			bolt_result,
-	#  			query,
-	#  			parameters)
-	#  	return [record[0] for record in result]
