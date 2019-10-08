@@ -2434,7 +2434,7 @@ class Cypher:
 		'		-[s:SUBMITTED]->(record: Record) '
 		'		-[:RECORD_FOR]->(), '
 		'	(uff)-[:CONTRIBUTED]->(ff:FieldInput) '
-		'		-[:FROM_FIELD]->(field: Field), '
+		'		-[:FROM_FIELD | FOR_ITEM]->(field: Field), '
 		'	(ff)-[:FOR_INPUT]->(input: Input) '
 		' WHERE s.time >= $starttime AND s.time <= $endtime '
 		' WITH '

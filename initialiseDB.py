@@ -654,7 +654,11 @@ else:
 			session.write_transaction(create_item_levels, app.config['ITEM_LEVELS'])
 			session.write_transaction(create_inputs, './instance/inputs.csv')
 			session.write_transaction(create_trials, varieties.trials)
-			session.write_transaction(create_variety_codes, varieties.el_frances_variety_codes, "Variety (El Frances code)")
+			session.write_transaction(
+				create_variety_codes,
+				varieties.el_frances_variety_codes,
+				"Assign variety (El Frances code)"
+			)
 			session.write_transaction(create_start_email)
 	else:
 		print('Nothing done')

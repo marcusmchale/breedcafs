@@ -774,7 +774,6 @@ class ItemList:
 			' RETURN { '
 			'	UID: item.uid, '
 			'	Name: item.name, '
-			'	Time: apoc.date.format(item.time, "ms", "yyyy-MM-dd HH:mm"), '
 			'	Varieties: item.varieties, '
 			'	Country: country.name, '
 			'	Region: region.name, '
@@ -782,7 +781,9 @@ class ItemList:
 		)
 		if parameters['item_level'] == 'field':
 			statement += (
-				' Field: item.name '
+				' Field: item.name, '
+				' Elevation: item.elevation, '
+				' Time: apoc.date.format(item.time, "ms", "yyyy-MM-dd HH:mm") '
 			)
 		else:
 			statement += (
@@ -791,13 +792,15 @@ class ItemList:
 			)
 			if parameters['item_level'] == 'block':
 				statement += (
-					' Block: item.name '
+					' Block: item.name, '
+					' Time: apoc.date.format(coalesce(item.time, field.time), "ms", "yyyy-MM-dd HH:mm") '
 				)
 			elif parameters['item_level'] == 'tree':
 				statement += (
 					' Block: block.name, '
 					' `Block ID` : block.id, '
-					' `Tree ID`: item.id '
+					' `Tree ID`: item.id, '
+					' Time: apoc.date.format(coalesce(item.time, block.time, field.time), "ms", "yyyy-MM-dd HH:mm") '
 				)
 			elif parameters['item_level'] == 'sample':
 				statement += (
@@ -819,7 +822,8 @@ class ItemList:
 					'	WHEN size(trees) <> 0 THEN [x in trees | x.id ] '
 					'	WHEN size(blocks) <> 0 THEN [x in blocks | x.id ] '
 					'	ELSE [field.uid]  '
-					'	END '
+					'	END, '
+					' Time: apoc.date.format(coalesce(item.time, samples[0].time), "ms", "yyyy-MM-dd HH:mm") '
 				)
 		statement += (
 			' } '

@@ -553,7 +553,7 @@ class AddFieldItems:
 				'	(if) '
 				'	<-[:RECORD_FOR]-(r: Record { '
 				'		found: False, '
-				'		value: block.name, '
+				'		value: toLower(block.name), '
 				'		person: user.name '
 				'	}) '
 				' CREATE '
@@ -573,11 +573,13 @@ class AddFieldItems:
 				'	`Block ID`: block.id, '
 				'	source_level: "Block", '
 				'	source_id: block.id, '
+				'	Time: coalesce(field.time, block.time), '
 		)
 		else:
 			statement += (
 				'	source_level: "Field", '
 				'	source_id: field.uid, '
+				'	Time: field.time, '
 			)
 		statement += (
 			'	UID: tree.uid,	'

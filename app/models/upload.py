@@ -576,7 +576,7 @@ class ParseResult:
 			return '<p>duplicated keys found</p>'
 		else:
 			max_length = 50
-			if self.submission_type == "FB":
+			if self.submission_type == "fb":
 				response = (
 					'<p>The uploaded file contains duplicated unique keys '
 					' (the combination of UID, timestamp and trait).'
@@ -3133,7 +3133,7 @@ class Upload:
 						' OPTIONAL MATCH '
 						'	(item) '
 						'	<-[:FOR_ITEM]-(ii: ItemInput) '
-						'	-[:FOR_INPUT*2]->(i: Input}), '
+						'	-[:FOR_INPUT*2]->(i: Input), '
 						'	(ii)<-[:RECORD_FOR]-(:Record) '
 						' WHERE i.name_lower IN $property_inputs '
 						' WITH '
@@ -3174,7 +3174,7 @@ class Upload:
 						'	WITH '
 						'		item, fv, contains_variety, '
 						'		kin, '
-						'		collect(distinct kin_of_kin.variety) as kin_varieties, '
+						'		collect(distinct kin_of_kin.variety) as kin_varieties '
 						'	SET kin.varieties = CASE WHEN kin.variety IS NOT NULL THEN [kin.variety] ELSE kin_varieties END '
 						' WITH '
 						'	item, fv, contains_variety, '
@@ -3189,7 +3189,7 @@ class Upload:
 						'	DELETE contains_variety '
 						' ) ',
 						uid_list=property_uid[input_variable],
-						property_inputs=properties_inputs[input_variable]
+						property_inputs=properties_inputs[inputs_properties[input_variable]]
 					)
 				elif inputs_properties[input_variable] == 'unit':
 					# There are multiple inputs for unit
@@ -3201,13 +3201,13 @@ class Upload:
 						' OPTIONAL MATCH '
 						'	(item) '
 						'	<-[:FOR_ITEM]-(ii: ItemInput) '
-						'	-[:FOR_INPUT*2]->(i: Input}), '
+						'	-[:FOR_INPUT*2]->(i: Input), '
 						'	(ii)<-[:RECORD_FOR]-(:Record) '
 						' WHERE i.name_lower IN $property_inputs '
 						' WITH item WHERE ii IS NULL '
 						' REMOVE item.unit ',
 						uid_list=property_uid[input_variable],
-						property_inputs=properties_inputs[input_variable]
+						property_inputs=properties_inputs[inputs_properties[input_variable]]
 					)
 				elif inputs_properties[input_variable] == 'source':
 					# There may be multiple inputs for tree/sample item sources (by id, by name)
@@ -3227,10 +3227,10 @@ class Upload:
 						' OPTIONAL MATCH '
 						'	(item) '
 						'	<-[:FOR_ITEM]-(ii: ItemInput) '
-						'	-[:FOR_INPUT*2]->(input: Input}), '
+						'	-[:FOR_INPUT*2]->(input: Input), '
 						'	(ii)<-[:RECORD_FOR]-(record:Record) '
 						'	<-[s:SUBMITTED]-() '
-						' WHERE i.name_lower IN $property_inputs '
+						' WHERE input.name_lower IN $property_inputs '
 					)
 					if 'to block' in input_variable:
 						# these will revert to field level if no records
@@ -3243,6 +3243,7 @@ class Upload:
 							# if no other records specifying and assignment
 							# The IS_IN field relationship is retained when assigning tree to block
 							statement += (
+								' WITH item, prior_ancestors '
 								' MATCH (item)-[is_in:IS_IN]->(:BlockTrees)<-[:FOR]-(c:Counter) '
 								' SET c._LOCK_ = True '
 								' DELETE is_in '
@@ -3254,6 +3255,7 @@ class Upload:
 						else: # assign sample
 							# these must be reattached to field ItemSamples container
 							statement += (
+								' WITH item, prior_ancestors '
 								' MATCH (item)-[from:FROM]->(:ItemSamples) '
 								' MATCH (item)-[:FROM | IS_IN]->(field: Field) '
 								' DELETE from '
@@ -3309,8 +3311,12 @@ class Upload:
 						'	(item)-[:FROM | IS_IN*]->(ancestor: Item) '
 						' WITH '
 						'	item, '
-						'	[x IN prior_ancestors WHERE NOT x IN collect(ancestor)] as removed_ancestors,'
+						'	prior_ancestors, '
 						'	collect(ancestor) as ancestors '
+						' WITH '
+						'	item, '
+						'	ancestors,'
+						'	[x IN prior_ancestors WHERE NOT x IN ancestors | x ] as removed_ancestors'
 						' OPTIONAL MATCH '
 						'	(item)<-[:FROM | IS_IN *]-(descendant: Item) '
 						' WITH '
@@ -3364,7 +3370,7 @@ class Upload:
 					tx.run(
 						statement,
 						uid_list=property_uid[input_variable],
-						property_inputs=properties_inputs[input_variable]
+						property_inputs=properties_inputs[inputs_properties[input_variable]]
 					)
 				elif inputs_properties[input_variable] == 'time':
 					# There is only one input for date and possibly one for time for each level of item.
@@ -3376,11 +3382,11 @@ class Upload:
 					)
 					if 'date' in input_variable:
 						statement += (
-							' DELETE item.date, item.time '
+							' REMOVE item.date, item.time '
 						)
 					else:
 						statement += (
-							' DELETE item.time_of_day'
+							' REMOVE item.time_of_day'
 							'	 SET item.time = CASE '
 							'		WHEN item.date IS NOT NULL '
 							'		THEN '
