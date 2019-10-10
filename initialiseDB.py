@@ -638,7 +638,11 @@ else:
 				session.write_transaction(delete_inputs)
 				session.write_transaction(create_inputs, './instance/inputs.csv')
 				session.write_transaction(create_trials, varieties.trials)
-				session.write_transaction(create_variety_codes, varieties.variety_codes)
+				session.write_transaction(
+					create_variety_codes,
+					varieties.el_frances_variety_codes,
+					"Assign variety (El Frances code)"
+				)
 	elif confirm('Do you want to a delete everything rebuild the constraints and reset the indexes?'):
 		print('Performing a full reset of database')
 		with driver.session() as session:
