@@ -753,7 +753,7 @@ class AddFieldItems:
 						'	user_samples, '
 						'	country, region, farm, field, '
 						'	block, '
-						'	COLLECT(field) + COLLECT(block) + COLLECT(tree) as ancestors, '
+						'	COLLECT(field) + COLLECT(block) + COLLECT(tree) as ancestors '
 						' UNWIND '
 						'	ancestors as ancestor '
 						' WITH '
