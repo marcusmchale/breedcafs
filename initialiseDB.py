@@ -634,9 +634,9 @@ else:
 				session.write_transaction(delete_data)
 			if confirm('Would you like to delete all items?'):
 				session.write_transaction(delete_items)
-			if confirm('Would you like to delete inputs and varieties then recreate them from inputs.csv and varieties.py?'):
+			if confirm('Would you like to delete inputs and varieties then recreate them from input_variables.csv and varieties.py?'):
 				session.write_transaction(delete_inputs)
-				session.write_transaction(create_inputs, './instance/inputs.csv')
+				session.write_transaction(create_inputs, './instance/input_variables.csv')
 				session.write_transaction(create_trials, varieties.trials)
 				session.write_transaction(
 					create_variety_codes,
@@ -656,7 +656,7 @@ else:
 			session.write_transaction(create_indexes, app.config['INDEXES'])
 			session.write_transaction(create_partners, app.config['PARTNERS'])
 			session.write_transaction(create_item_levels, app.config['ITEM_LEVELS'])
-			session.write_transaction(create_inputs, './instance/inputs.csv')
+			session.write_transaction(create_inputs, './instance/input_variables.csv')
 			session.write_transaction(create_trials, varieties.trials)
 			session.write_transaction(
 				create_variety_codes,

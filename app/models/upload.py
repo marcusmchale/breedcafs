@@ -806,9 +806,7 @@ class PropertyUpdateHandler:
 		self.errors = {}
 		self.error_threshold = 10
 		self.function_dict = {
-			'set sample unit (in situ)': self.set_unit,
-			'set sample unit (harvest)': self.set_unit,
-			'set sample unit (sub-sample)': self.set_unit,
+			'set sample unit': self.set_unit,
 			'set custom name': self.set_name,
 			'set elevation': self.set_elevation,
 			# TODO the above are basically the same form
@@ -3503,9 +3501,7 @@ class Upload:
 					# update properties where needed
 					property_uid = {
 						'set custom name': [],
-						'set sample unit (in situ)': [],
-						'set sample unit (harvest)': [],
-						'set sample unit (sub-sample)': [],
+						'set sample unit': [],
 						'assign tree to block by name': [],
 						'assign tree to block by id': [],
 						'assign sample to block(s) by name': [],
