@@ -868,7 +868,7 @@ class RecordForm(FlaskForm):
 			Optional(),
 			NumberRange(min=1, max=100, message='Currently limited to to a maximum of 100 time points per item')
 		],
-		description="Number of time points to include in template"
+		description="Number of rows to include per item (or replicate)"
 	)
 	replicates = IntegerField(
 		'Replicates',
@@ -876,7 +876,7 @@ class RecordForm(FlaskForm):
 			Optional(),
 			NumberRange(min=1, max=100, message='Currently limited to to a maximum of 100 replicates per item')
 		],
-		description="Number of replicated trait measurements or curves per item at each time point"
+		description="Number of replicated measurements or curves per item at each time point"
 	)
 	input_group = SelectField(
 		'Input group',

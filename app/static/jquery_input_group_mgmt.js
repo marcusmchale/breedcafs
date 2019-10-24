@@ -234,7 +234,8 @@ update_group_inputs = function() {
        url: '/record/inputs_selection',
        data: {
            input_group: group_select.val(),
-           username: true
+           username: true,
+           details: true
        },
        success: function(response) {
            const inputs = response;
@@ -244,10 +245,10 @@ update_group_inputs = function() {
                        $('<input type="hidden">').attr({
                             "id": "group_inputs-" + i,
                             "name": "group_inputs",
-                            "value": inputs[i][0]
+                            "value": inputs[i]['name_lower'],
                        })
-                   ).append($('<label>').text(
-                   inputs[i][1]
+                   ).append($('<label title="' + inputs[i]['details'] + '">').text(
+                   inputs[i]['name']
                )));
            }
            group_inputs.prop( "disabled", false);
@@ -282,6 +283,7 @@ update_all_inputs = function() {
             input_group: group_select.val(),
             username: true,
             inverse: true,
+            details: true,
             record_type: record_type_select.val(),
             item_level: item_level_select.val()
         },
@@ -293,10 +295,10 @@ update_all_inputs = function() {
                        $('<input type="hidden">').attr({
                             "id": "all_inputs-" + i,
                             "name": "all_inputs",
-                            "value": inputs[i][0]
+                            "value": inputs[i]['name_lower']
                        })
-                   ).append($('<label>').text(
-                   inputs[i][1]
+                   ).append($('<label title="' + inputs[i]['details'] + '">').text(
+                   inputs[i]['name']
                )));
             }
             all_inputs.prop("disabled", false);

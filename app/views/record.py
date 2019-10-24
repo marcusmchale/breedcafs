@@ -213,6 +213,7 @@ def inputs_selection():
 	partner = request.args.get('partner', False) if request.args.get('partner') not in ['', 'None', 'false'] else False
 	username = request.args.get('username', False) if request.args.get('username') not in ['', 'None', 'false'] else False
 	inverse = request.args.get('inverse', False) if request.args.get('inverse') not in ['', 'None', 'false'] else False
+	details = request.args.get('details', False) if request.args.get('details') not in ['', 'None', 'false'] else False
 	record_type = (
 		request.args.get('record_type', False) if request.args.get('record_type') not in ['', 'None', 'false'] else False
 	)
@@ -230,6 +231,7 @@ def inputs_selection():
 				username=session['username'] if username else False,
 				inverse=inverse,
 				record_type=record_type,
+				details=details,
 				item_level=item_level
 			)
 			response = make_response(jsonify(inputs_list))

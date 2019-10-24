@@ -154,11 +154,10 @@ class SelectionList:
 				' WHERE input.name_lower IN extract(item IN $inputs | toLower(trim(item))) '
 			)
 		if inverse:
-			# also losing the in_group properties here
+			# losing the in_group properties here
 			statement += (
 				' WITH collect(input) as selected_inputs '
 				' MATCH (input:Input) WHERE NOT input IN selected_inputs '
-
 			)
 		if record_type:
 			statement += (
@@ -177,8 +176,7 @@ class SelectionList:
 				'	}) '
 			)
 		if details:
-			if not inverse or (username or partner or input_group):
-				# Here there is no sense to order by group
+			if not inverse and (username or partner or input_group):
 				statement += (
 					' WITH input, in_group '
 					' OPTIONAL MATCH '

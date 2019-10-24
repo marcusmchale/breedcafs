@@ -107,6 +107,8 @@ WORKSHEET_NAMES = {
 
 REFERENCE_WORKSHEETS = ['item_details', 'input_details', 'hidden']
 
+REPLICATED_RECORD_TYPES = ['trait', 'curve']
+
 # The below are used in initialise_db.py
 CONSTRAINTS = [
 	# User/Partner

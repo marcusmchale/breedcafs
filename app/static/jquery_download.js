@@ -54,6 +54,21 @@ group_select_update = function() {
     });
 };
 
+const select_all = $('#select_all_input_variables')
+select_all.attr('checked', true);
+update_select_all = function () {
+    if (select_all.prop('checked')) {
+        input_variable_checkbox_div.find(":checkbox").each(function () {
+            this.checked = true;
+        })
+    } else {
+        input_variable_checkbox_div.find(":checkbox").each(function () {
+            this.checked = false;
+        })
+    }
+}
+select_all.change(update_select_all);
+
 inputs_variables_update = function() {
     input_variable_checkbox_div.empty();
     const record_type = record_type_select.val();
@@ -62,46 +77,35 @@ inputs_variables_update = function() {
     let args = ("?record_type=" + record_type
             + "&item_level=" + item_level
             + "&record_type=" + record_type
-            + "&username=false"
+            + "&details=true"
     );
     if (input_group !== '') {
         args = (args
-            + "&input_group=" + input_group
+            + "&input_group=" + escape(input_group)
             + "&username=true"
         )
     }
+    console.log(args);
     $.ajax({
         url: (
             "/record/inputs_selection" + args
         ),
         type: 'GET',
         success: function (response) {
-            console.log(response);
-            $('#select_all_input_variables').change(function () {
-                    const _this = this;
-                    if (_this.checked) {
-                        input_variable_checkbox_div.find(":checkbox").each(function () {
-                            this.checked = true;
-                        })
-                    } else {
-                        input_variable_checkbox_div.find(":checkbox").each(function () {
-                            this.checked = false;
-                        })
-                    }
-                });
+            const inputs = response;
             for (let i = 0; i < response.length; i++) {
                 input_variable_checkbox_div.append(
-                    "<li>" +
-                    "<input id=select_inputs-" + i + " " +
-                    "name='select_inputs' " +
-                    "type=checkbox value='" + response[i][0] + "' " +
-                    ">" +
-                    "<label for='checkbox_" + response[i][0] + "'>" +
-                    response[i][1] +
-                    "</label>" +
-                    "</li>"
-                );
+                   $('<li></li>').append(
+                       $('<input type="checkbox">').attr({
+                            "id": "inputs-" + i,
+                            "name": "inputs",
+                            "value": inputs[i]['name_lower']
+                       })
+                   ).append($('<label title="' + inputs[i]['details'] + '">').text(
+                   inputs[i]['name']
+               )));
             }
+            update_select_all();
         },
         error: function (error) {
             console.log(error);

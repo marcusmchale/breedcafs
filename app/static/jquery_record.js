@@ -10,7 +10,7 @@ const location_div = $('#location');
 const input_variable_div = $('#input_variable_selection');
 const generate_template_button = $('#generate_template');
 const generate_template_div = $('#generate_template_div');
-const submit_records_button = $('#submit_records');
+//const submit_records_button = $('#submit_records');
 const replicates_div = $('#replicates_div');
 
 $("#record_start").datepicker({ dateFormat: 'yy-mm-dd'});
@@ -115,46 +115,70 @@ group_update = function() {
     dynamic_form_div.empty();
     const item_level = item_level_select.val();
     const input_group = input_group_select.val();
-    if (item_level && input_group) {
-        $.ajax({
-            url: (
-                "/record/inputs"
-                + "?item_level=" + item_level
-                + "&input_group=" + input_group
-                + "&username=True"
-            ),
-            type: 'GET',
-            success: function (response) {
-                input_variable_checkbox_div.append(
-                    "<br><input id=select_all_input_variables type=checkbox>" +
-                    "<label>Select all</label>" +
-                    "<ul id='select_inputs'></ul>"
-                );
-                generate_form(response);
-                $('#select_all_input_variables').change(function () {
-                    if (this.checked) {
-                        input_variable_checkbox_div.find(":checkbox:not(#select_all_input_variables)").each(function () {
-                            this.checked = true;
-                        }).trigger('change');
-                    } else {
-                        input_variable_checkbox_div.find(":checkbox:not(#select_all_input_variables)").each(function () {
-                            this.checked = false;
-                        }).trigger('change');
-                    }
-                });
-            },
-            error: function (error) {
-                console.log(error);
-            }
-        });
-    }
-    update_submit_fields();
+    //if (item_level && input_group) {
+    //    load_input_checkboxes(item_level, input_group);
+    //}
+    //update_submit_fields();
 };
 
+//load_input_checkboxes = function (item_level, input_group) {
+//    input_variable_checkbox_div.append(
+//                "<br><input id=select_all_input_variables type=checkbox>" +
+//                "<label>Select all</label>" +
+//                "<ul id='select_inputs'></ul>"
+//            );
+//    const inputs_list = input_variable_checkbox_div.find('ul')
+//    $.ajax({
+//        type: 'GET',
+//        url: '/record/inputs_selection',
+//        data: {
+//            item_level: item_level,
+//            input_group: input_group,
+//            username: true,
+//            details: true
+//        },
+//        success: function(response) {
+//            const inputs = response;
+//            for (let i = 0; i < inputs.length; i++) {
+//                inputs_list.append(
+//                   $('<li></li>').append(
+//                       $('<input type="checkbox">').attr({
+//                            "id": "all_inputs-" + i,
+//                            "name": "all_inputs",
+//                            "value": inputs[i]['name_lower']
+//                       })
+//                   ).append($('<label title="' + inputs[i]['details'] + '">').text(
+//                   inputs[i]['name']
+//               )));
+//            };
+//            $('#select_all_input_variables').change(function () {
+//                if (this.checked) {
+//                    input_variable_checkbox_div.find(":checkbox:not(#select_all_input_variables)").each(function () {
+//                        this.checked = true;
+//                    }).trigger('change');
+//                } else {
+//                    input_variable_checkbox_div.find(":checkbox:not(#select_all_input_variables)").each(function () {
+//                        this.checked = false;
+//                    }).trigger('change');
+//                };
+//            })
+//        },
+//        error: function(error) {
+//            console.log('Error in request for inputs list')
+//            console.log(error);
+//        }
+//    })
+//    inputs_list.find('li').change(function() {
+//        update_submit_fields();
+//    })
+//    suppress_input();
+//};
 
-generate_form = function (response) {
-    dynamic_form_div.append('<dl></dl>');
-    for (let i = 0; i < response.length; i++) {
+
+
+//generate_form = function (response) {
+//   dynamic_form_div.append('<dl></dl>');
+//    for (let i = 0; i < response.length; i++) {
 //        if (['text', 'numeric', 'percent'].includes(response[i]['format'])) {
 //            dynamic_form_div.find('dl').append(
 //                '<dt>' + response[i]['name'] + '</dt>' +
@@ -224,22 +248,22 @@ generate_form = function (response) {
 //                category_options + '</select></dd>'
 //            );
 //        }
-        input_variable_checkbox_div.find('ul').append(
-            "<li>" +
-            "<input id=select_inputs-" + i + " " +
-            "name='select_inputs' " +
-            "type=checkbox value='" + response[i]['name_lower'] + "' " +
-            ">" +
-            "<label for='checkbox_" + response[i]['name_lower'] + "'>" +
-            response[i]['name'] +
-            "</label>" +
-            "</li>"
-        );
+//        input_variable_checkbox_div.find('ul').append(
+//            "<li>" +
+//            "<input id=select_inputs-" + i + " " +
+//            "name='select_inputs' " +
+//            "type=checkbox value='" + response[i]['name_lower'] + "' " +
+//            ">" +
+//            "<label for='checkbox_" + response[i]['name_lower'] + "'>" +
+//            response[i]['name'] +
+//            "</label>" +
+//            "</li>"
+//        );
 //        const form_field = $('[id="' + response[i]['name_lower'] + '"]').parent('dd');
 //        form_field.hide();
 //        form_field.prev().hide();
-        $('#select_inputs-' + i).change(function () {
-            update_submit_fields();
+//       $('#select_inputs-' + i).change(function () {
+//           update_submit_fields();
 //            if (this.checked) {
 //                 form_field.show();
 //                 form_field.prev().show();
@@ -247,30 +271,30 @@ generate_form = function (response) {
 //                 form_field.hide();
 //                 form_field.prev().hide();
 //            }
-        });
-    }
-    suppress_input();
-};
+//        });
+//    }
+//    suppress_input();
+//};
 
-update_submit_fields = function () {
-    const checkboxes = input_variable_checkbox_div.find(":checkbox:not(#select_all_input_variables)");
-    const count_checkboxes = checkboxes.length;
-    const count_checked = checkboxes.filter(":checked").length;
-    if (count_checked > 0){
-        submit_records_button.show();
-        generate_template_div.show();
-        if (count_checked === count_checkboxes) {
-            $('#select_all_input_variables').prop('checked', true);
-        } else {
-            $('#select_all_input_variables').prop('checked', false);
-        }
-    } else {
-        $('#select_all_input_variables').prop('checked', false);
-        $('#web_form_div').hide();
-        submit_records_button.hide();
-        generate_template_div.hide();
-    }
-};
+//update_submit_fields = function () {
+//    const checkboxes = input_variable_checkbox_div.find(":checkbox:not(#select_all_input_variables)");
+//    const count_checkboxes = checkboxes.length;
+//    const count_checked = checkboxes.filter(":checked").length;
+//    if (count_checked > 0){
+//        //submit_records_button.show();
+//       // generate_template_div.show();
+//        if (count_checked === count_checkboxes) {
+//            $('#select_all_input_variables').prop('checked', true);
+//        } else {
+//            $('#select_all_input_variables').prop('checked', false);
+//        }
+//    } else {
+//        $('#select_all_input_variables').prop('checked', false);
+//        $('#web_form_div').hide();
+//        //submit_records_button.hide();
+//        //generate_template_div.hide();
+//    }
+//};
 
 
 update_item_count = function() {
@@ -373,50 +397,50 @@ generate_template_button.click( function (e) {
 });
 
 
-submit_records_button.click( function (e) {
-    e.preventDefault();
-    update_item_count();
-    remove_flash();
-    const wait_message = "Please wait for submission to complete";
-    const flash_wait = "<div id='records_flash' class='flash'>" + wait_message + "</div>";
-    $(this).after(flash_wait);
-    const data = $("form").serialize();
-    $.ajax({
-        url: "/record/submit_records",
-        data: data,
-        type: 'POST',
-        success: function(response) {
-            if (response.hasOwnProperty('submitted')) {
-                if (response.hasOwnProperty('class') && response.class === 'conflicts') {
-                    const flash_submitted = "<div id='records_flash' class='flash' style='background:#f0b7e1'>" + response.submitted + "</div>";
-                    $("#records_flash").replaceWith(flash_submitted);
-                } else {
-                    const flash_submitted = "<div id='records_flash' class='flash'>" + response.submitted + "</div>";
-                    $("#records_flash").replaceWith(flash_submitted);
-                }
-            } else {
-                $("#records_flash").remove();
-                if (response.hasOwnProperty('errors')) {
-                    const errors= response['errors'];
-                    for (let i = 0; i < errors.length; i++) {
-                        for (const key in errors[i]) {
-                            if (errors[i].hasOwnProperty(key)) {
-                                const flash = "<div id='flash_" + key + "' class='flash'>" + errors[i][key][0] + "</div>";
-                                $('[id="' + key + '"').after(flash);
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        error: function(error) {
-            const error_message = error.status === 500 ? 'An error has occurred. Please try again':
-                'An unknown error as occurred, please contact an administrator';
-            const flash_error = "<div id='records_flash' class='flash'>" + error_message + "</div>";
-            $("#records_flash").replaceWith(flash_error);
-		}
-    })
-});
+//submit_records_button.click( function (e) {
+//    e.preventDefault();
+//    update_item_count();
+//    remove_flash();
+//    const wait_message = "Please wait for submission to complete";
+//    const flash_wait = "<div id='records_flash' class='flash'>" + wait_message + "</div>";
+//    $(this).after(flash_wait);
+//    const data = $("form").serialize();
+//    $.ajax({
+//        url: "/record/submit_records",
+//        data: data,
+//        type: 'POST',
+//        success: function(response) {
+//            if (response.hasOwnProperty('submitted')) {
+//                if (response.hasOwnProperty('class') && response.class === 'conflicts') {
+//                    const flash_submitted = "<div id='records_flash' class='flash' style='background:#f0b7e1'>" + response.submitted + "</div>";
+//                    $("#records_flash").replaceWith(flash_submitted);
+//                } else {
+//                    const flash_submitted = "<div id='records_flash' class='flash'>" + response.submitted + "</div>";
+//                    $("#records_flash").replaceWith(flash_submitted);
+//                }
+//            } else {
+//                $("#records_flash").remove();
+//                if (response.hasOwnProperty('errors')) {
+//                    const errors= response['errors'];
+//                    for (let i = 0; i < errors.length; i++) {
+//                        for (const key in errors[i]) {
+//                            if (errors[i].hasOwnProperty(key)) {
+//                                const flash = "<div id='flash_" + key + "' class='flash'>" + errors[i][key][0] + "</div>";
+//                                $('[id="' + key + '"').after(flash);
+//                            }
+//                        }
+//                    }
+//                }
+//            }
+//        },
+//        error: function(error) {
+//            const error_message = error.status === 500 ? 'An error has occurred. Please try again':
+//                'An unknown error as occurred, please contact an administrator';
+//            const flash_error = "<div id='records_flash' class='flash'>" + error_message + "</div>";
+//            $("#records_flash").replaceWith(flash_error);
+//		}
+//    })
+//});
 
 suppress_input = function () {
     $(':input').keypress(function (e) {

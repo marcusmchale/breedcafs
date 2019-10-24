@@ -231,7 +231,7 @@ class Download:
 			item_details,
 			item_num
 	):
-		if self.replicates:
+		if self.replicates and record_type in app.config['REPLICATED_RECORD_TYPES']:
 			replicate_list = ['.'.join([str(item_details['UID']), str(i)]) for i in range(1, self.replicates + 1)]
 			row_num = ((item_num - 1) * (self.replicates * self.time_points)) + 1
 		else:
@@ -539,7 +539,7 @@ class Download:
 		# currently no validation for curves as no definite columns
 		for record_type in self.inputs.keys():
 			if self.inputs[record_type] and record_type != 'curve':
-				if record_type == 'trait' and self.replicates > 1:
+				if record_type in ['trait', 'curve'] and self.replicates > 1:
 					row_count = item_num * self.replicates * self.time_points
 				else:
 					row_count = item_num * self.time_points

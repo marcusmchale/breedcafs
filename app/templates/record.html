@@ -5,10 +5,10 @@
     <h2>Record</h2>
         <div class="inner_main">
             <div class="text_body">
-                <h3>Select the type of registered items</h3>
+                <h3>Select the type of item</h3>
                 <dd>{{  record_form.item_level }}</dd>
                 <div id="location">
-                    <h3>Filter to select specific item/s</h3>
+                    <h3>Filter to select specific items</h3>
                     <dd>{{ render_field (location_form.country) }}</dd>
                     <dd>{{ render_field (location_form.region) }}</dd>
                     <dd>{{ render_field (location_form.farm) }}</dd>
@@ -28,67 +28,34 @@
                     <p><a>0</a> <a>items</a></p>
                 </div>
                 <div id='input_variable_selection'>
-                    <h3>Select input variables</h3>
+                    <h3>Select inputs</h3>
                         {% if ('global_admin' in session.access) or ('partner_admin' in session.access) %}
-		        			<a href={{  url_for('input_group_management') }}>
+		        			<a href=" {{  url_for('input_group_management') }}">
                                 Click here to create and manage input groups
                             </a><br><br>
         				{% endif %}
                         <dd>{{  render_field (record_form.input_group) }}</dd>
-                        <div id="input_variable_checkbox_div"></div>
-                    <br><br>
                 </div>
                 <div id="replicates_div" title="Number of replicated measures per item">
-                    <h3>Replicates</h3>
-                        <h4>Time points</h4>
+                    <h3>Replicates (optional)</h3>
                             <p>
-                                Number of values per item for each input.
-                                This is to support a single template for multiple times/periods.
-                            </p>
-                            {{  render_field (record_form.time_points) }}<br>
-                        <h4>Replicates</h4>
-                            <p>
-                                Number of replicated measures from the same time/period.
-                                Replicate codes will be appended to the UID and can be used to differentiate
-                                the records and to associate between records from the same time.
+                                If more than one (default) then replicate codes will be appended
+                                to the UID to differentiate records from the same point in time.
+                                This is applied to traits and curves only.
                             </p>
                             {{  render_field (record_form.replicates) }}
+                    <h3>Rows per item</h3>
+                        <p>
+                            Number of rows to include per item (or per replicate if used)
+                            This is to support a single template for multiple time points or periods.
+                        </p>
+                        {{  render_field (record_form.time_points) }}<br>
                 </div>
                 <div id="generate_template_div">
                     {{  render_field (record_form.template_format) }}
                     <input id="generate_template" name="generate_template" type="submit" value="Generate template">
                 </div>
                 {{ record_form.csrf_token }}
-            </div>
-            <div id="web_form_div" class="side_form">
-                <h3>Direct Submission</h3>
-                    <p>
-                        This form is provided to allow direct submission of simple values for the selected items,
-                        please use templates for more complex or detailed submissions.
-                    </p>
-                    <div id="record_period_div">
-                        <dt>Record period</dt>
-                        <dd>
-                            {{ render_field (record_form.record_start) }}
-                            {{ render_field (record_form.record_end) }}
-                            <p>
-                                This web form defaults to the start of the first day through end of the last,
-                                for more detailed submissions use a template
-                            </p>
-                        </dd>
-                    </div>
-                    <div id="record_time_div">
-                        <dt>Date determined</dt>
-                        <dd>
-                            {{ render_field (record_form.record_time) }}
-                            <p>
-                                This web form defaults to midday on the selected date,
-                                for more detailed submissions use a template
-                            </p>
-                        </dd>
-                    </div>
-                    <div id="dynamic_form_div"></div>
-                    {{  render_field (record_form.submit_records) }}
             </div>
         </div>
    </form>
