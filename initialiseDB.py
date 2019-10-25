@@ -6,7 +6,7 @@ import os
 import csv
 from flask import Flask
 from neo4j.v1 import GraphDatabase
-from instance import varieties
+from instance import varieties, input_groups
 
 app = Flask(__name__, instance_relative_config=True)
 app.config.from_object('config')
@@ -288,20 +288,8 @@ def create_inputs(tx, inputs_file):
 				'		item_level.name = trim(level) '
 				' MERGE '
 				'	(i)-[:AT_LEVEL]->(item_level) '
-				' WITH i, record_type, item_level '
-				' UNWIND [x in split($groups, "/") | trim(x)] as group '
-				' MERGE '
-				'	(input_group: InputGroup {'
-				'		name_lower:toLower(trim(group))'
-				'	}) '
-				'	ON CREATE SET '
-				'		input_group.name = trim(group) '
-				' MERGE '
-				'	(i)-[:IN_GROUP]->(input_group) '
-				' MERGE (input_group)-[:AT_LEVEL]->(item_level)'
 				' RETURN i.found ',
 				type=input_variable['type'],
-				groups=input_variable['groups'],
 				levels=input_variable['levels'],
 				name=input_variable['name'],
 				format=input_variable['format'],
@@ -318,6 +306,26 @@ def create_inputs(tx, inputs_file):
 					print ('Created input variable: ' + input_variable['name'])
 				else:
 					print ('Error with merger of input variable: ' + input_variable['name'])
+
+
+def create_input_groups(tx, groups):
+	for group in groups:
+		tx.run(
+			' MERGE (ig: InputGroup {name_lower:toLower(trim($name))}) '
+			'	ON CREATE SET ig.name = trim($name) '
+			' WITH (ig) '
+			'	MATCH (i:Input) '
+			'	WHERE i.name_lower IN [x in $inputs | toLower(trim(x))] '
+			'	MATCH (l:ItemLevel) '
+			'	WHERE l.name_lower IN [x in $levels | toLower(trim(x))] '
+			' MERGE '
+			'	(i)-[:IN_GROUP]->(ig) '
+			' MERGE '
+			'	(ig)-[:AT_LEVEL]->(l) ',
+			name=group['input_group'],
+			levels=group['input_levels'],
+			inputs=group['input_variables']
+		)
 
 
 def create_trials(tx, trials):
@@ -656,7 +664,8 @@ else:
 			session.write_transaction(create_indexes, app.config['INDEXES'])
 			session.write_transaction(create_partners, app.config['PARTNERS'])
 			session.write_transaction(create_item_levels, app.config['ITEM_LEVELS'])
-			session.write_transaction(create_inputs, './instance/input_variables.csv')
+			session.write_transaction(create_inputs, './instance/inputs.csv')
+			session.write_transaction(create_input_groups, input_groups.input_groups)
 			session.write_transaction(create_trials, varieties.trials)
 			session.write_transaction(
 				create_variety_codes,
