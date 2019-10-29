@@ -98,7 +98,7 @@ def clear_schema(tx):
 
 def delete_items(tx):
 	tx.run(
-		' apoc.periodic.iterate( '
+		' CALL apoc.periodic.iterate( '
 		'	" '
 		'		MATCH '
 		'			(item:Item), '
