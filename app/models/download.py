@@ -404,7 +404,7 @@ class Download:
 			if self.inputs[record_type] and record_type == 'curve':
 				for input_type in self.inputs[record_type]:
 					# Need to ensure curve input names do not contain "[]:*?/\" or excel can't use them as sheetnames
-					ws_dict[input['name_lower']] = wb.add_worksheet(input['name'])
+					ws_dict[input_type['name_lower']] = wb.add_worksheet(input_type['name'])
 					for i, field in enumerate(core_fields_formats[record_type]):
 						ws_dict[input_type['name_lower']].set_column(i, i, None, cell_format=field[1])
 					# - add the input field names
