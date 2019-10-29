@@ -108,6 +108,7 @@ def delete_items(tx):
 		'		DETACH DELETE counter, item'
 		'	", '
 		'	{batchSize:1000} '
+		' ) '
 	)
 	tx.run(' CREATE (:Counter {name: "field", count: 0})')
 
