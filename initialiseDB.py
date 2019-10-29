@@ -126,6 +126,8 @@ def delete_inputs(tx):
 		' MATCH '
 		'	(input:Input) ' 
 		' DETACH DELETE input '
+	)
+	tx.run(
 		' MATCH (input_group:InputGroup) '
 		' DETACH DELETE input_group '
 	)
