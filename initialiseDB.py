@@ -656,6 +656,7 @@ else:
 			if confirm('Would you like to delete inputs and varieties then recreate them from inputs.csv, input_groups.py and varieties.py?'):
 				session.write_transaction(delete_inputs)
 				session.write_transaction(create_inputs, './instance/inputs.csv')
+				session.write_transaction(create_input_groups, input_groups.input_groups)
 				session.write_transaction(create_trials, varieties.trials)
 				session.write_transaction(
 					create_variety_codes,
