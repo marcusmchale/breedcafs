@@ -98,12 +98,18 @@ def clear_schema(tx):
 
 def delete_items(tx):
 	tx.run(
-		' MATCH '
-		'	(item:Item), '
-		'	(counter:Counter) ' 
-		' DETACH DELETE counter, item '
-		' CREATE (:Counter {name: "field", count: 0})'
+		' apoc.periodic.iterate( '
+		'	" '
+		'		MATCH '
+		'			(item:Item), '
+		'			(counter:Counter) '
+		'		RETURN item, counter '
+		'	","'
+		'		DETACH DELETE counter, item'
+		'	", '
+		'	{batchSize:1000} '
 	)
+	tx.run(' CREATE (:Counter {name: "field", count: 0})')
 
 
 def delete_data(tx):
@@ -642,9 +648,9 @@ else:
 				session.write_transaction(delete_data)
 			if confirm('Would you like to delete all items?'):
 				session.write_transaction(delete_items)
-			if confirm('Would you like to delete inputs and varieties then recreate them from input_variables.csv and varieties.py?'):
+			if confirm('Would you like to delete inputs and varieties then recreate them from inputs.csv, input_groups.py and varieties.py?'):
 				session.write_transaction(delete_inputs)
-				session.write_transaction(create_inputs, './instance/input_variables.csv')
+				session.write_transaction(create_inputs, './instance/inputs.csv')
 				session.write_transaction(create_trials, varieties.trials)
 				session.write_transaction(
 					create_variety_codes,
