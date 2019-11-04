@@ -966,7 +966,6 @@ class CorrectForm(FlaskForm):
 		[InputRequired()],
 		choices=[
 			('db', 'Database (xlsx/csv)')
-			# ('FB', 'Field Book (.csv)')
 		]
 	)
 	file = FileField(

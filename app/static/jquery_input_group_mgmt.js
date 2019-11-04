@@ -310,7 +310,6 @@ update_all_inputs = function() {
         url: '/record/inputs_selection',
         data: {
             input_group: group_select.val(),
-            username: true,
             inverse: true,
             inverse_filter: group_filter.val(),
             details: true,
@@ -346,6 +345,7 @@ update_all_inputs = function() {
 
 record_type_select.change(update_all_inputs);
 item_level_select.change(update_all_inputs);
+group_filter.change(update_all_inputs);
 
 const commit = $('#commit_group_changes');
 

@@ -181,7 +181,7 @@ def inputs_selection():
 		request.args.get('input_group', default=None, type=int) if request.args.get('input_group') not in ['', 'None', 'false'] else None
 	)
 	inverse = request.args.get('inverse', False) if request.args.get('inverse') not in ['', 'None', 'false'] else False
-	inverse_filter = request.args.get('inverse_filter', False) if request.args.get('inverse_filter') not in ['', 'None', 'false'] else False
+	inverse_filter = request.args.get('inverse_filter', False, type=int) if request.args.get('inverse_filter') not in ['', 'None', 'false'] else False
 	details = request.args.get('details', False) if request.args.get('details') not in ['', 'None', 'false'] else False
 	record_type = (
 		request.args.get('record_type', False) if request.args.get('record_type') not in ['', 'None', 'false'] else False

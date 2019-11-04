@@ -102,6 +102,11 @@ class SelectionList:
 					'	(input)-[position:IN_GROUP]->(:InputGroup {id: $inverse_filter}) '
 					' WITH input ORDER BY position.position '
 				)
+			else:
+				statement += (
+					' WITH input '
+					' ORDER BY input.name_lower '
+				)
 		if record_type:
 			statement += (
 				' MATCH '
