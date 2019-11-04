@@ -718,12 +718,11 @@ class DownloadForm(FlaskForm):
 			record_type=record_type,
 			username=session['username']
 		)
-		selected_input_group = form.input_group.data if form.input_group.data not in ['', 'None'] else None
+		selected_input_group = int(form.input_group.data) if form.input_group.data not in ['', 'None'] else None
 		inputs_list = SelectionList.get_inputs(
 			item_level=item_level,
 			record_type=record_type,
-			input_group=selected_input_group,
-			username=False
+			input_group=selected_input_group
 		)
 		form.select_inputs.choices = inputs_list
 		return form
@@ -773,11 +772,16 @@ class ManageInputGroupForm(FlaskForm):
 		choices=[],
 		description="Record Type"
 	)
+	group_filter = SelectField(
+		[Optional()],
+		choices=[],
+		description="Input Group"
+	)
 	group_levels_select = SelectMultipleField(
 		'Group levels',
 		[InputRequired()],
 		choices=SelectionList.get_item_levels(),
-		description='Select item levels for availability of input group',
+		description='Levels at which input group is available',
 		option_widget=widgets.CheckboxInput(),
 		widget=widgets.ListWidget(prefix_label=False)
 	)
@@ -788,24 +792,24 @@ class ManageInputGroupForm(FlaskForm):
 		description="Item Level"
 	)
 	input_group_select = SelectField(
-		'Select input variable group to manage',
+		'Input group to manage',
 		[
 			InputRequired(),
 		],
-		description='Select input variable group to manage',
+		description='Input group to manage',
 		choices=[]
 	)
 	group_inputs = SelectMultipleField(
 		'Group members',
 		[Optional()],
-		description='Select inputs',
+		description='Selected inputs',
 		widget=widgets.ListWidget(prefix_label=False),
 		choices=[]
 	)
 	all_inputs = SelectMultipleField(
-		'Other input variables',
+		'Other inputs',
 		coerce=unicode,
-		description='Select inputs to add to group',
+		description='Unselected inputs',
 		widget=widgets.ListWidget(prefix_label=False),
 		choices=[]
 	)
@@ -817,12 +821,18 @@ class ManageInputGroupForm(FlaskForm):
 		form = ManageInputGroupForm()
 		form.item_level.choices = [('', 'Any')] + SelectionList.get_item_levels()
 		form.record_type.choices = [('', 'Any')] + SelectionList.get_record_types()
-		record_type = form.record_type.data if form.record_type.data not in ['', 'None'] else None
+		form.group_filter.choices = [('', 'Any')] + SelectionList.get_input_groups(
+			username=session['username'],
+			include_defaults=True
+		)
+		# record_type = form.record_type.data if form.record_type.data not in ['', 'None'] else None
 		partner_groups = SelectionList.get_input_groups(username=session['username'])
 		form.input_group_select.choices = partner_groups
-		group_members = SelectionList.get_inputs(username=session['username'], input_group=form.input_group_select.data)
+		selected_input_group = int(form.input_group_select.data) if form.input_group_select.data not in ['', 'None'] else None
+		group_members = SelectionList.get_inputs(
+			input_group=selected_input_group
+		)
 		form.group_inputs.choices = group_members
-		#form.all_inputs.choices = [i for i in SelectionList.get_inputs(record_type=record_type) if i not in group_members]
 		return form
 
 	@staticmethod
@@ -830,6 +840,10 @@ class ManageInputGroupForm(FlaskForm):
 		form = ManageInputGroupForm()
 		form.item_level.choices = [('', 'Any')] + SelectionList.get_item_levels()
 		form.record_type.choices = [('', 'Any')] + SelectionList.get_record_types()
+		form.group_filter.choices = [('', 'Any')] + SelectionList.get_input_groups(
+			username=session['username'],
+			include_defaults=True
+		)
 		partner_groups = SelectionList.get_input_groups(username=session['username'])
 		form.input_group_select.choices = partner_groups
 		form.group_inputs.choices = SelectionList.get_inputs()
@@ -933,7 +947,6 @@ class RecordForm(FlaskForm):
 			inputs_list = SelectionList.get_inputs(
 				item_level=item_level,
 				input_group=selected_input_group,
-				username=session['username'],
 				details=True
 			)
 			field_book_supported = True

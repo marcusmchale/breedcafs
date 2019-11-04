@@ -25,7 +25,7 @@ class Record:
 		tx = self.neo4j_session.begin_transaction()
 		parameters = {
 			'input_group_name': input_group_name,
-			'partner_to_copy':partner_to_copy,
+			'partner_to_copy': partner_to_copy,
 			'group_to_copy': group_to_copy,
 			'username': self.username
 		}
@@ -49,7 +49,7 @@ class Record:
 			'	}) '
 			' RETURN [ '
 			'	True, '
-			'	ig.name_lower, '
+			'	ig.id, '
 			'	ig.name '
 			' ] '
 		)
@@ -63,15 +63,16 @@ class Record:
 		# first make sure the user has the InputGroups submission node
 		statement = (
 			' MATCH '
+			' 	(c:Counter {name: "input_group"}), '
 			'	(: User { '
 			'		username_lower: toLower(trim($username)) '
 			'	})-[:SUBMITTED]->(sub: Submissions) '
 			' MERGE '
 			'	(sub)-[:SUBMITTED]->(igs: InputGroups) '
-			' WITH igs '
+			' WITH c, igs '
 		)
 		if group_to_copy:
-			if partner_to_copy :
+			if partner_to_copy:
 				statement += (
 					' MATCH '
 					'	(source_partner: Partner { '
@@ -82,30 +83,34 @@ class Record:
 					'	}]-(: User)-[: SUBMITTED]->(: Submissions) '
 					'	-[:SUBMITTED]->(: InputGroups) '
 					'	-[:SUBMITTED]->(source_ig: InputGroup { '
-					'		name_lower: toLower(trim($group_to_copy)) '
+					'		id: $group_to_copy '
 					'	}) '
-					' WITH igs, source_ig '
+					' WITH c, igs, source_ig '
 				)
 			else:
 				statement += (
 					' MATCH '
 					' (source_ig: InputGroup { '
-					'		name_lower: toLower(trim($group_to_copy)) '
+					'		id: $group_to_copy '
 					' }) '
 					' OPTIONAL MATCH (source_ig)<-[s:SUBMITTED]-() '
 					# prioritise selection of the oldest if partner not specified 
 					# (including original 'un-submitted' groups )
-					' WITH igs, source_ig ORDER BY s.time DESC LIMIT 1 '
+					' WITH c, igs, source_ig ORDER BY s.time DESC LIMIT 1 '
 				)
 		statement += (
+				' SET c._LOCK_ = True '
+				' SET c.count = c.count + 1 '
 				' CREATE '
 				'	(igs)-[: SUBMITTED { '
 				'		time: datetime.transaction().epochMillis '
 				'	}]->(ig: InputGroup {'
+				'		id: c.count, '
 				'		name_lower: toLower(trim($input_group_name)), '
 				'		name: trim($input_group_name), '
 				'		found: False '
 				'	}) '
+				' SET c._LOCK_ = False '
 		)
 		if group_to_copy:
 			statement += (
@@ -128,7 +133,7 @@ class Record:
 			' WITH DISTINCT ig '
 			' RETURN [ '
 			'	ig.found, '
-			'	ig.name_lower, '
+			'	ig.id, '
 			'	ig.name '
 			' ] '
 		)
@@ -159,7 +164,7 @@ class Record:
 			'	-[:SUBMITTED]->(: Submissions) '
 			'	-[:SUBMITTED]->(: InputGroups) '
 			'	-[:SUBMITTED]->(ig: InputGroup {'
-			'		name_lower: toLower(trim($input_group)) '
+			'		id: $input_group '
 			'	}) '
 			' MERGE '
 			'	(sub)-[:SUBMITTED]->(igs:InputGroups) '

@@ -141,6 +141,7 @@ class RowParseResult:
 		return self.row.keys()
 
 	def html_row(self, fieldnames):
+		fieldnames = [i.lower() for i in fieldnames]
 		formatted_cells = {}
 		for field in self.errors.keys():
 			if field not in fieldnames:  # curve conflicts return this
@@ -292,7 +293,7 @@ class RowParseResult:
 								])
 					formatted_cells[field] += '\n'
 				if isinstance(self.row[field], (int, float)):
-					value = str(self.row[field]).encode('utf8')
+					value = str(self.row[field].encode('utf8'))
 				else:
 					value = self.row[field]
 				formatted_cells[field] += '">'
@@ -459,13 +460,14 @@ class ParseResult:
 				parsed_time,
 				parsed_date is not True,
 				parsed_time is not True
-				]):
-					time = datetime.datetime.strptime(parsed_date + ' ' + parsed_time, '%Y-%m-%d %H:%M')
-			elif parsed_date and parsed_date is not True:
+			]):
+				time = datetime.datetime.strptime(parsed_date + ' ' + parsed_time, '%Y-%m-%d %H:%M')
+				unique_key = (parsed_uid, time)
+			elif parsed_date and parsed_date is not True and parsed_time is False:
 				time = datetime.datetime.strptime(parsed_date + ' ' + '12:00', '%Y-%m-%d %H:%M')
+				unique_key = (parsed_uid, time)
 			else:
-				time = None
-			unique_key = (parsed_uid, time)
+				unique_key = None
 		elif self.record_type == 'condition':
 			if 'start date' in row:
 				parsed_start_date = Parsers.date_format(row['start date'])
@@ -547,9 +549,9 @@ class ParseResult:
 				start,
 				end
 			)
-		if unique_key not in self.unique_keys:
+		if unique_key and unique_key not in self.unique_keys:
 			self.unique_keys.add(unique_key)
-		else:
+		elif unique_key:
 			if not self.duplicate_keys:
 				self.duplicate_keys = {}
 			self.duplicate_keys[row['row_index']] = row
@@ -573,35 +575,35 @@ class ParseResult:
 
 	def duplicate_keys_table(self):
 		if not self.duplicate_keys:
-			return '<p>duplicated keys found</p>'
+			return u'<p>duplicated keys found</p>'
 		else:
 			max_length = 50
 			if self.submission_type == "fb":
 				response = (
-					'<p>The uploaded file contains duplicated unique keys '
-					' (the combination of UID, timestamp and trait).'
-					' The following lines duplicate preceding lines in the file: </p>'
+					u'<p>The uploaded file contains duplicated unique keys '
+					u' (the combination of UID, timestamp and trait).'
+					u' The following lines duplicate preceding lines in the file: </p>'
 				)
 			else:
 				response = (
-					'<p>The uploaded table contains duplicated unique keys '
-					'(the combination of UID, date and time). '
-					' The following lines duplicate preceding lines in the file: </p>'
+					u'<p>The uploaded table contains duplicated unique keys '
+					u'(the combination of UID, date and time). '
+					u' The following lines duplicate preceding lines in the file: </p>'
 				)
-			header_string = '<tr><th><p>Line#</p></th>'
+			header_string = u'<tr><th><p>Line#</p></th>'
 			for field in self.fieldnames:
-				header_string += '<th><p>' + str(field) + '</p></th>'
-			html_table = header_string + '</tr>'
+				header_string += u'<th><p>' + field + u'</p></th>'
+			html_table = header_string + u'</tr>'
 			# construct each row and append to growing table
 			for i, row_num in enumerate(self.duplicate_keys):
 				if i >= max_length:
-					return response + '<table>' + html_table + '</table>'
-				row_string = '<tr><td>' + str(row_num) + '</td>'
+					return response + u'<table>' + html_table + u'</table>'
+				row_string = u'<tr><td>' + str(row_num) + u'</td>'
 				for field in self.fieldnames:
-					row_string += '<td>' + self.duplicate_keys[row_num][field] + '</td>'
-				row_string += '</tr>'
+					row_string += u'<td>' + self.duplicate_keys[row_num][field] + u'</td>'
+				row_string += u'</tr>'
 				html_table += row_string
-			return response + '<table>' + html_table + '</table>'
+			return response + u'<table>' + html_table + u'</table>'
 
 	def html_table(self):
 		max_length = 100
@@ -690,7 +692,11 @@ class SubmissionRecord:
 	def lists_to_strings(self):
 		for item in self.record:
 			if isinstance(self.record[item], list):
-				self.record[item] = str(', '.join([str(i).encode() for i in self.record[item]]))
+				self.record[item] = str(', '.join(
+					[
+						unicode(str(i), 'utf8') if not isinstance(i, list) else ', '.join([unicode(str(j), 'utf8') for j in i]) for i in self.record[item]
+					]
+				))
 
 
 class SubmissionResult:
@@ -814,6 +820,7 @@ class PropertyUpdateHandler:
 			'set harvest date': self.set_time,
 			'set harvest time': self.set_time,
 			'set planting date': self.set_time,
+			'set location': self.set_location,
 			# The below modify relationships , call these "assign" updates rather than "set"
 			'assign tree to block by name': self.assign_tree_to_block,
 			'assign tree to block by id': self.assign_tree_to_block,
@@ -1183,6 +1190,33 @@ class PropertyUpdateHandler:
 		self.error_check(
 			result,
 			'name'
+		)
+
+	def set_location(self, input_variable):
+		statement = (
+			' UNWIND $uid_value_list AS uid_value '
+			'	OPTIONAL MATCH '
+			'		(item: Item {uid: uid_value[0]}) '
+			'	WITH uid_value, item, item.location as existing '
+			'	SET item.location = CASE '
+			'		WHEN item.location IS NULL '
+			'		THEN uid_value[1] '
+			'		ELSE item.location '
+			'		END '
+			'	RETURN { '
+			'		UID: uid_value[0], '
+			'		value: uid_value[1], '
+			'		item_uid: item.uid, '
+			'		existing: existing '
+			'	} '
+		)
+		result = self.tx.run(
+			statement,
+			uid_value_list=self.updates[input_variable]
+		)
+		self.error_check(
+			result,
+			'location'
 		)
 
 	def set_unit(self, input_variable):
@@ -1913,7 +1947,7 @@ class Upload:
 					return 'Please upload comma (,) separated file with quoted (") fields'
 		elif self.file_extension.lower() == 'xlsx':
 			try:
-				wb = load_workbook(self.file_path, read_only=True)
+				wb = load_workbook(self.file_path, read_only=True, data_only=True)
 			except BadZipfile:
 				logging.info(
 					'Bad zip file submitted: \n'
@@ -2027,7 +2061,7 @@ class Upload:
 					return 'Submission type not recognised'
 		elif self.file_extension == 'xlsx':
 			try:
-				wb = load_workbook(self.file_path, read_only=True)
+				wb = load_workbook(self.file_path, read_only=True, data_only=True)
 			except BadZipfile:
 				logging.info(
 					'Bad zip file submitted: \n'
@@ -2049,7 +2083,12 @@ class Upload:
 						ws = wb[sheetname]
 						rows = ws.iter_rows(min_row=1, max_row=1)
 						first_row = next(rows)
-						self.fieldnames[record_type] = [str(c.value).encode().strip().lower() for c in first_row if c.value]
+						self.fieldnames[record_type] = [
+							c.value.strip().lower() if isinstance(c.value, basestring)
+							else unicode(str(c.value), 'utf8')
+							for c in first_row
+							if c.value
+						]
 						self.required_fieldnames[record_type] = record_type_sets[record_type]
 				else:
 					statement = (
@@ -2073,9 +2112,12 @@ class Upload:
 						rows = ws.iter_rows(min_row=1, max_row=1)
 						first_row = next(rows)
 						self.fieldnames[sheetname] = [
-							str(c.value).encode().strip().lower() for c in first_row if	c.value
+							c.value.strip().lower() if isinstance(c.value, basestring)
+							else unicode(str(c.value), 'utf8')
+							for c in first_row
+							if c.value
 						]
-						self.required_fieldnames[sheetname] = record_type_sets['curve']
+						self.required_fieldnames[sheetname] = record_type_sets[record_type]
 					else:
 						return (
 							' This workbook contains an unsupported worksheet:<br> "' + sheetname + '"<br><br>'
@@ -2099,7 +2141,7 @@ class Upload:
 	def check_headers(self, tx):
 		errors = []
 		for worksheet in self.fieldnames.keys():
-			fieldnames_set = set(self.fieldnames[worksheet])
+			fieldnames_set = set([i.lower() for i in self.fieldnames[worksheet]])
 			if len(self.fieldnames[worksheet]) > len(fieldnames_set):
 				if self.file_extension == 'xlsx':
 					if worksheet in app.config['WORKSHEET_NAMES']:
@@ -2130,7 +2172,7 @@ class Upload:
 				# except for curves, where they should all be numbers
 				if worksheet in app.config['WORKSHEET_NAMES']:
 					self.inputs[worksheet] = [
-						i for i in self.fieldnames[worksheet] if i not in self.required_fieldnames[worksheet]
+						i for i in self.fieldnames[worksheet] if i.lower() not in self.required_fieldnames[worksheet]
 					]
 					record_type = worksheet
 					statement = (
@@ -2253,7 +2295,7 @@ class Upload:
 			self.file_extension == 'xlsx',
 			self.submission_type in ['db', 'table']
 		]):
-			wb = load_workbook(self.file_path, read_only=True)
+			wb = load_workbook(self.file_path, read_only=True, data_only=True)
 			if self.submission_type == 'db':
 				ws = wb['Records']
 			elif self.submission_type == 'table':
@@ -2268,12 +2310,26 @@ class Upload:
 				)
 				rows = ws.iter_rows()
 				first_row = next(rows)
-				file_writer.writerow(['row_index'] + [str(cell.value).encode().lower() for cell in first_row if cell.value])
+				file_writer.writerow(
+					[
+						'row_index'] + [
+						str(cell.value.encode('utf8')).lower()
+						if isinstance(cell.value, basestring)
+						else str(cell.value)
+						for cell in first_row
+						if cell.value
+					]
+				)
 				# handle deleted columns in the middle of the worksheet
 				empty_headers = []
+				time_column_index = None
+				date_column_index = None
 				for i, cell in enumerate(first_row):
 					if not cell.value:
 						empty_headers.append(i)
+					if isinstance(cell.value, basestring):
+						if cell.value.strip().lower() == u'time':
+							time_column_index = i
 				for j, row in enumerate(rows):
 					# j+2 to store the "Line number" as index
 					# this is 0 based, and accounts for header
@@ -2285,18 +2341,16 @@ class Upload:
 					# remove empty rows
 					for i, value in enumerate(cell_values):
 						if isinstance(value, datetime.datetime):
-							# when importing 00:00 time from excel, which uses 1900 date system
-							# we get a datetime.datetime object of 30th December 1899 for the time field
-							# we have to catch this here. If the date/time is an exact match, we just render it as a time
-							# it will be picked up in the subsequent scan of the trimmed file
-							# although won't make a lot of sense to the user...
-							if cell_values[i] == datetime.datetime(1899, 12, 30, 0, 0):
-								cell_values[i] = "00:00"
+							# when importing from excel if the time isn't between 00:00 and 24:00
+							# then it is imported as a datetime object relative to 1900,1,1,0,0
+							# so we catch this here by checking if we are looking at the time column
+							if i == time_column_index:
+								cell_values[i] = value.strftime("%H:%M")
 							else:
 								try:
 									cell_values[i] = value.strftime("%Y-%m-%d")
 								except ValueError:
-									cell_values[i] = 'Dates before 1900 not supported'
+									cell_values[i] = 'Dates before 1900 are not supported'
 						elif isinstance(value, datetime.time):
 							cell_values[i] = value.strftime("%H:%M")
 						else:
@@ -2489,7 +2543,7 @@ class Upload:
 						'filename': urls.url_fix('file:///' + username + '/' + trimmed_filename),
 						'input_name': self.inputs[worksheet],
 						'x_values': sorted(
-							[float(i) for i in self.fieldnames[worksheet] if i not in self.required_fieldnames[worksheet]]
+							[float(i) for i in self.fieldnames[worksheet] if i.lower() not in self.required_fieldnames[worksheet]]
 						),
 						'record_type': record_type
 					}
@@ -3121,6 +3175,14 @@ class Upload:
 						' REMOVE item.name ',
 						uid_list=property_uid[input_variable]
 					)
+				elif inputs_properties[input_variable] == 'location':
+					tx.run(
+						' UNWIND $uid_list as uid'
+						' MATCH '
+						'	(item: Item {uid: uid}) '
+						' REMOVE item.location ',
+						uid_list=property_uid[input_variable]
+					)
 				elif inputs_properties[input_variable] == 'variety':
 					tx.run(
 						' UNWIND $uid_list as uid '
@@ -3460,7 +3522,7 @@ class Upload:
 					record_type = upload_object.record_types[0]
 					# todo Stop trimming before parsing, this should be done in one pass of the file
 					if upload_object.file_extension == 'xlsx':
-						wb = load_workbook(upload_object.file_path, read_only=True)
+						wb = load_workbook(upload_object.file_path, read_only=True, data_only=True)
 						if 'Records' not in wb.sheetnames:
 							return {
 								'status': 'ERRORS',

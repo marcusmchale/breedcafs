@@ -298,7 +298,7 @@ class AddLocations:
 			'	MERGE '
 			'		(user)-[:SUBMITTED]->(us: Submissions) '
 			'	MERGE '
-			'		(us)-[:SUBMITTED]->(ul:Locations) '
+			'		(us)-[:SUBMITTED]->(ul:Items) '
 			'	MERGE '
 			'		(ul)-[:SUBMITTED]->(uf:Fields) '
 			'	CREATE '

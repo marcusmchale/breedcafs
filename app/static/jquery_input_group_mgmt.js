@@ -5,6 +5,17 @@ remove_flash = function() {
 
 const partner_to_copy = $('#partner_to_copy');
 const group_to_copy = $('#group_to_copy');
+const group_filter = $('#group_filter');
+const group_to_copy_levels = $('#group_to_copy_levels');
+const group_to_copy_members= $('#group_to_copy_members');
+const input_group_name = $('#input_group_name');
+const submit_input_group_button = $('#submit_input_group_name');
+const group_select = $('#input_group_select');
+const group_levels = $('#group_levels_select');
+const group_inputs = $('#group_inputs');
+const record_type_select = $('#record_type');
+const item_level_select = $('#item_level');
+const all_inputs = $('#all_inputs');
 
 
 update_group_to_copy_list = function() {
@@ -36,10 +47,35 @@ update_group_to_copy_list = function() {
     });
 };
 
+update_group_filter_list = function() {
+    group_filter.empty();
+    group_filter.append($("<option></option>").attr("value", "").text(""));
+    group_filter.prop("disabled", true);
+    $.ajax({
+       type: 'GET',
+       url: '/record/input_groups',
+       data: {
+           username: true,
+           include_defaults: true
+       },
+       success: function(response) {
+           const groups = response;
+           for (let i = 0; i < groups.length; i++) {
+               group_filter.append(
+                   $("<option></option>").attr(
+                       "value", groups[i][0]).text(groups[i][1])
+               );
+           }
+           group_filter.prop( "disabled", false);
+       },
+        error: function(error) {
+           console.log('Error in update_group_to_copy_list');
+           console.log(error);
+        },
+    });
+};
+
 partner_to_copy.change(update_group_to_copy_list);
-
-
-const group_to_copy_levels = $('#group_to_copy_levels');
 
 update_group_to_copy_levels = function() {
     group_to_copy_levels.empty();
@@ -69,13 +105,11 @@ update_group_to_copy_levels = function() {
 
 group_to_copy.change(update_group_to_copy_levels);
 
-
-const group_to_copy_members= $('#group_to_copy_members');
-
 update_group_to_copy_members = function() {
     group_to_copy_members.empty();
     if (group_to_copy.val() !== '') {
         const partner = (partner_to_copy.val() !== "") ? partner_to_copy.val() : false;
+        console.log(group_to_copy.val());
         $.ajax({
             type: 'GET',
             url: '/record/inputs_selection',
@@ -102,8 +136,6 @@ update_group_to_copy_members = function() {
 
 group_to_copy.change(update_group_to_copy_members);
 
-const input_group_name = $('#input_group_name');
-
 provide_default_name = function() {
     const selected_name = $('#group_to_copy option:selected').text()
     //if (input_group_name.val().trim() == '') {
@@ -114,8 +146,6 @@ provide_default_name = function() {
 group_to_copy.change(provide_default_name);
 
 partner_to_copy.change(update_group_to_copy_members);
-
-const submit_input_group_button = $('#submit_input_group_name');
 
 submit_input_group_button.click( function (e) {
     e.preventDefault();
@@ -162,7 +192,6 @@ submit_input_group_button.click( function (e) {
     });
 });
 
-const group_select = $('#input_group_select');
 
 update_group_select = function(set_group = "") {
     group_select.empty();
@@ -193,7 +222,9 @@ update_group_select = function(set_group = "") {
     });
 };
 
-const group_levels = $('#group_levels_select');
+update_group_select();
+
+
 
 update_group_levels = function() {
     //uncheck all group_levels;
@@ -223,55 +254,53 @@ update_group_levels = function() {
 group_select.change(update_group_levels);
 update_group_levels();
 
-const group_inputs = $('#group_inputs');
 
 update_group_inputs = function() {
     group_inputs.empty();
     group_inputs.css("min-height", "50px");
     group_inputs.prop("disabled", true);
-    $.ajax({
-       type: 'GET',
-       url: '/record/inputs_selection',
-       data: {
-           input_group: group_select.val(),
-           username: true,
-           details: true
-       },
-       success: function(response) {
-           const inputs = response;
-           for (let i = 0; i < inputs.length; i++) {
-               group_inputs.append(
-                   $('<li></li>').append(
-                       $('<input type="hidden">').attr({
-                            "id": "group_inputs-" + i,
-                            "name": "group_inputs",
-                            "value": inputs[i]['name_lower'],
-                       })
-                   ).append($('<label title="' + inputs[i]['details'] + '">').text(
-                   inputs[i]['name']
-               )));
-           }
-           group_inputs.prop( "disabled", false);
-           group_inputs.sortable( {
-                connectWith: all_inputs
-            });
-           //group_inputs.disableSelection();
-           update_all_inputs(inputs);
-       },
-       error: function(error) {
-           console.log('Error in update_group_inputs');
-           console.log(error);
-       },
-    });
+    if (group_select.val() === '' ) {
+        all_inputs.empty();
+    } else {
+        $.ajax({
+           type: 'GET',
+           url: '/record/inputs_selection',
+           data: {
+               input_group: group_select.val(),
+               username: true,
+               details: true
+           },
+           success: function(response) {
+               const inputs = response;
+               for (let i = 0; i < inputs.length; i++) {
+                   group_inputs.append(
+                       $('<li></li>').append(
+                           $('<input type="hidden">').attr({
+                                "id": "group_inputs-" + i,
+                                "name": "group_inputs",
+                                "value": inputs[i]['name_lower'],
+                           })
+                       ).append($('<label title="' + inputs[i]['details'] + '">').text(
+                       inputs[i]['name']
+                   )));
+               }
+               group_inputs.prop( "disabled", false);
+               group_inputs.sortable( {
+                    connectWith: all_inputs
+                });
+               //group_inputs.disableSelection();
+               update_all_inputs(inputs);
+           },
+           error: function(error) {
+               console.log('Error in update_group_inputs');
+               console.log(error);
+           },
+        });
+    }
 };
 
 group_select.change(update_group_inputs);
 update_group_inputs();
-
-const record_type_select = $('#record_type');
-const item_level_select = $('#item_level');
-
-const all_inputs = $('#all_inputs');
 
 update_all_inputs = function() {
     all_inputs.empty();
@@ -283,6 +312,7 @@ update_all_inputs = function() {
             input_group: group_select.val(),
             username: true,
             inverse: true,
+            inverse_filter: group_filter.val(),
             details: true,
             record_type: record_type_select.val(),
             item_level: item_level_select.val()

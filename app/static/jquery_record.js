@@ -54,8 +54,6 @@ remove_flash = function() {
 //             record_time_div.hide();
 //         }
 
-
-
 level_update = function() {
     const item_level = item_level_select.val();
     input_group_select.empty();
@@ -108,7 +106,6 @@ level_update = function() {
     update_item_count();
     remove_flash();
 };
-
 
 group_update = function() {
     input_variable_checkbox_div.empty();

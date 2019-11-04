@@ -299,6 +299,7 @@ def create_inputs(tx, inputs_file):
 				'		item_level.name = trim(level) '
 				' MERGE '
 				'	(i)-[:AT_LEVEL]->(item_level) '
+				' WITH distinct i '
 				' RETURN i.found ',
 				type=input_variable['type'],
 				levels=input_variable['levels'],
@@ -320,10 +321,23 @@ def create_inputs(tx, inputs_file):
 
 
 def create_input_groups(tx, groups):
+	tx.run(
+		' MERGE (c:Counter { '
+		'	name: "input_group" '
+		' }) '
+		' ON CREATE SET c.count = 0 '
+	)
 	for group in groups:
 		tx.run(
-			' MERGE (ig: InputGroup {name_lower:toLower(trim($name))}) '
-			'	ON CREATE SET ig.name = trim($name) '
+			' MATCH (c:Counter {name: "input_group"}) '
+			' SET c._LOCK_ = True '
+			' WITH c '
+			' MERGE (c)-[:FOR]->(ig: InputGroup {name_lower:toLower(trim($name))}) '
+			'	ON CREATE SET '
+			'		c.count = c.count + 1, '
+			'		ig.name = trim($name), '
+			'		ig.id = c.count '
+			' SET c._LOCK_ = False '
 			' WITH (ig) '
 			'	MATCH (i:Input) '
 			'	WHERE i.name_lower IN [x in $inputs | toLower(trim(x))] '

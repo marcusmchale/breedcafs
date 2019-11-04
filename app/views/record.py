@@ -75,7 +75,7 @@ def record():
 
 @app.route("/record/input_group_levels")
 def input_group_levels():
-	input_group = request.args.get('input_group', None) if request.args.get('input_group') not in ['', 'None', 'false'] else None
+	input_group = request.args.get('input_group', default=None, type=int) if request.args.get('input_group') not in ['', 'None', 'false'] else None
 	partner = request.args.get('partner', None) if request.args.get('partner') not in [
 		'', 'None', 'false'
 	] else None
@@ -107,6 +107,7 @@ def input_groups():
 	partner = request.args.get('partner', None) if request.args.get('partner') not in ['', 'None', 'false'] else None
 	# send false for username to get other for partner admin etc.
 	username = request.args.get('username', True) if request.args.get('username') not in ['', 'None', 'false'] else None
+	include_defaults = request.args.get('include_defaults', False) if request.args.get('username') not in ['', 'None', 'false'] else None
 	if 'username' not in session:
 		flash('Please log in')
 		return redirect(url_for('login'))
@@ -117,40 +118,9 @@ def input_groups():
 				record_type=record_type,
 				partner=partner,
 				username=session['username'] if username else None,
+				include_defaults=include_defaults
 			)
 			response = make_response(jsonify(input_groups_list))
-			response.content_type = 'application/json'
-			return response
-		except (ServiceUnavailable, SecurityError):
-			flash("Database unavailable")
-			return redirect(url_for('index'))
-
-
-@app.route("/record/inputs")
-def inputs():
-	item_level = request.args.get('item_level', None)
-	record_type = (
-		request.args.get('record_type', None) if request.args.get('record_type') not in ['', 'None', 'false'] else None
-	)
-	input_group = (
-		request.args.get('input_group', None) if request.args.get('username') not in ['', 'None', 'false'] else None
-	)
-	username = (
-		request.args.get('username', None) if request.args.get('username') not in ['', 'None', 'false'] else None
-	)
-	if 'username' not in session:
-		flash('Please log in')
-		return redirect(url_for('login'))
-	else:
-		try:
-			inputs_details = SelectionList.get_inputs(
-				item_level=item_level,
-				record_type=record_type,
-				input_group=input_group,
-				username=session['username'] if username else None,
-				details=True
-			)
-			response = make_response(jsonify(inputs_details))
 			response.content_type = 'application/json'
 			return response
 		except (ServiceUnavailable, SecurityError):
@@ -177,7 +147,7 @@ def add_input_group():
 			]):
 				input_group_name = request.form['input_group_name'] if request.form['input_group_name'] not in ['', None] else None
 				partner_to_copy = request.form['partner_to_copy'] if request.form['partner_to_copy'] not in ['', None] else None
-				group_to_copy = request.form['group_to_copy'] if request.form['group_to_copy'] not in ['', None] else None
+				group_to_copy = request.form.get('group_to_copy', default=None, type=int) if request.form['group_to_copy'] not in ['', None] else None
 				recorder = Record(session['username'])
 				found_name = recorder.add_input_group(
 					input_group_name,
@@ -208,11 +178,10 @@ def add_input_group():
 @app.route("/record/inputs_selection")
 def inputs_selection():
 	input_group = (
-		request.args.get('input_group', None) if request.args.get('input_group') not in ['', 'None', 'false'] else None
+		request.args.get('input_group', default=None, type=int) if request.args.get('input_group') not in ['', 'None', 'false'] else None
 	)
-	partner = request.args.get('partner', False) if request.args.get('partner') not in ['', 'None', 'false'] else False
-	username = request.args.get('username', False) if request.args.get('username') not in ['', 'None', 'false'] else False
 	inverse = request.args.get('inverse', False) if request.args.get('inverse') not in ['', 'None', 'false'] else False
+	inverse_filter = request.args.get('inverse_filter', False) if request.args.get('inverse_filter') not in ['', 'None', 'false'] else False
 	details = request.args.get('details', False) if request.args.get('details') not in ['', 'None', 'false'] else False
 	record_type = (
 		request.args.get('record_type', False) if request.args.get('record_type') not in ['', 'None', 'false'] else False
@@ -227,12 +196,11 @@ def inputs_selection():
 		try:
 			inputs_list = SelectionList.get_inputs(
 				input_group=input_group,
-				partner=partner,
-				username=session['username'] if username else False,
 				inverse=inverse,
+				inverse_filter=inverse_filter,
 				record_type=record_type,
-				details=details,
-				item_level=item_level
+				item_level=item_level,
+				details=details
 			)
 			response = make_response(jsonify(inputs_list))
 			response.content_type = 'application/json'
@@ -257,7 +225,7 @@ def commit_group_changes():
 		try:
 			form = ManageInputGroupForm.commit()
 			if form.validate_on_submit():
-				input_group = request.form.get('input_group_select', None) if request.args.get('input_group') != '' else None
+				input_group = request.form.get('input_group_select', default=None, type=int) if request.form.get('input_group_select') != '' else None
 				input_variables = request.form.getlist('group_inputs')
 				levels = request.form.getlist('group_levels_select')
 				recorder = Record(session['username'])
@@ -382,7 +350,6 @@ def generate_template():
 					selected_inputs = request.form.getlist('select_inputs')
 				else:
 					selected_inputs = []
-
 				inputs_dict = {}
 				for input_variable in selected_inputs:
 					inputs_dict[input_variable] = request.form[input_variable]
@@ -481,7 +448,8 @@ def submit_records():
 				inputs_details = SelectionList.get_inputs(
 					item_level=item_level,
 					record_type=record_type,
-					inputs=request.form.getlist('select_inputs') if 'select_inputs' in request.form else None,
+					# TODO to use this view need to update to support input groups only, remove selecting individual inputs
+					#  inputs=request.form.getlist('select_inputs') if 'select_inputs' in request.form else None,
 					details=True
 				)
 				for input_variable in inputs_details:
@@ -618,7 +586,7 @@ def submit_records():
 					detailed_record_form.template_format.choices.append(('fb', 'Field Book'))
 					detailed_record_form.record_time.validators = [InputRequired()]
 				selected_input_group = (
-					request.form['input_group'] if request.form['input_group'] not in [
+					int(request.form['input_group']) if request.form['input_group'] not in [
 						'',	'None'
 					] else None
 				)
@@ -627,7 +595,6 @@ def submit_records():
 						item_level=item_level,
 						record_type=record_type,
 						input_group=selected_input_group,
-						username=session['username']
 					)
 					inputs_list = [(input_variable['name_lower'], input_variable['name']) for input_variable in inputs_details]
 					detailed_record_form.select_inputs.choices = inputs_list

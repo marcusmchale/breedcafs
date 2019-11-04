@@ -161,13 +161,48 @@ class Download:
 				file_path = os.path.join(self.user_download_folder, filename)
 		return file_path
 
+	def find_input_group_id(
+			self,
+			input_group_name
+	):
+		parameters = {
+			'input_group_name': input_group_name,
+			'username': self.username
+		}
+		statement = (
+			' MATCH (ig: InputGroup { '
+			'	name_lower: toLower($input_group_name) '
+			' }) '
+			' OPTIONAL MATCH '
+			'	(ig)<-[: SUBMITTED]-(igs:InputGroups) '
+			' OPTIONAL MATCH '
+			'	(igs) '
+			'	<-[:SUBMITTED]-(:Submissions) '
+			'	<-[:SUBMITTED]-(:User) '
+			'	-[:AFFILIATED {data_shared: True}]->(partner: Partner)'
+			'	<-[: AFFILIATED {'
+			'		data_shared: True '
+			'	}]-(: User {'
+			'		username_lower: toLower(trim($username))'
+			'	}) '
+			' WITH ig WHERE igs IS NULL OR (igs IS NOT NULL AND partner IS NOT NULL) '
+			' RETURN ig.id '
+		)
+		with get_driver().session() as neo4j_session:
+			result = neo4j_session.read_transaction(
+				bolt_result,
+				statement,
+				parameters
+			).single()
+			if result:
+				return result[0]
+
 	def set_inputs(
 			self,
 			item_level,
 			record_type=None,
 			input_group=None,
-			inputs=None,
-			sample_level=None
+			inputs=None
 	):
 		if not record_type:
 			record_types = app.config['RECORD_TYPES']
@@ -175,11 +210,9 @@ class Download:
 			record_types = [record_type]
 		for rt in record_types:
 			self.inputs[rt] = SelectionList.get_inputs(
+				input_group=input_group,
 				item_level=item_level,
 				record_type=rt,
-				input_group=input_group,
-				inputs=inputs,
-				username=self.username,
 				details=True
 			)
 

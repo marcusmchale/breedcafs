@@ -89,12 +89,10 @@ def register_samples():
 					per_item_count
 				):
 					download_object.item_level = "sample"
-					if level == 'field' and sampling_activity in ['sample registration (in situ)', 'sample registration (harvest)']:
-						sampling_activity = 'field ' + sampling_activity
+					input_group = download_object.find_input_group_id(sampling_activity)
 					download_object.set_inputs(
 						'sample',
-						input_group=sampling_activity,
-						sample_level=level
+						input_group=input_group
 					)
 					# drop some items from the self.inputs list to avoid confusion when they aren't relevant
 					download_object.id_list_to_xlsx_template(

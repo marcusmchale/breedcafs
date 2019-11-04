@@ -216,9 +216,10 @@ def add_trees():
 						count
 				):
 					download_object.item_level = "tree"
+					input_group = download_object.find_input_group_id("Tree registration")
 					download_object.set_inputs(
 						'tree',
-						input_group="Tree registration"
+						input_group=input_group
 					)
 					download_object.id_list_to_xlsx_template(
 						base_filename="Tree Registration Template",

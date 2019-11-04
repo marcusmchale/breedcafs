@@ -17,18 +17,15 @@ const sample_id_list_box = $('#sample_id_list');
 
 
 change_activity = function () {
-
-    //if (activity) {
-    //    sampling_activity_select.val(activity);
-    //}
     const sampling_activity = sampling_activity_select.val();
-    console.log(sampling_activity);
     if (sampling_activity === 'sample registration (sub-sample)') {
         level_select.children('option').attr('disabled', true);
-        level_select.children('option[value="sample"]').attr('disabled', false);
+        level_select.children('option[value="sample"]').attr('disabled', false).attr('selected', true);
+        $('.selDiv option:eq(1)').prop('selected', true)
     } else if (sampling_activity == 'sample registration (harvest)') {
         level_select.children('option').attr('disabled', false);
         level_select.children('option[value="sample"]').attr('disabled', true);
+        level_select.children('option[value=""]').attr('selected', true);
     } else {
         level_select.children('option').attr('disabled', false);
     }
