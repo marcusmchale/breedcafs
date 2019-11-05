@@ -448,6 +448,7 @@ suppress_input = function () {
     });
 };
 
+suppress_input();
 
 $(window).on('load', level_update);
 //$( window ).load(update_item_count);

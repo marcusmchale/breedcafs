@@ -175,7 +175,7 @@ def generate_file():
 						request.form['replicate_id_list']
 					) if request.form['replicate_id_list'] != '' else None
 				)
-				selected_inputs = request.form.getlist('select_inputs') if 'select_inputs' in request.form else None
+				selected_inputs = request.form.getlist('inputs') if 'inputs' in request.form else None
 				parameters = {
 					'username': username,
 					'submission_start': submission_start,
