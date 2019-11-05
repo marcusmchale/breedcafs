@@ -1037,17 +1037,17 @@ class Download:
 						if len(value) > 1:
 							for i, j in enumerate(value):
 								if isinstance(j, (float, int)):
-									record[0]['Records'][f]['values'][v][i] = str(j)
+									record[0]['Records'][f]['values'][v][i] = unicode(j)
 								if isinstance(j, list):
 									if len(j) > 1:
 										for ji, jj in enumerate(j):
 											if isinstance(jj, (float, int)):
-												record[0]['Records'][f]['values'][v][i][ji] = str(jj)
-										record[0]['Records'][f]['values'][v][i] = '[' + ', '.join(
-											[jl.encode('utf8') for jl in record[0]['Records'][f]['values'][v][i]]
-										) + ']'
-							record[0]['Records'][f]['values'][v] = ', '.join(
-								[l.encode('utf8') for l in record[0]['Records'][f]['values'][v]]
+												record[0]['Records'][f]['values'][v][i][ji] = unicode(jj)
+										record[0]['Records'][f]['values'][v][i] = u'[' + u', '.join(
+											[jl for jl in record[0]['Records'][f]['values'][v][i]]
+										) + u']'
+							record[0]['Records'][f]['values'][v] = u', '.join(
+								[l for l in record[0]['Records'][f]['values'][v]]
 							)
 						else:
 							record[0]['Records'][f]['values'][v] = record[0]['Records'][f]['values'][v][0]
@@ -1055,9 +1055,9 @@ class Download:
 				if len(record[0]['Records'][f]['values']) > 1:
 					for v, value in enumerate(record[0]['Records'][f]['values']):
 						if isinstance(value, (float, int)):
-							record[0]['Records'][f]['values'][v] = str(value)
-					record[0][input_type['input_name']] = ', '.join(
-						[value.encode('utf8') for value in record[0]['Records'][f]['values']]
+							record[0]['Records'][f]['values'][v] = unicode(value)
+					record[0][input_type['input_name']] = u', '.join(
+						[value for value in record[0]['Records'][f]['values']]
 					)
 				elif record[0]['Records'][f]['values']:
 					record[0][input_type['input_name']] = record[0]['Records'][f]['values'][0]
@@ -1077,7 +1077,7 @@ class Download:
 								"%Y-%m-%d %H:%M")
 						else:
 							record[0][key][1] = 'Undefined'
-						record[0][key] = ' - '.join(record[0][key])
+						record[0][key] = u' - '.join(record[0][key])
 				elif key == 'Time' and record[0][key]:
 					record[0][key] = datetime.utcfromtimestamp(record[0][key] / 1000).strftime("%Y-%m-%d %H:%M")
 				elif key == 'Submitted at':
@@ -1091,13 +1091,13 @@ class Download:
 					if len(record[0][key]) > 1:
 						for i, j in enumerate(record[0][key]):
 							if isinstance(j, (float, int)):
-								record[0][key][i] = str(j)
+								record[0][key][i] = unicode(j)
 							if isinstance(j, list):
 								for ii,jj in enumerate(j):
 									if isinstance(jj, (float, int)):
-										record[0][key][i][ii] = str(jj)
-								record[0][key][i] = '[' + ', '.join([l.encode('utf8') for l in record[0][key][i]]) + ']'
-						record[0][key] = ', '.join([str(i).encode('utf8') for i in record[0][key]])
+										record[0][key][i][ii] = unicode(jj)
+								record[0][key][i] = '[' + u', '.join([l for l in record[0][key][i]]) + ']'
+						record[0][key] = u', '.join([unicode(i) for i in record[0][key]])
 					else:
 						record[0][key] = record[0][key][0]
 		return record
@@ -1113,18 +1113,18 @@ class Download:
 		# prepare the file
 		base_filename = 'records'
 		item_fieldnames = [
-			'Country',
-			'Region',
-			'Farm',
-			'Field',
-			'Field UID',
-			'Block',
-			'Block ID',
-			'Source trees',
-			'Source samples',
-			'Name',
-			'UID',
-			'Replicate'
+			u'Country',
+			u'Region',
+			u'Farm',
+			u'Field',
+			u'Field UID',
+			u'Block',
+			u'Block ID',
+			u'Source trees',
+			u'Source samples',
+			u'Name',
+			u'UID',
+			u'Replicate'
 		]
 		fieldnames = [i for i in item_fieldnames if i in first_result[0].keys()]
 		if data_format == 'table':
@@ -1132,14 +1132,14 @@ class Download:
 			fieldnames += inputs
 		else:
 			fieldnames += [
-				'Input variable',
-				'Value',
-				'Time',
-				'Period',
-				'Recorded by',
-				'Submitted at',
-				'Submitted by',
-				'Partner'
+				u'Input variable',
+				u'Value',
+				u'Time',
+				u'Period',
+				u'Recorded by',
+				u'Submitted at',
+				u'Submitted by',
+				u'Partner'
 			]
 		if file_type == 'xlsx':
 			file_path = self.get_file_path(
@@ -1164,7 +1164,7 @@ class Download:
 					if field in record[0]:
 						if record[0][field]:
 							used_fields.add(field)
-						worksheet.write(row_number, col_number, record[0][field])
+							worksheet.write(row_number, col_number, record[0][field])
 					col_number += 1
 			# hide columns not written to,
 			# if we want to actually delete them we need to move to using openpyxl instead of xlsxwriter
@@ -1222,7 +1222,7 @@ class Download:
 		download_url = url_for(
 						"download_file",
 						username=self.username,
-						filename= os.path.basename(file_path),
+						filename=os.path.basename(file_path),
 						_external=True
 			)
 		self.file_list.append({
