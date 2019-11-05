@@ -345,7 +345,7 @@ def generate_template():
 				sample_id_list = (
 					Parsers.parse_range_list(request.form['sample_id_list']) if request.form['sample_id_list'] != '' else None
 				)
-				input_group = request.form['input_group']
+				input_group = int(request.form['input_group']) if request.form['input_group'] != '' else None
 				if 'selected_inputs' in request.form:
 					selected_inputs = request.form.getlist('select_inputs')
 				else:
