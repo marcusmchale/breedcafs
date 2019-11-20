@@ -20,53 +20,6 @@ logging.basicConfig(
 	datefmt='%Y-%m-%d %H:%M:%S'
 )
 
-# Varieties are defined in a list of nested dicts structured around the "Trials"
-# A bit complicated but this is how the partners initially provided me with details
-# so it is easier to update it in this way during development as they provide updates
-# The country, region, farm and varieties are all created where needed (IIRC)
-# This is defined in the varieties module.
-# e.g.
-# trials = [
-#	{
-#		"uid": 1, # an integer for trial UID
-#		"name": "A meaningful name for a trial",
-#		"country": "Ireland",
-#		"region": "Galway",
-#		"farm": "NUIG",
-#		"varieties": {
-#			"inbred": [
-#				"Marsellesa"
-#			],
-#			"hybrid": [
-#				"Hybrid1"
-#			],
-#			"graft": [
-#				"Variety 1 / Variety 2"
-#			]
-#		}
-#	},
-# variety codes are in current use in some regions, so these need to be defined
-# in the varieties module which I place in the instance path as it isn't public yet
-# It is a list of tuples,
-# - first element is the code (string or integer)
-# - second element is the maternal donor (mother plant)
-# - third element is the paternal donor
-# e.g:
-# variety_codes = [
-#	(1, "Mat 1", "Pat 1"),
-#	(2, "Mat 1", "Pat 2")
-# ]
-# Additional information about the parents of each variety that I was provided,
-# also in the varieties module which I place in the instance path as it isn't public yet
-# - first element is the name of the variety
-# - second element is the maternal donor (mother plant)
-# - third element is the paternal donor
-# e.g.:
-# hybrid_parents = [
-#	("variety 1 name", "mat 1", "pat 1"),
-#	("variety 2 name", "mat 1", "pat 2")
-# ]
-
 # neo4j config
 uri = app.config['BOLT_URI']
 print 'Initialising DB:' + uri
@@ -328,7 +281,7 @@ def create_input_groups(tx, groups):
 		' ON CREATE SET c.count = 0 '
 	)
 	for group in groups:
-		tx.run(
+		connect_inputs_to_group = tx.run(
 			' MATCH (c:Counter {name: "input_group"}) '
 			' SET c._LOCK_ = True '
 			' WITH c '
@@ -338,243 +291,104 @@ def create_input_groups(tx, groups):
 			'		ig.name = trim($name), '
 			'		ig.id = c.count '
 			' SET c._LOCK_ = False '
-			' WITH (ig) '
-			'	MATCH (i:Input) '
-			'	WHERE i.name_lower IN [x in $inputs | toLower(trim(x))] '
-			'	MATCH (l:ItemLevel) '
-			'	WHERE l.name_lower IN [x in $levels | toLower(trim(x))] '
+			' WITH ig '
+			' MATCH (l:ItemLevel) '
+			' WHERE l.name_lower IN [x in $levels | toLower(trim(x))] '
 			' MERGE '
-			'	(i)-[:IN_GROUP]->(ig) '
-			' MERGE '
-			'	(ig)-[:AT_LEVEL]->(l) ',
+			'	(ig)-[:AT_LEVEL]->(l) '
+			' WITH DISTINCT ig, range(0, size($inputs)) as count '
+			' UNWIND count AS index '
+			'	MATCH (input:Input {name_lower: toLower(trim($inputs[index]))}) '
+			'	MERGE (input)-[:IN_GROUP {position: index}]->(ig) '
+			' RETURN collect(input.name) as input_names ',
 			name=group['input_group'],
 			levels=group['input_levels'],
 			inputs=group['input_variables']
 		)
+		for record in connect_inputs_to_group:
+			if not record['input_names']:
+				print ('Error adding variables to group')
+			elif not len(record['input_names']) == len(group['input_variables']):
+				print (
+					'Some variables not matched by name: ' +
+					','.join([i for i in group['input_variables'] if i not in record['input_names']])
+				)
 
 
-def create_trials(tx, trials):
-	# also creates the variety name input and list of varieties as its categories
-	# as well as a number of known locations (from trial information)
-	tx.run(
-		' MATCH (input: Input {name_lower: "assign variety name"}) '
-		' SET input.category_list = [] '
-	)
-	for trial in trials:
-		# TODO major revision to handle the field trials that span multiple regions/farms.
-		# for now allowing registering to Farm/Region without details - so that anchored for existing queries
-		# then returned farm/region will just not have name property etc.
-		# but need to change registering to separate trial from farm completely, and add farm to trial
-		if trial['farm']:
+def create_varieties(tx, varieties_file):
+	with open(varieties_file, 'rb') as varieties_csv:
+		reader = csv.DictReader(varieties_csv, delimiter=',', quotechar='"')
+		for variety in reader:
 			tx.run(
 				' MERGE '
-				'	(country: Country { '
-				'		name: $country, '
-				'		name_lower: toLower($country) '
-				'	}) '
-				' ON CREATE SET country.found = False '
-				' ON MATCH SET country.found = True '
-				' MERGE '
-				'	(region: Region { '
-				'		name: $region,'
-				'		name_lower: toLower($region) '
-				'	})-[:IS_IN]->(country) '
-				' ON CREATE SET region.found = False '
-				' ON MATCH SET region.found = True '
-				' MERGE '
-				'	(farm: Farm { '
-				'		name: $farm,'
-				'		name_lower: toLower($farm) '
-				'	})-[:IS_IN]->(region) '
-				' ON CREATE SET farm.found = False '
-				' ON MATCH SET farm.found = True '
-				' MERGE '
-				'	(trial: Trial { '
-				'		uid: $uid, '
-				'		name: $name, '
-				'		name_lower: toLower($name) '
-				'	}) '
-				' -[: PERFORMED_IN]->(farm) ',
-				uid=trial['uid'],
-				name=trial['name'],
-				country=trial['country'],
-				region=trial['region'],
-				farm=trial['farm']
+				'	(v: Variety {name_lower: toLower(trim($name))}) '
+				' SET '
+				'	v.name = $name ',
+				name=variety['name']
 			)
-		else:
-			if trial['region']:
-				tx.run(
-					' MERGE '
-					'	(country: Country { '
-					'		name: $country, '
-					'		name_lower: toLower($country) '
-					'	}) '
-					' ON CREATE SET country.found = False '
-					' ON MATCH SET country.found = True '
-					' MERGE '
-					'	(region: Region { '
-					'		name: $region,'
-					'		name_lower: toLower($region) '
-					'	})-[:IS_IN]->(country) '
-					' ON CREATE SET region.found = False '
-					' ON MATCH SET region.found = True '
-					' MERGE '
-					'	(trial: Trial { '
-					'		uid: $uid, '
-					'		name: $name, '
-					'		name_lower: toLower($name) '
-					'	})-[: PERFORMED_IN]->(region) ',
-					uid=trial['uid'],
-					name=trial['name'],
-					country=trial['country'],
-					region=trial['region']
-				)
-			else:
-				tx.run(
-					' MERGE '
-					'	(country: Country { '
-					'		name: $country, '
-					'		name_lower: toLower($country) '
-					'	}) '
-					' ON CREATE SET country.found = False '
-					' ON MATCH SET country.found = True '
-					' MERGE '
-					'	(trial: Trial { '
-					'		uid: $uid, '
-					'		name: $name, '
-					'		name_lower: toLower($name) '
-					'	})-[:PERFORMED_IN]->(country) ',
-					uid=trial['uid'],
-					name=trial['name'],
-					country=trial['country']
-				)
-		# add a relationship between the trial and the "variety name" input variable
-		# make this relationship contain a category list
-		# use this later with coalesce to obtain location dependent category lists
-		tx.run(
-			' MATCH '
-			'	(trial: Trial {uid:$uid}), '
-			'	(input: Input {name_lower: "assign variety name"}) '
-			' MERGE '
-			'	(trial)'
-			'		<-[recorded_in: RECORDED_IN]-(input) '
-			' SET recorded_in.category_list = [] ',
-			uid=trial['uid']
-		)
-		# now merge the varieties into the recorded_in relationship as a category_list
-		# but also collect all as categories on input category_list
-		# will rely on a coalesce of assessed in and the input category list to return items
-		# also create the varieties
-		for variety_type in trial['varieties']:
-			for variety in trial['varieties'][variety_type]:
-				variety_create = tx.run(
-					' MATCH '
-					'	(trial: Trial { '
-					'		uid: $trial '
-					'	})<-[recorded_in:RECORDED_IN]-(input: Input { '
-					'		name_lower: "assign variety name" '
-					'	}) '
-					' SET '
-					'	recorded_in.category_list = CASE '
-					'		WHEN $variety IN recorded_in.category_list '
-					'		THEN recorded_in.category_list '
-					'		ELSE recorded_in.category_list + $variety '
-					'		END, '
-					'	input.category_list = CASE '
-					'		WHEN $variety IN input.category_list '
-					'		THEN input.category_list '
-					'		ELSE input.category_list + $variety '
-					'		END '
-					' MERGE '
-					'	(variety: Variety { '
-					'		name_lower: toLower($variety) '
-					'	}) '
-					'	ON CREATE SET '
-					'		variety.name = $variety, '
-					'		variety.type = $variety_type, '
-					'		variety.found = False '
-					'	ON MATCH SET '
-					'		variety.found = True '
-					' MERGE '
-					'	(variety)-[:ASSESSED_IN]->(trial) '
-					' RETURN '
-					'	variety.name, variety.found ',
-					variety=variety,
-					trial=trial['uid'],
-					variety_type=variety_type
-				)
-				for record in variety_create:
-					print ("Created" if record[1] else "Found"), record[0]
-	# build in any obvious relationships for hybrids to their parents
-	tx.run(
-		' MATCH '
-		'	(variety: Variety {type: "hybrid"}) '
-		' WITH '
-		'	variety, '
-		'	split(variety.name_lower, " x ") as parents '
-		' WHERE size(parents) = 2 '
-		' MATCH '
-		'	(maternal: Variety {name_lower: parents[0]}), '
-		'	(paternal: Variety {name_lower: parents[1]})'
-		' MERGE '
-		'	(variety)-[:MATERNAL_DONOR]->(maternal) '
-		' MERGE '
-		'	(variety)-[:PATERNAL_DONOR]->(paternal) '
-	)
-	# and now just a couple more that have non-obvious naming but for which I was provided details about parents
-	for hybrid in varieties.hybrid_parents:
-		tx.run(
-			' MERGE '
-			'	(variety: Variety { '
-			'		type: "hybrid", '
-			'		name_lower: toLower($hybrid) '
-			'	}) '
-			'	ON CREATE SET '
-			'		variety.name = $hybrid '
-			' MERGE '
-			'	(maternal: Variety { '
-			'		name_lower: toLower($maternal_donor) '
-			'	}) '
-			'	ON CREATE SET '
-			'		maternal.name = $maternal_donor '
-			' MERGE '
-			'	(paternal: Variety { '
-			'		name_lower: toLower($paternal_donor) '
-			'	}) '
-			'	ON CREATE SET '
-			'		paternal.name = $paternal_donor  '
-			' MERGE '
-			'	(variety)-[:MATERNAL_DONOR]->(maternal) '
-			' MERGE '
-			'	(variety)-[:PATERNAL_DONOR]->(paternal) ',
-			hybrid=hybrid[0],
-			maternal_donor=hybrid[1],
-			paternal_donor=hybrid[2]
-		)
-	# same for grafts (no additional lists here though)
-	tx.run(
-		' MATCH '
-		'	(variety: Variety {type: "graft"}) '
-		' WITH '
-		'	variety, '
-		'	split(variety.name_lower, " / ") as source_tissue '
-		' WHERE size(source_tissue) = 2 '
-		' MATCH '
-		'	(scion: Variety {name_lower: source_tissue[0]}), '
-		'	(rootstock: Variety {name_lower: source_tissue[1]})'
-		' MERGE '
-		'	(variety)-[:SCION]->(scion) '
-		' MERGE '
-		'	(variety)-[:ROOTSTOCK]->(rootstock) '
-	)
+			#'	v.type = $type, '
+			#'	v.lineage_description = $lineage_description ',
+			#type=variety['type'],
+			#lineage_description=variety['lineage_description']
+			#f variety['lineage_group']:
+			#	tx.run(
+			#		' MATCH '
+			#		'	(v: Variety {name: $name}) '
+			#		' MERGE '
+			#		'	(lg: LineageGroup {'
+			#		'		type: "basic" '
+			#		'	}) '
+			#		' MERGE '
+			#		'	(v)-[:IN_GROUP]->(lg) ',
+			#		name=variety['name'],
+			#		lineage_group=variety['lineage_group']
+			#	)
+			#f variety['type'] == 'hybrid':
+			#	tx.run(
+			#		' MATCH '
+			#		'	(v: Variety {name: $name}) '
+			#		' MERGE '
+			#		'	(m: Variety {name_lower: toLower(trim($maternal))}) '
+			#		'	ON MATCH SET m.found = True '
+			#		' MERGE '
+			#		'	(p: Variety {name_lower: toLower(trim($paternal))}) '
+			#		'	ON MATCH SET p.found = True '
+			#		' MERGE '
+			#		'	(v)-[:MATERNAL_DONOR]->(m) '
+			#		' MERGE '
+			#		'	(v)-[:PATERNAL_DONOR]->(p) ',
+			#		name=variety['name'],
+			#		maternal=variety['maternal'],
+			#		paternal=variety['paternal']
+			#	)
+			#lif variety['type'] == 'graft':
+			#	tx.run(
+			#		' MATCH '
+			#		'	(v: Variety {name: $name}) '
+			#		' MERGE '
+			#		'	(s: Variety {name_lower: toLower(trim(scion))}) '
+			#		'	ON MATCH SET s.found = True '
+			#		' MERGE '
+			#		'	(r: Variety {name_lower: toLower(trim($rootstock))}) '
+			#		'	ON MATCH SET r.found = True '
+			#		' MERGE '
+			#		'	(v)-[:SCION_TISSUE]->(s) '
+			#		' MERGE '
+			#		'	(v)-[:ROOTSTOCK_TISSUE]->(r) '
+			#		' RETURN m.found, p.found ',
+			#		name=variety['name'],
+			#		scion=variety['scion'],
+			#		rootstock=variety['rootstock']
+			#	)
 	# now sort the list of variety names (this sorting will handle numbers better than a simple string sort does)
 	tx.run(
-		' MATCH (input: Input {name_lower: "assign variety name"}) '
-		' WITH input, input.category_list as L '
-		' UNWIND L as l '
-		' WITH input, coalesce(toInteger(l), l) as L ORDER BY L '
-		' WITH input, collect(toString(L)) as l '
-		' SET input.category_list = l '
+		' MATCH '
+		'	(i: Input {name_lower: "assign variety name"}), '
+		'	(v: Variety) '
+		' WITH i, v.name as variety '
+		' ORDER BY variety '
+		' WITH i, collect(variety) as varieties	'
+		' SET i.category_list = varieties '
 	)
 
 
@@ -667,11 +481,14 @@ else:
 				session.write_transaction(delete_data)
 			if confirm('Would you like to delete all items?'):
 				session.write_transaction(delete_items)
-			if confirm('Would you like to delete inputs and varieties then recreate them from inputs.csv, input_groups.py and varieties.py?'):
+			if confirm(
+					'Would you like to delete inputs and varieties then recreate them from inputs.csv, '
+					'input_groups.py and varieties.py?'
+			):
 				session.write_transaction(delete_inputs)
 				session.write_transaction(create_inputs, './instance/inputs.csv')
 				session.write_transaction(create_input_groups, input_groups.input_groups)
-				session.write_transaction(create_trials, varieties.trials)
+				session.write_transaction(create_varieties, './instance/varieties.csv')
 				session.write_transaction(
 					create_variety_codes,
 					varieties.el_frances_variety_codes,
@@ -692,7 +509,7 @@ else:
 			session.write_transaction(create_item_levels, app.config['ITEM_LEVELS'])
 			session.write_transaction(create_inputs, './instance/inputs.csv')
 			session.write_transaction(create_input_groups, input_groups.input_groups)
-			session.write_transaction(create_trials, varieties.trials)
+			session.write_transaction(create_varieties, './instance/varieties.csv')
 			session.write_transaction(
 				create_variety_codes,
 				varieties.el_frances_variety_codes,

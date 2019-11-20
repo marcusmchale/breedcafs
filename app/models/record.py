@@ -118,7 +118,7 @@ class Record:
 					' OPTIONAL MATCH '
 					'	(source_ig) '
 					'	-[: AT_LEVEL]->(level: ItemLevel) '
-					' WITH '
+					' WITH DISTINCT '
 					'	ig, source_ig, level '
 					' CREATE '
 					'	(ig)-[:AT_LEVEL]->(level) '
