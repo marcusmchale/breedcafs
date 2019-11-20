@@ -86,6 +86,14 @@ def delete_inputs(tx):
 	)
 
 
+def delete_varieties(tx):
+	tx.run(
+		' MATCH '
+		'	(variety:Variety) ' 
+		' DETACH DELETE variety '
+	)
+
+
 def create_indexes(tx, indexes):
 	for item in indexes:
 		tx.run(
@@ -483,9 +491,10 @@ else:
 				session.write_transaction(delete_items)
 			if confirm(
 					'Would you like to delete inputs and varieties then recreate them from inputs.csv, '
-					'input_groups.py and varieties.py?'
+					'input_groups.py and varieties.csv?'
 			):
 				session.write_transaction(delete_inputs)
+				session.write_transaction(delete_varieties)
 				session.write_transaction(create_inputs, './instance/inputs.csv')
 				session.write_transaction(create_input_groups, input_groups.input_groups)
 				session.write_transaction(create_varieties, './instance/varieties.csv')
