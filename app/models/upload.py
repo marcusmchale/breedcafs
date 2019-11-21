@@ -814,6 +814,8 @@ class PropertyUpdateHandler:
 		self.function_dict = {
 			'set sample unit': self.set_unit,
 			'set custom name': self.set_name,
+			'set row': self.set_row,
+			'set column': self.set_column,
 			'set elevation': self.set_elevation,
 			# TODO the above are basically the same form
 			#  write a more generalised function rather than adding any more of this type
@@ -1190,6 +1192,60 @@ class PropertyUpdateHandler:
 		self.error_check(
 			result,
 			'name'
+		)
+
+	def set_row(self, input_variable):
+		statement = (
+			' UNWIND $uid_value_list AS uid_value '
+			'	OPTIONAL MATCH '
+			'		(item: Tree {uid: uid_value[0]}) '
+			'	WITH uid_value, item, item.row as existing '
+			'	SET item.row = CASE '
+			'		WHEN item.row IS NULL '
+			'		THEN uid_value[1] '
+			'		ELSE item.row '
+			'		END '
+			'	RETURN { '
+			'		UID: uid_value[0], '
+			'		value: uid_value[1], '
+			'		item_uid: item.uid, '
+			'		existing: existing '
+			'	} '
+		)
+		result = self.tx.run(
+			statement,
+			uid_value_list=self.updates[input_variable]
+		)
+		self.error_check(
+			result,
+			'row'
+		)
+
+	def set_column(self, input_variable):
+		statement = (
+			' UNWIND $uid_value_list AS uid_value '
+			'	OPTIONAL MATCH '
+			'		(item: Tree {uid: uid_value[0]}) '
+			'	WITH uid_value, item, item.column as existing '
+			'	SET item.column = CASE '
+			'		WHEN item.column IS NULL '
+			'		THEN uid_value[1] '
+			'		ELSE item.column '
+			'		END '
+			'	RETURN { '
+			'		UID: uid_value[0], '
+			'		value: uid_value[1], '
+			'		item_uid: item.uid, '
+			'		existing: existing '
+			'	} '
+		)
+		result = self.tx.run(
+			statement,
+			uid_value_list=self.updates[input_variable]
+		)
+		self.error_check(
+			result,
+			'column'
 		)
 
 	def set_location(self, input_variable):
@@ -1984,10 +2040,10 @@ class Upload:
 	def set_fieldnames(self):
 		record_type_sets = {
 			'mixed': {'uid'},
-			'property': {'name', 'uid', 'person'},
-			'trait': {'name', 'uid', 'person', 'date', 'time'},
-			'condition': {'name', 'uid', 'person', 'start date', 'start time', 'end date', 'end time'},
-			'curve': {'name', 'uid', 'person', 'date', 'time'},
+			'property': {'uid', 'person'},
+			'trait': {'uid', 'person', 'date', 'time'},
+			'condition': {'uid', 'person', 'start date', 'start time', 'end date', 'end time'},
+			'curve': {'uid', 'person', 'date', 'time'},
 		}
 		if self.file_extension == 'csv':
 			with open(self.file_path) as uploaded_file:
@@ -2171,8 +2227,10 @@ class Upload:
 				# these should now just be the input variables which we confirm are found in the db.
 				# except for curves, where they should all be numbers
 				if worksheet in app.config['WORKSHEET_NAMES']:
+					optional_fieldnames = {'name', 'row', 'column'}
 					self.inputs[worksheet] = [
-						i for i in self.fieldnames[worksheet] if i.lower() not in self.required_fieldnames[worksheet]
+						i for i in self.fieldnames[worksheet] if
+						i.lower() not in self.required_fieldnames[worksheet].union(optional_fieldnames)
 					]
 					record_type = worksheet
 					statement = (
@@ -3563,6 +3621,8 @@ class Upload:
 					# update properties where needed
 					property_uid = {
 						'set custom name': [],
+						'set row': [],
+						'set column': [],
 						'set sample unit': [],
 						'assign tree to block by name': [],
 						'assign tree to block by id': [],

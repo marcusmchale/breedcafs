@@ -733,6 +733,8 @@ class ItemList:
 					' Block: block.name, '
 					' `Block ID` : block.id, '
 					' `Tree ID`: item.id, '
+					' Row: item.row, '
+					' Column: item.column, '
 					' Time: apoc.date.format(coalesce(item.time, block.time, field.time), "ms", "yyyy-MM-dd HH:mm") '
 				)
 			elif parameters['item_level'] == 'sample':

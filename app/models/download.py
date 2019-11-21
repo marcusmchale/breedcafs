@@ -36,6 +36,7 @@ class Download:
 		self.item_fieldnames = None
 		self.item_level = None
 		self.inputs = {}
+		self.item_reference_details = []
 		for record_type in app.config['RECORD_TYPES']:
 			self.inputs[record_type] = []
 		self.file_list = []
@@ -115,6 +116,8 @@ class Download:
 			'Varieties',
 			'Unit',
 			'Name',
+			'Row',
+			'Column',
 			'UID'
 		]
 		self.item_fieldnames = [i for i in fieldnames_order if i in self.id_list.peek()[0].keys()]
@@ -240,19 +243,19 @@ class Download:
 			)
 		return True
 
-	@staticmethod
 	def write_ids_to_row(
+			self,
 			worksheet,
 			row_num,
 			uid,
-			name=None
+			item_reference_details_dict
 	):
-		if name:
+		for index, key in enumerate(self.item_reference_details):
 			worksheet.write(
-				row_num, 0, name
+				row_num, index, item_reference_details_dict[key]
 			)
 		worksheet.write(
-			row_num, 1, uid
+			row_num, len(self.item_reference_details), uid
 		)
 
 	def write_item_to_worksheet(
@@ -260,7 +263,8 @@ class Download:
 			record_type,
 			worksheet,
 			item_details,
-			item_num
+			item_num,
+			item_reference_details_dict
 	):
 		if self.replicates and record_type in app.config['REPLICATED_RECORD_TYPES']:
 			replicate_list = ['.'.join([str(item_details['UID']), str(i)]) for i in range(1, self.replicates + 1)]
@@ -275,7 +279,7 @@ class Download:
 					worksheet,
 					row_num,
 					uid,
-					name=item_details['Name'] if 'Name' in item_details else None,
+					item_reference_details_dict
 				)
 				row_num += 1
 
@@ -317,19 +321,16 @@ class Download:
 		# core field name and format tuple in dictionary by record type
 		core_fields_formats = {
 			'property': [
-				('Name', right_border),
 				('UID', right_border),
 				('Person', right_border)
 				],
 			'trait': [
-				('Name', right_border),
 				('UID', right_border),
 				('Date', date_lb_format),
 				('Time', time_format),
 				('Person', right_border)
 			],
 			'condition': [
-				('Name', right_border),
 				('UID', right_border),
 				('Start Date', date_lb_format),
 				('Start Time', time_format),
@@ -338,13 +339,25 @@ class Download:
 				('Person', right_border)
 			],
 			'curve': [
-				('Name', right_border),
 				('UID', right_border),
 				('Date', date_lb_format),
 				('Time', time_format),
 				('Person', right_border)
 			]
 		}
+		item_details_keys = self.id_list.peek()[0].keys()
+		if 'Column' in item_details_keys:
+			self.item_reference_details.insert(0, 'Column')
+			for i in core_fields_formats.keys():
+				core_fields_formats[i].insert(0, ('Column', right_border))
+		if 'Row' in item_details_keys:
+			self.item_reference_details.insert(0, 'Row')
+			for i in core_fields_formats.keys():
+				core_fields_formats[i].insert(0, ('Row', right_border))
+		if 'Name' in item_details_keys:
+			self.item_reference_details.insert(0, 'Name')
+			for i in core_fields_formats.keys():
+				core_fields_formats[i].insert(0, ('Name', right_border))
 		# Create worksheets
 		# Write headers and set formatting on columns
 		# Store worksheet in a dict by record type to later write values when iterating through id_list
@@ -465,6 +478,11 @@ class Download:
 		item_num = 0
 		for record in self.id_list:
 			item_num += 1
+			# construct a dict to pass the values for item reference details
+			item_reference_details_dict = {}
+			if self.item_reference_details:
+				for key in self.item_reference_details:
+					item_reference_details_dict[key] = record[0][key]
 			# if there is a list (or nested lists) stored in this item
 			# make sure it is returned as a list of strings
 			for key, value in record[0].iteritems():
@@ -480,7 +498,8 @@ class Download:
 							record_type,
 							ws_dict[record_type],
 							record[0],
-							item_num
+							item_num,
+							item_reference_details_dict
 						)
 						if record_type == 'property':
 							# We can pre-fill property templates with found values to present existing records to users
@@ -564,7 +583,8 @@ class Download:
 								record_type,
 								ws_dict[input_variable['name_lower']],
 								record[0],
-								item_num
+								item_num,
+								item_reference_details_dict
 							)
 		# now that we know the item_num we can add the validation
 		# currently no validation for curves as no definite columns
