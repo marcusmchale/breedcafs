@@ -75,6 +75,7 @@ update_group_filter_list = function() {
     });
 };
 
+update_group_to_copy_list;
 partner_to_copy.change(update_group_to_copy_list);
 
 update_group_to_copy_levels = function() {
