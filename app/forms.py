@@ -580,7 +580,7 @@ class CollectForm(FlaskForm):
 		'Samples to register per item',
 		[
 			Optional(),
-			NumberRange(min=1, max=1000, message='Maximum of 1000 ids per item per submission')
+			NumberRange(min=1, max=100000, message='Maximum of 100000 ids per item per submission')
 		],
 		description="Samples to register per item"
 	)
