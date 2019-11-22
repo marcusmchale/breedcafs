@@ -730,6 +730,7 @@ class DownloadForm(FlaskForm):
 
 class AddInputGroupForm(FlaskForm):
 	all_partners = SelectionList.get_partners()
+	all_partners = [(i[0], i[0]) for i in all_partners]
 	all_partners.insert(0, ("", "Default variable groups"))
 	partner_to_copy = SelectField(
 		'Select a partner from whom to copy an input group',
