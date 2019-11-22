@@ -3233,6 +3233,22 @@ class Upload:
 						' REMOVE item.name ',
 						uid_list=property_uid[input_variable]
 					)
+				elif inputs_properties[input_variable] == 'row':
+					tx.run(
+						' UNWIND $uid_list as uid'
+						' MATCH '
+						'	(item: Item {uid: uid}) '
+						' REMOVE item.row ',
+						uid_list=property_uid[input_variable]
+					)
+				elif inputs_properties[input_variable] == 'column':
+					tx.run(
+						' UNWIND $uid_list as uid'
+						' MATCH '
+						'	(item: Item {uid: uid}) '
+						' REMOVE item.column ',
+						uid_list=property_uid[input_variable]
+					)
 				elif inputs_properties[input_variable] == 'location':
 					tx.run(
 						' UNWIND $uid_list as uid'
