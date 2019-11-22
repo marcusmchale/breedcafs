@@ -92,10 +92,11 @@ class SelectionList:
 				' WITH input ORDER BY input.name_lower '
 			)
 		if inverse:
-			statement += (
-				' WITH collect(input) as selected_inputs '
-				' MATCH (input:Input) WHERE NOT input IN selected_inputs '
-			)
+			if input_group:
+				statement += (
+					' WITH collect(input) as selected_inputs '
+					' MATCH (input:Input) WHERE NOT input IN selected_inputs '
+				)
 			if inverse_filter:
 				statement += (
 					' MATCH '

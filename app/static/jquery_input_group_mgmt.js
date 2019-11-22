@@ -344,6 +344,7 @@ update_all_inputs = function() {
     });
 };
 
+update_all_inputs();
 record_type_select.change(update_all_inputs);
 item_level_select.change(update_all_inputs);
 group_filter.change(update_all_inputs);
