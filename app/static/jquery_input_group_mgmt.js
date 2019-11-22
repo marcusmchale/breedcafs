@@ -47,6 +47,8 @@ update_group_to_copy_list = function() {
     });
 };
 
+update_group_to_copy_list();
+
 update_group_filter_list = function() {
     group_filter.empty();
     group_filter.append($("<option></option>").attr("value", "").text(""));
