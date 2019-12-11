@@ -519,9 +519,23 @@ class ItemList:
 
 	@staticmethod
 	def build_match_item_statement(record_data):
+		clause_tuples = [
+			(record_data['field_uid_list'] and not record_data['field_uid'], ' field.uid IN $field_uid_list '),
+			(record_data['block_id_list'] and not record_data['block_uid'], ' block.id IN $block_id_list '),
+			(record_data['tree_id_list'], ' tree.id IN $tree_id_list '),
+			(record_data['sample_id_list'], ' sample.id IN $sample_id_list')
+		]
 		parameters = {
-			'item_level': record_data['item_level']
+			'item_level': record_data['item_level'],
 		}
+		if clause_tuples[0][0]:
+			parameters['field_uid_list'] = record_data['field_uid_list']
+		if clause_tuples[1][0]:
+			parameters['block_id_list'] = record_data['block_id_list']
+		if clause_tuples[2][0]:
+			parameters['tree_id_list'] = record_data['tree_id_list']
+		if clause_tuples[3][0]:
+			parameters['sample_id_list'] = record_data['sample_id_list']
 		statement = (
 			' MATCH (country: Country '
 		)
@@ -546,14 +560,9 @@ class ItemList:
 			statement += (
 				' {name_lower: toLower($farm)} '
 			)
-		if record_data['item_level'] == 'field':
-			statement += (
-				' )<-[:IS_IN]-(item: Field '
-			)
-		else:
-			statement += (
-				' )<-[: IS_IN]-(field: Field '
-			)
+		statement += (
+			' )<-[: IS_IN]-(field: Field '
+		)
 		if record_data['field_uid']:
 			parameters['field_uid'] = record_data['field_uid']
 			statement += (
@@ -562,21 +571,22 @@ class ItemList:
 		statement += (
 			' ) '
 		)
+		if record_data['item_level'] == 'field':
+			if clause_tuples[0][0]:
+				statement += ' WHERE ' + clause_tuples[0][1]
+			statement += (
+				' WITH '
+				' country, region, farm, field as item '
+			)
 		if any([
 			record_data['item_level'] == 'block',
-			record_data['block_uid']
+			record_data['block_uid'],
+			record_data['block_id_list']
 		]):
 			statement += (
 				' <-[: IS_IN]-(:FieldBlocks) '
+				' <-[: IS_IN]-(block: Block '
 			)
-			if record_data['item_level'] == 'block':
-				statement += (
-					' <-[: IS_IN]-(item: Block '
-				)
-			else:
-				statement += (
-					' <-[: IS_IN]-(block: Block '
-				)
 			if record_data['block_uid']:
 				parameters['block_uid'] = record_data['block_uid']
 				statement += (
@@ -585,11 +595,25 @@ class ItemList:
 			statement += (
 				' ) '
 			)
+			if record_data['item_level'] == 'block':
+				if any([i[0] for i in clause_tuples[0:2]]):
+					statement += (
+						' WHERE '
+					)
+					statement += (
+						' AND '.join(
+							[i[1] for i in clause_tuples[0:2] if i[0]]
+						)
+					)
+				statement += (
+					' WITH '
+					' country, region, farm, field, block as item '
+				)
 		if any([
 			record_data['item_level'] == 'tree',
 			record_data['tree_id_list']
 		]):
-			if record_data['block_uid']:
+			if record_data['block_uid'] or record_data['block_id_list']:
 				parameters['block_uid'] = record_data['block_uid']
 				statement += (
 					' <-[: IS_IN]-(: BlockTrees)<-[: IS_IN]- '
@@ -598,46 +622,57 @@ class ItemList:
 				statement += (
 					' <-[ :IS_IN]-(: FieldTrees)<-[: IS_IN]- '
 				)
+			statement += (
+				' (tree: Tree) '
+			)
 			if record_data['item_level'] == 'tree':
-				statement += (
-					' (item: Tree) '
-				)
-				if record_data['tree_id_list']:
-					parameters['tree_id_list'] = record_data['tree_id_list']
+				if any([i[0] for i in clause_tuples[0:3]]):
 					statement += (
 						' WHERE '
-						' item.id in $tree_id_list '
 					)
-			else:
-				statement += (
-					' (tree:Tree) '
-				)
-		if record_data['item_level'] == 'sample':
-			statement += (
-				' <-[: FROM | IS_IN* ]-(: ItemSamples) '
-				' <-[: FROM* ]-(item: Sample) '
-			)
-			if record_data['tree_id_list']:
-				parameters['tree_id_list'] = record_data['tree_id_list']
-				statement += (
-					' WHERE tree.id in $tree_id_list '
-				)
-			if record_data['sample_id_list']:
-				parameters['sample_id_list'] = record_data['sample_id_list']
-				if record_data['tree_id_list']:
 					statement += (
-						' AND '
+						' AND '.join(
+							[i[1] for i in clause_tuples[0:3] if i[0]]
+						)
+					)
+				if any([record_data['block_uid'], record_data['block_id_list']]):
+					statement += (
+						' WITH '
+						' country, region, farm, field, block, tree as item '
 					)
 				else:
 					statement += (
+						' WITH '
+						' country, region, farm, field, tree as item '
+					)
+		if record_data['item_level'] == 'sample':
+			statement += (
+				' <-[: FROM | IS_IN* ]-(: ItemSamples) '
+				' <-[: FROM* ]-(sample: Sample) '
+			)
+			if record_data['item_level'] == 'sample':
+				if any([i[0] for i in clause_tuples[0:4]]):
+					statement += (
 						' WHERE '
 					)
-				statement += (
-					' item.id IN $sample_id_list '
-				)
+					statement += (
+						' AND '.join(
+							[i[1] for i in clause_tuples[0:4] if i[0]]
+						)
+					)
+				if any([record_data['block_uid'], record_data['block_id_list']]):
+					statement += (
+						' WITH '
+						' country, region, farm, field, block, tree, sample as item '
+					)
+				else:
+					statement += (
+						' WITH '
+						' country, region, farm, field, tree, sample as item '
+					)
 		# Optional matches
 		if record_data['item_level'] in ['tree', 'sample']:
-			if not record_data['block_uid']:
+			if not any([record_data['block_uid'], record_data['block_id_list']]):
 				statement += (
 					' OPTIONAL MATCH '
 					'	(item)-[: FROM | IS_IN*]->(block: Block) '

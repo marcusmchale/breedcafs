@@ -338,7 +338,15 @@ def generate_template():
 				region = request.form['region'] if request.form['region'] != '' else None
 				farm = request.form['farm'] if request.form['farm'] != '' else None
 				field_uid = int(request.form['field']) if request.form['field'].isdigit() else None
+				field_uid_list = (
+					Parsers.parse_range_list(
+						request.form['field_uid_list']) if request.form['field_uid_list'] != '' else None
+				)
 				block_uid = request.form['block'] if request.form['block'] != '' else None
+				block_id_list = (
+					Parsers.parse_range_list(
+						request.form['block_id_list']) if request.form['block_id_list'] != '' else None
+				)
 				tree_id_list = (
 					Parsers.parse_range_list(request.form['tree_id_list']) if request.form['tree_id_list'] != '' else None
 				)
@@ -362,7 +370,9 @@ def generate_template():
 					'region': region,
 					'farm': farm,
 					'field_uid': field_uid,
+					'field_uid_list': field_uid_list,
 					'block_uid': block_uid,
+					'block_id_list': block_id_list,
 					'tree_id_list': tree_id_list,
 					'sample_id_list': sample_id_list,
 					'input_group': input_group,

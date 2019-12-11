@@ -17,10 +17,10 @@
             <dd>{{ render_field (location_form.country) }}</dd>
             <dd>{{ render_field (location_form.region) }}</dd>
             <dd>{{ render_field (location_form.farm) }}</dd>
-            <dd>{{ render_field (location_form.field) }}</dd>
+            <dd>{{ render_field (location_form.field) }} OR {{ render_field (collect_form.field_uid_list) }}</dd>
         </div>
         <div id="block_div">
-            <dd>{{ render_field (location_form.block) }}</dd>
+            <dd>{{ render_field (location_form.block) }} OR {{ render_field (collect_form.block_id_list) }}</dd>
         </div>
         <div id = 'tree_selection_div' title="ID is the integer from the end of a UID, e.g. from 1_T2 the ID is 2">
             <dd>{{ render_field (collect_form.tree_id_list) }}</dd>

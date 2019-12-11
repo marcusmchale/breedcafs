@@ -9,6 +9,7 @@ from datetime import datetime
 from flask import jsonify
 from parsers import Parsers
 
+
 class Chart:
 	def __init__(self):
 		pass
@@ -89,10 +90,26 @@ class Chart:
 			region=None,
 			farm=None,
 			field_uid=None,
+			field_uid_list=None,
 			block_uid=None,
+			block_id_list=None,
 			tree_id_list=None,
 			sample_id_list=None
 	):
+		if field_uid_list:
+			try:
+				field_uid_list = Parsers.parse_range_list(field_uid_list)
+				if len(field_uid_list) >= 1000:
+					return "Please select a range of less than 1000 field IDs"
+			except ValueError:
+				return 'Invalid range of Field UIDs'
+		if block_id_list:
+			try:
+				block_id_list = Parsers.parse_range_list(block_id_list)
+				if len(block_id_list) >= 1000:
+					return "Please select a range of less than 1000 block IDs"
+			except ValueError:
+				return 'Invalid range of Block IDs'
 		if tree_id_list:
 			try:
 				tree_id_list = Parsers.parse_range_list(tree_id_list)
@@ -152,14 +169,19 @@ class Chart:
 			)
 		else:
 			statement += (
-				' (field:Field) '
+				' (field: Field) '
 			)
 		if level == 'field':
+			if field_uid_list and not field_uid:
+				parameters['field_uid_list'] = field_uid_list
+				statement += (
+					' WHERE field.uid IN $field_uid_list '
+				)
 			statement += (
 				' RETURN count(field) '
 			)
 		else:
-			if any([level == 'block', block_uid]):
+			if any([level == 'block', block_uid, block_id_list]):
 				statement += (
 					' <-[:IS_IN]-(:FieldBlocks) '
 					' <-[:IS_IN]-(block:Block '
@@ -175,6 +197,23 @@ class Chart:
 					' ) '
 				)
 				if level == 'block':
+					if any([
+						field_uid_list and not field_uid,
+						block_id_list and not block_uid
+					]):
+						statement += ' WHERE '
+						if field_uid_list and not field_uid:
+							parameters['field_uid_list'] = field_uid_list
+							statement += (
+								' field.uid IN $field_uid_list '
+							)
+							if block_id_list and not block_uid:
+								statement += ' AND '
+						if block_id_list and not block_uid:
+							parameters['block_id_list'] = block_id_list
+							statement += (
+								' block.id IN $block_id_list '
+							)
 					statement += (
 						' RETURN count(block) '
 					)
@@ -182,7 +221,7 @@ class Chart:
 				statement += (
 					' <-[:IS_IN]-'
 				)
-				if block_uid:
+				if block_uid or block_id_list:
 					statement += (
 						' (:BlockTrees) '
 						' <-[:IS_IN]-'
@@ -196,12 +235,34 @@ class Chart:
 					' (tree:Tree) '
 				)
 				if level == 'tree':
-					if tree_id_list:
-						parameters['tree_id_list'] = tree_id_list
-						statement += (
-							' WHERE '
-							' tree.id in $tree_id_list '
-						)
+					if any([
+						field_uid_list and not field_uid,
+						block_id_list and not block_uid,
+						tree_id_list
+					]):
+						statement += ' WHERE '
+						if field_uid_list and not field_uid:
+							parameters['field_uid_list'] = field_uid_list
+							statement += (
+								' field.uid IN $field_uid_list '
+							)
+							if any([
+								block_id_list and not block_uid,
+								tree_id_list
+							]):
+								statement += ' AND '
+						if block_id_list and not block_uid:
+							parameters['block_id_list'] = block_id_list
+							statement += (
+								' block.id IN $block_id_list '
+							)
+							if tree_id_list:
+								statement += 'AND '
+						if tree_id_list:
+							parameters['tree_id_list'] = tree_id_list
+							statement += (
+								' tree.id in $tree_id_list '
+							)
 					statement += (
 						' RETURN count(tree) '
 					)
@@ -209,24 +270,46 @@ class Chart:
 				statement += (
 					' <-[: FROM | IS_IN* ]-(sample: Sample) '
 				)
-				if tree_id_list:
-					parameters['tree_id_list'] = tree_id_list
-					statement += (
-						' WHERE tree.id in $tree_id_list '
-					)
-				if sample_id_list:
-					parameters['sample_id_list'] = sample_id_list
+				if any([
+					field_uid_list and not field_uid,
+					block_id_list and not block_uid,
+					tree_id_list,
+					sample_id_list
+				]):
+					statement += ' WHERE '
+					if field_uid_list and not field_uid:
+						parameters['field_uid_list'] = field_uid_list
+						statement += (
+							' field.uid IN $field_uid_list '
+						)
+						if any([
+							block_id_list and not block_uid,
+							tree_id_list,
+							sample_id_list
+						]):
+							statement += ' AND '
+					if block_id_list and not block_uid:
+						parameters['block_id_list'] = block_id_list
+						statement += (
+							' block.id IN $block_id_list '
+						)
+						if any([
+							tree_id_list,
+							sample_id_list
+						]):
+							statement += 'AND '
 					if tree_id_list:
+						parameters['tree_id_list'] = tree_id_list
 						statement += (
-							' AND '
+							' tree.id in $tree_id_list '
 						)
-					else:
+						if sample_id_list:
+							statement += ' AND '
+					if sample_id_list:
+						parameters['sample_id_list'] = sample_id_list
 						statement += (
-							' WHERE '
+							' sample.id IN $sample_id_list '
 						)
-					statement += (
-						' sample.id IN $sample_id_list '
-					)
 				statement += (
 					' RETURN count(distinct(sample)) '
 				)

@@ -303,7 +303,9 @@ update_item_count = function() {
         const sel_region = $("#region").find(":selected").val();
         const sel_farm = $("#farm").find(":selected").val();
         const sel_field = $("#field").find(":selected").val();
+        const field_uid_list = $("#field_uid_list").val();
         const sel_block = $("#block").find(":selected").val();
+        const block_id_list = $("#block_id_list").val();
         const tree_id_list = $("#tree_id_list").val();
         const sample_id_list = $("#sample_id_list").val();
         $.ajax({
@@ -315,7 +317,9 @@ update_item_count = function() {
                 + "&region=" + sel_region
                 + "&farm=" + sel_farm
                 + "&field_uid=" + sel_field
+                + "&field_uid_list=" + field_uid_list
                 + "&block_uid=" + sel_block
+                + "&block_id_list=" + block_id_list
 				+ "&tree_id_list=" + tree_id_list
                 + "&sample_id_list=" + sample_id_list
             ),

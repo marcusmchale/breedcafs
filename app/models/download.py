@@ -57,7 +57,9 @@ class Download:
 			region,
 			farm,
 			field_uid,
+			field_list,
 			block_uid,
+			block_list,
 			tree_id_list,
 			sample_id_list,
 			per_item_count
@@ -69,7 +71,9 @@ class Download:
 			region,
 			farm,
 			field_uid,
+			field_list,
 			block_uid,
+			block_list,
 			tree_id_list,
 			sample_id_list,
 			per_item_count

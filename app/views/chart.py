@@ -31,7 +31,9 @@ def item_count():
 	region = request.args.get('region', None)
 	farm = request.args.get('farm', None)
 	field_uid = request.args.get('field_uid', None)
+	field_uid_list = request.args.get('field_uid_list', None)
 	block_uid = request.args.get('block_uid', None)
+	block_id_list = request.args.get('block_id_list', None)
 	tree_id_list = request.args.get('tree_id_list', None)
 	sample_id_list = request.args.get('sample_id_list', None)
 	if level:
@@ -42,7 +44,9 @@ def item_count():
 				region,
 				farm,
 				field_uid,
+				field_uid_list,
 				block_uid,
+				block_id_list,
 				tree_id_list,
 				sample_id_list
 			)

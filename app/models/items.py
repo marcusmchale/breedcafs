@@ -616,7 +616,9 @@ class AddFieldItems:
 			region,
 			farm,
 			field_uid,
+			field_uid_list,
 			block_uid,
+			block_id_list,
 			tree_id_list,
 			sample_id_list,
 			per_item_count
@@ -682,6 +684,11 @@ class AddFieldItems:
 			' ) '
 		)
 		if level == 'field':
+			if field_uid_list and not field_uid:
+				parameters['field_uid_list'] = field_uid_list
+				statement += (
+					' WHERE field.uid in $field_uid_list '
+				)
 			statement += (
 				' WITH '
 				' field AS item, '
@@ -698,17 +705,33 @@ class AddFieldItems:
 					'	uid: $block_uid '
 					' }) '
 				)
-			if level == 'block' and not block_uid:
+			elif any([level == 'block', block_id_list]):
 				statement += (
 					' <-[:IS_IN]-(: FieldBlocks) '
 					' <-[:IS_IN]-(block: Block) '
 				)
 			if level == 'block':
+				if all([field_uid_list and not field_uid, block_id_list and not block_uid]):
+					parameters['field_uid_list'] = field_uid_list
+					parameters['block_id_list'] = block_id_list
+					statement += (
+						' WHERE field.uid in $field_uid_list AND block.id IN $block_id_list '
+					)
+				elif field_uid_list and not field_uid:
+					parameters['field_uid_list'] = field_uid_list
+					statement += (
+						' WHERE field.uid in $field_uid_list '
+					)
+				elif block_id_list and not block_uid:
+					parameters['block_id_list'] = block_id_list
+					statement += (
+						' WHERE block.id IN $block_id_list '
+					)
 				statement += (
 					' WITH '
 					'	block AS item, '
 					'	user_samples, '
-					'	country, region, farm, field '
+					'	country, region, farm, field, '
 					'	COLLECT(field) + COLLECT(block) as ancestors '
 					' UNWIND '
 					'	ancestors as ancestor '
@@ -736,16 +759,38 @@ class AddFieldItems:
 					' (tree: Tree) '
 				)
 				if level == 'tree':
-					if tree_id_list:
-						parameters['tree_id_list'] = tree_id_list
+					if any([
+						field_uid_list and not field_uid,
+						block_id_list and not block_uid,
+						tree_id_list
+					]):
 						statement += (
 							' WHERE '
-							' tree.id in $tree_id_list '
 						)
-					if not block_uid:
+						if field_uid_list and not field_uid:
+							parameters['field_uid_list'] = field_uid_list
+
+							statement += (
+								'field.uid in $field_uid_list '
+							)
+							if any ([block_id_list and not block_uid, tree_id_list]):
+								statement += ' AND '
+						if block_id_list and not block_uid:
+							parameters['block_id_list'] = block_id_list
+							statement += (
+								'block.id in $block_id_list '
+							)
+							if tree_id_list:
+								statement += ' AND '
+						if tree_id_list:
+							parameters['tree_id_list'] = tree_id_list
+							statement += (
+								' tree.id in $tree_id_list '
+							)
+					if not any([block_uid, block_id_list]):
 						statement += (
 							' OPTIONAL MATCH '
-							'	(tree)-[:IS_IN*2]->(block: Block) '
+							'	(tree)-[:IS_IN]->(:BlockTrees)-[:IS_IN]->(block: Block) '
 						)
 					statement += (
 						' WITH '
@@ -767,24 +812,41 @@ class AddFieldItems:
 					' <-[: FROM | IS_IN* ]-(: ItemSamples) '
 					' <-[: FROM*]-(source_sample: Sample) '
 				)
-				if tree_id_list:
-					parameters['tree_id_list'] = tree_id_list
+				if any([
+					field_uid_list and not field_uid,
+					block_id_list and not block_uid,
+					tree_id_list,
+					sample_id_list
+				]):
 					statement += (
-						' WHERE tree.id in $tree_id_list '
+						' WHERE '
 					)
-				if sample_id_list:
-					parameters['sample_id_list'] = sample_id_list
+					if field_uid_list and not field_uid:
+						parameters['field_uid_list'] = field_uid_list
+						statement += (
+							'field.uid in $field_uid_list '
+						)
+						if any([block_id_list and not block_uid, tree_id_list, sample_id_list]):
+							statement += ' AND '
+					if block_id_list and not block_uid:
+						parameters['block_id_list'] = block_id_list
+						statement += (
+							'block.id in $block_id_list '
+						)
+						if any([tree_id_list, sample_id_list]):
+							statement += ' AND '
 					if tree_id_list:
+						parameters['tree_id_list'] = tree_id_list
 						statement += (
-							' AND '
+							' tree.id in $tree_id_list '
 						)
-					else:
+						if sample_id_list:
+							statement += ' AND '
+					if sample_id_list:
+						parameters['sample_id_list'] = sample_id_list
 						statement += (
-							' WHERE '
+							' source_sample.id IN $sample_id_list '
 						)
-					statement += (
-						' source_sample.id IN $sample_id_list '
-					)
 				if not block_uid:
 					statement += (
 						' OPTIONAL MATCH '

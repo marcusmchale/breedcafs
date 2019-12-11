@@ -112,7 +112,6 @@ update_group_to_copy_members = function() {
     group_to_copy_members.empty();
     if (group_to_copy.val() !== '') {
         const partner = (partner_to_copy.val() !== "") ? partner_to_copy.val() : false;
-        console.log(group_to_copy.val());
         $.ajax({
             type: 'GET',
             url: '/record/inputs_selection',

@@ -435,7 +435,7 @@ class AddBlock(FlaskForm):
 		'Block text input',
 		[
 			InputRequired(),
-			Regexp('([^\x00-\x7F]|\w|\s|[+-])+$', message='Block name contains illegal characters'),
+			Regexp('([^\x00-\x7F]|\w|\s|[+-,])+$', message='Block name contains illegal characters'),
 			Length(min=1, max=50, message='Maximum 50 characters')
 		],
 		filters=[strip_filter],
@@ -557,6 +557,24 @@ class CollectForm(FlaskForm):
 		choices=[
 			('', 'Select level')
 		]
+	)
+	field_uid_list = StringField(
+		'Field UID list',
+		[
+			Optional(),
+			Regexp("^[0-9,-]*$", message='List should be comma separated with hyphens for ranges, e.g. "1,2-5"'),
+			range_list_check
+		],
+		description="List of field UIDs, e.g. '1, 2-5' "
+	)
+	block_id_list = StringField(
+		'Block ID list',
+		[
+			Optional(),
+			Regexp("^[0-9,-]*$", message='List should be comma separated with hyphens for ranges, e.g. "1,2-5"'),
+			range_list_check
+		],
+		description="List of block IDs, e.g. '1, 2-5' "
 	)
 	tree_id_list = StringField(
 		'Tree list',
@@ -858,6 +876,24 @@ class RecordForm(FlaskForm):
 		[InputRequired()],
 		choices=[],
 		description="Item Level"
+	)
+	field_uid_list = StringField(
+		'Field UID list',
+		[
+			Optional(),
+			Regexp("^[0-9,-]*$", message='List should be comma separated with hyphens for ranges, e.g. "1,2-5"'),
+			range_list_check
+		],
+		description="List of field UIDs, e.g. '1, 2-5' "
+	)
+	block_id_list = StringField(
+		'Block ID list',
+		[
+			Optional(),
+			Regexp("^[0-9,-]*$", message='List should be comma separated with hyphens for ranges, e.g. "1,2-5"'),
+			range_list_check
+		],
+		description="List of block IDs, e.g. '1, 2-5' "
 	)
 	tree_id_list = StringField(
 		'Tree list',

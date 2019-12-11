@@ -6,12 +6,13 @@ const tree_div = $('#tree_selection_div');
 const sample_div = $('#sample_selection_div');
 const item_count_div = $('#item_count_div');
 const replicates_div = $('#replicates');
-
 const country_select = $('#country');
 const region_select = $('#region');
 const farm_select = $('#farm');
 const field_select = $('#field');
 const block_select = $('#block');
+const field_uid_list_box = $('#field_uid_list');
+const block_id_list_box = $('#block_id_list');
 const tree_id_list_box = $('#tree_id_list');
 const sample_id_list_box = $('#sample_id_list');
 
@@ -42,7 +43,9 @@ update_item_count = function() {
         const sel_region = $("#region").find(":selected").val();
         const sel_farm = $("#farm").find(":selected").val();
         const sel_field = $("#field").find(":selected").val();
+        const field_uid_list = $("#field_uid_list").val();
         const sel_block = $("#block").find(":selected").val();
+        const block_id_list = $("#block_id_list").val();
         const tree_id_list = $("#tree_id_list").val();
         const sample_id_list = $("#sample_id_list").val();
         $.ajax({
@@ -54,7 +57,9 @@ update_item_count = function() {
                 + "&region=" + sel_region
                 + "&farm=" + sel_farm
                 + "&field_uid=" + sel_field
+                + "&field_uid_list=" + field_uid_list
                 + "&block_uid=" + sel_block
+                + "&block_id_list=" + block_id_list
 				+ "&tree_id_list=" + tree_id_list
                 + "&sample_id_list=" + sample_id_list
             ),
@@ -137,6 +142,18 @@ $(farm_select).change(update_item_count);
 $(field_select).change(update_item_count);
 $(country_select).change(update_item_count);
 $(block_select).change(update_item_count);
+
+field_uid_list_box.keypress(function(e){
+	if (e.keyCode === 13 || e.keyCode === 10) {
+		update_item_count();
+	}
+});
+
+block_id_list_box.keypress(function(e){
+	if (e.keyCode === 13 || e.keyCode === 10) {
+		update_item_count();
+	}
+});
 
 tree_id_list_box.keypress(function(e){
 	if (e.keyCode === 13 || e.keyCode === 10) {
