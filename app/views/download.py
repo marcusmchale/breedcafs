@@ -211,14 +211,14 @@ def download_file(username, filename):
 	if 'username' not in session:
 		flash('Please log in')
 		return redirect(url_for('login'))
-	elif username != session['username']:
+	elif username.lower() != session['username'].lower():
 		flash('Files are currently only accessible to the user that generated them')
 		return redirect(url_for('index'))
 	else:
 		try:
-			if os.path.isfile(os.path.join(app.config['DOWNLOAD_FOLDER'], username, filename)):
+			if os.path.isfile(os.path.join(app.config['DOWNLOAD_FOLDER'], username.lower(), filename)):
 				return send_from_directory(
-					os.path.join(app.config['DOWNLOAD_FOLDER'], username),
+					os.path.join(app.config['DOWNLOAD_FOLDER'], username.lower()),
 					filename,
 					as_attachment = True
 				)

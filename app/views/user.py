@@ -209,7 +209,7 @@ def user_page():
 			affiliation_form = AffiliationForm.update(session['username'])
 			return render_template(
 				'user_page.html',
-				affiliation_form = affiliation_form
+				affiliation_form=affiliation_form
 			)
 	except (ServiceUnavailable, SecurityError):
 		flash("Database unavailable")
