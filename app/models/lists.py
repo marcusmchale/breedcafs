@@ -660,15 +660,17 @@ class ItemList:
 							[i[1] for i in clause_tuples[0:4] if i[0]]
 						)
 					)
+				statement += (
+					' WITH '
+					'	country, region, farm, field, sample as item '
+				)
 				if any([record_data['block_uid'], record_data['block_id_list']]):
 					statement += (
-						' WITH '
-						' country, region, farm, field, block, tree, sample as item '
+						', block '
 					)
-				else:
+				if record_data['tree_id_list']:
 					statement += (
-						' WITH '
-						' country, region, farm, field, tree, sample as item '
+						', tree'
 					)
 		# Optional matches
 		if record_data['item_level'] in ['tree', 'sample']:
