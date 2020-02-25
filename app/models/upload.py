@@ -1335,7 +1335,7 @@ class PropertyUpdateHandler:
 	# Need to update varieties property for all members of new item lineage (including item)
 	#  don't have to update prior lineage:
 	#  - item prior ancestors are still included in new item ancestors
-	#    - We enforce this by only allowing reassignments to descendents of a prior source
+	#    - We enforce this by only allowing reassignments to descendants of a prior source
 	#  - item prior descendants are included in new lineage
 	#  - source prior ancestors are included in new lineage
 	#  - source prior descendants are unaffected as they were not in the prior lineage

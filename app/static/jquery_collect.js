@@ -135,7 +135,9 @@ level_update = function() {
 
 $(window).on('load', level_update);
 
-level_select.change(level_update);
+
+$(level_select).change(level_update);
+$(sampling_activity_select).change(level_update);
 
 $(region_select).change(update_item_count);
 $(farm_select).change(update_item_count);

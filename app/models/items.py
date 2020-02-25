@@ -1,7 +1,7 @@
 # import os
 # import unicodecsv as csv
 # import cStringIO
-# from app import app
+from app import app
 from app.cypher import Cypher
 from neo4j_driver import (
 	bolt_result
@@ -609,7 +609,7 @@ class AddFieldItems:
 	# All the above are handled by effectively only allowing a Field level sample to be reassigned
 	@staticmethod
 	# can have multiple field UIDs so not true to class
-	def add_samples(
+	def add_samples_old(
 			username,
 			level,
 			country,
@@ -1017,6 +1017,361 @@ class AddFieldItems:
 				'	collect(ancestor.variety) as varieties '
 				' SET sample.varieties = varieties '
 			)
+		statement += (
+			' RETURN { '
+			'	UID: sample.uid, '
+			'	Country: country.name, '
+			'	Region: region.name, '
+			'	Farm: farm.name, '
+			'	Varieties: varieties, '
+		)
+		if level == 'field':
+			statement += (
+				' Field: item.name, '
+				' `Field UID`: item.uid, '
+				' source_level: "Field", '
+				' source_id: item.uid '
+			)
+		else:
+			statement += (
+				'	Field: field.name, '
+				'	`Field UID`: field.uid, '
+			)
+			if level == 'block':
+				statement += (
+					' Block: item.name, '
+					' `Block ID`: item.id, '
+					' source_level: "Block", '
+					' source_id: item.id '
+				)
+			elif level == 'tree':
+				statement += (
+					' Block: block.name, '
+					' `Block ID` : block.id, '
+					' `Tree ID`: item.id, '
+					' `Tree Name`: item.name, '
+					' source_level: "Tree", '
+					' source_id: item.id '
+					)
+			elif level == 'sample':
+				statement += (
+					' Blocks: [x IN blocks | x.name], '
+					' `Block IDs` : [x IN blocks | x.id], '
+					' `Tree IDs`: [x IN trees | x.id], '
+					' `Tree Names`: [x IN trees | x.name], '
+					' `Source Sample IDs` : [x IN source_samples | x.id], '
+					' `Source Sample Names` : [x IN source_samples | x.name], ' 
+					' source_level: "Sample", '
+					' source_id: item.id, '
+					' Unit: item.unit '
+				)
+		statement += (
+			' } '
+		)
+		with get_driver().session() as neo4j_session:
+			result = neo4j_session.write_transaction(bolt_result, statement, parameters)
+			return result
+
+	@staticmethod
+	# can have multiple field UIDs so not true to class
+	def add_samples(
+			username,
+			level,
+			country,
+			region,
+			farm,
+			field_uid,
+			field_uid_list,
+			block_uid,
+			block_id_list,
+			tree_id_list,
+			sample_id_list,
+			per_item_count
+	):
+		parameters= {
+			'username': username,
+			'per_item_count': per_item_count
+		}
+		id_types = ('name', 'uid', 'uid_list', 'id_list')
+		field_uid = int(field_uid) if field_uid else None
+		filters = {
+			'country': (country, id_types[0]),
+			'region': (region, id_types[0]),
+			'farm': (farm, id_types[0]),
+			'field': (field_uid, id_types[1]) if field_uid else (field_uid_list, id_types[2]),
+			'block': (block_uid, id_types[1]) if block_uid else(block_id_list, id_types[3]),
+			'tree': (tree_id_list, id_types[3]),
+			'sample': (sample_id_list, id_types[3])
+		}
+		statement = (
+			' MATCH '
+			'	(user: User { '
+			'		username_lower: toLower(trim($username)) '
+			'	}) '
+			' MERGE '
+			'	(user)-[: SUBMITTED]->(us: Submissions) '
+			' MERGE '
+			'	(us)-[: SUBMITTED]->(ui: Items) '
+			' MERGE '
+			'	(ui)-[: SUBMITTED]->(user_samples: Samples) '
+			' WITH user_samples '
+			' MATCH '
+			' (country: Country) '
+			' <-[: IS_IN]-(region: Region) '
+			' <-[: IS_IN]-(farm: Farm) '
+			' <-[: IS_IN]-(field: Field) '
+		)
+		if filters['block'][0]:
+			statement += (
+				' <-[:IS_IN]-(: FieldBlocks) '
+				' <-[:IS_IN]-(block: Block) '
+			)
+		if filters['tree'][0]:
+			statement += (
+				' <-[:IS_IN*2]-(tree: Tree) '
+			)
+		if filters['sample'][0]:
+			statement += (
+				' <-[:FROM | IS_IN*]-(sample:Sample) '
+			)
+		if any([i[0] for i in filters.values()]):
+			statement += (
+				' WHERE '
+			)
+			filter_count = 0
+			for key, value in filters.items():
+				if value:
+					id_value = value[0]
+					id_type = value[1]
+					if id_value:
+						parameters[key] = id_value
+						filter_count += 1
+						if filter_count != 1:
+							statement += ' AND '
+						if id_type == id_types[0]:
+							statement += (
+								key + '.name_lower = $' + key
+							)
+						elif id_type == id_types[1]:
+							statement += (
+								key + '.uid = $' + key
+							)
+						elif id_type == id_types[2]:
+							statement += (
+								key + '.uid IN $' + key
+							)
+						elif id_type == id_types[3]:
+							statement += (
+									key + '.id IN $' + key
+							)
+		if level == 'field':
+			statement += (
+				' WITH '
+				' user_samples, '
+				' country, region, farm, '
+				' field AS item, '
+				' COLLECT(field.variety) as varieties '
+			)
+		elif level == 'block':
+			if not filters['block'][0]:
+				statement += (
+					' MATCH '
+					'	(field) '
+					'	<-[:IS_IN]-(:FieldBlocks) '
+					'	<-[:IS_IN]-(block: Block) '
+				)
+			statement += (
+				' WITH '
+				'	user_samples, '
+				'	country, region, farm, field, '
+				'	block AS item, '
+				'	COLLECT(field) + COLLECT(block) as ancestors '
+				' UNWIND '
+				'	ancestors as ancestor '
+				' WITH '
+				' 	user_samples, '
+				' 	country, region, farm, field, '
+				' 	item, '
+				'	COLLECT(DISTINCT ancestor.variety) as varieties '
+			)
+		elif level == 'tree':
+			if not filters['tree'][0]:
+				if filters['block'][0]:
+					statement += (
+						' MATCH '
+						'	(block) '
+						'	<-[: IS_IN]-(: FieldTrees) '
+						'	<-[: IS_IN]-(tree: Tree) '
+					)
+				else:
+					statement += (
+						' MATCH '
+						'	(field) '
+						'	<-[: IS_IN]-(: FieldTrees) '
+						'	<-[: IS_IN]-(tree: Tree) '
+					)
+			if not filters['block'][0]:
+				statement += (
+					' OPTIONAL MATCH '
+					'	(block: Block) '
+					'	<-[:IS_IN]-(:BlockTrees) '
+					'	<-[:IS_IN]-(tree) '
+				)
+			statement += (
+				' WITH '
+				'	user_samples, '
+				'	country, region, farm, field, block, '
+				'	tree AS item, '
+				'	COLLECT(field) + COLLECT(block) + COLLECT(tree) as ancestors '
+				' UNWIND '
+				'	ancestors as ancestor '
+				' WITH '
+				'	user_samples, '
+				'	country, region, farm, field, block, '
+				'	item,  '
+				'	COLLECT(DISTINCT ancestor.variety) as varieties '
+			)
+		elif level == 'sample':
+			if not filters['sample'][0]:
+				if filters['tree'][0]:
+					statement += (
+						' MATCH '
+						'	(tree) '
+						'	<-[:FROM*]-(sample: Sample) '
+					)
+				elif filters['block'][0]:
+					statement += (
+						' MATCH '
+						'	(block) '
+						'	<-[:FROM | IS_IN *]-(sample: Sample) '
+					)
+				else:
+					statement += (
+						' MATCH '
+						'	(field) '
+						'	<-[:FROM | IS_IN *]-(sample: Sample) '
+					)
+			statement += (
+				' MATCH '
+				'	sample_path = (sample) '
+				'		-[:FROM*]->(:ItemSamples) '
+			)
+			if not filters['tree'][0]:
+				statement += (
+					' OPTIONAL MATCH '
+					'	(tree: Tree) '
+					'	<-[:FROM*]-(sample) '
+				)
+			if not filters['block'][0]:
+				statement += (
+					' OPTIONAL MATCH '
+					'	(block: Block) '
+					'	<-[:FROM | IS_IN *]-(sample) '
+				)
+			statement += (
+				' WITH '
+				'	user_samples, '
+				'	country, region, farm, field, '
+				'	COLLECT(DISTINCT block) as blocks, '
+				'	COLLECT(DISTINCT tree) as trees, '
+				'	[s in nodes(sample_path) WHERE "Sample" in labels(s)] as source_samples, '
+				'	sample AS item, '
+				'	nodes(sample_path)[-2] AS item_samples, '
+				'	COLLECT(field) + COLLECT(block) + COLLECT(tree) + '
+				'		[s in nodes(sample_path) WHERE "Sample" in labels(s)] as ancestors '
+				' UNWIND ancestors as ancestor '
+				' WITH '
+				'	user_samples, item_samples, '
+				'	country, region, farm, field, '
+				'	blocks, trees, source_samples, '
+				'	item, '
+				'	COLLECT(DISTINCT ancestor.variety) as varieties '
+			)
+		if level != 'sample':
+			statement += (
+				' MERGE '
+				'	(item)<-[: FROM]-(item_samples: ItemSamples) '
+			)
+		statement += (
+			' MERGE '
+			'	(user_samples) '
+			'	-[: SUBMITTED]->(user_item_samples: UserItemSamples)'
+			'	-[: CONTRIBUTED]->(item_samples) '
+			' MERGE '
+		)
+		if level == 'field':
+			statement += (
+				' (item) '
+			)
+		else:
+			statement += (
+				' (field) '
+			)
+		statement += (
+			'	<-[:FOR]-(field_sample_counter: Counter { '
+			'		name: "sample", '
+		)
+		if level == 'field':
+			statement += (
+				'		uid: (item.uid + "_sample") '
+			)
+		else:
+			statement += (
+				'		uid: (field.uid + "_sample") '
+			)
+		statement += (
+			' 	}) '
+			' ON CREATE SET field_sample_counter.count = 0 '
+			' SET field_sample_counter._LOCK_ = true '
+		)
+		statement += (
+			' WITH '
+			'	user_item_samples, '
+			'	item_samples, '
+			'	field_sample_counter, '
+			'	country, region, farm, '
+			'	item, varieties '
+		)
+		if level == 'block':
+			statement += (
+				' ,field '
+			)
+		elif level == 'tree':
+			statement += (
+				' ,field, block '
+			)
+		elif level == 'sample':
+			statement += (
+				' ,field, '
+				' blocks, trees, source_samples '
+			)
+		if level == 'field':
+			statement += (
+				' ORDER BY item.uid '
+			)
+		else:
+			statement += (
+				' ORDER BY field.uid, item.id '
+			)
+		statement += (
+			' UNWIND range(1, $per_item_count) as per_item_count '
+			'	SET field_sample_counter.count = field_sample_counter.count + 1 '
+			'	CREATE '
+			'		(sample: Sample: Item { '
+		)
+		if level == 'field':
+			statement += (
+				' uid: (item.uid + "_S" + field_sample_counter.count), '
+			)
+		else:
+			statement += (
+				' uid: (field.uid + "_S" + field_sample_counter.count), '
+			)
+		statement += (
+			'			id: field_sample_counter.count '
+			'		})-[:FROM]->(item_samples) '
+			'	SET field_sample_counter._LOCK_ = false '
+		)
 		statement += (
 			' RETURN { '
 			'	UID: sample.uid, '
