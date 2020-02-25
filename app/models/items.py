@@ -735,7 +735,7 @@ class AddFieldItems:
 					statement += (
 						' MATCH '
 						'	(block) '
-						'	<-[: IS_IN]-(: FieldTrees) '
+						'	<-[: IS_IN]-(: BlockTrees) '
 						'	<-[: IS_IN]-(tree: Tree) '
 					)
 				else:
