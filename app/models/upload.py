@@ -1134,8 +1134,8 @@ class PropertyUpdateHandler:
 					)
 				errors[-1] += ', '.join([
 					'(source uid: ' + str(i['ancestor']) + ', source variety:' + str(i['ancestor_variety']) + ', ' +
-					'dependent item: ' + str(i['descendant']) + ', ' + 'dependant variety: ' + str(i['dependant_variety']) +
-					')'
+					'descendant item: ' + str(i['descendant']) + ', ' + 'descendant variety: ' + str(i['descendant_variety']) +
+					')'item source error cehck
 					for i in record[0]['variety_conflicts'][0:2]
 				])
 			elif record[0]['tree_varieties_error']:
