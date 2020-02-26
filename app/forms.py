@@ -619,7 +619,6 @@ class UploadForm(FlaskForm):
 		[InputRequired()],
 		choices=[
 			('table', 'Table (xlsx, csv)'),
-			('fb', 'Field Book (.csv)'),
 			('seq', 'Sequencing data (.fastq, .gz, .zip)')
 		]
 	)
@@ -986,13 +985,8 @@ class RecordForm(FlaskForm):
 				input_group=selected_input_group,
 				details=True
 			)
-			field_book_supported = True
 			for input_variable in inputs_list:
 				form.select_inputs.choices.append((input_variable['name_lower'], input_variable['name']))
-				if input_variable['record_type'] != 'trait':
-					field_book_supported = False
-			if field_book_supported:
-				form.template_format.choices.append(('fb', 'Field Book'))
 		return form
 
 

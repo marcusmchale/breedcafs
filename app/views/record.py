@@ -593,7 +593,6 @@ def submit_records():
 				record_type = request.form['record_type'] if request.form['record_type'] not in ['', 'None'] else None
 				detailed_record_form.input_group.choices += SelectionList.get_input_groups(item_level, record_type)
 				if record_type == 'trait':
-					detailed_record_form.template_format.choices.append(('fb', 'Field Book'))
 					detailed_record_form.record_time.validators = [InputRequired()]
 				selected_input_group = (
 					int(request.form['input_group']) if request.form['input_group'] not in [

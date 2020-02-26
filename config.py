@@ -105,6 +105,10 @@ WORKSHEET_NAMES = {
 	'condition': 'Conditions (Input)'
 }
 
+WORKSHEET_TYPES = {
+	v.lower(): k for k, v in WORKSHEET_NAMES.iteritems()
+}
+
 REFERENCE_WORKSHEETS = ['item_details', 'input_details', 'hidden']
 
 REPLICATED_RECORD_TYPES = ['trait', 'curve']
