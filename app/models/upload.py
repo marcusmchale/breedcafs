@@ -2447,7 +2447,7 @@ class Upload:
 				if submission_type == 'table':
 					if record_type != 'curve':
 						# first check for input data, if none then just skip this row
-						if record_type in self.input_variables:
+						if worksheet in self.input_variables:
 							if [row[input_variable] for input_variable in self.input_variables[worksheet] if row[input_variable]]:
 								parse_result.contains_data = True
 								parse_result.parse_table_row(row)
@@ -2767,9 +2767,8 @@ class Upload:
 							upload_object.db_check(tx, worksheet)
 						if not upload_object.contains_data:
 							upload_object.error_messages.append(
-								'The uploaded file ('
-								+ upload_object.raw_filename
-								+ ') appears to contain no input values. '
+								upload_object.raw_filename
+								+ ' appears to contain no input values. '
 							)
 						if upload_object.error_messages:
 							error_messages = '<br>'.join(upload_object.error_messages)
