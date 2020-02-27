@@ -1954,7 +1954,7 @@ class Upload:
 		self.parse_results = dict()
 		self.submission_results = dict()
 		self.fieldnames = dict()
-		self.file_extension = raw_filename.rsplit('.', 1)[1].lower()
+		self.file_extension = self.filename.rsplit('.', 1)[1].lower()
 		self.contains_data = None
 		self.input_variables = dict()
 		self.row_count = dict()
@@ -1998,7 +1998,7 @@ class Upload:
 				'value',
 				'recorded by',
 				'submitted at',
-				'submitted by'
+				'submitted by',
 				'partner'
 			},
 			'property': {'name', 'row', 'column', 'person'},
@@ -2074,24 +2074,22 @@ class Upload:
 			self.error_messages.append(error_message + 'contains duplicate column labels. This is not supported.</p>')
 
 	def check_required_fieldnames(self, worksheet):
-		if worksheet.lower() in app.config['WORKSHEET_TYPES']:
-			record_type = app.config['WORKSHEET_TYPES'][worksheet.lower()]
-		else:
-			record_type = 'curve'
-		if not self.required_sets[record_type].issubset(self.fieldnames[worksheet]):
-			self.error_messages.append(
-				worksheet +
-				' does not appear to contain a full set of required fieldnames for any record type: ' +
-				' <br> Property records require: ' + ', '.join(self.required_sets['property']) +
-				' <br> Trait and Curve records require: ' + ', '.join(self.required_sets['trait']) +
-				' <br> Condition records require:' + ', '.join(self.required_sets['condition'])
-			)
+		record_type = self.get_record_type_from_worksheet(worksheet)
+		if record_type:
+			if not self.required_sets[record_type].issubset(self.fieldnames[worksheet]):
+				self.error_messages.append(
+					worksheet +
+					' does not appear to contain a full set of required fieldnames for any record type: ' +
+					' <br> Property records require: ' + ', '.join(self.required_sets['property']) +
+					' <br> Trait and Curve records require: ' + ', '.join(self.required_sets['trait']) +
+					' <br> Condition records require:' + ', '.join(self.required_sets['condition'])
+				)
 
 	def check_input_variables(self, worksheet):
 		# get fieldnames that aren't in the required list or optional list
 		# these should be the input variables which we then confirm are found in the db.
 		# except for curves, where they should all be numbers
-		record_type = app.config['WORKSHEET_TYPES'][worksheet.lower()]
+		record_type = self.get_record_type_from_worksheet(worksheet)
 		reference_fieldnames = self.required_sets[record_type].union(self.optional_sets[record_type])
 		self.input_variables[worksheet] = [
 			i for i in self.fieldnames[worksheet] if i not in reference_fieldnames
@@ -2275,7 +2273,7 @@ class Upload:
 			if self.file_extension == 'xlsx':
 				error_message = '<p>' + worksheet + ' worksheet'
 			else:
-				error_message = '<p>This file'
+				error_message = self.raw_filename
 			error_message += (
 				' contains unexpected column labels. '
 				' For curve data only float values are accepted in addition to the following labels: '
@@ -2287,44 +2285,42 @@ class Upload:
 				error_message += '<dd>' + str(i) + '</dd>'
 			self.error_messages.append(error_message)
 
+	def get_record_type_from_worksheet(self, worksheet):
+		record_type = None
+		if self.submission_type == 'db':
+			record_type = 'mixed'
+		elif worksheet.lower() in app.config['WORKSHEET_TYPES']:
+			worksheet_type = app.config['WORKSHEET_TYPES'][worksheet.lower()]
+			record_type = None if worksheet_type in app.config['REFERENCE_WORKSHEETS'] else worksheet_type
+		else:
+			input_variable = self.worksheet_to_curve_input(worksheet)
+			if input_variable:
+				record_type = 'curve'
+				self.input_variables[worksheet] = input_variable
+		if record_type and record_type not in self.record_types: # consider using a set for record types, is order important?
+			self.record_types.append(record_type)
+		return record_type
+
 	def set_record_types_and_fieldnames_from_xlsx(self):
 		wb = self.load_xlsx()
 		if wb:
 			for worksheet in wb.sheetnames:
-				if worksheet.lower() in app.config['WORKSHEET_TYPES']:
-					worksheet_type = app.config['WORKSHEET_TYPES'][worksheet.lower()]
-					record_type = None if worksheet_type in app.config['REFERENCE_WORKSHEETS'] else worksheet_type
-					if record_type:
-						self.record_types.append(record_type)
-						ws = wb[worksheet]
-						rows = ws.iter_rows(min_row=1, max_row=1)
-						first_row = next(rows)
-						self.fieldnames[worksheet] = [
-							c.value.strip().lower() if isinstance(c.value, basestring)
-							else unicode(str(c.value), 'utf8')
-							for c in first_row
-							if c.value
-						]
-						self.check_input_variables(worksheet)
-				else:
-					# check if this worksheet is for a 'curve' record type
-					input_variable = self.worksheet_to_curve_input(worksheet)
-					if input_variable:
-						record_type = 'curve'
-						self.input_variables[worksheet] = input_variable
-						self.record_types.append(record_type)
-						ws = wb[worksheet]
-						rows = ws.iter_rows(min_row=1, max_row=1)
-						first_row = next(rows)
-						self.fieldnames[worksheet] = [
-							c.value.strip().lower() if isinstance(c.value, basestring)
-							else unicode(str(c.value), 'utf8')
-							for c in first_row
-							if c.value
-						]
+				record_type = self.get_record_type_from_worksheet(worksheet)
+				if record_type:
+					ws = wb[worksheet]
+					rows = ws.iter_rows(min_row=1, max_row=1)
+					first_row = next(rows)
+					self.fieldnames[worksheet] = [
+						c.value.strip().lower() if isinstance(c.value, basestring)
+						else unicode(str(c.value), 'utf8')
+						for c in first_row
+						if c.value
+					]
+					if record_type == 'curve':
 						# check the fieldnames that aren't required/optional for curved inputs are all numbers:
 						self.check_curve_table(worksheet)
-
+					else:
+						self.check_input_variables(worksheet)
 
 	def set_fieldnames(self):
 		if self.file_extension == 'csv':
@@ -2439,10 +2435,11 @@ class Upload:
 		submission_type = self.submission_type
 		parse_result = ParseResult(submission_type, worksheet, self.fieldnames[worksheet])
 		self.parse_results[worksheet] = parse_result
-		if worksheet in app.config['WORKSHEET_NAMES']:
-			record_type = worksheet
-		else:
-			record_type = 'curve'
+		if submission_type == 'table':
+			record_type = self.get_record_type_from_worksheet(worksheet)
+		elif submission_type == 'db':
+			record_type = 'mixed'
+		if record_type == 'curve':
 			x_values = set(self.fieldnames[worksheet]) - self.required_sets[record_type]
 		with open(trimmed_file_path, 'r') as trimmed_file:
 			trimmed_dict = DictReaderInsensitive(trimmed_file)
@@ -3310,7 +3307,7 @@ class Upload:
 								' WITH '
 								'	item, prior_ancestors '
 							)
-						else: # assign sample
+						else:  # assign sample
 							# these must be reattached to field ItemSamples container
 							statement += (
 								' WITH item, prior_ancestors '
@@ -3322,7 +3319,7 @@ class Upload:
 								' WITH DISTINCT '
 								'	item, prior_ancestors '
 							)
-					else: # to tree or to sample (these are all samples)
+					else:  # to tree or to sample (these are all samples)
 						# for these we need to find the most recent record and update accordingly,
 						# if no record then we re-attach to the Field ItemSamples
 						# we only need to assess one record since if they are submitted concurrently they must agree
@@ -3468,21 +3465,21 @@ class Upload:
 	def async_correct(self, username, access, upload_object):
 		try:
 			upload_object.set_fieldnames()
-			fieldname_errors = upload_object.error_messages
-			if fieldname_errors:
+			if upload_object.error_messages:
 				with app.app_context():
+					error_messages = '<br>'.join(upload_object.error_messages)
 					html = render_template(
 						'emails/upload_report.html',
 						response=(
 							'Submission report for file: ' + upload_object.raw_filename + '\n<br>' +
-							fieldname_errors
+							error_messages
 						)
 					)
 					subject = "BreedCAFS upload rejected"
 					recipients = [User(username).find('')['email']]
 					response = (
 							'Submission report for file: ' + upload_object.raw_filename + '\n<br>' +
-							"Submission rejected due to invalid file:\n " + fieldname_errors
+							"Submission rejected due to invalid file:\n " + error_messages
 					)
 					body = response
 					send_email(subject, app.config['ADMINS'][0], recipients, body, html)
@@ -3490,7 +3487,8 @@ class Upload:
 					'status': 'ERRORS',
 					'result': (
 							'Submission report for file: ' + upload_object.raw_filename + '\n<br>' +
-							fieldname_errors
+							error_messages
+
 					)
 				}
 			with get_driver().session() as neo4j_session:
@@ -3512,10 +3510,6 @@ class Upload:
 					if not upload_object.row_count[record_type]:
 						upload_object.error_messages.append('No records found to delete')
 					upload_object.parse_rows(record_type)
-					#if upload_object.parse_results[record_type].errors:
-					#	upload_object.error_messages.append(
-					#		upload_object.parse_results[record_type].html_table()
-					#	)
 					upload_object.db_check(tx, record_type)
 					if upload_object.error_messages:
 						error_messages = '<br>'.join(upload_object.error_messages)

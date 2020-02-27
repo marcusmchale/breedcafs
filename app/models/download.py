@@ -396,6 +396,8 @@ class Download:
 		input_details_row_num = 0
 		core_fields_details = [
 			("name", "Pre-filled: If a name is registered for the item it will be here "),
+			("row", "Pre-filled: If a row is registered for the item it will be here "),
+			("column", "Pre-filled: If a column is registered for the item it will be here "),
 			("uid", "Pre-filled: Unique identifier for the item"),
 			("person", "Optional: Person responsible for determining these values")
 		]
