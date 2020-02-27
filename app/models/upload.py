@@ -2092,7 +2092,7 @@ class Upload:
 		record_type = self.get_record_type_from_worksheet(worksheet)
 		reference_fieldnames = self.required_sets[record_type].union(self.optional_sets[record_type])
 		self.input_variables[worksheet] = [
-			i for i in self.fieldnames[worksheet] if i not in reference_fieldnames
+			i for i in self.fieldnames[worksheet] if i.lower() not in reference_fieldnames
 		]
 		statement = (
 			' UNWIND $input_variables AS input_variable '
