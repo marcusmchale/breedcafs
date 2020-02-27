@@ -2460,24 +2460,11 @@ class Upload:
 		if parse_result.contains_data:
 			self.contains_data = True
 		if parse_result.duplicate_keys:
-			if self.file_extension != 'xlsx':
-				self.error_messages.append(
-					'<p> This file contains duplicate keys: </p>' +
-					parse_result.duplicate_keys_table()
-				)
-			else:
-				if worksheet in app.config['WORKSHEET_NAMES']:
-					self.error_messages.append(
-						'<p>' + app.config['WORKSHEET_NAMES'][worksheet]
-						+ 'worksheet contains duplicate keys:</p>'
-						+ parse_result.duplicate_keys_table()
-					)
-				else:
-					self.error_messages.append(
-						'<p>' + worksheet
-						+ 'worksheet contains duplicate keys:</p>'
-						+ parse_result.duplicate_keys_table()
-					)
+			self.error_messages.append(
+				'<p>' + worksheet
+				+ 'worksheet contains duplicate keys:</p>'
+				+ parse_result.duplicate_keys_table()
+			)
 
 	def db_check(
 		self,
