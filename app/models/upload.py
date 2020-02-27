@@ -2074,17 +2074,13 @@ class Upload:
 			self.error_messages.append(error_message + 'contains duplicate column labels. This is not supported.</p>')
 
 	def check_required_fieldnames(self, worksheet):
-		if worksheet in app.config['RECORD_TYPES']:
-			record_type = worksheet
+		if worksheet.lower() in app.config['WORKSHEET_TYPES']:
+			record_type = app.config['WORKSHEET_TYPES'][worksheet.lower()]
 		else:
 			record_type = 'curve'
 		if not self.required_sets[record_type].issubset(self.fieldnames[worksheet]):
-			if worksheet in app.config['WORKSHEET_NAMES']:
-				worksheet_name = app.config['WORKSHEET_NAMES'][worksheet]
-			else:
-				worksheet_name = worksheet
 			self.error_messages.append(
-				worksheet_name +
+				worksheet +
 				' does not appear to contain a full set of required fieldnames for any record type: ' +
 				' <br> Property records require: ' + ', '.join(self.required_sets['property']) +
 				' <br> Trait and Curve records require: ' + ', '.join(self.required_sets['trait']) +
@@ -2095,76 +2091,78 @@ class Upload:
 		# get fieldnames that aren't in the required list or optional list
 		# these should be the input variables which we then confirm are found in the db.
 		# except for curves, where they should all be numbers
-		if worksheet in app.config['WORKSHEET_NAMES']:
-			record_type = worksheet
-			reference_fieldnames = self.required_sets[record_type].union(self.optional_sets[record_type])
-			self.input_variables[record_type] = [
-				i for i in self.fieldnames[record_type] if i not in reference_fieldnames
-			]
-			statement = (
-				' UNWIND input_variables AS input_variable '
-				'	OPTIONAL MATCH '
-				'		(input: Input {name_lower: toLower(trim(toString(input_variable)))}) '
-				'	OPTIONAL MATCH '
-				'		(input)-[:OF_TYPE]->(record_type: RecordType) '
-				'	WITH '
-				'		input_variable, record_type '
-				'	WHERE '
-				'		input IS NULL '
-				'		OR '
-				'		record_type.name_lower <> $record_type '
-				'	RETURN '
-				'		input_variable, record_type.name_lower '
+		record_type = app.config['WORKSHEET_TYPES'][worksheet.lower()]
+		reference_fieldnames = self.required_sets[record_type].union(self.optional_sets[record_type])
+		self.input_variables[worksheet] = [
+			i for i in self.fieldnames[worksheet] if i not in reference_fieldnames
+		]
+		statement = (
+			' UNWIND $input_variables AS input_variable '
+			'	OPTIONAL MATCH '
+			'		(input: Input {name_lower: toLower(trim(toString(input_variable)))}) '
+			'	OPTIONAL MATCH '
+			'		(input)-[:OF_TYPE]->(record_type: RecordType) '
+			'	WITH '
+			'		input_variable, record_type '
+			'	WHERE '
+			'		input IS NULL '
+			'		OR '
+			'		record_type.name_lower <> $record_type '
+			'	RETURN '
+			'		input_variable, record_type.name_lower '
+		)
+		parameters = {
+			'record_type': record_type,
+			'input_variables': self.input_variables[worksheet]
+		}
+		with get_driver().session() as neo4j_session:
+			unrecognised_input_variables = neo4j_session.read_transaction(
+				bolt_result,
+				statement,
+				parameters
 			)
-			parameters = {
-				'record_type': record_type,
-				'input_variables': self.input_variables[worksheet]
-			}
-			with get_driver().session() as neo4j_session:
-				unrecognised_input_variables = neo4j_session.read_transaction(
-					bolt_result,
-					statement,
-					parameters
+			if unrecognised_input_variables.peek():
+				if self.file_extension == 'xlsx':
+					error_message = '<p>' + worksheet + ' worksheet '
+				else:
+					error_message = '<p>This file '
+				error_message += (
+					'contains column headers that are not recognised as input variables or required details: </p>'
 				)
-				if unrecognised_input_variables.peek():
-					if self.file_extension == 'xlsx':
-						error_message = '<p>' + app.config['WORKSHEET_NAMES'][record_type] + ' worksheet '
-					else:
-						error_message = '<p>This file '
-					error_message += (
-						'contains column headers that are not recognised as input variables or required details: </p>'
-					)
-					for input_variable in unrecognised_input_variables :
-						error_message += '<dt>' + input_variable[0] + ':</dt> '
-						input_record_type = input_variable[1]
-						if input_record_type:
-							if record_type == 'mixed':
-								error_message += (
-									' <dd> Required fields missing: '
-								)
-							else:
-								error_message += (
-										' <dd> Required fields present for ' + record_type + ' records but'
-																							 ' this input variable is a ' + input_record_type + '.'
-								)
-							if input_record_type == 'condition':
-								error_message += (
-									'. Condition records require "start date", "start time", "end date" and "end time" '
-									' in addition to the "UID" and "Person" fields.'
-								)
-							elif input_record_type == 'trait':
-								error_message += (
-									'. Trait records require "date" and "time" fields'
-									' in addition to the "UID" and "Person" fields.'
-								)
-							elif input_record_type == 'property':
-								error_message += '. Property records require the "UID" and "Person" fields.'
+				for input_variable in unrecognised_input_variables :
+					error_message += '<dt>' + input_variable[0] + ':</dt> '
+					input_record_type = input_variable[1]
+					if input_record_type:
+						if record_type == 'mixed':
 							error_message += (
-								'</dd>\n'
+								' <dd> Required fields missing: '
 							)
 						else:
-							error_message += '<dd>Unrecognised input variable. Please check your spelling.</dd>\n'
-					self.error_messages.append(error_message)
+							error_message += (
+									' <dd> Required fields present for ' +
+									record_type +
+									' records but this input variable is a ' +
+									input_record_type +
+									'.'
+							)
+						if input_record_type == 'condition':
+							error_message += (
+								'. Condition records require "start date", "start time", "end date" and "end time" '
+								' in addition to the "UID" and "Person" fields.'
+							)
+						elif input_record_type == 'trait':
+							error_message += (
+								'. Trait records require "date" and "time" fields'
+								' in addition to the "UID" and "Person" fields.'
+							)
+						elif input_record_type == 'property':
+							error_message += '. Property records require the "UID" and "Person" fields.'
+						error_message += (
+							'</dd>\n'
+						)
+					else:
+						error_message += '<dd>Unrecognised input variable. Please check your spelling.</dd>\n'
+				self.error_messages.append(error_message)
 
 	def check_fieldnames(self):
 		if not self.fieldnames:
@@ -2301,12 +2299,13 @@ class Upload:
 						ws = wb[worksheet]
 						rows = ws.iter_rows(min_row=1, max_row=1)
 						first_row = next(rows)
-						self.fieldnames[record_type] = [
+						self.fieldnames[worksheet] = [
 							c.value.strip().lower() if isinstance(c.value, basestring)
 							else unicode(str(c.value), 'utf8')
 							for c in first_row
 							if c.value
 						]
+						self.check_input_variables(worksheet)
 				else:
 					# check if this worksheet is for a 'curve' record type
 					input_variable = self.worksheet_to_curve_input(worksheet)
@@ -2325,6 +2324,7 @@ class Upload:
 						]
 						# check the fieldnames that aren't required/optional for curved inputs are all numbers:
 						self.check_curve_table(worksheet)
+
 
 	def set_fieldnames(self):
 		if self.file_extension == 'csv':
@@ -2491,8 +2491,8 @@ class Upload:
 		# todo we are handling this check before we parse the rows
 		# todo so we could remove this check for input variables from  here to simplify
 		username = self.username
-		if worksheet in app.config['WORKSHEET_NAMES']:
-			record_type = worksheet
+		if worksheet.lower() in app.config['WORKSHEET_TYPES']:
+			record_type = app.config['WORKSHEET_TYPES'][worksheet.lower()]
 		else:
 			record_type = 'curve'
 		trimmed_file_path = self.trimmed_file_paths[worksheet]
@@ -2527,7 +2527,7 @@ class Upload:
 							+ '</p>'
 					)
 					self.error_messages.append(error_message)
-			elif submission_type == 'table' and record_type in self.input_variables:
+			elif submission_type == 'table' and worksheet in self.input_variables:
 				if record_type == 'property':
 					statement = Cypher.upload_table_property_check
 					parameters = {
@@ -2668,8 +2668,8 @@ class Upload:
 			worksheet
 	):
 		username = self.username
-		if worksheet in app.config['WORKSHEET_NAMES']:
-			record_type = worksheet
+		if worksheet.lower() in app.config['WORKSHEET_TYPES']:
+			record_type = app.config['WORKSHEET_TYPES'][worksheet.lower()]
 		else:
 			record_type = 'curve'
 		trimmed_file_path = self.trimmed_file_paths[worksheet]
