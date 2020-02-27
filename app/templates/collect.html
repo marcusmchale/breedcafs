@@ -9,11 +9,12 @@
             {{  render_field (collect_form.sampling_activity) }}
         </div>
 		<div id="level_choice">
-		    <h3>Level of registered item from which the samples are being taken:</h3>
+		    <h3>Sampled items</h3>
+            <h4>Item level</h4>
 			{{ render_field (collect_form.item_level) }}
 		</div>
         <div id="location">
-            <h3>Filter to select specific item/s</h3>
+            <h4>Item/s</h4>
             <dd>{{ render_field (location_form.country) }}</dd>
             <dd>{{ render_field (location_form.region) }}</dd>
             <dd>{{ render_field (location_form.farm) }}</dd>
@@ -29,7 +30,7 @@
             <dd>{{ render_field (collect_form.sample_id_list) }}</dd>
         </div>
         <div id="item_count_div">
-            <h3>Selection</h3>
+            <h4>Item count</h4>
             <p><a>0</a> <a>items</a></p>
         </div>
          <div id="replicates" title="Number of samples to register per item in the selection">

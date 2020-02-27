@@ -41,9 +41,6 @@ class RowParseResult:
 		self.errors = {}
 		# todo store these on the interpreter side (html_table function) not in the result object
 		self.error_comments = {
-			"timestamp": {
-				"format": "Timestamp doesn't match Field Book generated pattern (e.g. 2018-01-01 13:00:00+0100)"
-			},
 			"date": {
 				"format": "Date format does not match the required input (e.g. 2018-01-01)"
 			},

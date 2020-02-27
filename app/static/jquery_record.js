@@ -25,34 +25,6 @@ remove_flash = function() {
 	$(".flash").remove();
 };
 
-// need to reimplement with scan of selected input group for record types
-    //if (record_type === "trait") {
-    //    $('#template_format').append('<option value="fb">Field Book (csv)</option>');
-    //}
-    //else {
-    //    $('#template_format option[value="fb"]').remove();
-    //}
-
-
-
-
-//        if (['trait', 'property', 'condition'].includes(record_type)){
-//                 $('#web_form_div').show();
-//         }
-
-
-//    const record_period_div = $('#record_period_div');
-//     const record_time_div = $('#record_time_div');
-//  if (record_type === 'trait') {
-//             record_period_div.hide();
-//             record_time_div.show();
-//         } else if (record_type === 'condition') {
-//             record_period_div.show();
-//             record_time_div.hide();
-//         } else {
-//             record_period_div.hide();
-//             record_time_div.hide();
-//         }
 
 level_update = function() {
     const item_level = item_level_select.val();

@@ -512,7 +512,11 @@ class Download:
 							# and also allow them to confirm inferred values
 							for input_variable in self.inputs[record_type]:
 								if input_variable['name_lower'] in inputs_properties:
-									input_column = input_names_lower.index(input_variable['name_lower']) + len(self.item_reference_details) + 2
+									input_column = (
+											input_names_lower.index(input_variable['name_lower']) +
+											len(self.item_reference_details) + # o.e optional fields like name, row, column
+											2  # shift from 0 based to 1 based indexing +  column for UID
+									)
 									# +3 for [Name/UID/Person] offset
 									if inputs_properties[input_variable['name_lower']] == 'name':
 										if 'Name' in record[0] and record[0]['Name']:

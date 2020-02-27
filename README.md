@@ -6,7 +6,6 @@
  * Python web framework ([Flask/Jinja2/Werkzeug/ItsDangerous](https://github.com/pallets))
    * [Celery](https://github.com/celery/celery) asynchronous tasks
    * [WTForms](https://github.com/wtforms/wtforms) validation
-   
  * Graph database back-end with [Neo4J](https://github.com/neo4j/neo4j)
    * also uses some [APOC](https://github.com/neo4j-contrib/neo4j-apoc-procedures) procedures
  * Javascript driven dynamic user interface
@@ -22,11 +21,11 @@
  * Items:
    - Typical units of analysis (Field > Blocks > Tree > Sample)
    - Pseudo-hierarchical relationships
-     - Block provides optional grouping for trees
-     - Samples can be representative of Fields, Trees or groups of Trees (i.e. pools)
-     - Samples can further be representative of samples, i.e. sub-divided samples.
+     - Block provides optional grouping for trees or samples
+     - Samples can be representative of Fields, Blocks, Trees or groups of Blocks or Trees (i.e. pools)
+     - Samples can further be representative of samples or groups of samples, i.e. sub-divided samples or pooled samples.
  * Records
-   * 3 types currently supported:
+   * 4 types currently supported:
     * Properties
       - Intransient values
     * Traits
@@ -34,16 +33,19 @@
       - Replicates are supported
     * Conditions
       - Each record corresponds to a period of time
-      - Un-bound ranges (i.e. no start and/or end time) are supported
+      - Replicates are supported
+      - Optionally bound ranges (i.e. optional start and/or end time)
     * Curves
+      - Each record corresponds to a single time-point
+      - Replicates are supported
       - An independent (X) and dependent (Y) variable, paired.
-      - These are stored as a list of X and a list of Y variables that are the same length 
+        - These are stored as a list of X and a list of Y variables that are the same length 
       and in the paired order (ascending X values)
-      - Missing values from Y are removed from X
-      - Records are not accepted that differ in the value of Y at a given time, for a given replicate at a given X value.
-   * Records are stored as nodes connected to the "ItemFeature" node on the path between an Item and a Feature
+        - Missing values from Y are removed from X
+        - Records are not accepted that differ in the value of Y for a given X , for a given replicate at a given X value.
+   * Records are stored as nodes connected to the "ItemInput" node on the path between an Item and a Feature
  * Inputs
-   * Standardised set of descriptions for properties, traits, conditions and curves
+   * Standardised set of descriptions for all record types
      * Record Type
      * Name
      * Description
@@ -55,12 +57,10 @@
    * Partner level management with ability to copy from other partners or a set of default groups
 
 ## Services 
- * Web forms, spreadsheets and [Field-Book](https://github.com/PhenoApps/Field-Book) app for data collection
-   * Spreadsheets ([OpenPyXL](https://openpyxl.readthedocs.io/en/stable/)/[XlsxWriter](https://xlsxwriter.readthedocs.io/)) 
- support all record types (properties, traits and conditions)
-   * [Field-Book](https://github.com/PhenoApps/Field-Book) **field.csv** and **trait.trt** files can be generated to record trait data.
-   * Upload collected data as csv or xlsx
-     * Input is constrained to specifications of the feature 
+ * Web forms and spreadsheets for data collection
+   * Spreadsheets ([OpenPyXL](https://openpyxl.readthedocs.io/en/stable/)/[XlsxWriter](https://xlsxwriter.readthedocs.io/)))
+   * Upload portal
+     * Input is constrained to specifications of the input variable 
      * Conflicts with existing records are prevented 
      * Feedback on submission success with details for any errors
  * User management

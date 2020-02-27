@@ -33,16 +33,15 @@
 				Blocked experimental designs are often necessary to account for conditions (nuisance factors) that vary
 				within a given field. Similarly, in controlled growth experiments such variation is often found
 				between growth chambers. To facilitate analyses in such experimental designs,
-                <a href="#trees">Trees</a> can be optionally assigned to Blocks within a <a href="#fields">Field</a>.
+                <a href="#trees">Trees</a> and <a href="#samples">Samples</a> can be optionally assigned to Blocks within a <a href="#fields">Field</a>.
 			</p>
 			<p>
 				Blocks are assigned a UID that is incremented from the <a href="#fields">Field</a> UID.
 				As an example, "1_B2" is the UID for the second block registered within the <a href="#fields">Field</a>
-                with UID 1. Blocks are best added first so that subsequent <a href="#trees">Trees</a>
-                may be registered directly into a Block.
-                However, <a href="#trees">Trees</a> may be later assigned to a registered Block
-                (must be in the same field) by recording the registered block name in the
-                "Assign tree to block by name" property.
+                with UID 1. Blocks are best added first so that subsequent items
+                may be registered directly into the corresponding Block. However, items may be later assigned to a registered Block
+                (must be in the same field) by submitting a record for one of the
+                "Assign...to block..." properties.
 			</p>
 		<h3 id="trees">Trees</h3>
 			<p>
@@ -51,8 +50,8 @@
 				As an example, "1_T2" is the UID for the second tree registered within the <a href="#fields">Field</a> with UID 1.
 			</p>
             <p>
-                In registering Trees you are be provided a BreedCAFS template listing the Tree UIDs and allowing you
-                to record details for later <a href="#upload">submission</a>. This same template can also be generated on the
+                In registering Trees you are provided a BreedCAFS template listing the Tree UIDs. This template is provided to help you
+                record details for later <a href="#upload">submission</a>. This same template can however also be generated on the
                 <a href="#record">Record</a> page by selecting the "Registration" input group.
             </p>
 	<h2 id="samples">
@@ -61,90 +60,111 @@
         </a>
 		Register samples
 	</h2>
-        <p>
-            The most common usage for Sample registration will be to represent phyiscal harvested specimens.
-            However, samples can also be used to describe nested statistical sampling strategies.
-        </p>
         <h3>
-            Item level
+            Sampling activity
         </h3>
             <p>
-                If each sample represents a single registered item then select the level of this item.
-                If each sample represents a group of items, then select the Field level
-                and later associate each sample with the specific Block(s), Tree(s) or Sample(s)
-                by recording the relevant property;
-                "Assign field sample to block by name", "Assign field sample to block(s) by ID",
-                "Assign field sample to tree(s) by ID" or
-                "Assign field sample to sample(s) by ID"
+                The most common usage for Sample registration will be to represent physical harvested specimens
+                either during harvest or during subsequent handling and distribution.
+                However, samples may also represent 'in situ' sampling events in more complex sampling designs
+                that can not be represented by the core Field/Block/Tree sampling structure (examples below).
+            </p>
+            <p>
+                Selecting the sampling activity filters the available selections
+                and ensures you are provided with a relevant registration template following sample registration.
+            </p>
+        <h3>
+            Sampled items
+        </h3>
+            <p>
+                To register samples you must first select a registered item from which you are sampling.
+            </p>
+            <p>
+
             </p>
             <h4>
-                Some examples to help clarify the distinction between levels
-                for samples as either specimens or statistical units:
+                Item level
             </h4>
-                <ul>
-                    <li>
-                        <p>
-                            In the case of harvested specimens, a Field level sample would correspond to
-                            tissue from the field for which the specific tree(s) identity is not known.
-                        </p>
-                        <p>
-                            In the case of statistical sampling, a Field level sample similarly corresponds
-                            to an identity to which other data may be associated. An example of this usage would be
-                            in recording data from trees for which only the Field is known. The tree could be registered
-                            as a sample and records for this tree associated with that sample.
-                        </p>
-                    </li>
-                    <li>
-                        A Block level sample can be used as for Field level samples, just that in this case the specific block
-                        that was sampled is known.
-                    </li>
-                    <li><p>
-                            In the case of a harvested specimen, a Tree level sample would correspond to tissue that
-                            was harvested from a registered tree or trees, for which the identity of the trees is known.
-                        </p>
-                        <p>
-                            In the case of statistical sampling, A Tree level sample similarly corresponds to an
-                            identity to which other data may be associated. An example of this usage would be in
-                            recording data from a branch. The branch could be registered as a sample and records
-                            for this branch associated with that sample.
-                        </p>
-                    </li>
-                    <li>
-                        <p>
-                            In the case of harvested specimens, Sample level sampling allow us to create sub-samples
-                            with unique identities to use following splitting of a sample either into multiple
-                            locations or following subdivision of tissues (e.g. separating cherry flesh from bean).
-                        </p>
-                        <p>
-                            In the case of statistical sampling, A Sample level sample allows us to model more complex
-                            statistical sampling strategies than would be supported by the more simple replicate codes.
-                            For example, in the provided case where a tree is registered as a Field level sample,
-                            further sub-samples could be created that represent individual branches of that tree.
-                        </p>
-                    </li>
-                </ul>
-        <h3>
-            Filters
+                <p>
+                    Here you should select the relevant level from which you are sampling .
+                    If each sample is taken from a single registered item then you can directly select this item.
+                    However, where each sample is a collection taken from multiple registered items
+                    you need to first register the samples against a parent item from which this collection was taken (e.g. the Field).
+                    You can then later specify the specific collection of source items for each sample
+                    by submitting a list of IDs for one of the "Assign sample to ...(s) ..." properties.
+                </p>
+                <p>
+                    Your selection for "Item level" will update the available filters for items below.
+                </p>
+            <h4>
+                Item/s
+            </h4>
+                <p>
+                    These filters allow you to select specific items to sample at the selected level.
+                    For Field and Block you can either use the drop down boxes or enter a list of IDs.
+                </p>
+                <p>
+                    Your selection for "Item level" will update the <a href="#item_count">item count</a> below.
+                    Press return when entering specific ID's into the text boxes to ensure the item count is updated.
+                </p>
+            <h3 id="item_count">
+                Item count
+            </h3>
+                <p>
+                    Here you can see the number of items selected to sample.
+                    You can then optionally specify the number of samples to register per item (default is 1).
+                    For example, if you wanted to register 5 samples from 2 fields you would ensure that
+                    the item count is 2 and then enter 5 in the text-box.
+                </p>
+                <p>
+                    When you register samples you are provided a BreedCAFS template detailing the sample UIDs.
+                    This allows you to record details for later <a href="#upload">submission</a>.
+                    This same template can also be generated on the
+                    <a href="#record">Record</a> page by selecting the appropriate "Registration" input group.
+                </p>
+            <h3>
+            Sampling examples
         </h3>
-            <p>
-                The filters allow you to select specific items to sample (Fields/Trees/Samples).
-                Your selection here will update the <a href="#selection">selection</a> below.
-            </p>
-        <h3 id="selection">
-            Selection
-        </h3>
-            <p>
-                Here you can see the number of items selected to sample.
-            </p>
-            <p>
-                You can then optionally specify the number of samples to register per item (default is 1).
-            </p>
-            <p>
-                When you register samples you are provided a BreedCAFS template detailing the sample UIDs
-                and allowing you to record details for later <a href="#upload">submission</a>.
-                This same template can also be generated on the
-                <a href="#record">Record</a> page by selecting the appropriate "Registration" input group.
-            </p>
+            <ul>
+                <li>
+                    A Field level sample corresponds to an entity (or collection of entities) from a registered Field
+                    for which a specific block/tree/sample identity is not specified.
+                    In the case of harvested specimens each sample may represent for example,
+                    a given tissue from a randomly selected tree or collection of trees.
+                    In the case of 'in situ' sampling each sample may represent for example,
+                    a randomly selected tree or collection of trees from which a specific trait was measured.
+                </li>
+                <li>
+                    A Block level sample is similar to the Field level sample,
+                    just that here the initial sampling was conducted within known blocks.
+                </li>
+                <li>
+                    A Tree level sample corresponds to tissue(s) from a registered tree (or collection thereof).
+                    In the case of harvested specimens this could be as simple as a leaf from a single tree
+                    or a volume of cherries harvested from a number of specified trees.
+                    In the case of 'in situ' sampling, each sample could represent a randomly selected branch
+                    from which a trait was measured.
+                </li>
+                <li>
+                    <p>
+                        Sample level samples (sub-samples) allow us to represent both the subdivision of physical specimens
+                        and more complex sampling strategies than could be represented with the core Field/Block/Tree/Sample identities.
+                    </p>
+                    <p>
+                        For physical specimens, sub-samples are unique identities to which records can be associated
+                        to ensure properties such as processing, subdivision of tissues (e.g. separating fruit and bean)
+                        and location can be appropriately recorded.
+                    </p>
+                    <p>
+                        For complex 'in situ' sampling strategies the sample represents
+                        a sampling event from within the registered sample.
+                        For example, using sub-samples we can register a design in which
+                        randomly selected trees were selected from a Field (Field level samples) and then
+                        from each such tree a given trait was measured from a number of randomly selected branches (Sample level samples).
+                    </p>
+                </li>
+            </ul>
+
     <h2 id="record">
         <a href="{{ url_for('record') }}">
             <img src = "{{ url_for('static', filename='record.svg') }}">
@@ -153,8 +173,7 @@
     </h2>
         <p>
             This page allows users to <!--either <a href="#direct">directly submit</a> records or-->
-            generate templates to record data in <a href="#spreadsheet">spreadsheet software</a> such as Microsoft Excel,
-            or alternatively generate files required for the <a href="#field book">Field Book</a> application.
+            generate templates to record data in <a href="#spreadsheet">spreadsheet software</a> such as Microsoft Excel.
         </p>
         <p>
             Templates you have already generated can be found through the
@@ -244,33 +263,6 @@
                 To generate spreadsheet table templates for the selected items and input variables,
                 simply select "Table (xlsx)" in the drop down box (selected by default)
                 and click "Generate template".
-            </p>
-       <!-- <h3 id="direct">Direct submission</h3>
-            <p>
-                To easily make direct submissions of a single value for a set of items a web-form is provided.
-                Please ensure you have carefully selected the items as the same value will be recorded for the entire selection.
-            </p>
-            <p>
-                Currently, to make a <a href="#direct">direct submission</a> the record type must be selected
-                and curves are not supported.
-            </p>
-            <p>
-                With items, input variables and record type selected, simply enter values for all selected input variables and click submit.
-                You will receive a report in the browser window that will either confirm your submission or warn of errors and/or conflicts.
-            </p>-->
-        <h3 id = "field book">Field Book application</h3>
-            <p>
-                The Field Book application is designed to support data collection for simple traits.
-                To facilitate the use of this application the database tools site can generate the required input files;
-                "traits.trt" and "fields.csv". More detailed instructions on using Field Book application are available
-                <a href=" {{  url_for('field_book_help') }}">here</a>
-            </p>
-            <p>
-                To generate the Field Book input files the "Trait" record type must be selected.
-            </p>
-            <p>
-                With items, input variables and record type selected, simply select "Field Book (csv)"
-                in the drop down box and click "Generate template".
             </p>
         <h3>Record Types</h3>
         <h4 id="properties">Properties</h4>
@@ -366,7 +358,7 @@
         Upload data
     </h2>
         <p>
-            This is the portal to submit templates and exported data from Field Book.
+            This is the portal to submit templates.
             A simple graphic is displayed to provide immediate feedback on the submission process.
         </p>
         <p>
@@ -403,7 +395,7 @@
 			Both database format (single row per item/time/trait) and table format (single row per item)
 			are provided.
 			The database format contains additional information about who submitted the data (user and partner)
-			as well as when, where and by whom (if using Field Book) this data was collected.
+			as well as when, where and by whom this data was collected (if "person" was recorded for this record).
 			The table format may be useful in simple cases although please note:
 			when multiple data points are found for a single trait, these will be returned
 			as a list within a single cell of the table.
