@@ -2004,7 +2004,7 @@ class Upload:
 			'property': {'name', 'row', 'column', 'person'},
 			'trait': {'name', 'row', 'column', 'person', 'time'},
 			'curve': {'name', 'row', 'column', 'person', 'time'},
-			'condition': {'name', 'row', 'column', 'person', 'start time', 'end_date', 'end time'}
+			'condition': {'name', 'row', 'column', 'person', 'start time', 'end date', 'end time'}
 		}
 
 	def file_save(self, file_data):
