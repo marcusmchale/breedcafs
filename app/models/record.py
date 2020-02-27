@@ -179,7 +179,7 @@ class Record:
 			' WITH user, ig '
 			' MATCH (level:ItemLevel) '
 			'	WHERE level.name_lower in $levels '
-			' CREATE (ig)-[:AT_LEVEL]->(level) '
+			' MERGE (ig)-[:AT_LEVEL]->(level) '
 			' WITH user, ig '
 			' OPTIONAL MATCH '
 			'	(ig)<-[in_rel:IN_GROUP]-(:Input) '

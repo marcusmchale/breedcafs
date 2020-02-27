@@ -107,9 +107,9 @@
                     Your selection for "Item level" will update the <a href="#item_count">item count</a> below.
                     Press return when entering specific ID's into the text boxes to ensure the item count is updated.
                 </p>
-            <h3 id="item_count">
+            <h4 id="item_count">
                 Item count
-            </h3>
+            </h4>
                 <p>
                     Here you can see the number of items selected to sample.
                     You can then optionally specify the number of samples to register per item (default is 1).
@@ -122,48 +122,50 @@
                     This same template can also be generated on the
                     <a href="#record">Record</a> page by selecting the appropriate "Registration" input group.
                 </p>
-            <h3>
+        <h3>
             Sampling examples
         </h3>
-            <ul>
-                <li>
-                    A Field level sample corresponds to an entity (or collection of entities) from a registered Field
-                    for which a specific block/tree/sample identity is not specified.
-                    In the case of harvested specimens each sample may represent for example,
-                    a given tissue from a randomly selected tree or collection of trees.
-                    In the case of 'in situ' sampling each sample may represent for example,
-                    a randomly selected tree or collection of trees from which a specific trait was measured.
-                </li>
-                <li>
-                    A Block level sample is similar to the Field level sample,
-                    just that here the initial sampling was conducted within known blocks.
-                </li>
-                <li>
-                    A Tree level sample corresponds to tissue(s) from a registered tree (or collection thereof).
-                    In the case of harvested specimens this could be as simple as a leaf from a single tree
-                    or a volume of cherries harvested from a number of specified trees.
-                    In the case of 'in situ' sampling, each sample could represent a randomly selected branch
-                    from which a trait was measured.
-                </li>
-                <li>
-                    <p>
-                        Sample level samples (sub-samples) allow us to represent both the subdivision of physical specimens
-                        and more complex sampling strategies than could be represented with the core Field/Block/Tree/Sample identities.
-                    </p>
-                    <p>
-                        For physical specimens, sub-samples are unique identities to which records can be associated
-                        to ensure properties such as processing, subdivision of tissues (e.g. separating fruit and bean)
-                        and location can be appropriately recorded.
-                    </p>
-                    <p>
-                        For complex 'in situ' sampling strategies the sample represents
-                        a sampling event from within the registered sample.
-                        For example, using sub-samples we can register a design in which
-                        randomly selected trees were selected from a Field (Field level samples) and then
-                        from each such tree a given trait was measured from a number of randomly selected branches (Sample level samples).
-                    </p>
-                </li>
-            </ul>
+           <p>
+                A Field level sample corresponds to an entity (or collection of entities) from a registered Field
+                for which a specific block/tree/sample identity is not specified.
+                In the case of harvested specimens each sample may represent for example,
+                a given tissue from a randomly selected tree or collection of trees.
+                In the case of 'in situ' sampling each sample may represent for example,
+                a randomly selected tree or collection of trees from which a specific trait was measured.
+            </p>
+            <p>
+                A Block level sample is similar to the Field level sample,
+                just that here the initial sampling was conducted within known blocks.
+            </p>
+            <p>
+                A Tree level sample corresponds to a tissue(s) or other delimited part(s)
+                of a registered tree (or collection of specified registered trees).
+                In the case of harvested specimens this could be as simple as a leaf from a single tree
+                or a volume of cherries harvested from a number of specified trees.
+                In the case of 'in situ' sampling, each sample could represent a randomly selected branch
+                from which a trait was measured.
+            </p>
+            <p>
+                Sample level samples (sub-samples) allow us to represent both the subdivision of physical specimens
+                and more complex sampling strategies than can be represented with the simple Field/Block/Tree/Sample identities.
+            </p>
+            <p>
+                For physical specimens, sub-samples represent a part of a divided specimen
+                or a modified form of the original sample.
+                For example:
+            </p>
+                <li> The divided fruit and bean tissues from a cherry sample can each be registered as a distinct sub-sample.</li>
+                <li> The divided of a volumes of a given tissue to be distributed into different facilities or storage environments
+                    can each be registered as distinct sub-samples.</li>
+                <li> A processed form of a specimen, such as roasted beans, can equally be registered as a sub-sample from the original specimen</li>
+            <p>
+                For complex 'in situ' sampling strategies the sample represents
+                a sampling event from within the registered sample.
+                For example, using sub-samples we can register a design in which
+                randomly selected trees were selected from a Field (Field level samples) and then
+                from each such tree a given trait was measured from a number of randomly selected branches (Sample level samples).
+            </p>
+
 
     <h2 id="record">
         <a href="{{ url_for('record') }}">
