@@ -3,12 +3,12 @@
 # import cStringIO
 from app import app
 from app.cypher import Cypher
-from neo4j_driver import (
+from .neo4j_driver import (
 	bolt_result
 )
 from flask import session
 # from datetime import datetime
-from neo4j_driver import get_driver
+from .neo4j_driver import get_driver
 
 
 class FindLocations:
@@ -669,12 +669,12 @@ class AddFieldItems:
 			statement += (
 				' <-[:FROM | IS_IN*]-(sample:Sample) '
 			)
-		if any([i[0] for i in filters.values()]):
+		if any([i[0] for i in list(filters.values())]):
 			statement += (
 				' WHERE '
 			)
 			filter_count = 0
-			for key, value in filters.items():
+			for key, value in list(filters.items()):
 				if value:
 					id_value = value[0]
 					id_type = value[1]

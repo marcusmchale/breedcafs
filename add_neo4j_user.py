@@ -15,7 +15,7 @@ driver = GraphDatabase.driver(config.BOLT_URI, auth=auth)
 def add_database_user(tx):
 	username = os.environ['NEO4J_USERNAME']
 	password = os.environ['NEO4J_PASSWORD']
-	print username
+	print(username)
 	tx.run('CALL dbms.security.createUser($username, $password, false)', username=username, password=password)
 
 

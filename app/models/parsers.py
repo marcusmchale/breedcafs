@@ -18,7 +18,7 @@ class Parsers:
 		end = start if len(parts) == 1 else parts[1]
 		if start > end:
 			end, start = start, end
-		return range(start, end + 1)
+		return list(range(start, end + 1))
 
 	@staticmethod
 	def parse_range_list(

@@ -14,8 +14,8 @@ driver = GraphDatabase.driver(uri, auth=auth)
 
 
 def add_global_admin(tx):
-	username = raw_input('Enter the username that is to receive global_admin privileges: ')
-	print ('Adding global admin privilege to account: ' + username)
+	username = input('Enter the username that is to receive global_admin privileges: ')
+	print(('Adding global admin privilege to account: ' + username))
 	result = tx.run(
 		' MATCH '
 		'	(u:User {username_lower: toLower($username)}) '

@@ -4,10 +4,10 @@ from app import (
 	SecurityError
 )
 from app.cypher import Cypher
-from neo4j_driver import get_driver, neo4j_query
+from .neo4j_driver import get_driver, neo4j_query
 from datetime import datetime
 from flask import jsonify
-from parsers import Parsers
+from .parsers import Parsers
 
 
 class Chart:
@@ -46,8 +46,8 @@ class Chart:
 					}
 				)
 			# uniquify
-			nodes = {node['id']: node for node in nodes}.values()
-			rels = {rel['id']: rel for rel in rels}.values()
+			nodes = list({node['id']: node for node in nodes}.values())
+			rels = list({rel['id']: rel for rel in rels}.values())
 			# and create the d3 input
 			return jsonify({"nodes": nodes, "links": rels})
 		except (ServiceUnavailable, SecurityError):

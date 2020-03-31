@@ -6,7 +6,7 @@ from app.cypher import Cypher
 
 from flask import jsonify
 
-from neo4j_driver import get_driver, neo4j_query, bolt_result
+from .neo4j_driver import get_driver, neo4j_query, bolt_result
 
 import datetime
 

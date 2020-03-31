@@ -1,6 +1,6 @@
 from app import logging
 
-from neo4j_driver import (
+from .neo4j_driver import (
 	get_driver,
 	bolt_result
 )

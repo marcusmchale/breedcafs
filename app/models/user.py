@@ -9,11 +9,11 @@ from app import (
 )
 from app.cypher import Cypher
 from passlib.hash import bcrypt
-from neo4j_driver import get_driver
+from .neo4j_driver import get_driver
 from time import time
 # from datetime import datetime
 
-from neo4j_driver import (
+from .neo4j_driver import (
 	get_driver,
 	bolt_result
 )

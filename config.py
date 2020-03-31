@@ -57,7 +57,7 @@ ALLOWED_EXTENSIONS = {'csv', 'xlsx', 'gz', 'fastq', 'zip'}
 
 # I am using the setgid bit so both celery and the web server can write to import path
 # your solution may vary depending on your web infrastructure
-IMPORT_FOLDER_PERMISSIONS = 02775
+IMPORT_FOLDER_PERMISSIONS = 0o2775
 CELERYGRPNAME = "CELERY_USER_GROUP"
 WEBSERVERGRPNAME = "WEB_SERVER_USER_GROUP"
 
@@ -106,7 +106,7 @@ WORKSHEET_NAMES = {
 }
 
 WORKSHEET_TYPES = {
-	v.lower(): k for k, v in WORKSHEET_NAMES.iteritems()
+	v.lower(): k for k, v in WORKSHEET_NAMES.items()
 }
 
 REFERENCE_WORKSHEETS = ['item_details', 'input_details', 'hidden']

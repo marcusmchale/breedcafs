@@ -25,5 +25,5 @@ def send_static_attachment(subject, sender, recipients, text_body, html_body, fi
 	msg.body = text_body
 	msg.html = html_body
 	with app.open_instance_resource(file_path, 'r') as file:
-		msg.attach(unicode(filename), mimetype, file.read())
+		msg.attach(str(filename), mimetype, file.read())
 	mail.send(msg)

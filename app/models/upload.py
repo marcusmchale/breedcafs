@@ -5,8 +5,8 @@ from app.emails import send_email
 from app.models.parsers import Parsers
 from flask import render_template, url_for
 from werkzeug import urls
-from user import User
-from neo4j_driver import get_driver, bolt_result
+from .user import User
+from .neo4j_driver import get_driver, bolt_result
 import unicodecsv as csv
 import datetime
 import itertools
@@ -22,7 +22,7 @@ class DictReaderInsensitive(csv.DictReader):
 	def fieldnames(self):
 		return [field.strip().lower() for field in csv.DictReader.fieldnames.fget(self) if field]
 
-	def next(self):
+	def __next__(self):
 		return DictInsensitive(csv.DictReader.next(self))
 
 
@@ -135,12 +135,12 @@ class RowParseResult:
 		})
 
 	def headers(self):
-		return self.row.keys()
+		return list(self.row.keys())
 
 	def html_row(self, fieldnames):
 		fieldnames = [i.lower() for i in fieldnames]
 		formatted_cells = {}
-		for field in self.errors.keys():
+		for field in list(self.errors.keys()):
 			if field not in fieldnames:  # curve conflicts return this
 				# get x_values
 				x_values = []
@@ -558,28 +558,28 @@ class ParseResult:
 
 	def duplicate_keys_table(self):
 		if not self.duplicate_keys:
-			return u'<p>duplicated keys found</p>'
+			return '<p>duplicated keys found</p>'
 		else:
 			max_length = 50
 			response = (
-				u'<p>The uploaded table contains duplicated unique keys '
-				u'(the combination of UID, date and time). '
-				u' The following lines duplicate preceding lines in the file: </p>'
+				'<p>The uploaded table contains duplicated unique keys '
+				'(the combination of UID, date and time). '
+				' The following lines duplicate preceding lines in the file: </p>'
 			)
-			header_string = u'<tr><th><p>Line#</p></th>'
+			header_string = '<tr><th><p>Line#</p></th>'
 			for field in self.fieldnames:
-				header_string += u'<th><p>' + field + u'</p></th>'
-			html_table = header_string + u'</tr>'
+				header_string += '<th><p>' + field + '</p></th>'
+			html_table = header_string + '</tr>'
 			# construct each row and append to growing table
 			for i, row_num in enumerate(self.duplicate_keys):
 				if i >= max_length:
-					return response + u'<table>' + html_table + u'</table>'
-				row_string = u'<tr><td>' + str(row_num) + u'</td>'
+					return response + '<table>' + html_table + '</table>'
+				row_string = '<tr><td>' + str(row_num) + '</td>'
 				for field in self.fieldnames:
-					row_string += u'<td>' + self.duplicate_keys[row_num][field] + u'</td>'
-				row_string += u'</tr>'
+					row_string += '<td>' + self.duplicate_keys[row_num][field] + '</td>'
+				row_string += '</tr>'
 				html_table += row_string
-			return response + u'<table>' + html_table + u'</table>'
+			return response + '<table>' + html_table + '</table>'
 
 	def html_table(self):
 		max_length = 100
@@ -670,7 +670,7 @@ class SubmissionRecord:
 			if isinstance(self.record[item], list):
 				self.record[item] = str(', '.join(
 					[
-						unicode(str(i), 'utf8') if not isinstance(i, list) else ', '.join([unicode(str(j), 'utf8') for j in i]) for i in self.record[item]
+						str(str(i), 'utf8') if not isinstance(i, list) else ', '.join([str(str(j), 'utf8') for j in i]) for i in self.record[item]
 					]
 				))
 
@@ -829,7 +829,7 @@ class PropertyUpdateHandler:
 			self.update_collection(key)
 
 	def format_error_list(self):
-		for property_name, errors in self.errors.iteritems():
+		for property_name, errors in self.errors.items():
 			if errors:
 				errors.insert(
 					0,
@@ -2052,7 +2052,7 @@ class Upload:
 				if not result.single():
 					return (
 						'This workbook does not appear to contain any of the following accepted worksheets: <br> - '
-						+ '<br>  - '.join([str(i) for i in app.config['WORKSHEET_NAMES'].values()])
+						+ '<br>  - '.join([str(i) for i in list(app.config['WORKSHEET_NAMES'].values())])
 						+ ' nor does it appear to contain a "curve" input variable. '
 					)
 		else:
@@ -2165,7 +2165,7 @@ class Upload:
 				'This file does not contain recognised input'
 			)
 		else:
-			for worksheet in self.fieldnames.keys():
+			for worksheet in list(self.fieldnames.keys()):
 				self.check_duplicate_fieldnames(worksheet)
 				self.check_required_fieldnames(worksheet)
 
@@ -2247,7 +2247,7 @@ class Upload:
 				+ '<ul><li>'
 				+ '</li><li>'.join(
 					[
-						str(i) for i in app.config['WORKSHEET_NAMES'].values() if
+						str(i) for i in list(app.config['WORKSHEET_NAMES'].values()) if
 						i not in app.config['REFERENCE_WORKSHEETS']
 					]
 				)
@@ -2308,8 +2308,8 @@ class Upload:
 					rows = ws.iter_rows(min_row=1, max_row=1)
 					first_row = next(rows)
 					self.fieldnames[worksheet] = [
-						c.value.strip().lower() if isinstance(c.value, basestring)
-						else unicode(str(c.value), 'utf8')
+						c.value.strip().lower() if isinstance(c.value, str)
+						else str(str(c.value), 'utf8')
 						for c in first_row
 						if c.value
 					]
@@ -2381,7 +2381,7 @@ class Upload:
 					[
 						'row_index'] + [
 						str(cell.value.encode('utf8')).lower()
-						if isinstance(cell.value, basestring)
+						if isinstance(cell.value, str)
 						else str(cell.value)
 						for cell in first_row
 						if cell.value
@@ -2394,8 +2394,8 @@ class Upload:
 				for i, cell in enumerate(first_row):
 					if not cell.value:
 						empty_headers.append(i)
-					if isinstance(cell.value, basestring):
-						if cell.value.strip().lower() == u'time':
+					if isinstance(cell.value, str):
+						if cell.value.strip().lower() == 'time':
 							time_column_index = i
 				for j, row in enumerate(rows):
 					# j+2 to store the "Line number" as index
@@ -2421,7 +2421,7 @@ class Upload:
 						elif isinstance(value, datetime.time):
 							cell_values[i] = value.strftime("%H:%M")
 						else:
-							if isinstance(value, basestring):
+							if isinstance(value, str):
 								cell_values[i] = value.strip()
 					if any(value for value in cell_values):
 						cell_values = [self.row_count[worksheet]] + cell_values
@@ -2553,12 +2553,12 @@ class Upload:
 					parameters
 				)
 				trimmed_dict_reader = DictReaderInsensitive(trimmed_file)
-				row = trimmed_dict_reader.next()
+				row = next(trimmed_dict_reader)
 				# need to check_result sorted by file/dictreader row_index
 				for item in check_result:
 					record = item[0]
 					while record['row_index'] != int(row['row_index']):
-						row = trimmed_dict_reader.next()
+						row = next(trimmed_dict_reader)
 					if not record['UID']:
 						parse_result.merge_error(
 							row,
@@ -2740,7 +2740,7 @@ class Upload:
 			with get_driver().session() as neo4j_session:
 				if upload_object.file_extension in ['csv', 'xlsx']:
 					with neo4j_session.begin_transaction() as tx:
-						for worksheet in upload_object.fieldnames.keys():
+						for worksheet in list(upload_object.fieldnames.keys()):
 							# todo Stop trimming before parsing, this should be done in one pass of the file
 							# clean up the file removing empty lines and whitespace, lower case headers for matching in db
 							upload_object.trim_file(worksheet)
@@ -2780,7 +2780,7 @@ class Upload:
 							}
 						conflict_files = []
 						submissions = []
-						for worksheet in upload_object.fieldnames.keys():
+						for worksheet in list(upload_object.fieldnames.keys()):
 							# submit data
 							upload_object.submit(tx, worksheet)
 							submission_result = upload_object.submission_results[worksheet]
@@ -2847,7 +2847,7 @@ class Upload:
 							if property_updater.errors:
 								property_updater.format_error_list()
 								error_messages = [
-									item for errors in property_updater.errors.values() for item in errors
+									item for errors in list(property_updater.errors.values()) for item in errors
 								]
 								error_messages = '<br>'.join(error_messages)
 								tx.rollback()
@@ -3127,7 +3127,7 @@ class Upload:
 	def remove_properties(tx, property_uid):
 		inputs_properties = app.config['INPUTS_PROPERTIES']
 		properties_inputs = app.config['PROPERTIES_INPUTS']
-		for input_variable, item_uids in property_uid.iteritems():
+		for input_variable, item_uids in property_uid.items():
 			if property_uid[input_variable]:
 				if inputs_properties[input_variable] == 'name':
 					tx.run(
@@ -3537,7 +3537,7 @@ class Upload:
 					missing_row_indexes = []
 					expected_row_index = 1
 					if not deletion_result.peek():
-						missing_row_indexes += range(2, upload_object.row_count[record_type] + 2)
+						missing_row_indexes += list(range(2, upload_object.row_count[record_type] + 2))
 					else:
 						for record in deletion_result:
 							while (
@@ -3554,10 +3554,10 @@ class Upload:
 								property_uid[record[0]['input variable']].append(record[0]['uid'])
 						upload_object.remove_properties(tx, property_uid)
 						if not expected_row_index == upload_object.row_count[record_type]:
-							missing_row_indexes += range(expected_row_index, upload_object.row_count[record_type] + 2)
+							missing_row_indexes += list(range(expected_row_index, upload_object.row_count[record_type] + 2))
 					if missing_row_indexes:
 						missing_row_ranges = (
-							list(x) for _, x in itertools.groupby(enumerate(missing_row_indexes), lambda (i, x): i-x)
+							list(x) for _, x in itertools.groupby(enumerate(missing_row_indexes), lambda i_x: i_x[0]-i_x[1])
 						)
 						missing_row_str = str(
 							",".join("-".join(map(str, (i[0][1], i[-1][1])[:len(i)])) for i in missing_row_ranges)

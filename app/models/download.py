@@ -1,6 +1,6 @@
 from app import app, os
 import grp
-from neo4j_driver import (
+from .neo4j_driver import (
 	get_driver,
 	bolt_result
 )
@@ -46,7 +46,7 @@ class Download:
 			os.mkdir(self.user_download_folder)
 			gid = grp.getgrnam(app.config['CELERYGRPNAME']).gr_gid
 			os.chown(self.user_download_folder, -1, gid)
-			os.chmod(self.user_download_folder, 0775)
+			os.chmod(self.user_download_folder, 0o775)
 		# prepare variables to write the file
 		self.time = datetime.utcnow().strftime('%Y%m%d-%H%M%S')
 
@@ -124,7 +124,7 @@ class Download:
 			'Column',
 			'UID'
 		]
-		self.item_fieldnames = [i for i in fieldnames_order if i in self.id_list.peek()[0].keys()]
+		self.item_fieldnames = [i for i in fieldnames_order if i in list(self.id_list.peek()[0].keys())]
 
 	def get_file_list_html(self):
 		if not self.file_list:
@@ -349,18 +349,18 @@ class Download:
 				('Person', right_border)
 			]
 		}
-		item_details_keys = self.id_list.peek()[0].keys()
+		item_details_keys = list(self.id_list.peek()[0].keys())
 		if 'Column' in item_details_keys:
 			self.item_reference_details.insert(0, 'Column')
-			for i in core_fields_formats.keys():
+			for i in list(core_fields_formats.keys()):
 				core_fields_formats[i].insert(0, ('Column', right_border))
 		if 'Row' in item_details_keys:
 			self.item_reference_details.insert(0, 'Row')
-			for i in core_fields_formats.keys():
+			for i in list(core_fields_formats.keys()):
 				core_fields_formats[i].insert(0, ('Row', right_border))
 		if 'Name' in item_details_keys:
 			self.item_reference_details.insert(0, 'Name')
-			for i in core_fields_formats.keys():
+			for i in list(core_fields_formats.keys()):
 				core_fields_formats[i].insert(0, ('Name', right_border))
 		# Create worksheets
 		# Write headers and set formatting on columns
@@ -491,13 +491,13 @@ class Download:
 					item_reference_details_dict[key] = record[0][key]
 			# if there is a list (or nested lists) stored in this item
 			# make sure it is returned as a list of strings
-			for key, value in record[0].iteritems():
+			for key, value in record[0].items():
 				if isinstance(value, list):
 					value = ", ".join([str(i) for i in value])
 				if key in self.item_fieldnames:
 					item_details_column_number = self.item_fieldnames.index(key)
 					ws_dict['item_details'].write(item_num, item_details_column_number, value)
-			for record_type in self.inputs.keys():
+			for record_type in list(self.inputs.keys()):
 				if self.inputs[record_type]:
 					if record_type in ['property', 'trait', 'condition']:
 						self.write_item_to_worksheet(
@@ -598,7 +598,7 @@ class Download:
 							)
 		# now that we know the item_num we can add the validation
 		# currently no validation for curves as no definite columns
-		for record_type in self.inputs.keys():
+		for record_type in list(self.inputs.keys()):
 			if self.inputs[record_type] and record_type != 'curve':
 				if record_type in ['trait', 'curve'] and self.replicates > 1:
 					row_count = item_num * self.replicates * self.time_points
@@ -1067,16 +1067,16 @@ class Download:
 						if len(value) > 1:
 							for i, j in enumerate(value):
 								if isinstance(j, (float, int)):
-									record[0]['Records'][f]['values'][v][i] = unicode(j)
+									record[0]['Records'][f]['values'][v][i] = str(j)
 								if isinstance(j, list):
 									if len(j) > 1:
 										for ji, jj in enumerate(j):
 											if isinstance(jj, (float, int)):
-												record[0]['Records'][f]['values'][v][i][ji] = unicode(jj)
-										record[0]['Records'][f]['values'][v][i] = u'[' + u', '.join(
+												record[0]['Records'][f]['values'][v][i][ji] = str(jj)
+										record[0]['Records'][f]['values'][v][i] = '[' + ', '.join(
 											[jl for jl in record[0]['Records'][f]['values'][v][i]]
-										) + u']'
-							record[0]['Records'][f]['values'][v] = u', '.join(
+										) + ']'
+							record[0]['Records'][f]['values'][v] = ', '.join(
 								[l for l in record[0]['Records'][f]['values'][v]]
 							)
 						else:
@@ -1085,8 +1085,8 @@ class Download:
 				if len(record[0]['Records'][f]['values']) > 1:
 					for v, value in enumerate(record[0]['Records'][f]['values']):
 						if isinstance(value, (float, int)):
-							record[0]['Records'][f]['values'][v] = unicode(value)
-					record[0][input_type['input_name']] = u', '.join(
+							record[0]['Records'][f]['values'][v] = str(value)
+					record[0][input_type['input_name']] = ', '.join(
 						[value for value in record[0]['Records'][f]['values']]
 					)
 				elif record[0]['Records'][f]['values']:
@@ -1107,7 +1107,7 @@ class Download:
 								"%Y-%m-%d %H:%M")
 						else:
 							record[0][key][1] = 'Undefined'
-						record[0][key] = u' - '.join(record[0][key])
+						record[0][key] = ' - '.join(record[0][key])
 				elif key == 'Time' and record[0][key]:
 					record[0][key] = datetime.utcfromtimestamp(record[0][key] / 1000).strftime("%Y-%m-%d %H:%M")
 				elif key == 'Submitted at':
@@ -1121,13 +1121,13 @@ class Download:
 					if len(record[0][key]) > 1:
 						for i, j in enumerate(record[0][key]):
 							if isinstance(j, (float, int)):
-								record[0][key][i] = unicode(j)
+								record[0][key][i] = str(j)
 							if isinstance(j, list):
 								for ii,jj in enumerate(j):
 									if isinstance(jj, (float, int)):
-										record[0][key][i][ii] = unicode(jj)
-								record[0][key][i] = '[' + u', '.join([l for l in record[0][key][i]]) + ']'
-						record[0][key] = u', '.join([unicode(i) for i in record[0][key]])
+										record[0][key][i][ii] = str(jj)
+								record[0][key][i] = '[' + ', '.join([l for l in record[0][key][i]]) + ']'
+						record[0][key] = ', '.join([str(i) for i in record[0][key]])
 					else:
 						record[0][key] = record[0][key][0]
 		return record
@@ -1143,33 +1143,33 @@ class Download:
 		# prepare the file
 		base_filename = 'records'
 		item_fieldnames = [
-			u'Country',
-			u'Region',
-			u'Farm',
-			u'Field',
-			u'Field UID',
-			u'Block',
-			u'Block ID',
-			u'Source trees',
-			u'Source samples',
-			u'Name',
-			u'UID',
-			u'Replicate'
+			'Country',
+			'Region',
+			'Farm',
+			'Field',
+			'Field UID',
+			'Block',
+			'Block ID',
+			'Source trees',
+			'Source samples',
+			'Name',
+			'UID',
+			'Replicate'
 		]
-		fieldnames = [i for i in item_fieldnames if i in first_result[0].keys()]
+		fieldnames = [i for i in item_fieldnames if i in list(first_result[0].keys())]
 		if data_format == 'table':
 			inputs = [i['input_name'] for i in first_result[0]['Records']]
 			fieldnames += inputs
 		else:
 			fieldnames += [
-				u'Input variable',
-				u'Value',
-				u'Time',
-				u'Period',
-				u'Recorded by',
-				u'Submitted at',
-				u'Submitted by',
-				u'Partner'
+				'Input variable',
+				'Value',
+				'Time',
+				'Period',
+				'Recorded by',
+				'Submitted at',
+				'Submitted by',
+				'Partner'
 			]
 		if file_type == 'xlsx':
 			file_path = self.get_file_path(

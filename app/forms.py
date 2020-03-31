@@ -705,7 +705,7 @@ class DownloadForm(FlaskForm):
 	)
 	select_inputs = SelectMultipleField(
 		[Optional()],
-		coerce=unicode,
+		coerce=str,
 		option_widget=widgets.CheckboxInput(),
 		widget=widgets.ListWidget(prefix_label=False),
 		description="Select individual input variables to include in the form/template",
@@ -826,7 +826,7 @@ class ManageInputGroupForm(FlaskForm):
 	)
 	all_inputs = SelectMultipleField(
 		'Other inputs',
-		coerce=unicode,
+		coerce=str,
 		description='Unselected inputs',
 		widget=widgets.ListWidget(prefix_label=False),
 		choices=[]
@@ -936,7 +936,7 @@ class RecordForm(FlaskForm):
 	)
 	select_inputs = SelectMultipleField(
 		[InputRequired()],
-		coerce=unicode,
+		coerce=str,
 		option_widget=widgets.CheckboxInput(),
 		widget=widgets.ListWidget(prefix_label=False),
 		description='Select input variables to include',

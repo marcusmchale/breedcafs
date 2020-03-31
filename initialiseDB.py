@@ -22,7 +22,7 @@ logging.basicConfig(
 
 # neo4j config
 uri = app.config['BOLT_URI']
-print 'Initialising DB:' + uri
+print('Initialising DB:' + uri)
 
 auth = (os.environ['NEO4J_USERNAME'], os.environ['NEO4J_PASSWORD'])
 driver = GraphDatabase.driver(uri, auth=auth)
@@ -33,7 +33,7 @@ def confirm(question):
 	prompt = " [y/n] "
 	while True:
 		sys.stdout.write(question + prompt)
-		choice = raw_input().lower()
+		choice = input().lower()
 		if choice in valid:
 			return valid[choice]
 		else:
@@ -164,49 +164,49 @@ def create_partners(tx, partner_list):
 		)
 		for record in partner_create:
 			if record['p.found'] and record['r.found'] and record['c.found']:
-				print (
+				print((
 					'Found: '
 					+ partner['name']
 					+ ' BASED_IN '
 					+ partner['BASED_IN']
-				)
+				))
 			elif record['p.found'] and not record['r.found'] and record['c.found']:
-				print (
+				print((
 					'Created: '
 					+ partner['name']
 					+ ' BASED_IN '
 					+ partner['BASED_IN']
 					+ '(relationship only)'
-				)
+				))
 			elif record['p.found'] and not record['r.found'] and not record['c.found']:
-				print (
+				print((
 					'Created: '
 					+ partner['name']
 					+ ' BASED_IN '
 					+ partner['BASED_IN']
 					+ '(country and relationship only)'
-				)
+				))
 			elif not record['p.found'] and not record['r.found'] and record['c.found']:
-				print (
+				print((
 					'Created: '
 					+ partner['name']
 					+ ' BASED_IN '
 					+ partner['BASED_IN']
 					+ '(partner and relationship only)'
-				)
+				))
 			elif not record['p.found'] and not record['r.found'] and not record['c.found']:
-				print (
+				print((
 					'Created: '
 					+ partner['name']
 					+ ' BASED_IN '
 					+ partner['BASED_IN']
-				)
+				))
 			else:
-				print (
+				print((
 					'Error with merger of partner '
 					+ partner['name']
 					+ ' and/or BASED_IN relationship'
-				)
+				))
 
 
 def create_inputs(tx, inputs_file):
@@ -274,11 +274,11 @@ def create_inputs(tx, inputs_file):
 			)
 			for record in input_create:
 				if record['i.found']:
-					print ('Found input variable ' + input_variable['name'])
+					print(('Found input variable ' + input_variable['name']))
 				elif not record['i.found']:
-					print ('Created input variable: ' + input_variable['name'])
+					print(('Created input variable: ' + input_variable['name']))
 				else:
-					print ('Error with merger of input variable: ' + input_variable['name'])
+					print(('Error with merger of input variable: ' + input_variable['name']))
 
 
 def create_input_groups(tx, groups):
@@ -317,10 +317,10 @@ def create_input_groups(tx, groups):
 			if not record['input_names']:
 				print ('Error adding variables to group')
 			elif not len(record['input_names']) == len(group['input_variables']):
-				print (
+				print((
 					'Some variables not matched by name: ' +
 					','.join([i for i in group['input_variables'] if i not in record['input_names']])
-				)
+				))
 
 
 def create_varieties(tx, varieties_file):
@@ -448,13 +448,13 @@ def create_variety_codes(tx, variety_codes, input_name):
 				paternal=str(item[2]).lower(),
 				input_name=input_name
 			)
-		print str(item[0]).lower(), str(item[1]).lower(), str(item[2]).lower()
+		print(str(item[0]).lower(), str(item[1]).lower(), str(item[2]).lower())
 		for record in result:
-			print "Merging variety codes for " + str(input_name)
+			print("Merging variety codes for " + str(input_name))
 			if record[0]:
-				print "Existing variety, code set"
+				print("Existing variety, code set")
 			else:
-				print "New variety created"
+				print("New variety created")
 	# now sort that list of codes (this sorting will handle numbers better than a simple string sort does)
 	tx.run(
 		' MATCH (input: Input {name_lower: $input_name}) '
@@ -468,8 +468,8 @@ def create_variety_codes(tx, variety_codes, input_name):
 
 
 def create_start_email(tx):
-	email = raw_input('Enter the email address to be first registrant: ')
-	print ('Adding email to allowed users: ' + email)
+	email = input('Enter the email address to be first registrant: ')
+	print(('Adding email to allowed users: ' + email))
 	tx.run(
 		' CREATE (emails: Emails {'
 		'	allowed: $email '
