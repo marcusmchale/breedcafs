@@ -1,7 +1,10 @@
 *.pyc
 *.log
 *.idea
+*.swp
+*.swo
 logs/
 instance/
 venv/
 venv3/
+__pycache__/
