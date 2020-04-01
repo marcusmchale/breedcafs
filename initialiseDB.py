@@ -210,7 +210,7 @@ def create_partners(tx, partner_list):
 
 
 def create_inputs(tx, inputs_file):
-	with open(inputs_file, 'rb') as inputs_csv:
+	with open(inputs_file, 'r') as inputs_csv:
 		reader = csv.DictReader(inputs_csv, delimiter=',', quotechar='"')
 		for input_variable in reader:
 			input_create = tx.run(
