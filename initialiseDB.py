@@ -324,7 +324,7 @@ def create_input_groups(tx, groups):
 
 
 def create_varieties(tx, varieties_file):
-	with open(varieties_file, 'rb') as varieties_csv:
+	with open(varieties_file, 'r') as varieties_csv:
 		reader = csv.DictReader(varieties_csv, delimiter=',', quotechar='"')
 		for variety in reader:
 			tx.run(
