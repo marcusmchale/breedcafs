@@ -235,7 +235,7 @@ class User:
 			user = self.find('')
 			if user:
 				if user['confirmed']:
-					if bcrypt.check_password_hash(password, user['password']):
+					if bcrypt.check_password_hash(user['password'], password):
 						return {'success': 'Logged in', 'access': user['access']}
 					else:
 						# handle bad login attempts here,
