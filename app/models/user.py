@@ -1,5 +1,6 @@
 from app import (
 	# app,
+	bcrypt,
 	logging,
 	# celery,
 	redis_store,
@@ -8,7 +9,7 @@ from app import (
 	SecurityError
 )
 from app.cypher import Cypher
-from passlib.hash import bcrypt
+# from passlib.hash import bcrypt  # using the flask-bcrypt extension now
 from .neo4j_driver import get_driver
 from time import time
 # from datetime import datetime
@@ -162,10 +163,10 @@ class User:
 		tx.run(
 			Cypher.user_register,
 			username=self.username,
-			password = bcrypt.encrypt(self.password), 
-			email = self.email, 
-			name = self.name, 
-			partner = self.partner
+			password=bcrypt.generate_password_hash(self.password),
+			email=self.email,
+			name=self.name,
+			partner=self.partner
 		)
 
 	def remove(self, email):
@@ -234,7 +235,7 @@ class User:
 			user = self.find('')
 			if user:
 				if user['confirmed']:
-					if bcrypt.verify(password, user['password']):
+					if bcrypt.check_password_hash(password, user['password']):
 						return {'success': 'Logged in', 'access': user['access']}
 					else:
 						# handle bad login attempts here,
@@ -267,7 +268,7 @@ class User:
 
 	@staticmethod
 	def _password_reset(tx, email, password):
-		tx.run(Cypher.password_reset, email=email, password=bcrypt.encrypt(password))
+		tx.run(Cypher.password_reset, email=email, password=bcrypt.generate_password_hash(password))
 
 	# this retrieves the list of users the input user is able to confirm
 	def get_users_for_admin(self, access):

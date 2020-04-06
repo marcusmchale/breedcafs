@@ -67,7 +67,7 @@ def register():
 					"Your account on the BreedCAFS server was successfully created. Your username is" + username +
 					" Please visit the following link to activate your account:" + confirm_url
 				)
-				html = render_template('emails/activate.html', confirm_url=confirm_url, username = username)
+				html = render_template('emails/activate.html', confirm_url=confirm_url, username=username)
 				send_email(subject, app.config['ADMINS'][0], recipients, body, html)
 				flash('Registration successful. Please check your email to confirm.')
 				return redirect(url_for('login'))

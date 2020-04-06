@@ -20,10 +20,11 @@ Set up neo4j:
 
     Connect to db using cypher shell to create breedcafs user:
         cypher-shell -u neo4j -p NEO4J_ROOT_USER-PASSWORD-HERE
-        CALL dbms.security.createUser('breedcafs', BREEDCAFS_USER-PASSWORD-HERE, false)
+        CALL dbms.security.createUser('breedcafs', BREEDCAFS_USER-PASSWORD-HERE, false);
 		# Now that I am using ONgDB for enterprise features we want to set roles for the users
-		CALL dbms.security.listRoles()
-		CALL dbms.security.addRoleToUser('editor', 'breedcafs')
+		CALL dbms.security.listRoles();
+		#CALL dbms.security.addRoleToUser('editor', 'breedcafs');
+		CALL dbms.security.addRoleToUser('admin', 'breedcafs');
 
         # the 3rd argument in the above call suppresses the request to change password
 
@@ -103,6 +104,12 @@ Configure apache2:
 		export FLASK_APP=run.py
 		flask run
 
+SELinux:
+	Wherever apache logs are kept needs to be set as http log type:
+		chcon method:
+			chcon -Rv --type=httpd_log_t /httpd/logs
+		semanage method (persists through file system relabel:
+			semanage fcontext -a -t httpd_log_t “/httpd/logs(/.*)
 
 Redis:
 	This is needed as an in memory data store for asynchronous tasks (like uploading large files)
