@@ -23,7 +23,7 @@ class DictReaderInsensitive(csv.DictReader):
 		return [field.strip().lower() for field in csv.DictReader.fieldnames.fget(self) if field]
 
 	def __next__(self):
-		return DictInsensitive(csv.DictReader.next(self))
+		return DictInsensitive(next(self))
 
 
 class DictInsensitive(dict):
@@ -2308,8 +2308,9 @@ class Upload:
 					rows = ws.iter_rows(min_row=1, max_row=1)
 					first_row = next(rows)
 					self.fieldnames[worksheet] = [
-						c.value.strip().lower() if isinstance(c.value, str)
-						else str(str(c.value), 'utf8')
+						c.value.strip().lower()
+						if isinstance(c.value, str)
+						else str(c.value)
 						for c in first_row
 						if c.value
 					]
@@ -2370,7 +2371,7 @@ class Upload:
 					ws = wb[app.config['WORKSHEET_NAMES'][worksheet]]
 				else:
 					ws = wb[worksheet]
-			with open(trimmed_file_path, "wb") as trimmed_file:
+			with open(trimmed_file_path, "wt") as trimmed_file:
 				file_writer = csv.writer(
 					trimmed_file,
 					quoting=csv.QUOTE_ALL
