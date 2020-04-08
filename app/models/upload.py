@@ -680,10 +680,7 @@ class SubmissionResult:
 		self.username = username
 		download_path = os.path.join(app.config['DOWNLOAD_FOLDER'], username)
 		if not os.path.isdir(download_path):
-			os.mkdir(download_path)
-			gid = grp.getgrnam(app.config['CELERYGRPNAME']).gr_gid
-			os.chown(download_path, -1, gid)
-			os.chmod(download_path, app.config['IMPORT_FOLDER_PERMISSIONS'])
+			os.mkdir(download_path, mode=app.config['EXPORT_FOLDER_PERMISSIONS'])
 		if os.path.splitext(filename)[1] == '.xlsx':
 			conflicts_filename =  '_'.join([
 				os.path.splitext(filename)[0],
@@ -2008,10 +2005,8 @@ class Upload:
 		# create user upload path if not found
 		upload_path = os.path.join(app.config['UPLOAD_FOLDER'], self.username)
 		if not os.path.isdir(upload_path):
-			os.mkdir(upload_path)
-			gid = grp.getgrnam(app.config['CELERYGRPNAME']).gr_gid
-			os.chown(upload_path, -1, gid)
-			os.chmod(upload_path, app.config['IMPORT_FOLDER_PERMISSIONS'])
+			os.mkdir(upload_path, mode=app.config['IMPORT_FOLDER_PERMISSIONS'])
+			logging.debug('Created upload path for user: %s', self.username)
 		file_data.save(self.file_path)
 
 	def file_format_errors(self):
@@ -3626,21 +3621,16 @@ class Resumable:
 		)
 		if not os.path.isdir(user_upload_dir):
 			logging.debug('Creating path for user: %s', username)
-			os.mkdir(user_upload_dir)
-			logging.debug('Settings permissions on created path for user: %s', username)
-			# gid = grp.getgrnam(app.config['CELERYGRPNAME']).gr_gid
-			# os.chown(user_upload_dir, -1, gid)
-			os.chmod(user_upload_dir, app.config['IMPORT_FOLDER_PERMISSIONS'])
+			os.mkdir(user_upload_dir, mode=app.config['IMPORT_FOLDER_PERMISSIONS'])
+			logging.debug('Created upload path for user: %s', username)
 		self.temp_dir = os.path.join(
 			app.config['UPLOAD_FOLDER'],
 			self.username,
 			self.resumable_id
 		)
 		if not os.path.isdir(self.temp_dir):
-			os.mkdir(self.temp_dir)
-			# gid = grp.getgrnam(app.config['CELERYGRPNAME']).gr_gid
-			# os.chown(self.temp_dir, -1, gid)
-			os.chmod(self.temp_dir, app.config['IMPORT_FOLDER_PERMISSIONS'])
+			os.mkdir(self.temp_dir, mode=app.config['IMPORT_FOLDER_PERMISSIONS'])
+			logging.debug('Created upload path for user: %s', username)
 		self.filename = secure_filename(raw_filename)
 		self.file_path = os.path.join(
 			app.config['UPLOAD_FOLDER'],
