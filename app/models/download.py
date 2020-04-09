@@ -43,10 +43,7 @@ class Download:
 		# create user download path if not found
 		self.user_download_folder = os.path.join(app.config['DOWNLOAD_FOLDER'], username)
 		if not os.path.isdir(self.user_download_folder):
-			os.mkdir(self.user_download_folder, mode=0o775)
-			#gid = grp.getgrnam(app.config['CELERYGRPNAME']).gr_gid
-			#os.chown(self.user_download_folder, -1, gid)
-			#os.chmod(self.user_download_folder, 0o775)
+			os.mkdir(self.user_download_folder, mode=0o770)
 		# prepare variables to write the file
 		self.time = datetime.utcnow().strftime('%Y%m%d-%H%M%S')
 

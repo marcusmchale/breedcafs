@@ -2363,6 +2363,8 @@ class Upload:
 				else:
 					ws = wb[worksheet]
 			# here opening trimmed file with permissions allowing the groupe (neo4j) to have read access
+			# umask 130 is rw-r-----
+			os.umask(0o130)
 			with open(os.open(trimmed_file_path, os.O_CREAT | os.O_WRONLY, 0o640), "wt") as trimmed_file:
 				file_writer = csv.writer(
 					trimmed_file,
