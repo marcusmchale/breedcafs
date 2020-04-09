@@ -2362,7 +2362,8 @@ class Upload:
 					ws = wb[app.config['WORKSHEET_NAMES'][worksheet]]
 				else:
 					ws = wb[worksheet]
-			with open(trimmed_file_path, "wt") as trimmed_file:
+			# here opening trimmed file with permissions allowing the groupe (neo4j) to have read access
+			with open(os.open(trimmed_file_path, os.O_CREAT | os.O_WRONLY, 0o640), "wt") as trimmed_file:
 				file_writer = csv.writer(
 					trimmed_file,
 					quoting=csv.QUOTE_ALL
