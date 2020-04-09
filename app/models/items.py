@@ -1,5 +1,4 @@
 # import os
-# import unicodecsv as csv
 # import cStringIO
 from app import app
 from app.cypher import Cypher

@@ -7,7 +7,7 @@ from flask import render_template, url_for
 from werkzeug import urls
 from .user import User
 from .neo4j_driver import get_driver, bolt_result
-import unicodecsv as csv
+import csv
 import datetime
 import itertools
 import contextlib
@@ -20,10 +20,10 @@ class DictReaderInsensitive(csv.DictReader):
 	# overwrites csv.fieldnames property so uses without surrounding whitespace and in lowercase
 	@property
 	def fieldnames(self):
-		return [field.strip().lower() for field in csv.DictReader.fieldnames.fget(self) if field]
+		return [str(field.strip().lower()) for field in csv.DictReader.fieldnames.fget(self) if field]
 
 	def __next__(self):
-		return DictInsensitive(next(self))
+		return DictInsensitive(csv.DictReader.__next__(self))
 
 
 class DictInsensitive(dict):
@@ -176,7 +176,7 @@ class RowParseResult:
 											if float(x) == x_value:
 												try:
 													if y_value != float(self.row[x]):
-														formatted_cells[x] = '<td bgcolor = #FFFF00 title = "'.encode('utf8')
+														formatted_cells[x] = '<td bgcolor = #FFFF00 title = "'
 														formatted_cells[x] += self.error_comments['other'][
 															error['error_type']]
 														formatted_cells[x] += (
@@ -189,8 +189,7 @@ class RowParseResult:
 														])
 														formatted_cells[x] += '">' + str(self.row[x]) + '</td>'
 												except ValueError:
-													formatted_cells[x] = '<td bgcolor = #FFFF00 title = "'.encode(
-														'utf8')
+													formatted_cells[x] = '<td bgcolor = #FFFF00 title = "'
 													formatted_cells[x] += self.error_comments['other'][
 														error['error_type']]
 													formatted_cells[x] += (
@@ -203,7 +202,7 @@ class RowParseResult:
 													])
 													formatted_cells[x] += '">' + str(self.row[x]) + '</td>'
 			else:
-				formatted_cells[field] = '<td bgcolor = #FFFF00 title = "'.encode('utf8')
+				formatted_cells[field] = '<td bgcolor = #FFFF00 title = "'
 				for error in self.errors[field]:
 					field_error_type = error['error_type']
 					field_input_name = error['input_name'].lower() if error['input_name'] else None
@@ -290,11 +289,11 @@ class RowParseResult:
 								])
 					formatted_cells[field] += '\n'
 				if isinstance(self.row[field], (int, float)):
-					value = str(self.row[field].encode('utf8'))
+					value = str(self.row[field])
 				else:
 					value = self.row[field]
 				formatted_cells[field] += '">'
-				formatted_cells[field] += value.encode('utf8').decode('utf8')
+				formatted_cells[field] += value
 				formatted_cells[field] += '</td>'
 		row_string = '<tr><td>' + str(self.row['row_index']) + '</td>'
 		for field in fieldnames:
@@ -668,11 +667,7 @@ class SubmissionRecord:
 	def lists_to_strings(self):
 		for item in self.record:
 			if isinstance(self.record[item], list):
-				self.record[item] = str(', '.join(
-					[
-						str(str(i), 'utf8') if not isinstance(i, list) else ', '.join([str(str(j), 'utf8') for j in i]) for i in self.record[item]
-					]
-				))
+				self.record[item] = ', '.join([str(i) if not isinstance(i, list) else ', '.join([str(j) for j in i]) for i in self.record[item]])
 
 
 class SubmissionResult:
@@ -680,9 +675,10 @@ class SubmissionResult:
 		self.username = username
 		download_path = os.path.join(app.config['DOWNLOAD_FOLDER'], username)
 		if not os.path.isdir(download_path):
-			os.mkdir(download_path, mode=app.config['EXPORT_FOLDER_PERMISSIONS'])
+			logging.debug('Creating download path for user: %s', username)
+			os.mkdir(download_path, mode = app.config['EXPORT_FOLDER_PERMISSIONS'])
 		if os.path.splitext(filename)[1] == '.xlsx':
-			conflicts_filename =  '_'.join([
+			conflicts_filename = '_'.join([
 				os.path.splitext(filename)[0],
 				record_type,
 				'conflicts.csv'
@@ -2005,8 +2001,8 @@ class Upload:
 		# create user upload path if not found
 		upload_path = os.path.join(app.config['UPLOAD_FOLDER'], self.username)
 		if not os.path.isdir(upload_path):
-			os.mkdir(upload_path, mode=app.config['IMPORT_FOLDER_PERMISSIONS'])
-			logging.debug('Created upload path for user: %s', self.username)
+			logging.debug('Creating upload path for user: %s', self.username)
+			os.mkdir(upload_path, mode=app.config['IMPORT_FOLDER_PERMISSIONS'] )
 		file_data.save(self.file_path)
 
 	def file_format_errors(self):
@@ -2374,14 +2370,8 @@ class Upload:
 				rows = ws.iter_rows()
 				first_row = next(rows)
 				file_writer.writerow(
-					[
-						'row_index'] + [
-						str(cell.value.encode('utf8')).lower()
-						if isinstance(cell.value, str)
-						else str(cell.value)
-						for cell in first_row
-						if cell.value
-					]
+					['row_index'] +
+					[cell.value.lower() if isinstance(cell.value, str) else str(cell.value) for cell in first_row if cell.value]
 				)
 				# handle deleted columns in the middle of the worksheet
 				empty_headers = []
@@ -2434,8 +2424,8 @@ class Upload:
 			record_type = 'mixed'
 		if record_type == 'curve':
 			x_values = set(self.fieldnames[worksheet]) - self.required_sets[record_type]
-		with open(trimmed_file_path, 'r') as trimmed_file:
-			trimmed_dict = DictReaderInsensitive(trimmed_file)
+		with open(trimmed_file_path, 'rt') as trimmed_file:
+			trimmed_dict = csv.DictReader(trimmed_file)
 			for row in trimmed_dict:
 				if submission_type == 'table':
 					if record_type != 'curve':
@@ -3620,17 +3610,16 @@ class Resumable:
 			self.username
 		)
 		if not os.path.isdir(user_upload_dir):
-			logging.debug('Creating path for user: %s', username)
+			logging.debug('Creating upload path for user: %s', username)
 			os.mkdir(user_upload_dir, mode=app.config['IMPORT_FOLDER_PERMISSIONS'])
-			logging.debug('Created upload path for user: %s', username)
 		self.temp_dir = os.path.join(
 			app.config['UPLOAD_FOLDER'],
 			self.username,
 			self.resumable_id
 		)
 		if not os.path.isdir(self.temp_dir):
+			logging.debug('Creating upload path for user: %s', username)
 			os.mkdir(self.temp_dir, mode=app.config['IMPORT_FOLDER_PERMISSIONS'])
-			logging.debug('Created upload path for user: %s', username)
 		self.filename = secure_filename(raw_filename)
 		self.file_path = os.path.join(
 			app.config['UPLOAD_FOLDER'],

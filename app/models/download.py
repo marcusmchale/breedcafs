@@ -18,7 +18,7 @@ from app.models import(
 
 from app.emails import send_email
 
-import unicodecsv as csv
+import csv
 
 from datetime import datetime
 
@@ -858,13 +858,10 @@ class Download:
 			)
 			statement += ' AND '.join(filters)
 		statement += (
-			' OPTIONAL MATCH (item)-[: FROM*]->(sample_sample: Sample) '
-			' OPTIONAL MATCH (item)-[: FROM*]->(sample_tree: Tree) '
-			' OPTIONAL MATCH (sample_tree)-[:IS_IN]->(:BlockTrees) '
-			'	-[:IS_IN]->(sample_tree_block: Block) '
-			' OPTIONAL MATCH (sample_tree)-[:IS_IN]->(:FieldTrees) '
-			'	-[:IS_IN]->(sample_tree_field: Field) '
-			' OPTIONAL MATCH (item)-[: FROM*]->(sample_field: Field) '
+			' OPTIONAL MATCH (item)-[: FROM*]->(sample_samples: Sample) '
+			' OPTIONAL MATCH (item)-[: FROM*]->(sample_trees: Tree) '
+			' OPTIONAL MATCH (item)-[: FROM | IS_IN*]->(sample_blocks: Block) '
+			' OPTIONAL MATCH (item)-[: FROM | IS_IN*]->(sample_field: Field) '
 			' OPTIONAL MATCH (item)-[: IS_IN]->(: BlockTrees) '
 			'	-[: IS_IN]->(tree_block: Block) '
 			' OPTIONAL MATCH (item)-[: IS_IN]->(: FieldTrees) '
@@ -880,28 +877,26 @@ class Download:
 			'	item.uid as UID, '
 			'	item.id as ID, '
 			'	item.name as Name,'
-			'	COLLECT(DISTINCT sample_sample.id) as `Source samples`, '
-			'	COLLECT(DISTINCT sample_tree.id) as `Source trees`, '
+			'	COLLECT(DISTINCT sample_samples.id) as `Source samples`, '
+			'	COLLECT(DISTINCT sample_trees.id) as `Source trees`, '
 			'	COALESCE( '
 			'		CASE WHEN item: Block THEN item.name ELSE Null END, '
 			'		tree_block.name, '
-			'		COLLECT(DISTINCT sample_tree_block.name) '
+			'		COLLECT(DISTINCT sample_blocks.name) '
 			'	) as Block, '
 			'	COALESCE( '
 			'		CASE WHEN item: Block THEN item.id ELSE Null END, '
 			'		tree_block.id, '
-			'		COLLECT(DISTINCT sample_tree_block.id) '
+			'		COLLECT(DISTINCT sample_blocks.id) '
 			'	) as `Block ID`, '
 			'	COALESCE ( '
 			'		CASE WHEN item: Field THEN item.name ELSE Null END, '
-			'		sample_tree_field.name, '
 			'		sample_field.name, '
 			'		tree_field.name, '
 			'		block_field.name '
 			'	) as Field, '
 			'	COALESCE ( '
 			'		CASE WHEN item: Field THEN item.uid ELSE Null END, '
-			'		sample_tree_field.uid, '
 			'		sample_field.uid, '
 			'		tree_field.uid, '
 			'		block_field.uid '
