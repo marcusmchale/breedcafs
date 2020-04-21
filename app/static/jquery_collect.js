@@ -15,7 +15,8 @@ const field_uid_list_box = $('#field_uid_list');
 const block_id_list_box = $('#block_id_list');
 const tree_id_list_box = $('#tree_id_list');
 const sample_id_list_box = $('#sample_id_list');
-
+const per_item_count = $('#per_item_count');
+var item_count = 0
 
 change_activity = function () {
     const sampling_activity = sampling_activity_select.val();
@@ -33,6 +34,7 @@ change_activity = function () {
 };
 
 sampling_activity_select.change(change_activity);
+
 
 update_item_count = function() {
 	const sel_level = level_select.find(":selected").val();
@@ -71,6 +73,8 @@ update_item_count = function() {
                     item_type_text.replaceWith(
                         "<a></a>"
                     );
+                    item_count = 0;
+                    update_sample_count();
                 } else {
                     item_count_text.replaceWith(
                         "<a>" + response['item_count'] + "</a>"
@@ -80,6 +84,8 @@ update_item_count = function() {
                     item_type_text.replaceWith(
                         "<a>" + item_type_text_entry + "</a>"
                     );
+                    item_count = response['item_count']
+                    update_sample_count();
                 }
             },
             error: function (error) {
@@ -132,6 +138,17 @@ level_update = function() {
     remove_flash();
 };
 
+update_sample_count = function () {
+    var n = (isNaN(parseInt(per_item_count.val())) ? 1 : per_item_count.val())
+    console.log(n);
+    sample_count = (n * item_count);
+    const sample_count_text = $('#sample_count_div a:eq(0)');
+    sample_count_text.replaceWith(
+        "<a>" + sample_count + "</a>"
+    );
+};
+
+per_item_count.on('input', update_sample_count);
 
 $(window).on('load', level_update);
 
