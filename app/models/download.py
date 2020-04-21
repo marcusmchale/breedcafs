@@ -597,7 +597,7 @@ class Download:
 		# currently no validation for curves as no definite columns
 		for record_type in list(self.inputs.keys()):
 			if self.inputs[record_type] and record_type != 'curve':
-				if record_type in ['trait', 'curve'] and self.replicates > 1:
+				if record_type in ['trait', 'curve'] and self.replicates:
 					row_count = item_num * self.replicates * self.time_points
 				else:
 					row_count = item_num * self.time_points

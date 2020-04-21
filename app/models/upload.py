@@ -559,7 +559,7 @@ class ParseResult:
 		if not self.duplicate_keys:
 			return '<p>duplicated keys found</p>'
 		else:
-			max_length = 50
+			max_length = 25
 			response = (
 				'<p>The uploaded table contains duplicated unique keys '
 				'(the combination of UID, date and time). '
@@ -581,7 +581,7 @@ class ParseResult:
 			return response + '<table>' + html_table + '</table>'
 
 	def html_table(self):
-		max_length = 100
+		max_length = 25
 		# create a html table string with tooltip for details
 		if self.errors:
 			header_string = '<tr><th><p>Line#</p></th>'
@@ -594,12 +594,11 @@ class ParseResult:
 						header_string += '<th><p>' + field + '</p></th>'
 				else:
 					header_string += '<th><p>' + field + '</p></th>'
-			header_string += '</tr>'
-			html_table = header_string
+			html_table = header_string + '</tr>'
 			# construct each row and append to growing table
 			for i, item in enumerate(sorted(self.errors)):
 				if i >= max_length:
-					return html_table
+					return '<div id="response_table_div"><table>' + html_table + '</table></div>'
 				row_string = self.errors[item].html_row(self.fieldnames)
 				html_table += row_string
 			return '<div id="response_table_div"><table>' + html_table + '</table></div>'
