@@ -315,7 +315,7 @@ def create_input_groups(tx, groups):
 		)
 		for record in connect_inputs_to_group:
 			if not record['input_names']:
-				print ('Error adding variables to group')
+				print('Error adding variables to group')
 			elif not len(record['input_names']) == len(group['input_variables']):
 				print((
 					'Some variables not matched by name: ' +
@@ -478,23 +478,45 @@ def create_start_email(tx):
 	)
 
 
-if not confirm('Are you sure you want to proceed? This is should probably only be run when setting up the database'):
-	sys.exit()
-else:
-	if not confirm(
-			'Would you like to remove everything? Select no to delete just the items, data or input variables.'
-	):
-		with driver.session() as session:
-			if confirm('Would you like to delete all data?'):
-				session.write_transaction(delete_data)
-			if confirm('Would you like to delete all items?'):
-				session.write_transaction(delete_items)
-			if confirm(
-					'Would you like to delete inputs and varieties then recreate them from inputs.csv, '
-					'input_groups.py and varieties.csv?'
-			):
-				session.write_transaction(delete_inputs)
-				session.write_transaction(delete_varieties)
+def go():
+	if not confirm('Are you sure you want to proceed? This is should probably only be run when setting up the database'):
+		sys.exit()
+	else:
+		if not confirm(
+				'Would you like to remove everything? Select no to delete just the items, data or input variables.'
+		):
+			with driver.session() as session:
+				if confirm('Would you like to delete all data?'):
+					session.write_transaction(delete_data)
+				if confirm('Would you like to delete all items?'):
+					session.write_transaction(delete_items)
+				if confirm(
+						'Would you like to delete inputs and varieties then recreate them from inputs.csv, '
+						'input_groups.py and varieties.csv?'
+				):
+					session.write_transaction(delete_inputs)
+					session.write_transaction(delete_varieties)
+					session.write_transaction(create_inputs, './instance/inputs.csv')
+					session.write_transaction(create_input_groups, input_groups.input_groups)
+					session.write_transaction(create_varieties, './instance/varieties.csv')
+					session.write_transaction(
+						create_variety_codes,
+						varieties.el_frances_variety_codes,
+						"Assign variety (El Frances code)"
+					)
+		elif confirm('Do you want to a delete everything rebuild the constraints and reset the indexes?'):
+			print('Performing a full reset of database')
+			with driver.session() as session:
+				print('deleting all nodes and relationships')
+				session.write_transaction(delete_database)
+				print('clearing schema')
+				session.write_transaction(clear_schema)
+				print('creating constraints')
+				session.write_transaction(create_constraints, app.config['CONSTRAINTS'])
+				print('creating indexes')
+				session.write_transaction(create_indexes, app.config['INDEXES'])
+				session.write_transaction(create_partners, app.config['PARTNERS'])
+				session.write_transaction(create_item_levels, app.config['ITEM_LEVELS'])
 				session.write_transaction(create_inputs, './instance/inputs.csv')
 				session.write_transaction(create_input_groups, input_groups.input_groups)
 				session.write_transaction(create_varieties, './instance/varieties.csv')
@@ -503,28 +525,11 @@ else:
 					varieties.el_frances_variety_codes,
 					"Assign variety (El Frances code)"
 				)
-	elif confirm('Do you want to a delete everything rebuild the constraints and reset the indexes?'):
-		print('Performing a full reset of database')
-		with driver.session() as session:
-			print('deleting all nodes and relationships')
-			session.write_transaction(delete_database)
-			print('clearing schema')
-			session.write_transaction(clear_schema)
-			print('creating constraints')
-			session.write_transaction(create_constraints, app.config['CONSTRAINTS'])
-			print('creating indexes')
-			session.write_transaction(create_indexes, app.config['INDEXES'])
-			session.write_transaction(create_partners, app.config['PARTNERS'])
-			session.write_transaction(create_item_levels, app.config['ITEM_LEVELS'])
-			session.write_transaction(create_inputs, './instance/inputs.csv')
-			session.write_transaction(create_input_groups, input_groups.input_groups)
-			session.write_transaction(create_varieties, './instance/varieties.csv')
-			session.write_transaction(
-				create_variety_codes,
-				varieties.el_frances_variety_codes,
-				"Assign variety (El Frances code)"
-			)
-			session.write_transaction(create_start_email)
-	else:
-		print('Nothing done')
-	print ('Finished')
+				session.write_transaction(create_start_email)
+		else:
+			print('Nothing done')
+		print('Finished')
+
+go()
+driver.close()
+
