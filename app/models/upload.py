@@ -2165,7 +2165,6 @@ class Upload:
 			file_dict = DictReaderInsensitive(uploaded_file)
 			if self.submission_type == 'db':  # this type is submitted through the Correct page
 				record_type = 'mixed'
-
 				if not self.required_sets[record_type].issubset(set(file_dict.fieldnames)):
 					self.error_messages.append(
 						'This file does not appear to be a database exported csv file. ' +
@@ -2461,13 +2460,15 @@ class Upload:
 		# todo we are handling this check before we parse the rows
 		# todo so we could remove this check for input variables from  here to simplify
 		username = self.username
-		if worksheet.lower() in app.config['WORKSHEET_TYPES']:
+		submission_type = self.submission_type
+		if submission_type == 'db':
+			record_type = 'mixed'
+		elif worksheet.lower() in app.config['WORKSHEET_TYPES']:
 			record_type = app.config['WORKSHEET_TYPES'][worksheet.lower()]
 		else:
 			record_type = 'curve'
 		trimmed_file_path = self.trimmed_file_paths[worksheet]
 		trimmed_filename = os.path.basename(trimmed_file_path)
-		submission_type = self.submission_type
 		parse_result = self.parse_results[worksheet]
 		with open(trimmed_file_path, 'r') as trimmed_file:
 			if submission_type == 'db':
@@ -2487,6 +2488,7 @@ class Upload:
 				).value()
 				if not set(self.required_sets[record_type]).issubset(set(self.fieldnames[worksheet])):
 					missing_fieldnames = set(self.required_sets[record_type]) - set(self.fieldnames[worksheet])
+					from celery.contrib import rdb; rdb.set_trace()
 					if self.file_extension == 'xlsx':
 						error_message = '<p>' + app.config['WORKSHEET_NAMES'][worksheet] + ' worksheet '
 					else:
