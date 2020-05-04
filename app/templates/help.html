@@ -405,7 +405,7 @@
 			as a list within a single cell of the table.
 		</p>
     <h2 id="correct">
-        <a href=""{{ url_for('correct') }}>
+        <a href="{{ url_for('correct') }}>">
             <img src="{{ url_for('static', filename='correct.svg') }}">
         </a>
         Delete records
@@ -415,8 +415,7 @@
             you want to delete through the <a href="{{ url_for('correct') }}">correct</a> portal.
         </p>
         <p>
-            If you just uploaded the records and you want to delete the entire submission then the submission report file is suitable.
-            Otherwise generate a "database" format file on the download page using appropriate filters to include only the records you want to delete.
+            Generate a "database" format file on the download page using appropriate filters to include only the records you want to delete.
             You may also manually remove rows from this generated file if you can't find all the appropriate filters.
             With this file now describing the records you want to delete, simply upload the file on the <a href=""{{ url_for('correct') }}>correct</a> page.
         </p>

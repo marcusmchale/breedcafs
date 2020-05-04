@@ -2165,6 +2165,7 @@ class Upload:
 			file_dict = DictReaderInsensitive(uploaded_file)
 			if self.submission_type == 'db':  # this type is submitted through the Correct page
 				record_type = 'mixed'
+
 				if not self.required_sets[record_type].issubset(set(file_dict.fieldnames)):
 					self.error_messages.append(
 						'This file does not appear to be a database exported csv file. ' +
@@ -2484,8 +2485,8 @@ class Upload:
 					' RETURN distinct(record_type.name_lower) ',
 					inputs=list(inputs_set)
 				).value()
-				if not set(self.required_sets[worksheet]).issubset(set(self.fieldnames[worksheet])):
-					missing_fieldnames = set(self.required_sets[worksheet]) - set(self.fieldnames[worksheet])
+				if not set(self.required_sets[record_type]).issubset(set(self.fieldnames[worksheet])):
+					missing_fieldnames = set(self.required_sets[record_type]) - set(self.fieldnames[worksheet])
 					if self.file_extension == 'xlsx':
 						error_message = '<p>' + app.config['WORKSHEET_NAMES'][worksheet] + ' worksheet '
 					else:
@@ -2646,7 +2647,7 @@ class Upload:
 		submission_type = self.submission_type
 		filename = self.filename
 		inputs = self.input_variables[worksheet] if worksheet in self.input_variables else None
-		with contextlib.closing(SubmissionResult(username, filename, submission_type, worksheet)) as submission_result:
+		with contextlib.closing(SubmissionResult(username, filename, submission_type, record_type)) as submission_result:
 			self.submission_results[worksheet] = submission_result
 			if record_type == 'property':
 				statement = Cypher.upload_table_property
@@ -2928,7 +2929,7 @@ class Upload:
 			self,
 			tx,
 			access,
-			record_type
+			worksheet
 	):
 		if access == 'global_admin':
 			statement = (
@@ -3057,7 +3058,7 @@ class Upload:
 			'	END '
 			'	AND '
 			'	CASE '
-			'		WHEN record.start IS NULL '
+			'		WHEN record.start IS NULL'
 			'		THEN True '
 			'		ELSE record.start = start '
 			'	END'
@@ -3069,7 +3070,7 @@ class Upload:
 			'	END '
 			'	AND '
 			'	CASE '
-			'		WHEN record.replicate IS NULL '
+			'		WHEN record.replicate IS NULL OR record.replicate = 0 '
 			'		THEN True '
 			'		ELSE record.replicate = replicate '
 			'	END '
@@ -3101,7 +3102,7 @@ class Upload:
 			' } '
 			' ORDER BY row_index '
 		)
-		trimmed_file_path = self.trimmed_file_paths[record_type]
+		trimmed_file_path = self.trimmed_file_paths[worksheet]
 		trimmed_filename = os.path.basename(trimmed_file_path)
 		result = tx.run(
 				statement,
@@ -3464,8 +3465,6 @@ class Upload:
 				}
 			with get_driver().session() as neo4j_session:
 				with neo4j_session.begin_transaction() as tx:
-					# there should only be one record type here, "mixed", so no need to iterate
-					record_type = upload_object.record_types[0]
 					# todo Stop trimming before parsing, this should be done in one pass of the file
 					if upload_object.file_extension == 'xlsx':
 						wb = load_workbook(upload_object.file_path, read_only=True, data_only=True)
@@ -3473,98 +3472,125 @@ class Upload:
 							return {
 								'status': 'ERRORS',
 								'result': (
-									'Submission report for file: ' + upload_object.raw_filename + '\n<br>' +
-									'This workbook does not contain the expected "Records" worksheet'
+										'Submission report for file: ' + upload_object.raw_filename + '\n<br>' +
+										'This workbook does not contain the expected "Records" worksheet'
 								)
 							}
-					upload_object.trim_file(record_type)
-					if not upload_object.row_count[record_type]:
-						upload_object.error_messages.append('No records found to delete')
-					upload_object.parse_rows(record_type)
-					upload_object.db_check(tx, record_type)
-					if upload_object.error_messages:
-						error_messages = '<br>'.join(upload_object.error_messages)
-						with app.app_context():
-							response = (
-									'Submission report for file: ' + upload_object.raw_filename + '\n<br>' +
-									error_messages
-							)
-							html = render_template(
-								'emails/upload_report.html',
-								response=response
-							)
-							subject = "BreedCAFS correction rejected"
-							recipients = [User(username).find('')['email']]
-							body = response
-							send_email(subject, app.config['ADMINS'][0], recipients, body, html)
-						return {
-							'status': 'ERRORS',
-							'result': response
+					for worksheet in list(upload_object.fieldnames.keys()):
+						if upload_object.file_extension == 'xlsx':
+							if worksheet != 'Records':
+								continue
+						upload_object.trim_file(worksheet)
+						if not upload_object.row_count[worksheet]:
+							upload_object.error_messages.append('No records found to delete')
+						upload_object.parse_rows(worksheet)
+						upload_object.db_check(tx, worksheet)
+						if upload_object.error_messages:
+							error_messages = '<br>'.join(upload_object.error_messages)
+							with app.app_context():
+								response = (
+										'Submission report for file: ' + upload_object.raw_filename + '\n<br>' +
+										error_messages
+								)
+								html = render_template(
+									'emails/upload_report.html',
+									response=response
+								)
+								subject = "BreedCAFS correction rejected"
+								recipients = [User(username).find('')['email']]
+								body = response
+								send_email(subject, app.config['ADMINS'][0], recipients, body, html)
+							return {
+								'status': 'ERRORS',
+								'result': response
+							}
+						deletion_result = upload_object.correct(tx, access, worksheet)
+						# update properties where needed
+						property_uid = {
+							'set custom name': [],
+							'set row': [],
+							'set column': [],
+							'set sample unit': [],
+							'assign tree to block by name': [],
+							'assign tree to block by id': [],
+							'assign sample to block(s) by name': [],
+							'assign sample to block(s) by id': [],
+							'assign sample to tree(s) by id': [],
+							'assign sample to sample(s) by id': [],
+							'set harvest date': [],
+							'set planting date': [],
+							'set harvest time': [],
+							'assign variety name': [],
+							'assign variety (el frances code)': []
 						}
-					deletion_result = upload_object.correct(tx, access, record_type)
-					# update properties where needed
-					property_uid = {
-						'set custom name': [],
-						'set row': [],
-						'set column': [],
-						'set sample unit': [],
-						'assign tree to block by name': [],
-						'assign tree to block by id': [],
-						'assign sample to block(s) by name': [],
-						'assign sample to block(s) by id': [],
-						'assign sample to tree(s) by id': [],
-						'assign sample to sample(s) by id': [],
-						'set harvest date': [],
-						'set planting date': [],
-						'set harvest time': [],
-						'assign variety name': [],
-						'assign variety (el frances code)': []
-					}
-					# just grab the UID where records are deleted and do the update from any remaining records
-					record_tally = {}
-					missing_row_indexes = []
-					expected_row_index = 1
-					if not deletion_result.peek():
-						missing_row_indexes += list(range(2, upload_object.row_count[record_type] + 2))
-					else:
-						for record in deletion_result:
-							while (
-									expected_row_index != record[0]['row_index']
-									and expected_row_index <= upload_object.row_count[record_type] + 2
-							):
-								expected_row_index += 1
-								if expected_row_index != record[0]['row_index']:
-									missing_row_indexes.append(expected_row_index)
-							if not record[0]['input variable'] in record_tally:
-								record_tally[record[0]['input variable']] = 0
-							record_tally[record[0]['input variable']] += 1
-							if record[0]['input variable'] in property_uid:
-								property_uid[record[0]['input variable']].append(record[0]['uid'])
-						upload_object.remove_properties(tx, property_uid)
-						if not expected_row_index == upload_object.row_count[record_type]:
-							missing_row_indexes += list(range(expected_row_index, upload_object.row_count[record_type] + 2))
-					if missing_row_indexes:
-						missing_row_ranges = (
-							list(x) for _, x in itertools.groupby(enumerate(missing_row_indexes), lambda i_x: i_x[0]-i_x[1])
-						)
-						missing_row_str = str(
-							",".join("-".join(map(str, (i[0][1], i[-1][1])[:len(i)])) for i in missing_row_ranges)
-						)
-						tx.rollback()
+						# just grab the UID where records are deleted and do the update from any remaining records
+						record_tally = {}
+						missing_row_indexes = []
+						expected_row_index = 1
+						if not deletion_result.peek():
+							missing_row_indexes += list(range(2, upload_object.row_count[worksheet] + 2))
+						else:
+							for record in deletion_result:
+								while (
+										expected_row_index != record[0]['row_index']
+										and expected_row_index <= upload_object.row_count[worksheet] + 2
+								):
+									expected_row_index += 1
+									if expected_row_index != record[0]['row_index']:
+										missing_row_indexes.append(expected_row_index)
+								if not record[0]['input variable'] in record_tally:
+									record_tally[record[0]['input variable']] = 0
+								record_tally[record[0]['input variable']] += 1
+								if record[0]['input variable'] in property_uid:
+									property_uid[record[0]['input variable']].append(record[0]['uid'])
+							upload_object.remove_properties(tx, property_uid)
+							if not expected_row_index == upload_object.row_count[worksheet]:
+								missing_row_indexes += list(range(expected_row_index, upload_object.row_count[worksheet] + 2))
+						if missing_row_indexes:
+							missing_row_ranges = (
+								list(x) for _, x in itertools.groupby(enumerate(missing_row_indexes), lambda i_x: i_x[0]-i_x[1])
+							)
+							missing_row_str = str(
+								",".join("-".join(map(str, (i[0][1], i[-1][1])[:len(i)])) for i in missing_row_ranges)
+							)
+							tx.rollback()
+							with app.app_context():
+								# send result of merger in an email
+								subject = 'BreedCAFS correction rejected'
+								recipients = [User(username).find('')['email']]
+								response = (
+									'Submission report for file: ' + upload_object.raw_filename + '\n<br>' +
+									'Correction rejected:\n '
+								)
+								if missing_row_str:
+									response += (
+										'<p>Records from the following rows of the uploaded file were not found: '
+										+ missing_row_str
+										+ '\n</p>'
+									)
+								body = response
+								html = render_template(
+									'emails/upload_report.html',
+									response=response
+								)
+								send_email(subject, app.config['ADMINS'][0], recipients, body, html)
+							return {
+								'status': 'ERRORS',
+								'result': response
+							}
+						tx.commit()
 						with app.app_context():
 							# send result of merger in an email
-							subject = 'BreedCAFS correction rejected'
+							subject = 'BreedCAFS correction summary'
 							recipients = [User(username).find('')['email']]
 							response = (
 								'Submission report for file: ' + upload_object.raw_filename + '\n<br>' +
-								'Correction rejected:\n '
+								'Correction report:\n '
 							)
-							if missing_row_str:
-								response += (
-									'<p>Records from the following rows of the uploaded file were not found: '
-									+ missing_row_str
-									+ '\n</p>'
-								)
+							if record_tally:
+								response += '<p>The following records were deleted: \n</p>'
+								for key in record_tally:
+									response += '<p>  -' + str(record_tally[key]) + ' ' + str(key) + ' records deleted\n </p>'
 							body = response
 							html = render_template(
 								'emails/upload_report.html',
@@ -3572,32 +3598,9 @@ class Upload:
 							)
 							send_email(subject, app.config['ADMINS'][0], recipients, body, html)
 						return {
-							'status': 'ERRORS',
+							'status': 'SUCCESS',
 							'result': response
-						}
-					tx.commit()
-					with app.app_context():
-						# send result of merger in an email
-						subject = 'BreedCAFS correction summary'
-						recipients = [User(username).find('')['email']]
-						response = (
-							'Submission report for file: ' + upload_object.raw_filename + '\n<br>' +
-							'Correction report:\n '
-						)
-						if record_tally:
-							response += '<p>The following records were deleted: \n</p>'
-							for key in record_tally:
-								response += '<p>  -' + str(record_tally[key]) + ' ' + str(key) + ' records deleted\n </p>'
-						body = response
-						html = render_template(
-							'emails/upload_report.html',
-							response=response
-						)
-						send_email(subject, app.config['ADMINS'][0], recipients, body, html)
-					return {
-						'status': 'SUCCESS',
-						'result': response
-						}
+							}
 		except (ServiceUnavailable, SecurityError) as exc:
 			raise self.retry(exc=exc)
 
