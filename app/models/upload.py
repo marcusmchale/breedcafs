@@ -3117,7 +3117,6 @@ class Upload:
 	def remove_properties(tx, property_uid):
 		inputs_properties = app.config['INPUTS_PROPERTIES']
 		properties_inputs = app.config['PROPERTIES_INPUTS']
-		from celery.contrib import rdb; rdb.set_trace()
 		for input_variable, item_uids in property_uid.items():
 			if property_uid[input_variable]:
 				if inputs_properties[input_variable] == 'name':
