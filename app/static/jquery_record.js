@@ -25,7 +25,6 @@ remove_flash = function() {
 	$(".flash").remove();
 };
 
-
 level_update = function() {
     const item_level = item_level_select.val();
     input_group_select.empty();

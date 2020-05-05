@@ -1,7 +1,12 @@
 //update the drop down boxes
+const country_select = $("#country");
+const region_select = $("#region");
+const farm_select=$("#farm");
+const field_select = $("#field");
+const block_select = $("#block");
+const note = $("#note");
 
 update_countries = function(set_country="") {
-	const country_select = $("#country");
 	country_select.empty();
 	country_select.append($("<option></option>").attr("value", "").text("Select Country"));
 	$.ajax({
@@ -25,8 +30,7 @@ update_countries = function(set_country="") {
 };
 
 update_regions = function(set_region = "") {
-	const sel_country = $("#country").find(":selected").val();
-	const region_select = $("#region");
+	const sel_country = country_select.find(":selected").val();
 	region_select.empty();
 	region_select.append($("<option></option>").attr("value", "").text("Select Region"));
 	if (sel_country !== "") {
@@ -56,9 +60,8 @@ update_regions = function(set_region = "") {
 };
 
 update_farms = function(set_farm = "") {
-	const sel_country=$("#country").find(":selected").val();
-	const sel_region=$("#region").find(":selected").val();
-	const farm_select=$("#farm");
+	const sel_country = country_select.find(":selected").val();
+	const sel_region = region_select.find(":selected").val();
 	farm_select.empty();
 	farm_select.append($("<option></option>").attr("value", "").text("Select Farm"));
 	if (sel_region !== "") {
@@ -89,10 +92,9 @@ update_farms = function(set_farm = "") {
 };
 
 update_fields = function(set_field = "") {
-	const sel_country = $("#country").find(":selected").val();
-	const sel_region = $("#region").find(":selected").val();
-	const sel_farm = $("#farm").find(":selected").val();
-	const field_select = $("#field");
+	const sel_country = country_select.find(":selected").val();
+	const sel_region = region_select.find(":selected").val();
+	const sel_farm = farm_select.find(":selected").val();
 	field_select.empty();
 	field_select.append($("<option></option>").attr("value", "").text("Select Field"));
 	if (sel_farm !== "") {
@@ -122,8 +124,7 @@ update_fields = function(set_field = "") {
 };
 
 update_blocks = function(set_block = "") {
-	const sel_field = $("#field").find(":selected").val();
-	const block_select = $("#block");
+	const sel_field = field_select.find(":selected").val();
 	block_select.empty();
 	block_select.append($("<option></option>").attr("value", "").text("Select Block"));
 	if (sel_field !== "")  {
@@ -395,11 +396,23 @@ $("input").keypress( function(e) {
 	}
 });
 
-
+update_note = function () {
+    const sel_field = field_select.find(":selected").val();
+    const sel_block = block_select.find(":selected").val();
+    note.empty()
+    if (sel_block) {
+        note.append('Adding trees to block: ' + block_select.find(":selected").text())
+    } else if (sel_field) {
+        note.append('Adding trees to field: ' + field_select.find(":selected").text())
+    } else {
+        note.append('Select a field or block to add trees')
+    }
+}
 
 $( window ).load(update_countries);
-$("#country").change(update_regions).change(update_farms).change(update_fields).change(update_blocks).change(remove_flash);
-$("#region").change(update_farms).change(update_fields).change(update_blocks).change(remove_flash);
-$("#farm").change(update_fields).change(update_blocks).change(remove_flash);
-$('#field').change(update_blocks).change(remove_flash);
+country_select.change(update_regions).change(update_farms).change(update_fields).change(update_blocks).change(remove_flash);
+region_select.change(update_farms).change(update_fields).change(update_blocks).change(remove_flash);
+farm_select.change(update_fields).change(update_blocks).change(remove_flash);
+field_select.change(update_blocks).change(remove_flash).change(update_note);
+block_select.change(remove_flash).change(update_note);
 
