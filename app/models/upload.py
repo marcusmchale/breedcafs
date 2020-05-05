@@ -2488,7 +2488,6 @@ class Upload:
 				).value()
 				if not set(self.required_sets[record_type]).issubset(set(self.fieldnames[worksheet])):
 					missing_fieldnames = set(self.required_sets[record_type]) - set(self.fieldnames[worksheet])
-					from celery.contrib import rdb; rdb.set_trace()
 					if self.file_extension == 'xlsx':
 						error_message = '<p>' + app.config['WORKSHEET_NAMES'][worksheet] + ' worksheet '
 					else:
@@ -3118,6 +3117,7 @@ class Upload:
 	def remove_properties(tx, property_uid):
 		inputs_properties = app.config['INPUTS_PROPERTIES']
 		properties_inputs = app.config['PROPERTIES_INPUTS']
+		from celery.contrib import rdb; rdb.set_trace()
 		for input_variable, item_uids in property_uid.items():
 			if property_uid[input_variable]:
 				if inputs_properties[input_variable] == 'name':
@@ -3242,7 +3242,7 @@ class Upload:
 					# There may be multiple inputs for tree/sample item sources (by id, by name)
 					#  and multiple contributions with variable specificity for samples
 					#  but conflicts are prevented between assignments at same level and
-					#  only assigment to greater specificity is allowed so
+					#  only assignment to greater specificity is allowed so
 					#  we only need to update if the deleted record is the latest "source" submission for this item
 					#  we could check this by comparing the latest record 'value' against the current assignments
 					#  but it might be sensible to just always update to assignment from latest record submission
@@ -3251,7 +3251,7 @@ class Upload:
 						' UNWIND $uid_list as uid '
 						' MATCH '
 						'	(item: Item {uid: uid}) '
-						'	-[:FROM | IS_IN]->(ancestor:Item) '
+						'	-[:FROM | IS_IN*]->(ancestor:Item) '
 						' WITH item, collect(ancestor) as prior_ancestors '
 						' OPTIONAL MATCH '
 						'	(item) '
