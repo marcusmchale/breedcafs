@@ -9,12 +9,12 @@
             {{  render_field (collect_form.sampling_activity) }}
         </div>
 		<div id="level_choice">
-		    <h3>Sampled items</h3>
-            <h4>Item level</h4>
+		    <h3>Source items</h3>
+            <h4>Source level</h4>
 			{{ render_field (collect_form.item_level) }}
 		</div>
         <div id="location">
-            <h4>Item/s</h4>
+            <h4>Source item/s</h4>
             <dd>{{ render_field (location_form.country) }}</dd>
             <dd>{{ render_field (location_form.region) }}</dd>
             <dd>{{ render_field (location_form.farm) }}</dd>
@@ -30,10 +30,11 @@
             <dd>{{ render_field (collect_form.sample_id_list) }}</dd>
         </div>
         <div id="item_count_div">
-            <h4>Item count</h4>
+            <h4>Source count</h4>
             <p><a>0</a> <a>items</a></p>
         </div>
          <div id="replicates" title="Number of samples to register per item in the selection">
+            <h4>Replicates</h4>
             <dt>
                 {{ render_field (collect_form.per_item_count) }}
             </dt>
@@ -43,12 +44,11 @@
         <p><a>0</a> <a>samples will be created</a></p>
         <div id="file_creation">
         </div>
-		<h3>File type</h3>
-			<dt>
-				{{ render_field (collect_form.submit_collect) }}
-				<input id="email_checkbox" name="email_checkbox" placeholder="" value="y" type="checkbox" checked>
-				<a>Email a copy</a>
-			</dt>
+        <dt>
+            {{ render_field (collect_form.submit_collect) }}
+            <input id="email_checkbox" name="email_checkbox" placeholder="" value="y" type="checkbox" checked>
+            <a>Email a copy</a>
+        </dt>
 		</div>
 	{{ collect_form.csrf_token }}
 	</form>

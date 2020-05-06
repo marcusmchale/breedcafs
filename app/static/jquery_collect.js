@@ -6,11 +6,6 @@ const tree_div = $('#tree_selection_div');
 const sample_div = $('#sample_selection_div');
 const item_count_div = $('#item_count_div');
 const replicates_div = $('#replicates');
-const country_select = $('#country');
-const region_select = $('#region');
-const farm_select = $('#farm');
-const field_select = $('#field');
-const block_select = $('#block');
 const field_uid_list_box = $('#field_uid_list');
 const block_id_list_box = $('#block_id_list');
 const tree_id_list_box = $('#tree_id_list');
@@ -140,7 +135,6 @@ level_update = function() {
 
 update_sample_count = function () {
     var n = (isNaN(parseInt(per_item_count.val())) ? 1 : per_item_count.val())
-    console.log(n);
     sample_count = (n * item_count);
     const sample_count_text = $('#sample_count_div a:eq(0)');
     sample_count_text.replaceWith(
