@@ -85,7 +85,6 @@ inputs_variables_update = function() {
             + "&username=true"
         )
     }
-    console.log(args);
     $.ajax({
         url: (
             "/record/inputs_selection" + args

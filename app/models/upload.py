@@ -245,9 +245,12 @@ class RowParseResult:
 							# only show 3 conflicts or "title" attribute is overloaded
 							# TODO implement better tooltips to include as a table rather than "title" attribute
 							for conflict in itertools.islice(field_conflicts, 3):
+								existing_value = conflict['existing_value']
+								if isinstance(existing_value, list):
+									existing_value = ', '.join(existing_value)
 								formatted_cells[field] += '\n\n'
 								formatted_cells[field] += ''.join(
-									['Existing value: ', conflict['existing_value'], '\n']
+									['Existing value: ', existing_value, '\n']
 								)
 								if 'time' in conflict and conflict['time']:
 									formatted_cells[field] += (
@@ -962,6 +965,13 @@ class PropertyUpdateHandler:
 				errors.append(
 					'Item source assignment failed. The item (' + str(record[0]['UID']) + ')' + ') was not found.'
 				)
+			# if new source is direct match for self
+			elif record[0]['item_uid'] in [ns[0] for ns in record[0]['new_source_details']]:
+				errors.append(
+					'Item source assignment failed. An attempt was made to assign item ('
+					+ str(record[0]['UID'])
+					+ ') to itself. '
+				)
 			# If we don't find the source
 			elif len(record[0]['new_source_details']) == 0:
 				errors.append(
@@ -1496,7 +1506,20 @@ class PropertyUpdateHandler:
 			'		collect(coalesce(prior_primary_sample_from, prior_secondary_sample_from)) as prior_source_rels '
 			'	UNWIND value as source_identifier '
 			'		OPTIONAL MATCH '
-			'			(new_source: Item)-[: IS_IN | FROM*]->(field) '
+		)
+		if source_level == 'Block':
+			statement += (
+				' (new_source: Block)-[: IS_IN *2]->(field) '
+			)
+		elif source_level == 'Tree':
+			statement += (
+				' (new_source: Tree)-[: IS_IN *2]->(field) '
+			)
+		elif source_level == 'Sample':
+			statement += (
+				' (new_source: Sample)-[: IS_IN | FROM*]->(field) '
+			)
+		statement += (
 			'		WHERE $source_level in labels(new_source) AND '
 		)
 		if 'name' in input_variable:
@@ -1612,6 +1635,7 @@ class PropertyUpdateHandler:
 			'	UNWIND '
 			'		new_sources as new_source '
 			'		FOREACH (n IN CASE WHEN '
+			'			sample <> new_source AND '	
 			'			new_source IS NOT NULL AND '
 			'			NOT new_source IN prior_sources AND '
 			'			sample IS NOT NULL AND '
@@ -1622,7 +1646,7 @@ class PropertyUpdateHandler:
 			'		THEN [1] ELSE [] END | '
 			'			FOREACH (n in prior_source_rels | delete n) '
 		)
-		if source_level == "sample":
+		if source_level == "Sample":
 			statement += (
 				'		MERGE (sample)-[:FROM]->(new_source) '
 			)
@@ -2364,7 +2388,7 @@ class Upload:
 			# here opening trimmed file with permissions allowing the groupe (neo4j) to have read access
 			# umask 130 is rw-r-----
 			os.umask(0o130)
-			with open(os.open(trimmed_file_path, os.O_CREAT | os.O_WRONLY, 0o640), "wt") as trimmed_file:
+			with open(os.open(trimmed_file_path, os.O_CREAT | os.O_WRONLY | os.O_TRUNC, 0o640), "w") as trimmed_file:
 				file_writer = csv.writer(
 					trimmed_file,
 					quoting=csv.QUOTE_ALL
@@ -3264,11 +3288,10 @@ class Upload:
 						# these will revert to field level if no records
 						# but remain unchanged if existing source assignment records
 						statement += (
-							' AND ii IS NULL '
+							' AND record IS NULL '
 						)
 						if 'assign tree' in input_variable:
-							# these are trees so can just be deleted and the counter decremented
-							# if no other records specifying and assignment
+							# these are trees so block relationship can just be deleted and the counter decremented
 							# The IS_IN field relationship is retained when assigning tree to block
 							statement += (
 								' WITH item, prior_ancestors '
@@ -3281,18 +3304,18 @@ class Upload:
 								'	item, prior_ancestors '
 							)
 						else:  # assign sample
-							# these must be reattached to field ItemSamples container
+							# these must be detached and reattached to field ItemSamples container
 							statement += (
 								' WITH item, prior_ancestors '
-								' MATCH (item)-[from:FROM]->(:ItemSamples) '
-								' MATCH (item)-[:FROM | IS_IN]->(field: Field) '
+								' MATCH (item)-[from: FROM]->(:ItemSamples) '
+								'	-[:FROM]->(:Block)-[:IS_IN]->(:FieldBlocks)-[:IS_IN]->(field:Field) '
 								' DELETE from '
 								' MERGE (is:ItemSamples)-[:FROM]->(field) '
 								' CREATE (item)-[:FROM]->(is) '
 								' WITH DISTINCT '
 								'	item, prior_ancestors '
 							)
-					else:  # to tree or to sample (these are all samples)
+					else:  # to tree or sample (these are all samples) and the values are lists
 						# for these we need to find the most recent record and update accordingly,
 						# if no record then we re-attach to the Field ItemSamples
 						# we only need to assess one record since if they are submitted concurrently they must agree
@@ -3300,39 +3323,48 @@ class Upload:
 						# either the same items, a subset thereof or an ancestor
 						statement += (
 							' WITH '
-							'	item, prior_ancestors, '
-							'	collect(input.name_lower, record.value, s.time) as records '
+							'	item, '
+							'	prior_ancestors, '
+							'	collect([input.name_lower, record.value, s.time]) as records, '
 							'	max(s.time) as latest '
-							' WITH '
-							'	item, prior_ancestors, '
-							'	[x IN records WHERE x[2] = latest | [x[0], x[1]][0][0] as value, '
-							'	[x IN records WHERE x[2] = latest | [x[0], x[1]][0][1] as input_name_lower '
+							' WITH item, prior_ancestors, [x IN records WHERE x[2] = latest][0] as record '
+							' WITH item, prior_ancestors, record[0] as input_name_lower, record[1] as value'
 							' MATCH '
-							'	(item)-[:FROM | IS_IN*]->(field: Field) '
-							' WITH item, prior_ancestors, field, value, input_name_lower '
+							'	(item)-[: IS_IN | FROM *]->(field: Field) '
 							' OPTIONAL MATCH '
-							'	(new_source: Item)-[:FROM | IS_IN*]->(field) '
+							'	(new_source: Item)-[: IS_IN | FROM *]->(field) '
 							'	WHERE '
+							'		any(x IN labels(new_source) WHERE input_name_lower CONTAINS ("assign sample to " + toLower(x))) '
+							'	AND '
 							'		CASE '
-							'			WHEN "by name" IN input_name_lower ' 
-							'			THEN new_source.name_lower IN [x in split(value, ",") | toLower(x) '
-							'			ELSE new_source.id IN [x in split(value, ",") | toInteger(x)] '
+							'			WHEN '
+							'				input_name_lower CONTAINS "by name" THEN new_source.name_lower IN value '
+							'			WHEN '
+							'				input_name_lower CONTAINS "by id" THEN new_source.id IN value '
 							'		END '
-							'	AND CASE ' 
-							'		WHEN "to block" IN input_name_lower '
-							'		THEN "Block" in labels(new_source) '
-							'		WHEN "to tree" IN input_name_lower '
-							'		THEN "Tree" in labels(new_source) '
-							'		ELSE "Sample" in labels(new_source) '
+							' WITH item, prior_ancestors, collect(new_source) as new_sources, field '
 							' WITH '
-							'	item, prior_ancestors, '
-							'	coalesce(new_source, field) as new_source '
-							' MERGE '
-							'	(is:ItemSamples)-[:FROM]->(new_source) '
-							' MERGE '
-							'	(item)-[:FROM]->(is) '
+							'	item, '
+							'	prior_ancestors, '
+							'	CASE '
+							'		WHEN length(new_sources) = 0 THEN [field] '
+							'		ELSE new_sources '
+							'		END '	
+							'	as new_sources '
+							' UNWIND new_sources AS new_source '
+							' FOREACH (n IN CASE WHEN NOT "Sample" IN labels(new_source) THEN [1] ELSE [] END | '
+							'	MERGE (:ItemSamples)-[:FROM]->(new_source) '
 							' ) '
-							' WITH DISTINCT item, prior_ancestors '
+							' WITH item, prior_ancestors, new_source '
+							' OPTIONAL MATCH (item_samples: ItemSamples)-[:FROM]->(new_source) '
+							' WITH item, prior_ancestors, collect(coalesce(item_samples, new_source)) as new_sources '
+							' MATCH (item)-[from: FROM]->() '
+							' DELETE from '
+							' WITH DISTINCT item, prior_ancestors, new_sources '
+							' UNWIND new_sources as new_source '
+							' MERGE '
+							'	(item)-[:FROM]->(new_source) '
+							' WITH distinct item, prior_ancestors '
 						)
 					statement += (
 						' OPTIONAL MATCH '

@@ -647,8 +647,33 @@ class AddFieldItems:
 			' MERGE '
 			'	(us)-[: SUBMITTED]->(ui: Items) '
 			' MERGE '
+			'	(us)-[: SUBMITTED]->(user_records: Records) '
+			' MERGE '
 			'	(ui)-[: SUBMITTED]->(user_samples: Samples) '
-			' WITH user_samples '
+			' WITH user, user_records, user_samples '
+		)
+		if level != 'field':
+			statement += (
+				' MATCH (input: Input { name_lower:  '
+			)
+			if level == 'block':
+				statement += (
+					' "assign sample to block(s) by name" '
+				)
+			elif level == 'tree':
+				statement += (
+					' "assign sample to tree(s) by id" '
+				)
+			elif level == 'sample':
+				statement += (
+					' "assign sample to sample(s) by id" '
+				)
+			statement += (
+				' }) '
+
+			)
+			' WITH user, user_records, user_samples, input '
+		statement += (
 			' MATCH '
 			' (country: Country) '
 			' <-[: IS_IN]-(region: Region) '
@@ -701,6 +726,7 @@ class AddFieldItems:
 		if level == 'field':
 			statement += (
 				' WITH '
+				' user, '	
 				' user_samples, '
 				' country, region, farm, '
 				' field AS item, '
@@ -709,21 +735,28 @@ class AddFieldItems:
 		elif level == 'block':
 			if not filters['block'][0]:
 				statement += (
-					' MATCH '
-					'	(field) '
+					' MATCH (field) '
 					'	<-[:IS_IN]-(:FieldBlocks) '
 					'	<-[:IS_IN]-(block: Block) '
 				)
 			statement += (
+				' MERGE '
+				'	(input) '
+				'	<-[: FOR_INPUT]-(ff: FieldInput) '
+				'	<-[: FROM_FIELD]->(field) '			
 				' WITH '
+				'	user, '
 				'	user_samples, '
+				'	user_records, input, '
 				'	country, region, farm, field, '
 				'	block AS item, '
 				'	COLLECT(field) + COLLECT(block) as ancestors '
 				' UNWIND '
 				'	ancestors as ancestor '
 				' WITH '
+				'	user, '
 				' 	user_samples, '
+				'	user_records, input, '
 				' 	country, region, farm, field, '
 				' 	item, '
 				'	COLLECT(DISTINCT ancestor.variety) as varieties '
@@ -752,15 +785,23 @@ class AddFieldItems:
 					'	<-[:IS_IN]-(tree) '
 				)
 			statement += (
+				' MERGE '
+				'	(input) '
+				'	<-[: FOR_INPUT]-(ff: FieldInput) '
+				'	<-[: FROM_FIELD]->(field) '
 				' WITH '
+				'	user, '
 				'	user_samples, '
+				'	user_records, input, '
 				'	country, region, farm, field, block, '
 				'	tree AS item, '
 				'	COLLECT(field) + COLLECT(block) + COLLECT(tree) as ancestors '
 				' UNWIND '
 				'	ancestors as ancestor '
 				' WITH '
+				'	user, '
 				'	user_samples, '
+				'	user_records, input, '
 				'	country, region, farm, field, block, '
 				'	item,  '
 				'	COLLECT(DISTINCT ancestor.variety) as varieties '
@@ -804,7 +845,9 @@ class AddFieldItems:
 				)
 			statement += (
 				' WITH '
+				'	user, '
 				'	user_samples, '
+				'	user_records, input, '
 				'	country, region, farm, field, '
 				'	COLLECT(DISTINCT block) as blocks, '
 				'	COLLECT(DISTINCT tree) as trees, '
@@ -815,7 +858,9 @@ class AddFieldItems:
 				'		[s in nodes(sample_path) WHERE "Sample" in labels(s)] as ancestors '
 				' UNWIND ancestors as ancestor '
 				' WITH '
+				'	user, '
 				'	user_samples, item_samples, '
+				'	user_records, input, '
 				'	country, region, farm, field, '
 				'	blocks, trees, source_samples, '
 				'	item, '
@@ -858,39 +903,70 @@ class AddFieldItems:
 			' ON CREATE SET field_sample_counter.count = 0 '
 			' SET field_sample_counter._LOCK_ = true '
 		)
+
 		statement += (
 			' WITH '
+			'	user, '
 			'	user_item_samples, '
 			'	item_samples, '
 			'	field_sample_counter, '
 			'	country, region, farm, '
 			'	item, varieties '
 		)
-		if level == 'block':
+		if level != 'field':
+
 			statement += (
-				' ,field '
+				'	,user_records, input '
 			)
-		elif level == 'tree':
-			statement += (
-				' ,field, block '
-			)
-		elif level == 'sample':
-			statement += (
-				' ,field, '
-				' blocks, trees, source_samples '
-			)
-		if level == 'field':
-			statement += (
-				' ORDER BY item.uid '
-			)
-		else:
+			if level == 'block':
+				statement += (
+
+					' ,field '
+				)
+			elif level == 'tree':
+				statement += (
+					' ,field, block '
+				)
+			elif level == 'sample':
+				statement += (
+					' ,field, '
+					' blocks, trees, source_samples '
+				)
 			statement += (
 				' ORDER BY field.uid, item.id '
+				' MERGE '
+				'	(input)<-[: FOR_INPUT]-(fi:FieldInput) '
+				'	<-[: FROM_FIELD]->(field) '
+				' MERGE '
+				'	(user_records)-[: SUBMITTED]->(ufi: UserFieldInput) '
+				'	-[: CONTRIBUTED]->(fi) '
+				' WITH '
+				'	user, '
+				'	input, '
+				'	user_item_samples, '
+				'	item_samples, '
+				'	fi, ufi, '
+				'	field_sample_counter, '
+				'	country, region, farm, field, '
+				'	item, varieties '
+			)
+			if level == 'tree':
+				statement += (
+					' , block '
+				)
+			elif level == 'sample':
+				statement += (
+					' , blocks, trees, source_samples '
+				)
+		else:
+			statement += (
+				' ORDER BY item.uid '
 			)
 		statement += (
 			' UNWIND range(1, $per_item_count) as per_item_count '
 			'	SET field_sample_counter.count = field_sample_counter.count + 1 '
 			'	CREATE '
+			'		(user_item_samples)-[:SUBMITTED {time: datetime.transaction().epochMillis}]-> '
 			'		(sample: Sample: Item { '
 		)
 		if level == 'field':
@@ -904,8 +980,31 @@ class AddFieldItems:
 		statement += (
 			'			id: field_sample_counter.count '
 			'		})-[:FROM]->(item_samples) '
+			'	'
 			'	SET field_sample_counter._LOCK_ = false '
 		)
+		if level != 'field':
+			statement += (
+				' CREATE '
+				'	(fi)<-[:FOR_INPUT]-(ii: ItemInput)-[:FOR_ITEM]->(sample), '
+				'	(ii)<-[:RECORD_FOR]-(r:Record { '
+				'		found: False, '
+				'		value: '
+				'			CASE '
+				'				WHEN input.name_lower CONTAINS "(s)" AND input.name_lower CONTAINS "by name" THEN '
+				'					[item.name_lower] '
+				' 				WHEN input.name_lower CONTAINS "(s)" AND input.name_lower CONTAINS "by id" THEN '
+				'					[item.id] '			
+				' 				WHEN input.name_lower CONTAINS "by id" THEN '
+				'					item.id '
+				' 				ELSE '  # input.name_lower CONTAINS "by name" THEN '
+				'					item.name_lower '
+				'			END '
+				'		, '
+				'		person: user.name '
+				'	})'
+				' CREATE (ufi)-[: SUBMITTED {time: datetime.transaction().epochMillis}]->(r) '
+			)
 		statement += (
 			' RETURN { '
 			'	UID: sample.uid, '
