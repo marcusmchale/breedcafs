@@ -297,7 +297,6 @@ class Download:
 			with_timestamp=False
 		)
 		wb = Workbook(file_path)
-		os.chmod(file_path, 0o640)
 		# column < row < cell formatting in priority
 		date_lb_format = wb.add_format({'num_format': 'yyyy-mm-dd', 'left': 1})
 		time_format = wb.add_format({'num_format': 'hh:mm', 'right': 1})
