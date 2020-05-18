@@ -716,8 +716,8 @@ class SubmissionResult:
 		conflicts_fieldnames.insert(-2, "Uploaded value")
 		self.conflicts_file_path = os.path.join(download_path, conflicts_filename)
 		self.submissions_file_path = os.path.join(download_path, submissions_filename)
-		self.conflicts_file = open(self.conflicts_file_path, 'w+')
-		self.submissions_file = open(self.submissions_file_path, 'w+')
+		self.conflicts_file = open(os.open(self.conflicts_file_path, os.O_CREAT | os.O_WRONLY | os.O_TRUNC, 0o640), "w")
+		self.submissions_file = open(os.open(self.submissions_file_path, os.O_CREAT | os.O_WRONLY | os.O_TRUNC, 0o640), "w")
 		self.conflicts_writer = csv.DictWriter(
 					self.conflicts_file,
 					fieldnames=conflicts_fieldnames,
@@ -2025,7 +2025,7 @@ class Upload:
 		upload_path = os.path.join(app.config['UPLOAD_FOLDER'], self.username)
 		if not os.path.isdir(upload_path):
 			logging.debug('Creating upload path for user: %s', self.username)
-			os.mkdir(upload_path, mode=app.config['IMPORT_FOLDER_PERMISSIONS'] )
+			os.mkdir(upload_path, mode=app.config['IMPORT_FOLDER_PERMISSIONS'])
 		file_data.save(self.file_path)
 
 	def file_format_errors(self):
@@ -2352,7 +2352,8 @@ class Upload:
 		])
 		self.trimmed_file_paths[worksheet] = trimmed_file_path
 		if self.file_extension == 'csv':
-			with open(self.file_path, 'r') as uploaded_file, open(trimmed_file_path, "w") as trimmed_file:
+			with open(self.file_path) as uploaded_file, \
+					open(os.open(trimmed_file_path, os.O_CREAT | os.O_WRONLY | os.O_TRUNC, 0o640), "w") as trimmed_file:
 				# this dict reader lowers case and trims whitespace on all headers
 				file_dict = DictReaderInsensitive(
 					uploaded_file,
@@ -2385,9 +2386,7 @@ class Upload:
 					ws = wb[app.config['WORKSHEET_NAMES'][worksheet]]
 				else:
 					ws = wb[worksheet]
-			# here opening trimmed file with permissions allowing the groupe (neo4j) to have read access
-			# umask 130 is rw-r-----
-			os.umask(0o130)
+			# here opening trimmed file with permissions allowing the group (neo4j) to have read access
 			with open(os.open(trimmed_file_path, os.O_CREAT | os.O_WRONLY | os.O_TRUNC, 0o640), "w") as trimmed_file:
 				file_writer = csv.writer(
 					trimmed_file,
@@ -2450,7 +2449,7 @@ class Upload:
 			record_type = 'mixed'
 		if record_type == 'curve':
 			x_values = set(self.fieldnames[worksheet]) - self.required_sets[record_type]
-		with open(trimmed_file_path, 'rt') as trimmed_file:
+		with open(trimmed_file_path) as trimmed_file:
 			trimmed_dict = csv.DictReader(trimmed_file)
 			for row in trimmed_dict:
 				if submission_type == 'table':
@@ -2494,7 +2493,7 @@ class Upload:
 		trimmed_file_path = self.trimmed_file_paths[worksheet]
 		trimmed_filename = os.path.basename(trimmed_file_path)
 		parse_result = self.parse_results[worksheet]
-		with open(trimmed_file_path, 'r') as trimmed_file:
+		with open(trimmed_file_path) as trimmed_file:
 			if submission_type == 'db':
 				trimmed_dict_reader = DictReaderInsensitive(trimmed_file)
 				inputs_set = set()
@@ -3727,7 +3726,7 @@ class Resumable:
 		# replace file if same name already found
 		if os.path.isfile(self.file_path):
 			os.unlink(self.file_path)
-		with open(self.file_path, "ab") as target_file:
+		with open(os.open(self.file_path, os.O_CREAT | os.O_WRONLY | os.O_APPEND, 0o640), "ab") as target_file:
 			for p in self.chunk_paths:
 				stored_chunk_filename = p
 				stored_chunk_file = open(stored_chunk_filename, 'rb')

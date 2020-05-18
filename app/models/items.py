@@ -936,7 +936,7 @@ class AddFieldItems:
 				' ORDER BY field.uid, item.id '
 				' MERGE '
 				'	(input)<-[: FOR_INPUT]-(fi:FieldInput) '
-				'	<-[: FROM_FIELD]->(field) '
+				'	-[: FROM_FIELD]->(field) '
 				' MERGE '
 				'	(user_records)-[: SUBMITTED]->(ufi: UserFieldInput) '
 				'	-[: CONTRIBUTED]->(fi) '

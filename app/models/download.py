@@ -297,6 +297,7 @@ class Download:
 			with_timestamp=False
 		)
 		wb = Workbook(file_path)
+		os.chmod(file_path, 0o640)
 		# column < row < cell formatting in priority
 		date_lb_format = wb.add_format({'num_format': 'yyyy-mm-dd', 'left': 1})
 		time_format = wb.add_format({'num_format': 'hh:mm', 'right': 1})
@@ -641,7 +642,7 @@ class Download:
 			with_timestamp=with_timestamp
 		)
 		# make the file
-		with open(file_path, 'w') as csv_file:
+		with open(os.open(file_path, os.O_CREAT | os.O_WRONLY | os.O_TRUNC, 0o640), "w") as csv_file:
 			writer = csv.DictWriter(
 				csv_file,
 				fieldnames=fieldnames,
@@ -1206,7 +1207,7 @@ class Download:
 					'csv',
 					base_filename + '_temp'
 				)
-				with open(file_path_temp, 'w') as csv_temp_file:
+				with open(os.open(file_path_temp, os.O_CREAT | os.O_WRONLY | os.O_TRUNC, 0o640), "w") as csv_temp_file:
 					temp_writer = csv.DictWriter(
 						csv_temp_file,
 						fieldnames=fieldnames,
@@ -1218,8 +1219,8 @@ class Download:
 								fieldnames.append(input_name)
 						record = self.format_record(record, data_format)
 						temp_writer.writerow(record[0])
-				with open(file_path_temp, 'r') as csv_temp_file:
-					with open(file_path, 'w') as csv_file:
+				with open(file_path_temp) as csv_temp_file:
+					with open(os.open(file_path, os.O_CREAT | os.O_WRONLY | os.O_TRUNC, 0o640), "w") as csv_file:
 						writer = csv.DictWriter(
 							csv_file,
 							fieldnames=fieldnames,
@@ -1230,7 +1231,7 @@ class Download:
 						csv_file.write(csv_temp_file.read())
 				os.unlink(file_path_temp)
 			else:
-				with open(file_path, 'w') as csv_file:
+				with open(os.open(file_path, os.O_CREAT | os.O_WRONLY | os.O_TRUNC, 0o640), "w") as csv_file:
 					writer = csv.DictWriter(
 						csv_file,
 						fieldnames=fieldnames,
