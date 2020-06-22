@@ -776,6 +776,7 @@ class PropertyUpdateHandler:
 		# This is also in line with the policy of aggregating errors
 		# so the user has a chance to see the type of corrections they may need to make on the entire submission
 		# without the server needing to fully process the entire submission only to reject it.
+		# TODO neo4j is waiting to commit the transaction though and keeping all this in memory!! reconsider
 		# Threshold for aggregating records before processing the submission
 		# this is per update property function
 		self.update_threshold = 100
@@ -2714,11 +2715,12 @@ class Upload:
 					record_type=record_type
 				)
 			else:
-				logging.warn('Record type not recognised')
+				logging.warning('Record type not recognised')
 			# create a submission result and update properties from result
 			if record_type == 'property':
 				self.property_updater = PropertyUpdateHandler(tx)
 			for record in result:
+				logging.debug('Now parse result and update properties in the graph')
 				submission_result.parse_record(record[0])
 				if record_type == 'property':
 					if self.property_updater.process_record(record[0]):
@@ -2750,8 +2752,10 @@ class Upload:
 							'<br>'.join(upload_object.error_messages)
 					)
 				}
+			logging.debug('Start database session')
 			with get_driver().session() as neo4j_session:
 				if upload_object.file_extension in ['csv', 'xlsx']:
+					logging.debug('Start db_check transaction')
 					with neo4j_session.begin_transaction() as tx:
 						for worksheet in list(upload_object.fieldnames.keys()):
 							# todo Stop trimming before parsing, this should be done in one pass of the file
@@ -2791,6 +2795,8 @@ class Upload:
 									error_messages
 								)
 							}
+					logging.debug('Finished db_check transaction')
+					with neo4j_session.begin_transaction() as tx:
 						conflict_files = []
 						submissions = []
 						for worksheet in list(upload_object.fieldnames.keys()):

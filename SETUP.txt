@@ -128,4 +128,3 @@ Celery:
 		celery -A app.models worker --loglevel info
 
 
-

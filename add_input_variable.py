@@ -97,6 +97,8 @@ def create_input(tx):
 	categories = None
 	if input_format in ['categorical', 'multicat']:
 		categories = input('Enter a list of categories (separated by /) if categorical variable:\n')
+	if input_format == 'boolean':
+		categories = input('Enter two names for boolean values (e.g. Yes/No):\n')
 	notes = input(
 		'Optionally enter any notes about how this variable should be handled internally '
 		'(not displayed in database tools)'
