@@ -1,243 +1,409 @@
-from app import ServiceUnavailable, SecurityError, TransactionError
-
-from app.models import ItemList
-
+from app import app, logging
+from app.models.queries import Query
 from app.cypher import Cypher
+from datetime import datetime
+from app.models.parsers import Parsers
 
-from flask import jsonify
 
-from .neo4j_driver import get_driver, neo4j_query, bolt_result
+class TableRowParser:
+	def __init__(self, record_type, input_variables, row_fields, value_fields, row_errors):
+		self.record_type = record_type
+		self.input_variables = input_variables
+		self.required = app.config['REQUIRED_FIELDNAMES'][record_type]
+		self.row_fields = row_fields
+		self.value_fields = value_fields
+		self.row_errors = row_errors
 
-import datetime
+
+	def add_error(self, row_index, field, message):
+		if row_index not in self.row_errors:
+			self.row_errors[row_index] = {}
+		if field not in self.row_errors[row_index]:
+			self.row_errors[row_index][field] = set()
+		self.row_errors[row_index][field].add(message)
+
+	def check_row_fields(self, row_index, row_dict):
+		for field in self.row_fields:
+			value = row_dict[field].strip()
+			if field in self.required and not value:
+				self.add_error(row_index, field, '%s is required' % field)
+				return
+			if field == 'uid':
+				self.check_uid_format(row_index, field, value)
+			elif field == 'person':
+				self.check_person_format(row_index, field, value)
+			elif field in ['date', 'start date', 'end date']:
+				self.check_date_format(row_index, field, value)
+			elif field in ['time', 'start time', 'end time']:
+				self.check_time_format(row_index, field, value)
+
+	def check_uid_format(self, row_index, field, value):
+		uid = value.lower()
+		if '.' in uid:
+			try:
+				uid, replicate = uid.split('.')
+				try:
+					int(replicate)
+				except ValueError:
+					self.add_error(row_index, field, 'Replicate code must be an integer')
+					return
+			except ValueError:
+				self.add_error(row_index, field, 'Malformed UID')
+				return
+		uid_letters = [k for k in uid if k in app.config['UID_LETTERS']]
+		if len(uid_letters) > 1:
+			self.add_error(row_index, field, 'Malformed UID')
+		if not uid_letters:  # if no recognised letters then should be a field uid
+			ids = [uid]
+		else:
+			ids = uid.split(uid_letters[0])
+		try:
+			[int(n) for n in ids]
+		except ValueError:
+			self.add_error(row_index, field, 'Malformed UID')
+
+	def check_person_format(self, row_index, field, value):
+		max_len = app.config['PERSON_FIELD_MAX_LEN']
+		if len(value) > max_len:
+			self.add_error(row_index, field, ('Maximum character length for %s is %s' % (field, max_len)))
+
+	def check_date_format(self, row_index, field, value):
+		try:
+			datetime.strptime(value, '%Y-%m-%d')
+		except ValueError:
+			self.add_error(row_index, field, '%s must be in "YYYY-MM-DD" format (ISO 8601), e.g. "2020-07-14"' % field)
+
+	def check_time_format(self, row_index, field, value):
+		try:
+			datetime.strptime(value, '%H:%M')
+		except ValueError:
+			self.add_error(row_index, field, '%s must be in "hh:mm" format (ISO 8601), e.g. "13:01"' % field)
+
+	# these aren't relevant to tables, keeping for copy to db format parser
+	#def check_integer_format(self, row_index, field, value):
+	#	try:
+	#		int(value)
+	#	except ValueError:
+	#		self.add_error(row_index, field, '%s must be an integer' % field)
+	#
+	#def check_date_time_format(self, row_index, field, value):
+	#	try:
+	#		datetime.strptime(value, '%Y-%m-%d %H:%M:%S')
+	#	except ValueError:
+	#		self.add_error(
+	#			row_index,
+	#			field,
+	#			'%s must be in "YYYY-MM-DD hh:mm:ss" format (ISO 8601), e.g. "2020-07-14"' % field
+	#		)
+	#
+	#def check_period_format(self, row_index, field, value):
+	#	try:
+	#		start, end = value.split(' - ')
+	#	except ValueError:
+	#		self.add_error(
+	#			row_index,
+	#			field,
+	#			'%s must contain both start and end details separated by " - ". ' % field
+	#		)
+	#		return
+	#	try:
+	#		if not start.lower() == 'undefined':
+	#			datetime.strptime(start, '%Y-%m-%d %H:%M')
+	#		if not end.lower() == 'undefined':
+	#			datetime.strptime(end, '%Y-%m-%d %H:%M')
+	#	except ValueError:
+	#		self.add_error(
+	#			row_index,
+	#			field,
+	#			'%s start and end must be either "Undefined" or in "YYYY-MM-DD hh:mm" format (ISO 8601),'
+	#			' e.g. "2020-07-14 13:01"' % field
+	#		)
 
 
 class Record:
-	def __init__(self, username):
-		self.username = username
-		self.neo4j_session = get_driver().session()
+	@classmethod
+	def select(cls, record_type):
+		if record_type == 'property':
+			return Property
+		elif record_type == 'trait':
+			return Trait
+		elif record_type == 'condition':
+			return Condition
+		elif record_type == 'curve':
+			return Curve
+		else:
+			raise ValueError('Record type not recognised')
 
-	def add_input_group(
-			self,
-			input_group_name,
-			partner_to_copy=None,
-			group_to_copy=None
-	):
-		tx = self.neo4j_session.begin_transaction()
-		parameters = {
-			'input_group_name': input_group_name,
-			'partner_to_copy': partner_to_copy,
-			'group_to_copy': group_to_copy,
-			'username': self.username
-		}
-		# need to check if name is already registered by anyone with [AFFILIATED {data_shared:True}] to this partner
-		check_existing_statement = (
-			' MATCH '
-			'	(partner: Partner)'
-			'	<-[affiliated: AFFILIATED {'
-			'		data_shared: True'
-			'	}]-(: User {'
-			'		username_lower: toLower(trim($username))'
-			'	}) '
-			' MATCH '
-			'	(partner)<-[: AFFILIATED {'
-			'		data_shared: True '
-			'	}]-(user: User) '
-			'	-[:SUBMITTED]->(: Submissions) '
-			'	-[:SUBMITTED]->(: InputGroups) '
-			'	-[:SUBMITTED]->(ig: InputGroup { '
-			'		name_lower: toLower(trim($input_group_name)) '
-			'	}) '
-			' RETURN [ '
-			'	True, '
-			'	ig.id, '
-			'	ig.name '
-			' ] '
-		)
-		existing_for_partner = tx.run(
-			check_existing_statement,
-			parameters
-		).single()
-		if existing_for_partner:
-			return existing_for_partner[0]
-		# now create a new group
-		# first make sure the user has the InputGroups submission node
-		statement = (
-			' MATCH '
-			' 	(c:Counter {name: "input_group"}), '
-			'	(: User { '
-			'		username_lower: toLower(trim($username)) '
-			'	})-[:SUBMITTED]->(sub: Submissions) '
-			' MERGE '
-			'	(sub)-[:SUBMITTED]->(igs: InputGroups) '
-			' WITH c, igs '
-		)
-		if group_to_copy:
-			if partner_to_copy:
-				statement += (
-					' MATCH '
-					'	(source_partner: Partner { '
-					'		name_lower:toLower(trim($partner_to_copy)) '
-					'	}) '
-					'	<-[: AFFILIATED {'
-					'		data_shared: True'
-					'	}]-(: User)-[: SUBMITTED]->(: Submissions) '
-					'	-[:SUBMITTED]->(: InputGroups) '
-					'	-[:SUBMITTED]->(source_ig: InputGroup { '
-					'		id: $group_to_copy '
-					'	}) '
-					' WITH c, igs, source_ig '
-				)
-			else:
-				statement += (
-					' MATCH '
-					' (source_ig: InputGroup { '
-					'		id: $group_to_copy '
-					' }) '
-					' OPTIONAL MATCH (source_ig)<-[s:SUBMITTED]-() '
-					# prioritise selection of the oldest if partner not specified 
-					# (including original 'un-submitted' groups )
-					' WITH c, igs, source_ig ORDER BY s.time DESC LIMIT 1 '
-				)
-		statement += (
-				' SET c._LOCK_ = True '
-				' SET c.count = c.count + 1 '
-				' CREATE '
-				'	(igs)-[: SUBMITTED { '
-				'		time: datetime.transaction().epochMillis '
-				'	}]->(ig: InputGroup {'
-				'		id: c.count, '
-				'		name_lower: toLower(trim($input_group_name)), '
-				'		name: trim($input_group_name), '
-				'		found: False '
-				'	}) '
-				' SET c._LOCK_ = False '
-		)
-		if group_to_copy:
-			statement += (
-					' WITH ig, source_ig '
-					' OPTIONAL MATCH '
-					'	(source_ig) '
-					'	-[: AT_LEVEL]->(level: ItemLevel) '
-					' WITH DISTINCT '
-					'	ig, source_ig, level '
-					' CREATE '
-					'	(ig)-[:AT_LEVEL]->(level) '
-					' WITH DISTINCT ig, source_ig '
-					' OPTIONAL MATCH '
-					'	(source_ig) '
-					'	<-[in_group: IN_GROUP]-(input: Input) '
-					' CREATE (input)-[new_in_group:IN_GROUP]->(ig) '
-					' SET new_in_group = in_group '
+	def __init__(self, row_index, row_dict, row_errors):
+		self.row_index = row_index
+		self.uid = row_dict['uid'].strip().lower()
+		if 'person' in row_dict and row_dict['person']:
+			self.person = row_dict['person']
+		else:
+			self.person = None
+		self.row_errors = row_errors
+
+	def add_error(self, field, message):
+		if self.row_index not in self.row_errors:
+			self.row_errors[self.row_index] = {}
+		if field not in self.row_errors[self.row_index]:
+			self.row_errors[self.row_index][field] = set()
+		self.row_errors[self.row_index][field].add(message)
+
+
+class Curve(Record):
+	def __init__(self, row_index, row_dict, row_errors):
+		super().__init__(row_index, row_dict, row_errors)
+		self.x_values = []
+		self.y_values = []
+		self.date = None
+		self.time = None
+
+	def create(self, field, row_dict):
+		if not isinstance(field, list):
+			raise TypeError(
+				'Curve records take a list of fields rather than a single field. '
+				'These correspond to the x-values.'
 			)
-		statement += (
-			' WITH DISTINCT ig '
-			' RETURN [ '
-			'	ig.found, '
-			'	ig.id, '
-			'	ig.name '
-			' ] '
-		)
-		result = tx.run(
-			statement,
-			parameters
-		).single()
-		if result:
-			tx.commit()
-			return result[0]
+		for x in field:
+			try:
+				y = float(row_dict[x])
+				if y:
+					self.x_values.append(float(x))
+					self.y_values.append(y)
+			except ValueError:
+				self.add_error(x, 'Curve record types only support numeric values')
+		date = row_dict['date'].strip()
+		if not date:
+			self.add_error('date', 'Date value required')
+		else:
+			self.date = date
+		if 'time' in row_dict:
+			time = row_dict['time'].strip()
+			if time:
+				self.time = time
 
-	def update_group(self, input_group, inputs, levels):
-		parameters = {
-			'username': self.username,
-			'input_group': input_group,
-			'inputs': inputs,
-			'levels': levels
-		}
-		statement = (
-			' MATCH '
-			'	(user:User {username_lower:toLower(trim($username))}) '
-			'	-[:SUBMITTED]->(sub:Submissions) '
-			' MATCH (user)-[: AFFILIATED { '
-			'	data_shared: True '
-			'	}]->(p:Partner) '
-			' MATCH '
-			'	(p)<-[:AFFILIATED {data_shared: True}]-(:User) '
-			'	-[:SUBMITTED]->(: Submissions) '
-			'	-[:SUBMITTED]->(: InputGroups) '
-			'	-[:SUBMITTED]->(ig: InputGroup {'
-			'		id: $input_group '
-			'	}) '
-			' MERGE '
-			'	(sub)-[:SUBMITTED]->(igs:InputGroups) '
-			' MERGE '
-			'	(igs)-[mod:MODIFIED]->(ig) '
-			'	ON CREATE SET mod.times = [datetime.transaction().epochMillis] '
-			'	ON MATCH SET mod.times = mod.times + datetime.transaction().epochMillis '
-			' WITH user, ig '
-			' OPTIONAL MATCH '
-			'	(ig)-[at_level:AT_LEVEL]->(:ItemLevel) '
-			' DELETE at_level '
-			' WITH user, ig '
-			' MATCH (level:ItemLevel) '
-			'	WHERE level.name_lower in $levels '
-			' MERGE (ig)-[:AT_LEVEL]->(level) '
-			' WITH user, ig '
-			' OPTIONAL MATCH '
-			'	(ig)<-[in_rel:IN_GROUP]-(:Input) '
-			' DELETE in_rel '
-			' WITH DISTINCT '
-			'	user, ig, range(0, size($inputs)) as index '
-			' UNWIND index as i '
-			'	MATCH (input:Input {name_lower:toLower(trim($inputs[i]))}) '
-			'	CREATE (input)-[rel:IN_GROUP {position: i}]->(ig) '
-			' RETURN '
-			'	input.name '
-			' ORDER BY rel.position '
-		)
-		result = self.neo4j_session.run(
-				statement,
-				parameters
-		)
-		return [record[0] for record in result]
 
-	def add_inputs_to_group(self, input_group, inputs):
-		parameters = {
-			'username': self.username,
-			'input_group': input_group,
-			'inputs': inputs
-		}
-		statement = (
-			' MATCH '
-			'	(user:User {username_lower:toLower(trim($username))}) '
-			'	-[:SUBMITTED]->(sub:Submissions) '
-			' MATCH '
-			'	(ig: InputGroup {'
-			'		name_lower: toLower(trim($input_group)) '
-			'	}) '
-			' MERGE '
-			'	(sub)-[:SUBMITTED]->(igs:InputGroups) '
-			' MERGE '
-			'	(igs)-[:MODIFIED]->(ig) '
-			' WITH '
-			'	user, ig '
-			' UNWIND $inputs as input_name '
-			'	MATCH (input:Input {name_lower:toLower(trim(input_name))}) '
-			'	MERGE (input)-[add:IN_GROUP]->(ig) '
-			'		ON CREATE SET '
-			'			add.user = user.username, '
-			'			add.time = datetime.transaction().epochMillis, '
-			'			add.found = False '
-			'		ON MATCH SET '
-			'			add.found = True '
-			' RETURN [ '
-			'	add.found, '
-			'	input.name '
-			' ] '
-		)
-		result = self.neo4j_session.run(
-				statement,
-				parameters
-		)
-		return [record[0] for record in result]
+class GenericRecord(Record):
+	def __init__(self, row_index, row_dict, row_errors):
+		super().__init__(row_index, row_dict, row_errors)
+		self.value = None
+
+	def parse_value(self, field, value, input_format, categories = None):
+		value = value.strip()
+		if input_format == 'text':
+			self.parse_text_value(field, value)
+		elif input_format == 'numeric':
+			self.parse_numeric_value(field, value)
+		elif input_format == 'percent':
+			self.parse_percent_value(field, value)
+		elif input_format == 'counter':
+			self.parse_counter_value(field, value)
+		elif input_format == 'boolean':
+			self.parse_boolean_value(field, value)
+		elif input_format == 'location':
+			self.parse_location_value(field, value)
+		elif input_format == 'date':
+			self.parse_date_value(field, value)
+		elif input_format == 'categorical':
+			self.parse_categorical_value(field, value, categories)
+		elif input_format == 'multicat':
+			self.parse_multicat_value(field, value, categories)
+
+	def parse_text_value(self, field, value):
+		if field == 'assign tree to block by id':
+			try:
+				self.value = int(value)
+			except ValueError:
+				self.add_error(field, 'Value for "%s" must be an integer' % field)
+		elif field == 'assign tree to block by name':
+			self.value = value.lower()
+		elif field == 'assign sample to block(s) by name':
+			self.value =  Parsers.parse_name_list(value)
+		elif field in [
+			'assign sample to sample(s) by id',
+			'assign sample to tree(s) by id',
+			'assign sample to block(s) by id'
+		]:
+			try:
+				self.value = Parsers.parse_range_list()
+			except ValueError:
+				self.add_error(
+					field,
+					'Value for "%s" can be a single integer, a range of integers separated by "-" '
+					'or a comma separated list of either of these.' %field
+				)
+		elif 'time' in field:
+			try:
+				datetime.strptime(value, '%H:%M')
+				self.value = value
+			except ValueError:
+				self.add_error(field, '%s must be in "hh:mm" format (ISO 8601), e.g. "13:01"' % field)
+
+	def parse_numeric_value(self, field, value):
+		try:
+			self.value = float(value)
+		except ValueError:
+			self.add_error(field, '%s values must be numeric' % field)
+
+	def parse_percent_value(self, field, value):
+		try:
+			self.value = float(value.replace('%', ''))
+		except ValueError:
+			self.add_error(field, '%s values must be numeric (optional "%" character is ignored)' % field)
+
+	def parse_counter_value(self, field, value):
+		try:
+			value = int(value)
+			if not value >= 0:
+				self.add_error(field, '%s values must be positive integers or 0' % field)
+		except ValueError:
+			self.add_error(field, '%s values must be integers' % field)
+		else:
+			self.value = value
+
+	def parse_boolean_value(self, field, value):
+		value = value.strip().lower()
+		yes = ['yes', 'y','true','t', '1']
+		no = ['no', 'n','0','false','f', '0']
+		if value in yes:
+			self.value = True
+		elif value in no:
+			self.value = False
+		else:
+			self.add_error(
+				field,
+				'%s values must be either True (%s) or False (%s)' % (field, ', '.join(yes), ', '.join(no))
+			)
+
+	def parse_date_value(self, field, value):
+		try:
+			datetime.strptime(value, '%Y-%m-%d')
+		except ValueError:
+			self.add_error(field, '%s must be in YYYY-MM-DD format, e.g. "2020-07-14"' % field)
+
+	def parse_location_value(self, field, value):
+		try:
+			lat, long = value.split(';')
+			float(lat)
+			float(long)
+			self.value = lat, long
+		except ValueError:
+			self.add_error(
+				field,
+				'%s value must be two numeric values (corresponding to latitude and longitude) '
+				'separated by ";", e.g. (53.270962;-9.062691)' % field)
+
+	def parse_categorical_value(self, field, value, categories):
+		if value.lower() in [cat.lower() for cat in categories]:
+			self.value = value
+		else:
+			self.add_error(
+				field,
+				'%s values must be one of the following categories: \n %s' % (field, '\n'.join(categories))
+			)
+
+	def parse_multicat_value(self, field, value, categories):
+		values = value.split(',')
+		all_valid = True
+		invalid_values = []
+		for v in set(values):
+			if v.strip() and v.lower() not in [cat.lower() for cat in categories]:
+				all_valid = False
+				invalid_values.append(v)
+		if not all_valid:
+			self.add_error(
+				field,
+				'The following values are not supported categories for %s: '
+				'\n %s \n The following categories are supported: %s' %
+				(field, '\n'.join(invalid_values), '\n'.join(categories))
+			)
+
+
+
+
+
+
+
+
+class Property(GenericRecord):
+	def __init__(self, row_index, row_dict, row_errors):
+		super().__init__(row_index, row_dict, row_errors)
+		self.value = None
+
+
+	def create(self, field, row_dict):
+
+		if not field in row_dict:
+			raise TypeError('Field must be in the row dict')
+
+		if self.replicate:
+			self.add_error('uid', 'Replicates are not supported for property records')
+		value = row_dict[field].strip()
+		self.check_value(field, value)
+
+
+class Trait(GenericRecord):
+	def __init__(self, row_index, row_dict, row_errors):
+		super().__init__(row_index, row_dict, row_errors)
+		self.value = None
+		self.date = None
+		self.time = None
+
+	def create(self, row_dict, input_variable=None):
+		if not input_variable:
+			raise TypeError('Input variable required for trait records to look up the value in the row_dict')
+
+		self.value = row_dict[input_variable].strip()
+		date = row_dict['date'].strip()
+		if not date:
+			self.add_error('date', 'Date value required')
+		else:
+			self.date = date
+			self.check_date('date', date)
+		if 'time' in row_dict:
+			time = row_dict['time'].strip()
+			if time:
+				self.time = time
+				self.check_time('time', time)
+
+
+class Condition(GenericRecord):
+	def __init__(self, row_index, row_dict, row_errors):
+		super().__init__(row_index, row_dict, row_errors)
+		self.value = None
+		self.start_date = None
+		self.start_time = None
+		self.end_date = None
+		self.end_time = None
+
+	def create(self, row_dict, input_variable=None):
+		if not input_variable:
+			raise TypeError('Input variable required in condition records to look up the value in row_dict')
+		self.value = row_dict[input_variable].strip()
+		if 'start date' in row_dict:
+			start_date = row_dict['start date'].strip()
+			if start_date:
+				self.start_date = start_date
+				self.check_date('start date', start_date)
+		if 'start time' in row_dict:
+			start_time = row_dict['start time'].strip()
+			if start_time:
+				self.start_time = start_time
+				self.check_time('start time', start_time)
+		if 'end date' in row_dict:
+			end_date = row_dict['end date'].strip()
+			if end_date:
+				self.end_date = end_date
+				self.check_date('end date', end_date)
+		if 'end time' in row_dict:
+			end_time = row_dict['end time'].strip()
+			if end_time:
+				self.end_time = end_time
+				self.check_time('end time', end_time)
+
+
+Class new:
 
 	def submit_records(self, record_data):
 		record_data['username'] = self.username
@@ -248,9 +414,9 @@ class Record:
 				# for traits we don't do this as it is simpler to perform during the merger
 				conflicts_query = self.build_condition_conflicts_query(record_data)
 				conflicts = tx.run(
-						conflicts_query['statement'],
-						conflicts_query['parameters']
-					)
+					conflicts_query['statement'],
+					conflicts_query['parameters']
+				)
 				if conflicts.peek():
 					tx.close()
 					html_table = self.result_table(conflicts, record_data['record_type'])['table']
@@ -303,7 +469,7 @@ class Record:
 							' RETURN v.name ',
 							name=record_data['inputs_dict']['variety name'],
 							code=record_data['inputs_dict']['variety code']
-							).single()
+						).single()
 						if not same_variety:
 							tx.rollback()
 							return jsonify({
@@ -354,14 +520,14 @@ class Record:
 						'	CASE '
 						'		WHEN access.confirmed THEN user.name + "(" + p.name + ")" '
 						'		ELSE p.name '
-						'	END as `Submitted by`, '						
+						'	END as `Submitted by`, '
 						' WHERE s.time <> datetime.transaction().epochMillis '
 						# removing these because
 						# we want to keep all and roll back to be able to provide feedback about conflicts
 						# and prevent the record being created
-						#' WITH item, update_variety '
-						#'	WHERE of_current_variety IS NULL '
-						#'	AND source_sample IS NULL '
+						# ' WITH item, update_variety '
+						# '	WHERE of_current_variety IS NULL '
+						# '	AND source_sample IS NULL '
 					)
 					if record_data['item_level'] == 'field':
 						update_variety_statement += (
@@ -411,7 +577,7 @@ class Record:
 						tx.rollback()
 						return jsonify({
 							'submitted': (
-									'<br> - '.join(variety_update_errors)
+								'<br> - '.join(variety_update_errors)
 							),
 							'class': 'conflicts'
 						})
@@ -419,7 +585,8 @@ class Record:
 					update_block_statement = match_item_query[0]
 					update_block_parameters = match_item_query[1]
 					update_block_parameters['username'] = record_data['username']
-					update_block_parameters['assign_tree_to_block_by_name'] = record_data['inputs_dict']['assign tree to block by name']
+					update_block_parameters['assign_tree_to_block_by_name'] = record_data['inputs_dict'][
+						'assign tree to block by name']
 					update_block_statement += (
 						' WITH DISTINCT item, field '
 						' MATCH '
@@ -631,9 +798,9 @@ class Record:
 				html_table = result_table['table']
 				return jsonify({
 					'submitted': (
-						' Record not submitted. <br><br> '
-						' A value you are trying to submit conflicts with an existing entry. '
-						+ html_table
+							' Record not submitted. <br><br> '
+							' A value you are trying to submit conflicts with an existing entry. '
+							+ html_table
 					),
 					'class': 'conflicts'
 				})
@@ -641,9 +808,9 @@ class Record:
 				tx.commit()
 				html_table = result_table['table']
 				return jsonify({'submitted': (
-					' Records submitted or found (highlighted): '
-					+ html_table
-					)
+						' Records submitted or found (highlighted): '
+						+ html_table
+				)
 				})
 		except (TransactionError, SecurityError, ServiceUnavailable):
 			return jsonify({
@@ -713,10 +880,10 @@ class Record:
 				'	-[:FOR_ITEM]->(item) '
 				' WITH '
 				'	item, input, if, ff, us, '
-				)
+			)
 		statement += (
-			Cypher.upload_check_value +
-			' as value '
+				Cypher.upload_check_value +
+				' as value '
 		)
 		if record_data['item_level'] != 'field':
 			statement += (
@@ -883,10 +1050,10 @@ class Record:
 				'	-[:FOR_ITEM]->(item) '
 				' WITH '
 				'	item, input, if, ff, us, '
-				)
+			)
 		statement += (
-			Cypher.upload_check_value +
-			' as value '
+				Cypher.upload_check_value +
+				' as value '
 		)
 		if record_data['item_level'] != 'field':
 			statement += (
@@ -1031,39 +1198,39 @@ class Record:
 				', field '
 			)
 		statement += (
-			'	MATCH (item) '
-			'	<-[:FOR_ITEM]-(if: ItemInput) '
-			'	-[:FOR_INPUT*..2]->(input: Input'
-			'		{name_lower: toLower(input_name)} '
-			'	), '
-			'	(if) '
-			'	<-[:RECORD_FOR]-(r: Record) '
-			'	<-[s: SUBMITTED]-(: UserFieldInput) '
-			'	<-[: SUBMITTED]-(: Records) '
-			'	<-[: SUBMITTED]-(: Submissions) '
-			'	<-[: SUBMITTED]-(u: User) '
-			'	-[:AFFILIATED {data_shared: true}]->(p:Partner) '
-			'	OPTIONAL MATCH '
-			'		(p)<-[: AFFILIATED {confirmed: true}]-(cu: User {username_lower: toLower($username)}) '
-			# set lock on ItemCondition node and only unlock after merge or result
-			# this is either rolled back or set to false on subsequent merger, 
-			# prevents conflicts (per item/input) emerging from race conditions
-			' SET if._LOCK_ = True '
-			' WITH '
-			'	$end_time as end, '
-			'	$start_time as start, '
-			'	item,'
-			'	input, '
-			'	if, '
-			'	r, '
-			'	CASE WHEN r.start <> False THEN r.start ELSE Null END as r_start, '
-			'	CASE WHEN r.end <> False THEN r.end ELSE Null END as r_end, '
-			'	s, '
-			'	u, '
-			'	p, '
-			'	cu, '
-			+ Cypher.upload_check_value +
-			' as value '
+				'	MATCH (item) '
+				'	<-[:FOR_ITEM]-(if: ItemInput) '
+				'	-[:FOR_INPUT*..2]->(input: Input'
+				'		{name_lower: toLower(input_name)} '
+				'	), '
+				'	(if) '
+				'	<-[:RECORD_FOR]-(r: Record) '
+				'	<-[s: SUBMITTED]-(: UserFieldInput) '
+				'	<-[: SUBMITTED]-(: Records) '
+				'	<-[: SUBMITTED]-(: Submissions) '
+				'	<-[: SUBMITTED]-(u: User) '
+				'	-[:AFFILIATED {data_shared: true}]->(p:Partner) '
+				'	OPTIONAL MATCH '
+				'		(p)<-[: AFFILIATED {confirmed: true}]-(cu: User {username_lower: toLower($username)}) '
+				# set lock on ItemCondition node and only unlock after merge or result
+				# this is either rolled back or set to false on subsequent merger, 
+				# prevents conflicts (per item/input) emerging from race conditions
+				' SET if._LOCK_ = True '
+				' WITH '
+				'	$end_time as end, '
+				'	$start_time as start, '
+				'	item,'
+				'	input, '
+				'	if, '
+				'	r, '
+				'	CASE WHEN r.start <> False THEN r.start ELSE Null END as r_start, '
+				'	CASE WHEN r.end <> False THEN r.end ELSE Null END as r_end, '
+				'	s, '
+				'	u, '
+				'	p, '
+				'	cu, '
+				+ Cypher.upload_check_value +
+				' as value '
 		)
 		if record_data['item_level'] != "field":
 			statement += (
@@ -1256,8 +1423,8 @@ class Record:
 		# So we coalesce the value and the boolean False, but it means we have to check for this False value
 		# in all comparisons...e.g. in the condition conflict query
 		statement += (
-			Cypher.upload_check_value +
-			' as value '
+				Cypher.upload_check_value +
+				' as value '
 		)
 		if record_data['item_level'] != 'field':
 			statement += (
@@ -1373,13 +1540,15 @@ class Record:
 			# iterate through the result, building the table.
 			# if we find a conflict we drop the existing table and start only including the conflicts to report
 			if record['submitted_at']:
-				submitted_at = datetime.datetime.utcfromtimestamp(int(record['submitted_at']) / 1000).strftime("%Y-%m-%d %H:%M")
+				submitted_at = datetime.datetime.utcfromtimestamp(int(record['submitted_at']) / 1000).strftime(
+					"%Y-%m-%d %H:%M")
 			else:
 				submitted_at = ""
 			row_string = '<tr><td>'
 			if record_type == 'condition':
 				if record['start']:
-					start_time = datetime.datetime.utcfromtimestamp(int(record['start']) / 1000).strftime("%Y-%m-%d %H:%M")
+					start_time = datetime.datetime.utcfromtimestamp(int(record['start']) / 1000).strftime(
+						"%Y-%m-%d %H:%M")
 				else:
 					start_time = ""
 				if record['end']:
@@ -1387,13 +1556,13 @@ class Record:
 				else:
 					end_time = ""
 				row_data = [
-						str(record['UID']),
-						record['input'],
-						start_time,
-						end_time,
-						record['user'],
-						submitted_at
-					]
+					str(record['UID']),
+					record['input'],
+					start_time,
+					end_time,
+					record['user'],
+					submitted_at
+				]
 			elif record_type in ['trait', 'curve']:
 				if record['time']:
 					time = datetime.datetime.utcfromtimestamp(int(record['time']) / 1000).strftime("%Y-%m-%d %H:%M")
@@ -1401,12 +1570,12 @@ class Record:
 				else:
 					time = ""
 				row_data = [
-						str(record['UID']),
-						record['input'],
-						time,
-						record['user'],
-						submitted_at
-					]
+					str(record['UID']),
+					record['input'],
+					time,
+					record['user'],
+					submitted_at
+				]
 			else:
 				row_data = [
 					str(record['UID']),

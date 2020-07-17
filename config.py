@@ -136,9 +136,58 @@ CONSTRAINTS = [
 # it would be possible with manual indexing and Lucene query syntax
 
 INDEXES = [
-	# not needed if in unique constraints list
-	# {'label': 'Country', 'property': 'name'},
+	# indexes are also created on anything in the unique constraints list
 	{'label': 'Region', 'property': 'name_lower'},
 	{'label': 'Farm', 'property': 'name_lower'},
 	{'label': 'Field', 'property': 'name_lower'}
 ]
+
+REQUIRED_FIELDNAMES = {
+	'mixed': {
+		'uid',
+		'input variable',
+		'value'
+	},
+	'property': {'uid'},
+	'trait': {'uid', 'date'},
+	'curve': {'uid', 'date'},
+	'condition': {'uid'}
+}
+
+OPTIONAL_FIELDNAMES = {
+	'mixed': {
+		'replicate',
+		'time',
+		'period',
+		'submitted at'
+	},
+	'property': {'person'},
+	'trait': {'person', 'time'},
+	'curve': {'person', 'time'},
+	'condition': {'person', 'start date', 'start time', 'end date', 'end time'}
+}
+
+REFERENCE_FIELDNAMES = {
+		'country',
+		'region',
+		'farm',
+		'field',
+		'field uid',
+		'block',
+		'block id',
+		'source trees',
+		'source samples',
+		'name',
+		'row',
+		'column',
+		'recorded by',
+		'submitted by',
+		'partner'
+}
+
+UID_LETTERS = {'b', 't', 's'}
+
+BATCH_PROCESS_ROW_COUNT = 100
+BATCH_PROCESS_MAX_ERROR_ROWS = 25
+PERSON_FIELD_MAX_LEN = 100
+

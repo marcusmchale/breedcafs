@@ -1155,6 +1155,7 @@ class Cypher:
 	)
 
 	upload_table_property = (
+		' USING PERIODIC COMMIT 100 '
 		' LOAD CSV WITH HEADERS FROM $filename as csvLine '
 		' WITH '
 		'	csvLine, '
@@ -1201,6 +1202,7 @@ class Cypher:
 		# Check for data in table  
 		'	WHERE trim(csvLine[input_name]) <> "" '
 		'	WITH '
+		'		csvLine, '
 		'		field, '
 		'		item, '
 		'		input, '
@@ -1222,6 +1224,7 @@ class Cypher:
 		'					(item)<-[: FOR_ITEM]-(:ItemInput)-[: FOR_INPUT]->(field_input) '
 		'	) '
 		'	WITH '
+		'		csvLine, '
 		'		field, '
 		'		item, '
 		'		input, '
@@ -1275,6 +1278,7 @@ class Cypher:
 		'						s1.time = datetime.transaction().epochMillis '
 		'	) '
 		'	WITH '
+		'		csvLine, '
 		'		field, '
 		'		item, '
 		'		input, '
@@ -1293,6 +1297,7 @@ class Cypher:
 		'		(partner)<-[access: AFFILIATED {confirmed: True}]-(:User {username_lower:toLower(trim($username))}) '
 		# And give the user feedback on their submission
 		'	RETURN { '
+		'		row_index: csvLine.row_index, '
 		'		Found: r.found, '
 		'		`Submitted by`: CASE WHEN access IS NOT NULL THEN user.name ELSE partner.name END, '
 		'		`Submitted at`: submitted.time, '
@@ -1313,6 +1318,7 @@ class Cypher:
 	)
 
 	upload_table_trait = (
+		' USING PERIODIC COMMIT 100 '
 		' LOAD CSV WITH HEADERS FROM $filename as csvLine '
 		' WITH '
 		'	csvLine, '
@@ -1394,6 +1400,7 @@ class Cypher:
 		# Check for data in table  
 		'	WHERE trim(csvLine[input_name]) <> "" '
 		'	WITH '
+		'		csvLine, '
 		'		field, '
 		'		item, '
 		'		input, '
@@ -1422,6 +1429,7 @@ class Cypher:
 		'					(item)<-[: FOR_ITEM]-(:ItemInput)-[: FOR_INPUT]->(field_input) '
 		'	) '
 		'	WITH '
+		'		csvLine, '
 		'		field, '
 		'		item, '
 		'		input, '
@@ -1483,6 +1491,7 @@ class Cypher:
 		'						s1.time = datetime.transaction().epochMillis '
 		' ) '
 		'	WITH '
+		'		csvLine, '
 		'		field, '
 		'		item, '
 		'		input, '
@@ -1501,6 +1510,7 @@ class Cypher:
 		'	(partner)<-[access: AFFILIATED {confirmed: True}]-(:User {username_lower:toLower(trim($username))}) '
 		# And give the user feedback on their submission
 		'	RETURN { '
+		'		row_index: csvLine.row_index, '
 		'		Found: r.found, '
 		'		`Submitted by`: CASE WHEN access IS NOT NULL THEN user.name ELSE partner.name END, '
 		'		`Submitted at`: submitted.time, '
@@ -1523,6 +1533,7 @@ class Cypher:
 	)
 
 	upload_table_curve = (
+		' USING PERIODIC COMMIT 100 '
 		' LOAD CSV WITH HEADERS FROM $filename as csvLine '
 		' WITH '
 		'	csvLine, '
@@ -1618,6 +1629,7 @@ class Cypher:
 		' 		name_lower: level '
 		' 	}) '  
 		' WITH '
+		'	csvLine, '
 		' 	field, '
 		' 	item, '
 		' 	input, '
@@ -1647,6 +1659,7 @@ class Cypher:
 		'				(item)<-[: FOR_ITEM]-(:ItemInput)-[: FOR_INPUT]->(field_input) '
 		' ) '
 		'	WITH '
+		'		csvLine, '
 		'		field, '
 		'		item, '
 		'		input, '
@@ -1706,6 +1719,7 @@ class Cypher:
 		'						s1.time = datetime.transaction().epochMillis '
 		' ) '
 		'	WITH '
+		'		csvLine, '
 		'		field, '
 		'		item, '
 		'		input, '
@@ -1725,6 +1739,7 @@ class Cypher:
 		'	(partner)<-[access: AFFILIATED {confirmed: True}]-(:User {username_lower:toLower(trim($username))}) '
 		# And give the user feedback on their submission
 		'	RETURN { '
+		'		row_index: csvLine.row_index, '
 		'		Found: r.found, '
 		'		`Submitted by`: CASE WHEN access IS NOT NULL THEN user.name ELSE partner.name END, '
 		'		`Submitted at`: submitted.time, '
@@ -1745,8 +1760,8 @@ class Cypher:
 		' } '
 		'	ORDER BY input.name_lower, field.uid, item.id, r.replicate '
 	)
-
 	upload_table_condition = (
+		' USING PERIODIC COMMIT 100 '
 		# load in the csv
 		' LOAD CSV WITH HEADERS FROM $filename as csvLine '
 		' WITH '
@@ -1862,6 +1877,7 @@ class Cypher:
 		# Check for data in table
 		'	WHERE trim(csvLine[input_name]) <> "" '
 		'	WITH '
+		'		csvLine, '
 		'		field, '
 		'		item, '
 		'		input, '
@@ -1887,6 +1903,7 @@ class Cypher:
 		'					(item)<-[: FOR_ITEM]-(:ItemInput)-[: FOR_INPUT]->(field_input) '
 		'	) '
 		'	WITH '
+		'		csvLine, '
 		'		field, '
 		'		item, '
 		'		input, '
@@ -1948,6 +1965,7 @@ class Cypher:
 		'						s1.time = datetime.transaction().epochMillis '
 		' ) '
 		'	WITH '
+		'		csvLine, '
 		'		field, '
 		'		item, '
 		'		input, '
@@ -2040,6 +2058,7 @@ class Cypher:
 		# If don't have access or if have access and values don't match then potential conflict 
 		# time parsing to allow various degrees of specificity in the relevant time range is below
 		'	WITH '
+		'		csvLine, '
 		'		r, '
 		'		access, '
 		'		user, '
@@ -2061,6 +2080,7 @@ class Cypher:
 		'			ELSE Null END as conflicts '
 		# And give the user feedback on their submission
 		'	RETURN { '
+		'		row_index: csvLine.row_index, '
 		'		Found: r.found, '
 		'		`Submitted by`: CASE WHEN access IS NOT NULL THEN user.name ELSE partner.name END, '
 		'		`Submitted at`: submitted.time, '

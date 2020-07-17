@@ -55,8 +55,6 @@ def correct_submit():
 			upload_object = Upload(username, submission_type, raw_filename)
 			if not Resumable.allowed_file(raw_filename, submission_type=submission_type):
 				return jsonify({'submitted': 'Please select a supported file type'})
-			file_data = form.file.data
-			upload_object.file_save(file_data)
 			file_format_errors = upload_object.file_format_errors()
 			if file_format_errors:
 				return jsonify({

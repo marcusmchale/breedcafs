@@ -24,13 +24,15 @@ class Parsers:
 	def parse_range_list(
 			range_list
 	):
-		return sorted(set(chain(*[Parsers.parse_range(range_string) for range_string in range_list.split(',')])))
+		return sorted(set(chain(*[
+			Parsers.parse_range(range_string) for range_string in range_list.split(',') if range_string.strip()
+		])))
 
 	@staticmethod
 	def parse_name_list(
 			name_list
 	):
-		return sorted(set([i.lower().strip() for i in name_list.split(',')]))
+		return sorted(set([i.lower().strip() for i in name_list.split(',') if i.strip()]))
 
 	@staticmethod
 	def db_time_format(time_string):

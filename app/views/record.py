@@ -41,7 +41,7 @@ from app.forms import (
 )
 
 from app.models import (
-	Record,
+	InputManager,
 	Parsers,
 	Download,
 	User,
@@ -148,7 +148,7 @@ def add_input_group():
 				input_group_name = request.form['input_group_name'] if request.form['input_group_name'] not in ['', None] else None
 				partner_to_copy = request.form['partner_to_copy'] if request.form['partner_to_copy'] not in ['', None] else None
 				group_to_copy = request.form.get('group_to_copy', default=None, type=int) if request.form['group_to_copy'] not in ['', None] else None
-				recorder = Record(session['username'])
+				recorder = InputManager(session['username'])
 				found_name = recorder.add_input_group(
 					input_group_name,
 					partner_to_copy=partner_to_copy,
@@ -228,7 +228,7 @@ def commit_group_changes():
 				input_group = request.form.get('input_group_select', default=None, type=int) if request.form.get('input_group_select') != '' else None
 				input_variables = request.form.getlist('group_inputs')
 				levels = request.form.getlist('group_levels_select')
-				recorder = Record(session['username'])
+				recorder = InputManager(session['username'])
 				result = recorder.update_group(input_group, input_variables, levels)
 				report = 'Group members set: <ul>'
 				for i in result:
@@ -265,7 +265,7 @@ def add_inputs_to_group():
 			if form.validate_on_submit():
 				input_group = request.form.get('input_group_select', None) if request.args.get('input_group') != '' else None
 				inputs = request.form.getlist('all_inputs')
-				recorder = Record(session['username'])
+				recorder = InputManager(session['username'])
 				result = recorder.add_inputs_to_group(input_group, inputs)
 				new = 'Added to group: <ul>'
 				existing = 'Already in group: <ul>'
@@ -673,7 +673,7 @@ def submit_records():
 						'selected_inputs': selected_inputs,
 						'inputs_dict': inputs_dict
 					}
-					result = Record(username).submit_records(record_data)
+					result = InputManager(username).submit_records(record_data)
 					return result
 				else:
 					errors = jsonify({

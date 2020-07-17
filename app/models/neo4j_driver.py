@@ -2,14 +2,10 @@ from app import (
 	app,
 	os,
 	GraphDatabase,
-	ServiceUnavailable,
 	logging
 )
 
-from flask import redirect, url_for
 
-
-# this was pulled out of the initialisation process for the app so that the site can handle server downtime for backups
 class DriverHolder:
 	driver = None
 
@@ -20,9 +16,8 @@ class DriverHolder:
 def get_driver():
 	if DriverHolder.driver:
 		return DriverHolder.driver
-	uri = app.config['BOLT_URI']
 	DriverHolder.driver = GraphDatabase.driver(
-		uri,
+		app.config['BOLT_URI'],
 		auth=(
 			os.environ['NEO4J_USERNAME'],
 			os.environ['NEO4J_PASSWORD']
@@ -31,23 +26,13 @@ def get_driver():
 		connection_acquisition_timeout=5,
 		max_retry_time=5
 	)
-	neo4j_log = logging.getLogger("neobolt")
-	neo4j_log.setLevel(logging.DEBUG)
 	fh = logging.FileHandler(app.config['NEO4J_DRIVER_LOG'])
-	fh.setLevel(logging.DEBUG)
+	neo4j_log = logging.getLogger("neobolt")
 	neo4j_log.addHandler(fh)
 	return DriverHolder.driver
 
 
-def neo4j_query(tx, query, parameters=None):
-	try:
-		result = tx.run(query, parameters)
-		# must not return live result object or may break retry
-		return [record for record in result]
-	except Exception as e:
-		logging.error("Error with neo4j_query:" + str(e))
-
-
+# the below is deprecated, should use the new Query class that applies the query in a transaction
 def bolt_result(tx, query, parameters=None):
 	try:
 		result = tx.run(query, parameters)

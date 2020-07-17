@@ -106,13 +106,6 @@ def upload_submit():
 					'status': 'ERRORS'
 				})
 			upload_object = Upload(username, submission_type, raw_filename)
-			file_format_errors = upload_object.file_format_errors()
-			if file_format_errors:
-				return jsonify({
-					'result': file_format_errors,
-					'status': 'ERRORS'
-				})
-			# check for UID/person then time/date etc to set record_type
 			try:
 				# as an asynchronous function with celery
 				# result is stored in redis and accessible from the status/task_id endpoint

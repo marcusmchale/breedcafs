@@ -14,7 +14,7 @@ from .items import (
 from .chart import Chart
 from .download import Download
 from .neo4j_driver import get_driver
-from .record import Record
+from .record import InputManager
 from .parsers import Parsers
 
 from app import celery

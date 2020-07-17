@@ -1,10 +1,9 @@
 from app import (
-	# app,
 	ServiceUnavailable,
 	SecurityError
 )
 from app.cypher import Cypher
-from .neo4j_driver import get_driver, neo4j_query
+from .queries import Query
 from datetime import datetime
 from flask import jsonify
 from .parsers import Parsers
@@ -24,13 +23,12 @@ class Chart:
 				'starttime': ((datetime.strptime(startdate, '%Y-%m-%d')-epoch).total_seconds())*1000,
 				'endtime': ((datetime.strptime(enddate, '%Y-%m-%d')-epoch).total_seconds())*1000
 			}
-			with get_driver().session() as neo4j_session:
-				result = neo4j_session.read_transaction(neo4j_query, Cypher.get_submissions_range, parameters)
-			records = [record for record in result]
+			result = Query().bolt_result(Cypher.get_submissions_range, parameters)
 			# collect all nodes/rels from records into lists of dicts
 			nodes = []
 			rels = []
-			for record in records:
+			for record in result:
+				record = record[0]
 				nodes.extend(
 					(
 						{'id': record['d_id'], 'label': record['d_label'], 'name': record['d_name']},
@@ -56,13 +54,10 @@ class Chart:
 	# get lists of submitted nodes (relationships and directly linked nodes) in json format
 	@staticmethod
 	def get_fields_treecount():
-		with get_driver().session() as neo4j_session:
-			result = neo4j_session.read_transaction(neo4j_query, Cypher.get_fields_treecount)
-		records = [record for record in result]
 		nested = {
 			'name': 'nodes',
 			'label': 'root_node',
-			'children': [record[0] for record in records]
+			'children': Query().list_result(Cypher.get_fields_treecount)
 		}
 		return jsonify(nested)
 
@@ -79,9 +74,7 @@ class Chart:
 			' RETURN '
 			'	c.count '
 		)
-		with get_driver().session() as neo4j_session:
-			result = neo4j_session.read_transaction(neo4j_query, statement, parameters)
-			return [record[0] for record in result]
+		return Query().list_result(statement, parameters)
 
 	@staticmethod
 	def get_item_count(
@@ -313,16 +306,4 @@ class Chart:
 				statement += (
 					' RETURN count(distinct(sample)) '
 				)
-		with get_driver().session() as neo4j_session:
-			result = neo4j_session.read_transaction(
-				neo4j_query,
-				statement,
-				parameters
-			)[0][0]
-			return result
-
-
-
-
-
-
+		return Query().bolt_result(statement, parameters).single()[0]
