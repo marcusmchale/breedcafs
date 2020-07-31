@@ -30,13 +30,3 @@ def get_driver():
 	neo4j_log = logging.getLogger("neobolt")
 	neo4j_log.addHandler(fh)
 	return DriverHolder.driver
-
-
-# the below is deprecated, should use the new Query class that applies the query in a transaction
-def bolt_result(tx, query, parameters=None):
-	try:
-		result = tx.run(query, parameters)
-		# must not return live result object or may break retry
-		return result
-	except Exception as e:
-		logging.error("Error with neo4j_query:" + str(e))

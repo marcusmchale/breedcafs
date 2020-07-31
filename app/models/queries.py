@@ -11,7 +11,7 @@ class Query:
 			else:
 				self.tx = session.read_transaction()
 
-	def run_query(self, query, parameters):
+	def run_query(self, query, parameters=None):
 		try:
 			result = self.tx.run(query, parameters)
 			# must not return live result object or may break retry
@@ -22,14 +22,14 @@ class Query:
 		except Exception as e:
 			logging.exception(e)
 
-	def bolt_result(self, query, parameters=None):
+	def get_bolt(self, query, parameters=None):
 		return self.run_query(query, parameters)
 
-	def list_result(self, query, parameters=None):
-		return [i[0] for i in self.run_query(query, parameters)]
+	def get_list(self, query, parameters=None):
+		return list(self.run_query(query, parameters))
 
-	def boolean_result(self, query, parameters=None):
-		if self.run_query(query, parameters).single:
+	def get_boolean(self, query, parameters=None):
+		if self.run_query(query, parameters).single():
 			return True
 		else:
 			return False

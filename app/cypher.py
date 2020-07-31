@@ -1858,7 +1858,7 @@ class Cypher:
 		'		, "ms", "yyyy-MM-dd HH:mm") as end '
 		# And identify the fields and inputs assessed
 		' MATCH  '
-		'	(field:Field { '
+		'	(field: Field { '
 		'		uid: field_uid '
 		'	}), '
 		'	(item: Item { '
@@ -2098,7 +2098,7 @@ class Cypher:
 		'		`Input variable`: input.name, '
 		'		Partner: partner.name, '
 		'		Conflicts: conflicts '
-		' } '
+		' } '`
 		'	ORDER BY input.name_lower, field.uid, item.id  '
 	)
 

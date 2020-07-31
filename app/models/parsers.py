@@ -32,7 +32,7 @@ class Parsers:
 	def parse_name_list(
 			name_list
 	):
-		return sorted(set([i.lower().strip() for i in name_list.split(',') if i.strip()]))
+		return sorted(set([i.strip() for i in name_list.split(',') if i.strip()]), key=str.casefold)
 
 	@staticmethod
 	def db_time_format(time_string):
@@ -147,3 +147,12 @@ class Parsers:
 					return uid
 			else:
 				return False
+
+	@staticmethod
+	def flatten_record_values(record):
+		for key, value in record.items():
+			if isinstance(value, list):
+				record[key] = ', '.join(
+					[str(i) if not isinstance(i, list) else '(%s)' % ', '.join([str(j) for j in i]) for i in record[key]]
+				)
+		return record

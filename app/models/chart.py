@@ -23,7 +23,7 @@ class Chart:
 				'starttime': ((datetime.strptime(startdate, '%Y-%m-%d')-epoch).total_seconds())*1000,
 				'endtime': ((datetime.strptime(enddate, '%Y-%m-%d')-epoch).total_seconds())*1000
 			}
-			result = Query().bolt_result(Cypher.get_submissions_range, parameters)
+			result = Query().get_bolt(Cypher.get_submissions_range, parameters)
 			# collect all nodes/rels from records into lists of dicts
 			nodes = []
 			rels = []
@@ -57,7 +57,7 @@ class Chart:
 		nested = {
 			'name': 'nodes',
 			'label': 'root_node',
-			'children': Query().list_result(Cypher.get_fields_treecount)
+			'children': Query().get_list(Cypher.get_fields_treecount)
 		}
 		return jsonify(nested)
 
@@ -74,7 +74,7 @@ class Chart:
 			' RETURN '
 			'	c.count '
 		)
-		return Query().list_result(statement, parameters)
+		return Query().get_list(statement, parameters)
 
 	@staticmethod
 	def get_item_count(
@@ -306,4 +306,4 @@ class Chart:
 				statement += (
 					' RETURN count(distinct(sample)) '
 				)
-		return Query().bolt_result(statement, parameters).single()[0]
+		return Query().get_bolt(statement, parameters).single()[0]

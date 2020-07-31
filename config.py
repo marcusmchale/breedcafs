@@ -185,7 +185,7 @@ REFERENCE_FIELDNAMES = {
 		'partner'
 }
 
-UID_LETTERS = {'b', 't', 's'}
+UID_LETTERS = {'b': 'block', 't': 'tree', 's': 'sample'}
 
 BATCH_PROCESS_ROW_COUNT = 100
 BATCH_PROCESS_MAX_ERROR_ROWS = 25
