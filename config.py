@@ -53,7 +53,12 @@ DOWNLOAD_FOLDER = 'export'
 # neo4j config: dbms.directories.import = 'insert UPLOAD_FOLDER path'
 
 # The below set controls which file extensions can be uploaded
-ALLOWED_EXTENSIONS = {'csv', 'xlsx', 'gz', 'fastq', 'zip'}
+ALLOWED_EXTENSIONS = {
+	'db':['.csv', '.xlsx'],
+	'table':['.csv', '.xlsx'],
+	'seq':['.fastq']
+}
+
 
 # I am using the setgid bit so both celery and the web server can write to import path
 # your solution may vary depending on your web infrastructure
@@ -137,9 +142,22 @@ CONSTRAINTS = [
 
 INDEXES = [
 	# indexes are also created on anything in the unique constraints list
+	{'label': 'Country', 'property': 'name'},
+	{'label': 'Region', 'property': 'name'},
+	{'label': 'Farm', 'property': 'name'},
+	{'label': 'Field', 'property': 'name'},
+	{'label': 'Block', 'property': 'name'},
 	{'label': 'Region', 'property': 'name_lower'},
 	{'label': 'Farm', 'property': 'name_lower'},
-	{'label': 'Field', 'property': 'name_lower'}
+	{'label': 'Field', 'property': 'name_lower'},
+	{'label': 'Block', 'property': 'name_lower'},
+	{'label': 'Block', 'property': 'id'},
+	{'label': 'Tree', 'property': 'id'},
+	{'label': 'Sample', 'property': 'id'},
+	{'label': 'Field', 'property': 'uid'},
+	{'label': 'Block', 'property': 'uid'},
+	{'label': 'Tree', 'property': 'uid'},
+	{'label': 'Sample', 'property': 'uid'}
 ]
 
 REQUIRED_FIELDNAMES = {

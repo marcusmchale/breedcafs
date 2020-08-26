@@ -9,7 +9,7 @@ from instance import config
 # neo4j config
 passwd = getpass.getpass()
 auth = ('neo4j', passwd)
-driver = GraphDatabase.driver(config.BOLT_URI, auth=auth)
+driver = GraphDatabase.neo4j_driver(config.BOLT_URI, auth=auth)
 
 
 def add_database_user(tx):

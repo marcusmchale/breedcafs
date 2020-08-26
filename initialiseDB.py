@@ -25,7 +25,7 @@ uri = app.config['BOLT_URI']
 print('Initialising DB:' + uri)
 
 auth = (os.environ['NEO4J_USERNAME'], os.environ['NEO4J_PASSWORD'])
-driver = GraphDatabase.driver(uri, auth=auth)
+driver = GraphDatabase.neo4j_driver(uri, auth=auth)
 
 
 def confirm(question):
