@@ -49,7 +49,12 @@ def correct_submit():
 		form = CorrectForm()
 		if form.validate_on_submit():
 			username = session['username']
-			access = session['access']
+			if 'global_admin' in session['access']:
+				access = 'global_admin'
+			elif 'partner_admin' in session['access']:
+				access = 'partner_admin'
+			elif 'user' in session['access']:
+				access = 'user'
 			submission_type = form.submission_type.data
 			raw_filename = form.file.data.filename
 			upload_object = Upload(username, submission_type, raw_filename)

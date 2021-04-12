@@ -793,7 +793,7 @@ class PropertyUpdateHandler:
 			'set harvest date': self.set_time,
 			'set harvest time': self.set_time,
 			'set planting date': self.set_time,
-			'set location': self.set_location,
+                        'set location': self.set_location,
 			# The below modify relationships , call these "assign" updates rather than "set"
 			'assign tree to block by name': self.assign_tree_to_block,
 			'assign tree to block by id': self.assign_tree_to_block,
@@ -835,7 +835,7 @@ class PropertyUpdateHandler:
 			self,
 			input_variable
 	):
-		if self.updates[input_variable]:
+		if self.updates[input_variable] and input_variable in self.function_dict:
 			self.function_dict[input_variable](input_variable)
 
 	def error_check(
@@ -2960,7 +2960,7 @@ class Upload:
 			statement = (
 				' MATCH '
 				'	(partner:Partner) '
-				'	<-[:AFFILIATED {data_shared:True})-(user:User) '
+				'	<-[:AFFILIATED {data_shared:True}]-(user:User) '
 				' MATCH '
 				'	(current_user: User { '
 				'		username_lower: toLower($username) '

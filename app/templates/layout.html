@@ -1,13 +1,14 @@
 <!doctype html>
 <html lang="en" charset="utf-8">
 	<head>
+		<meta charset="UTF-8">
 		{% if title %}
             <title>BreedCAFS database tools - {{ title }}</title>
 		{% else %}
 		<title>Welcome to BreedCAFS database tools</title>
 		{% endif %}
+		<link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='style.css') }}">
 	</head>
-<link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='style.css') }}">
 <body>
     {% if config['TEST'] %}
         <a>DEVELOPMENT SITE ONLY - DATA HERE WILL NOT BE PRESERVED</a>
