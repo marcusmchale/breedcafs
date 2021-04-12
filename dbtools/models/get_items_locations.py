@@ -1,7 +1,7 @@
 from dbtools import logging
 from typing import List
 
-from dbtools.cypher.form_field_lists import queries
+from dbtools.models.cypher import queries
 
 
 # the below is useful in considering combinations of parameters for filters to create the cypher queries

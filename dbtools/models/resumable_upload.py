@@ -1,6 +1,5 @@
 import os
-from pathlib import Path, PurePath
-
+from pathlib import Path
 from werkzeug.utils import secure_filename
 
 from dbtools import app, logging

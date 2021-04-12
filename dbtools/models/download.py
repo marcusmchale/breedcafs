@@ -930,7 +930,7 @@ class Download:
 		if parameters['block_uid']:
 			with_filters.append(
 				' ( '
-				'	`Block ID` = toInteger(split($block_uid, "_")[1]) '
+				'   toInteger(split($block_uid, "_B")[1]) IN [] + `Block ID`'
 				' ) '
 			)
 		if parameters['tree_id_list']:

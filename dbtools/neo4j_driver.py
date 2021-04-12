@@ -22,7 +22,7 @@ class Neo4jDriver:
 		)
 		fh = logging.FileHandler(app.config['NEO4J_DRIVER_LOG'])
 		neo4j_log = logging.getLogger("neobolt")
-		neo4j_log.addHandler(fh)
+		neo4j_log.addHandler(fh)burkin
 
 	@staticmethod
 	def get_transaction(session):

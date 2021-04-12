@@ -17,6 +17,6 @@ def application(environ, start_response):
 	]
 	for VAR in ENVARS:
 		os.environ[VAR] = environ.get(VAR, '')
-	from app import app as _application
+	from dbtools import app as _application
 	print(environ)
 	return _application(environ, start_response)

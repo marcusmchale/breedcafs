@@ -10,49 +10,20 @@ from dbtools import (
 	redis_client
 )
 
-from dbtools.cypher.account_admin import queries
 
-
-class User:
-	def __init__(self, username, password):
-		self.username = username,
-		self.password = password,
-		self.access = None
-
-
-class Guest(User):
-	def __init__(self, username, password, ip_address):
-		super().__init__(username, password)
-		self.ip_address = ip_address
-
-
-class RegisteredUser(User):
-	def __init__(self, user_record):
-		super().__init__(user_record['username'], user_record['password'])
-		self.confirmed = user_record['confirmed']
-		self.access = user_record['access']
+from dbtools.models.user import User
 
 
 class LoginHandler:
-	def __init__(self, guest):
+	def __init__(self, user):
 		self.errors = set()
 		self.time = time.time()
-		self.guest = guest
-		self.registered_user = None
 
-	def login(self, tx):
-		if self.excessive_bad_logins() or not self.valid_credentials(tx):
-			return False
-		else:
-			return True
 
-	def valid_credentials(self, tx):
-		user_record = tx.run(queries['get_user_properties'])
-		self.registered_user = RegisteredUser(user_record)
-		return self.password_matches() and self.email_confirmed
 
-	def password_matches(self):
-		if Bcrypt(app).check_password_hash(self.registered_user.password, self.guest.password):
+
+	def password_matches(self, password):
+		if ):
 			return True
 		else:
 			self.record_bad_login()
@@ -71,6 +42,18 @@ class LoginHandler:
 				'Please check your email and follow the link provided following registration.'
 			)
 			return False
+
+
+
+	def login(self, tx):
+
+
+		if self.excessive_bad_logins() or not self.valid_credentials(tx):
+
+			elif Bcrypt(app).check_password_hash(self.registered_user.password, self.guest.password
+			return False
+		else:
+			return True
 
 	def excessive_bad_logins(self):
 		if any([

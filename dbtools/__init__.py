@@ -53,3 +53,4 @@ redis_client = Redis(host='localhost', port=app.config['REDIS_PORT'], db=0)
 # https://flask.palletsprojects.com/en/1.1.x/patterns/packages/
 # noinspection PyPep8
 import dbtools.views
+

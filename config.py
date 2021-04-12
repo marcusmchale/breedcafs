@@ -46,23 +46,18 @@ BREEDCAFS_LOG = os.environ.get('BREEDCAFS_LOG')
 NEO4J_DRIVER_LOG = os.environ.get('NEO4J_DRIVER_LOG')
 
 # PLace upload and download directories in the instance folder
-UPLOAD_FOLDER = 'import'
-DOWNLOAD_FOLDER = 'export'
+IMPORT_FOLDER = 'import'
+EXPORT_FOLDER = 'export'
 # to enable uploads you will also need to enable import from this directory in neo4j
 # found in /etc/neo4j/neo4j.conf
 # neo4j config: dbms.directories.import = 'insert UPLOAD_FOLDER path'
 
-# The below set controls which file extensions can be uploaded
-ALLOWED_EXTENSIONS = {
-	'db':['.csv', '.xlsx'],
-	'table':['.csv', '.xlsx'],
-	'seq':['.fastq']
-}
-
-
 # I am using the setgid bit so both celery and the web server can write to import path
 # your solution may vary depending on your web infrastructure
 IMPORT_FOLDER_PERMISSIONS = 0o2775
+EXPORT_FOLDER_PERMISSIONS = 0o2775
+
+
 CELERYGRPNAME = "CELERY_USER_GROUP"
 WEBSERVERGRPNAME = "WEB_SERVER_USER_GROUP"
 

@@ -31,10 +31,7 @@ def register():
 			email = form.email.data.lower()
 			name = form.name.data
 			partner = form.partner.data
-
 			# get list of allowed emails
-
-
 			allowed_emails = get_all_allowed_emails()
 			if email not in allowed_emails:
 				flash('This email is not registered, please contact your BreedCAFS partner administrator.')
@@ -86,6 +83,7 @@ def register():
 				User.set_user_confirmed(email)
 				flash('Email confirmed')
 				return redirect(url_for('login'))
+			except Exception as e:
 			except Exception as e:
 				logging.info('Error with user confirmation (email): ' + str(e))
 				flash('Please register again and confirm within 24hrs')

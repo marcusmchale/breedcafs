@@ -13,7 +13,7 @@ from dbtools.models.forms import LoginForm
 
 from dbtools.views.custom_decorators import redis_required, neo4j_required
 
-from dbtools.controllers.user_session import Guest, LoginHandler
+from dbtools.blueprints.accounts.controllers import Guest, LoginHandler
 
 
 @app.route('/login', methods=['GET', 'POST'])
