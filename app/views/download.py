@@ -86,7 +86,8 @@ def download_files_list():
 						"download_file",
 						username=session['username'],
 						filename=i,
-						_external=True
+						_external=True,
+						_scheme="https"
 					)
 					+ '">'
 					+ str(i) + '</a></td>'

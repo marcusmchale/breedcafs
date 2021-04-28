@@ -118,7 +118,7 @@ class RegistrationForm(FlaskForm):
 		[
 			InputRequired(),
 			Length(min=1, max=20, message='Maximum 20 characters'),
-			Regexp("^[\x00-\x7F]+$", message='Username contains illegal characters')
+			Regexp("^[a-zA-Z]+$", message='Username contains illegal characters')
 		],
 		filters=[strip_filter],
 		description="Enter a username"

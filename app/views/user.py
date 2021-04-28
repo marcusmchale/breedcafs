@@ -62,7 +62,7 @@ def register():
 				token = ts.dumps(email, salt=app.config['CONFIRM_EMAIL_SALT'])
 				subject = "BreedCAFS database confirmation."
 				recipients = [email]
-				confirm_url = url_for('confirm', token=token, _external = True)
+				confirm_url = url_for('confirm', token=token, _external = True, _scheme="https")
 				body = (
 					"Your account on the BreedCAFS server was successfully created. Your username is" + username +
 					" Please visit the following link to activate your account:" + confirm_url
@@ -147,7 +147,7 @@ def password_reset():
 					token = ts.dumps(email, salt = app.config["PASSWORD_RESET_SALT"])
 					subject = "BreedCAFS database password reset request"
 					recipients = [email]
-					confirm_url = url_for('confirm_password_reset', token = token, _external = True)
+					confirm_url = url_for('confirm_password_reset', token = token, _external = True, _scheme="https")
 					body = (
 						"Hi " + name +
 						". Someone recently requested to reset the password "

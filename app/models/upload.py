@@ -2829,7 +2829,8 @@ class Upload:
 											'download_file',
 											username=username,
 											filename=os.path.basename(conflict_file),
-											_external=True
+											_external=True,
+											_scheme="https"
 										)
 									)
 									response += '\n'
@@ -2902,6 +2903,7 @@ class Upload:
 										username=username,
 										filename=os.path.basename(submission[2]),
 										_external=True,
+										_scheme="https",
 										# adding a parameter here to stop browser from accessing cached version of file
 										date=datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S-%f')
 									)

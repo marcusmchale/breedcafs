@@ -630,7 +630,8 @@ class Download:
 				'download_file',
 				username=self.username,
 				filename=os.path.basename(file_path),
-				_external=True
+				_external=True,
+				_scheme="https"
 			)
 		})
 
@@ -674,7 +675,8 @@ class Download:
 				'download_file',
 				username=self.username,
 				filename=os.path.basename(file_path),
-				_external=True
+				_external=True,
+				_scheme="https"
 			)
 		})
 
@@ -1245,7 +1247,8 @@ class Download:
 						"download_file",
 						username=self.username,
 						filename=os.path.basename(file_path),
-						_external=True
+						_external=True,
+						_scheme="https"
 			)
 		self.file_list.append({
 			"filename": os.path.basename(file_path),
