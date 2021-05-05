@@ -3,12 +3,14 @@
 ## Portal to database for [BreedCAFS](www.breedcafs.eu) project
 
 ## Technology Stack
- * Python web framework ([Flask/Jinja2/Werkzeug/ItsDangerous](https://github.com/pallets))
+ * Python web framework ([Flask](https://github.com/pallets))
    * [Celery](https://github.com/celery/celery) asynchronous tasks
    * [WTForms](https://github.com/wtforms/wtforms) validation
  * Graph database back-end with [Neo4J](https://github.com/neo4j/neo4j)
    * also uses some [APOC](https://github.com/neo4j-contrib/neo4j-apoc-procedures) procedures
- * Javascript driven dynamic user interface
+   * alternatively use [ONgDB](https://github.com/graphfoundation/ongdb)
+  
+ * Javascript UI
    * [jQuery](https://github.com/jquery/jquery) for dynamic content
    * [jQuery-ui](https://github.com/jquery/jquery-ui) for datepicker, drag and drop sortable lists
    * Resumable uploads ([Resumable.js](https://github.com/23/resumable.js/)) to support large files and poor connections
