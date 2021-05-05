@@ -23,6 +23,8 @@ from wtforms.validators import (
 	Length,
 	Regexp
 )
+
+import markupsafe
 from flask_wtf import FlaskForm
 from flask_wtf.file import FileField, FileRequired
 # from app import app
@@ -50,16 +52,6 @@ from wtforms.compat import (
 
 
 class CustomTableWidget(object):
-	"""
-	Renders a list of fields as a set of table rows with th/td pairs.
-
-	If `with_table_tag` is True, then an enclosing <table> is placed around the
-	rows.
-
-	Hidden fields will not be displayed with a row, instead the field will be
-	pushed into a subsequent table row to ensure XHTML validity. Hidden fields
-	at the end of the field list will appear outside the table.
-	"""
 	def __init__(self, with_table_tag=True):
 		self.with_table_tag = with_table_tag
 
@@ -73,13 +65,13 @@ class CustomTableWidget(object):
 			if subfield.type in ('HiddenField', 'CSRFTokenField'):
 				hidden += text_type(subfield)
 			else:
-				html.append('<tr>%s<td>%s%s</td></tr>' % (text_type(subfield.label), hidden, text_type(subfield)))
+				html.append('<tr>%s<td>%s%s</td></tr>' % (text_type(subfield.label.text), hidden, text_type(subfield)))
 				hidden = ''
 		if self.with_table_tag:
 			html.append('</table>')
 		if hidden:
 			html.append(hidden)
-		return HTMLString(''.join(html))
+		return markupsafe.Markup(''.join(html))
 
 
 # custom validators
@@ -195,7 +187,7 @@ class AddUserEmailForm(FlaskForm):
 			Email(),
 			Length(min=1, max=254, message='Maximum 100 characters')
 		],
-		description = 'Add new allowed email'
+		description='Add new allowed email'
 	)
 	submit_user_email = SubmitField('+')
 
@@ -242,7 +234,7 @@ class UserAdminForm(FlaskForm):
 		form.confirmed_users.checked = False
 		form.unconfirmed_users.choices = []
 		form.unconfirmed_users.checked = True
-		users = [record[0] for record in User(user).get_users_for_admin(access)]
+		users = User(user).get_users_for_admin(access)
 		for user in users:
 			user_table = "<td>" + user['Name'] + "</td><td>" + user['Partner'] + "</td>"
 			if user['Confirmed']:
@@ -277,7 +269,7 @@ class PartnerAdminForm(FlaskForm):
 		form.partner_admins.checked = False
 		form.not_partner_admins.choices = []
 		form.not_partner_admins.checked = False
-		users = [record[0] for record in User.admin_get_partner_admins()]
+		users = User.admin_get_partner_admins()
 		for user in users:
 			user_table = "<td>" + user['Name'] + "</td><td>" + user['Partner'] + "</td>"
 			if user['Confirmed']:
@@ -728,14 +720,14 @@ class DownloadForm(FlaskForm):
 		form = DownloadForm()
 		form.record_type.choices = [('', 'Any')] + SelectionList.get_record_types()
 		form.item_level.choices = [('', 'Any')] + SelectionList.get_item_levels()
-		item_level = form.item_level.data if form.item_level.data not in ['', 'None'] else None
-		record_type = form.record_type.data if form.record_type.data not in ['', 'None'] else None
+		item_level = form.item_level.data if form.item_level.data else None
+		record_type = form.record_type.data if form.record_type.data else None
 		form.input_group.choices = [('', 'Any')] + SelectionList.get_input_groups(
 			item_level=item_level,
 			record_type=record_type,
 			username=session['username']
 		)
-		selected_input_group = int(form.input_group.data) if form.input_group.data not in ['', 'None'] else None
+		selected_input_group = int(form.input_group.data) if form.input_group.data else None
 		inputs_list = SelectionList.get_inputs(
 			item_level=item_level,
 			record_type=record_type,
@@ -776,7 +768,7 @@ class AddInputGroupForm(FlaskForm):
 	@staticmethod
 	def update():
 		form = AddInputGroupForm()
-		partner_to_copy = form.partner_to_copy.data if form.partner_to_copy.data not in ['', 'None'] else None
+		partner_to_copy = form.partner_to_copy.data if form.partner_to_copy.data else None
 		if partner_to_copy:
 			partner_groups = SelectionList.get_input_groups(partner=partner_to_copy)
 			partner_groups.insert(0, ("", ""))
@@ -843,10 +835,9 @@ class ManageInputGroupForm(FlaskForm):
 			username=session['username'],
 			include_defaults=True
 		)
-		# record_type = form.record_type.data if form.record_type.data not in ['', 'None'] else None
 		partner_groups = SelectionList.get_input_groups(username=session['username'])
 		form.input_group_select.choices = partner_groups
-		selected_input_group = int(form.input_group_select.data) if form.input_group_select.data not in ['', 'None'] else None
+		selected_input_group = int(form.input_group_select.data) if form.input_group_select.data else None
 		group_members = SelectionList.get_inputs(
 			input_group=selected_input_group
 		)
@@ -971,14 +962,14 @@ class RecordForm(FlaskForm):
 	def update():
 		form = RecordForm()
 		form.item_level.choices = SelectionList.get_item_levels()
-		item_level = form.item_level.data if form.item_level.data not in ['', 'None'] else None
+		item_level = form.item_level.data if form.item_level.data else None
 		form.input_group.choices += SelectionList.get_input_groups(
 			item_level=item_level,
 			username=session['username']
 		)
 		# list is no longer all we need as no longer specifying record type.
 		# need to get record types for format choices and for direct submission forms
-		selected_input_group = form.input_group.data if form.input_group.data not in ['', 'None'] else None
+		selected_input_group = form.input_group.data if form.input_group.data else None
 		if selected_input_group:
 			inputs_list = SelectionList.get_inputs(
 				item_level=item_level,

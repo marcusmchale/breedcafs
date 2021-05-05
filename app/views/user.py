@@ -1,4 +1,7 @@
-from app import app, ServiceUnavailable, SecurityError, logging
+from app import app
+from neo4j.exceptions import ServiceUnavailable, AuthError
+import logging
+
 from flask import (
 	request,
 	session, 
@@ -75,7 +78,7 @@ def register():
 				logging.info('Error registering user:' + str(e))
 				flash('Error with registration please contact an administrator')
 		return render_template('register.html', form=form, title='Register') 
-	except (ServiceUnavailable, SecurityError):
+	except (ServiceUnavailable, AuthError):
 		flash("Database unavailable")
 		return redirect(url_for('index'))
 
@@ -93,7 +96,7 @@ def confirm(token):
 			logging.info('Error with user confirmation (email): ' + str(e))
 			flash('Please register again and confirm within 24hrs')
 			return redirect(url_for('register'))
-	except (ServiceUnavailable, SecurityError):
+	except (ServiceUnavailable, AuthError):
 		flash("Database unavailable")
 		return redirect(url_for('index'))
 
@@ -147,7 +150,7 @@ def password_reset():
 					token = ts.dumps(email, salt = app.config["PASSWORD_RESET_SALT"])
 					subject = "BreedCAFS database password reset request"
 					recipients = [email]
-					confirm_url = url_for('confirm_password_reset', token = token, _external = True, _scheme="https")
+					confirm_url = url_for('confirm_password_reset', token=token, _external=True, _scheme="https")
 					body = (
 						"Hi " + name +
 						". Someone recently requested to reset the password "
@@ -157,9 +160,9 @@ def password_reset():
 					)
 					html = render_template(
 						'emails/password_reset.html',
-						confirm_url = confirm_url,
-						username = username,
-						name = name
+						confirm_url=confirm_url,
+						username=username,
+						name=name
 					)
 					send_email(subject, app.config['ADMINS'][0], recipients, body, html)
 					flash('Please check your email to confirm password reset')
@@ -169,7 +172,7 @@ def password_reset():
 			else:
 				flash('User is not registered')
 		return render_template('password_reset.html', form=form, title='Password reset')
-	except (ServiceUnavailable, SecurityError):
+	except (ServiceUnavailable, AuthError):
 		flash("Database unavailable")
 		return redirect(url_for('index'))
 
@@ -194,7 +197,7 @@ def confirm_password_reset(token):
 			form=form,
 			token=token
 		)
-	except (ServiceUnavailable, SecurityError):
+	except (ServiceUnavailable, AuthError):
 		flash("Database unavailable")
 		return redirect(url_for('index'))
 
@@ -211,7 +214,7 @@ def user_page():
 				'user_page.html',
 				affiliation_form=affiliation_form
 			)
-	except (ServiceUnavailable, SecurityError):
+	except (ServiceUnavailable, AuthError):
 		flash("Database unavailable")
 		return redirect(url_for('index'))
 
@@ -296,11 +299,11 @@ def user_admin():
 			remove_user_email_form = RemoveUserEmailForm().update(session['username'])
 			return render_template(
 				'user_admin.html',
-				user_admin_form = user_admin_form,
-				add_user_email_form = add_user_email_form,
-				remove_user_email_form = remove_user_email_form
+				user_admin_form=user_admin_form,
+				add_user_email_form=add_user_email_form,
+				remove_user_email_form=remove_user_email_form
 			)
-		except (ServiceUnavailable, SecurityError):
+		except (ServiceUnavailable, AuthError):
 			flash("Database unavailable")
 			return redirect(url_for('index'))
 
@@ -328,7 +331,7 @@ def add_allowed_user():
 						return jsonify({'error': 'This email address is already allowed '})
 				else:
 					return jsonify({'error': add_user_email_form.errors["user_email"]})
-		except (ServiceUnavailable, SecurityError):
+		except (ServiceUnavailable, AuthError):
 			flash("Database unavailable")
 			return redirect(url_for('index'))
 
@@ -353,7 +356,7 @@ def remove_allowed_user():
 					return jsonify({'success': result})
 				else:
 					return jsonify({'error': remove_user_email_form.errors["user_email"]})
-		except (ServiceUnavailable, SecurityError):
+		except (ServiceUnavailable, AuthError):
 			flash("Database unavailable")
 			return redirect(url_for('index'))
 
@@ -371,7 +374,7 @@ def get_user_allowed_emails():
 				return redirect(url_for('index'))
 			else: 
 				return jsonify(User(session['username']).get_user_allowed_emails())
-		except (ServiceUnavailable, SecurityError):
+		except (ServiceUnavailable, AuthError):
 			flash("Database unavailable")
 			return redirect(url_for('index'))
 
@@ -387,7 +390,7 @@ def partner_admin():
 			try:
 				form = PartnerAdminForm.update()
 				return render_template('partner_admin.html', form=form)
-			except (ServiceUnavailable, SecurityError):
+			except (ServiceUnavailable, AuthError):
 				flash("Database unavailable")
 				return redirect(url_for('index'))
 		else:
@@ -403,9 +406,9 @@ def admin_users():
 		return redirect(url_for('login'))
 	else:
 		if 'global_admin' in session['access']:
-			users = [record[0] for record in User(session['username']).get_users_for_admin('global_admin')]
+			users = User(session['username']).get_users_for_admin('global_admin')
 		elif 'partner_admin' in session['access']:
-			users = [record[0] for record in User(session['username']).get_users_for_admin('partner_admin')]
+			users = User(session['username']).get_users_for_admin('partner_admin')
 		else:
 			flash('User access to this page is restricted to administrators')
 			return redirect(url_for('index'))
@@ -461,12 +464,12 @@ def confirm_users():
 						for i, item in enumerate(confirm_list):
 							confirm_list[i] = json.loads(item)
 						users = User.admin_confirm_users(session['username'], session['access'], confirm_list)
-						return jsonify({'success': [record[0] for record in users]})
+						return jsonify({'success': [user['name'] for user in users]})
 					else:
 						return jsonify({'error': 'No users selected'})
 				else:
 					return jsonify({'error': 'Unexpected form values'})
-			except (ServiceUnavailable, SecurityError):
+			except (ServiceUnavailable, AuthError):
 				flash("Database unavailable")
 				return redirect(url_for('admin'))
 		else:
@@ -482,19 +485,18 @@ def admin_partner_admins():
 		return redirect(url_for('login'))
 	else:
 		if 'global_admin' in session['access']:
-			users = [record[0] for record in User.admin_get_partner_admins()]
+			users = User.admin_get_partner_admins()
 		else:
 			flash('You attempted to access a restricted page')
 			return redirect(url_for('index'))
 		user_lists = defaultdict(list)
-		for user in enumerate(users):
-			if user[1]['Confirmed']:
+		for i, user in enumerate(users):
+			if user['Confirmed']:
 				row = (
 					'<tr><label for="partner_admins-%s"></label><td>%s</td><td>%s</td><td><input id="partner_admins-'
 					'%s" name="partner_admins" value=\'{"username":"%s", "partner":"%s"}\' type="checkbox"></td></tr>'
 					% (
-						str(user[0]), user[1]['Name'], user[1]['Partner'],  str(user[0]), user[1]['Username'],
-						user[1]["Partner"]
+						str(i), user['Name'], user['Partner'],  str(i), user['Username'], user["Partner"]
 					)
 				)
 				user_lists['partner_admins'].append(row)
@@ -503,8 +505,8 @@ def admin_partner_admins():
 					'<tr><label for="not_partner_admins-%s"></label><td>%s</td><td>%s</td><td><input id="not_partner_admins-'
 					'%s" name="not_partner_admins" value=\'{"username":"%s", "partner":"%s"}\' type="checkbox"></td></tr>'
 					% (
-						str(user[0]), user[1]['Name'], user[1]['Partner'], str(user[0]), user[1]['Username'],
-						user[1]["Partner"]
+						str(i), user['Name'], user['Partner'], str(i), user['Username'],
+						user["Partner"]
 					)
 				)
 				user_lists['not_partner_admins'].append(row)
@@ -512,7 +514,7 @@ def admin_partner_admins():
 
 
 # endpoint to select partner_admins (where relationship ADMIN_FOR exists flip property confirmed = true/false)
-@app.route('/admin/confirm_partner_admins', methods = ['POST'])
+@app.route('/admin/confirm_partner_admins', methods=['POST'])
 def confirm_partner_admins():
 	if 'username' not in session:
 		flash('Please log in')
@@ -528,10 +530,10 @@ def confirm_partner_admins():
 						for i, item in enumerate(admins):
 							admins[i] = json.loads(item)
 						users = User.admin_confirm_admins(admins)
-						return jsonify({'success': [record[0] for record in users]})
+						return jsonify({'success': [user['name'] for user in users]})
 					else:
 						return jsonify({'error': 'No users selected'})
-			except (ServiceUnavailable, SecurityError):
+			except (ServiceUnavailable, AuthError):
 				flash("Database unavailable")
 				return redirect(url_for('admin'))
 		else:

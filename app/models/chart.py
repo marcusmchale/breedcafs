@@ -1,10 +1,6 @@
-from app import (
-	# app,
-	ServiceUnavailable,
-	SecurityError
-)
 from app.cypher import Cypher
-from .neo4j_driver import get_driver, neo4j_query
+from neo4j.exceptions import ServiceUnavailable, AuthError
+from .neo4j_driver import get_driver, list_records, single_record
 from datetime import datetime
 from flask import jsonify
 from .parsers import Parsers
@@ -16,17 +12,17 @@ class Chart:
 
 	# get lists of submitted nodes and relationships in json format
 	@staticmethod
-	def get_submissions_range(username, startdate, enddate):
+	def get_submissions_range(username, start_date, end_date):
 		try:
 			epoch = datetime.utcfromtimestamp(0)
-			parameters = {
-				'username': username,
-				'starttime': ((datetime.strptime(startdate, '%Y-%m-%d')-epoch).total_seconds())*1000,
-				'endtime': ((datetime.strptime(enddate, '%Y-%m-%d')-epoch).total_seconds())*1000
-			}
 			with get_driver().session() as neo4j_session:
-				result = neo4j_session.read_transaction(neo4j_query, Cypher.get_submissions_range, parameters)
-			records = [record for record in result]
+				records = neo4j_session.read_transaction(
+					list_records,
+					Cypher.get_submissions_range,
+					username=username,
+					starttime=((datetime.strptime(start_date, '%Y-%m-%d') - epoch).total_seconds()) * 1000,
+					endtime=((datetime.strptime(end_date, '%Y-%m-%d') - epoch).total_seconds()) * 1000
+				)
 			# collect all nodes/rels from records into lists of dicts
 			nodes = []
 			rels = []
@@ -50,38 +46,34 @@ class Chart:
 			rels = list({rel['id']: rel for rel in rels}.values())
 			# and create the d3 input
 			return jsonify({"nodes": nodes, "links": rels})
-		except (ServiceUnavailable, SecurityError):
+		except (ServiceUnavailable, AuthError):
 			return jsonify({"status": "Database unavailable"})
 
 	# get lists of submitted nodes (relationships and directly linked nodes) in json format
 	@staticmethod
 	def get_fields_treecount():
 		with get_driver().session() as neo4j_session:
-			result = neo4j_session.read_transaction(neo4j_query, Cypher.get_fields_treecount)
-		records = [record for record in result]
+			records = neo4j_session.read_transaction(list_records, Cypher.get_fields_treecount)
 		nested = {
 			'name': 'nodes',
 			'label': 'root_node',
-			'children': [record[0] for record in records]
+			'children': [record['country'] for record in records]
 		}
 		return jsonify(nested)
 
 	@staticmethod
 	def get_tree_count(uid):
-		parameters = {
-			'uid': uid
-		}
 		statement = (
 			' MATCH '
 			'	(c: Counter { '
 			'		uid: ($uid + "_tree") '
 			'	}) '
 			' RETURN '
-			'	c.count '
+			'	c.count as count '
 		)
 		with get_driver().session() as neo4j_session:
-			result = neo4j_session.read_transaction(neo4j_query, statement, parameters)
-			return [record[0] for record in result]
+			records = neo4j_session.read_transaction(list_records, statement, uid=uid)
+			return [record['count'] for record in records]
 
 	@staticmethod
 	def get_item_count(
@@ -311,15 +303,15 @@ class Chart:
 							' sample.id IN $sample_id_list '
 						)
 				statement += (
-					' RETURN count(distinct(sample)) '
+					' RETURN count(distinct(sample)) as count '
 				)
 		with get_driver().session() as neo4j_session:
-			result = neo4j_session.read_transaction(
-				neo4j_query,
+			count = neo4j_session.read_transaction(
+				single_record,
 				statement,
-				parameters
-			)[0][0]
-			return result
+				**parameters
+			)
+			return count
 
 
 

@@ -1,7 +1,4 @@
-from app import (
-	ServiceUnavailable,
-	SecurityError
-)
+from neo4j.exceptions import ServiceUnavailable, AuthError
 
 from flask import (
 	session,
@@ -31,7 +28,7 @@ class ListCountries(MethodView):
 				response = make_response(jsonify(countries))
 				response.content_type = 'application/json'
 				return response
-			except (ServiceUnavailable, SecurityError):
+			except (ServiceUnavailable, AuthError):
 				flash("Database unavailable")
 				return redirect(url_for('index'))
 
@@ -47,7 +44,7 @@ class ListRegions(MethodView):
 				response = make_response(jsonify(regions))
 				response.content_type = 'application/json'
 				return response
-			except (ServiceUnavailable, SecurityError):
+			except (ServiceUnavailable, AuthError):
 				flash("Database unavailable")
 				return redirect(url_for('index'))
 
@@ -63,7 +60,7 @@ class ListFarms(MethodView):
 				response = make_response(jsonify(farms))
 				response.content_type = 'application/json'
 				return response
-			except (ServiceUnavailable, SecurityError):
+			except (ServiceUnavailable, AuthError):
 				flash("Database unavailable")
 				return redirect(url_for('index'))
 
@@ -79,7 +76,7 @@ class ListFields(MethodView):
 				response = make_response(jsonify(fields))
 				response.content_type = 'application/json'
 				return response
-			except (ServiceUnavailable, SecurityError):
+			except (ServiceUnavailable, AuthError):
 				flash("Database unavailable")
 				return redirect(url_for('index'))
 
@@ -95,7 +92,7 @@ class ListBlocks(MethodView):
 				response = make_response(jsonify(blocks))
 				response.content_type = 'application/json'
 				return response
-			except (ServiceUnavailable, SecurityError):
+			except (ServiceUnavailable, AuthError):
 				flash("Database unavailable")
 				return redirect(url_for('index'))
 
@@ -112,6 +109,6 @@ class TreeCount(MethodView):
 				response = make_response(jsonify(tree_count))
 				response.content_type = 'application/json'
 				return response
-			except (ServiceUnavailable, SecurityError):
+			except (ServiceUnavailable, AuthError):
 				flash("Database unavailable")
 				return redirect(url_for('index'))

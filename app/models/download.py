@@ -1,8 +1,9 @@
-from app import app, os
-import grp
+from app import app
+import os
 from .neo4j_driver import (
 	get_driver,
-	bolt_result
+	list_records,
+	single_record
 )
 from flask import (
 	url_for,
@@ -41,7 +42,7 @@ class Download:
 			self.inputs[record_type] = []
 		self.file_list = []
 		# create user download path if not found
-		self.user_download_folder = os.path.join(app.config['DOWNLOAD_FOLDER'], username)
+		self.user_download_folder = os.path.join(app.config['EXPORT_FOLDER'], username)
 		if not os.path.isdir(self.user_download_folder):
 			os.mkdir(self.user_download_folder, mode=0o770)
 		# prepare variables to write the file
@@ -75,7 +76,7 @@ class Download:
 			sample_id_list,
 			per_item_count
 		)
-		if id_list.peek():
+		if id_list:
 			self.id_list = id_list
 			return True
 		else:
@@ -91,7 +92,7 @@ class Download:
 			count,
 			block_uid
 		)
-		if id_list.peek():
+		if id_list:
 			self.id_list = id_list
 			return True
 		else:
@@ -121,7 +122,7 @@ class Download:
 			'Column',
 			'UID'
 		]
-		self.item_fieldnames = [i for i in fieldnames_order if i in list(self.id_list.peek()[0].keys())]
+		self.item_fieldnames = [i for i in fieldnames_order if i in list(self.id_list[0].keys())]
 
 	def get_file_list_html(self):
 		if not self.file_list:
@@ -191,13 +192,11 @@ class Download:
 			' RETURN ig.id '
 		)
 		with get_driver().session() as neo4j_session:
-			result = neo4j_session.read_transaction(
-				bolt_result,
+			return neo4j_session.read_transaction(
+				single_record,
 				statement,
-				parameters
-			).single()
-			if result:
-				return result[0]
+				**parameters
+			)
 
 	def set_inputs(
 			self,
@@ -346,7 +345,7 @@ class Download:
 				('Person', right_border)
 			]
 		}
-		item_details_keys = list(self.id_list.peek()[0].keys())
+		item_details_keys = list(self.id_list[0].keys())
 		if 'Column' in item_details_keys:
 			self.item_reference_details.insert(0, 'Column')
 			for i in list(core_fields_formats.keys()):
@@ -485,10 +484,10 @@ class Download:
 			item_reference_details_dict = {}
 			if self.item_reference_details:
 				for key in self.item_reference_details:
-					item_reference_details_dict[key] = record[0][key]
+					item_reference_details_dict[key] = record[key]
 			# if there is a list (or nested lists) stored in this item
 			# make sure it is returned as a list of strings
-			for key, value in record[0].items():
+			for key, value in record.items():
 				if isinstance(value, list):
 					value = ", ".join([str(i) for i in value])
 				if key in self.item_fieldnames:
@@ -500,7 +499,7 @@ class Download:
 						self.write_item_to_worksheet(
 							record_type,
 							ws_dict[record_type],
-							record[0],
+							record,
 							item_num,
 							item_reference_details_dict
 						)
@@ -516,12 +515,12 @@ class Download:
 									)
 									# +3 for [Name/UID/Person] offset
 									if inputs_properties[input_variable['name_lower']] == 'name':
-										if 'Name' in record[0] and record[0]['Name']:
-											name = record[0]['Name']
+										if 'Name' in record and record['Name']:
+											name = record['Name']
 											ws_dict[record_type].write(item_num, input_column, name)
 									elif inputs_properties[input_variable['name_lower']] == "variety":
-										if 'Varieties' in record[0] and record[0]['Varieties'] and len(record[0]['Varieties']) == 1:
-											variety = record[0]['Varieties'][0]
+										if 'Varieties' in record and record['Varieties'] and len(record['Varieties']) == 1:
+											variety = record['Varieties'][0]
 											if 'name' in input_variable['name_lower']:
 												ws_dict[record_type].write(item_num, input_column, variety)
 											else:
@@ -537,16 +536,16 @@ class Download:
 															app.config['SYSTEM_VARIETY_CODE'][code_system][variety]
 														)
 									elif inputs_properties[input_variable['name_lower']] == "unit":
-										if 'Unit' in record[0] and record[0]['Unit']:
-											unit = record[0]['Unit']
+										if 'Unit' in record and record['Unit']:
+											unit = record['Unit']
 											ws_dict[record_type].write(item_num, input_column, unit)
 									elif inputs_properties[input_variable['name_lower']] == "elevation":
-										if 'Elevation' in record[0] and record[0]['Elevation']:
-											elevation = record[0]['Elevation']
+										if 'Elevation' in record and record['Elevation']:
+											elevation = record['Elevation']
 											ws_dict[record_type].write(item_num, input_column, elevation)
 									elif inputs_properties[input_variable['name_lower']] == "time":
-										if 'Time' in record[0] and record[0]['Time']:
-											time = record[0]['Time']
+										if 'Time' in record and record['Time']:
+											time = record['Time']
 											if 'date' in input_variable['name_lower']:
 												date = time.split(' ')[0]
 												ws_dict[record_type].write(item_num, input_column, date)
@@ -556,40 +555,40 @@ class Download:
 									elif inputs_properties[input_variable['name_lower']] == "source":
 										if 'assign tree' in input_variable['name_lower']:
 											if 'by name' in input_variable['name_lower']:
-												if 'Block' in record[0] and record[0]['Block']:
-													block = record[0]['Block']
+												if 'Block' in record and record['Block']:
+													block = record['Block']
 													ws_dict[record_type].write(item_num, input_column, block)
 											else:   # by code in input variable['name_lower']:
-												if 'Block ID' in record[0] and record[0]['Block ID']:
-													block = record[0]['Block ID']
+												if 'Block ID' in record and record['Block ID']:
+													block = record['Block ID']
 													ws_dict[record_type].write(item_num, input_column, block)
 										else:  # 'assign sample' in input_variable['name_lower']
 											if 'by name' in input_variable['name_lower']:
-												if 'source_level' in record[0] and record[0]['source_level'] == 'Block':
-													blocks = ', '.join([str(i) for i in record[0]['Blocks']])
+												if 'source_level' in record and record['source_level'] == 'Block':
+													blocks = ', '.join([str(i) for i in record['Blocks']])
 													ws_dict[record_type].write(item_num, input_column, blocks)
 											else:  # by id
 												if 'to block' in input_variable['name_lower']:
-													if 'source_level' in record[0] and record[0]['source_level'] == 'Block':
-														if 'Block IDs' in record[0] and record[0]['Block IDs']:
-															blocks = ', '.join([str(i) for i in record[0]['Block IDs']])
+													if 'source_level' in record and record['source_level'] == 'Block':
+														if 'Block IDs' in record and record['Block IDs']:
+															blocks = ', '.join([str(i) for i in record['Block IDs']])
 															ws_dict[record_type].write(item_num, input_column, blocks)
 												elif 'to tree' in input_variable['name_lower']:
-													if 'source_level' in record[0] and record[0]['source_level'] == 'Tree':
-														if 'Tree IDs' in record[0] and record[0]['Tree IDs']:
-															trees = ', '.join([str(i) for i in record[0]['Tree IDs']])
+													if 'source_level' in record and record['source_level'] == 'Tree':
+														if 'Tree IDs' in record and record['Tree IDs']:
+															trees = ', '.join([str(i) for i in record['Tree IDs']])
 															ws_dict[record_type].write(item_num, input_column, trees)
 												elif 'to sample' in input_variable['name_lower']:
-													if 'source_level' in record[0] and record[0]['source_level'] == 'Sample':
-														if 'source_ids' in record[0] and record[0]['Source Sample IDs']:
-															source_samples = ', '.join([str(i) for i in record[0]['source_ids']])
+													if 'source_level' in record and record['source_level'] == 'Sample':
+														if 'source_ids' in record and record['Source Sample IDs']:
+															source_samples = ', '.join([str(i) for i in record['source_ids']])
 															ws_dict[record_type].write(item_num, input_column, source_samples)
 					else:  # i.e. record_type == 'curve', where worksheet is named after input
 						for input_variable in self.inputs[record_type]:
 							self.write_item_to_worksheet(
 								record_type,
 								ws_dict[input_variable['name_lower']],
-								record[0],
+								record,
 								item_num,
 								item_reference_details_dict
 							)
@@ -965,66 +964,62 @@ class Download:
 			statement += ' AND '.join(with_filters)
 		if data_format == 'db':
 			statement += (
-				' WITH { '
-				'	record_type: record_type, '
-				'	`Input variable`: Input, '
-				'	Partner: Partner, '
-				'	`Submitted by`: `Submitted by`, '
-				'	`Submitted at`: `Submitted at`, '
-				'	Value: Value, '
-				'	Time: Time, '
-				'	Period: [Start, End], '
-				'	`Recorded by`: `Recorded by`, '
-				'	UID: UID, '
-				'	Name: Name,'
-				'	Replicate: Replicate, '
-				'	`Source samples`: `Source samples`, '
-				'	`Source trees`: `Source trees`, '
-				'	Block: Block, '
-				'	`Block ID`: `Block ID`, '
-				'	Field: Field, '
-				'	`Field UID`: `Field UID`, '
-				'	Farm: Farm, '
-				'	Region: Region, '
-				'	Country: Country, '
-				'	ID: ID'
-				' } as result'
-				' RETURN result '
+				' RETURN '
+				'	record_type, '
+				'	Input as `Input variable`, '
+				'	Partner, '
+				'	`Submitted by`, '
+				'	`Submitted at`, '
+				'	Value, '
+				'	Time, '
+				'	[Start, End] as Period, '
+				'	`Recorded by`, '
+				'	UID, '
+				'	Name,'
+				'	Replicate, '
+				'	`Source samples`, '
+				'	`Source trees`, '
+				'	Block, '
+				'	`Block ID`, '
+				'	Field, '
+				'	`Field UID`, '
+				'	Farm, '
+				'	Region, '
+				'	Country, '
+				'	ID'
 				' ORDER BY '
-				'	result["Input variable"], '
+				'	"Input variable", '
 				'	CASE '
-				'		WHEN result["Field UID"] IS NOT NULL THEN result["Field UID"] '
-				'		ELSE result["UID"] END, '
-				'	result["ID"], '
-				'	result["Replicate"] '
+				'		WHEN "Field UID" IS NOT NULL THEN "Field UID" '
+				'		ELSE "UID" END, '
+				'	"ID", '
+				'	"Replicate" '
 			)
 		else:
 			statement += (
-				' WITH { '
-				'	Records: collect({'
+				' RETURN '
+				'	collect({'
 				'		input_name: Input, '
 				'		record_type: record_type, '
 				'		values: Values '
-				'	}), '
-				'	UID: UID, '
-				'	Name: Name,'
-				'	`Source samples`: `Source samples`, '
-				'	`Source trees`: `Source trees`, '
-				'	Block: Block, '
-				'	`Block ID`: `Block ID`, '
-				'	Field: Field, '
-				'	`Field UID`: `Field UID`, '
-				'	Farm: Farm, '
-				'	Region: Region, '
-				'	Country: Country, '
-				'	ID: ID '
-				' } as result '
+				'	}) as Records, '
+				'	UID, '
+				'	Name,'
+				'	`Source samples`, '
+				'	`Source trees`, '
+				'	Block, '
+				'	`Block ID`, '
+				'	Field, '
+				'	`Field UID`, '
+				'	Farm, '
+				'	Region, '
+				'	Country, '
+				'	ID '
 				' ORDER BY '
 				'	CASE '
-				'		WHEN result["Field UID"] IS NOT NULL THEN result["Field UID"] '
-				'		ELSE result["UID"] END, '
+				'		WHEN "Field UID" IS NOT NULL THEN "Field UID" '
+				'		ELSE "UID" END, '
 				'	result["ID"] '
-				' RETURN result '
 			)
 		return statement
 
@@ -1044,91 +1039,90 @@ class Download:
 		)
 		statement += self.user_record_query(parameters, data_format)
 		with get_driver().session() as neo4j_session:
-			result = neo4j_session.read_transaction(
-				bolt_result,
+			return neo4j_session.read_transaction(
+				list_records,
 				statement,
-				parameters
+				**parameters
 			)
-		return result
 
 	@staticmethod
 	def format_record(record, data_format='db'):
 		if data_format == 'table':
-			for f, input_type in enumerate(record[0]['Records']):
+			for f, input_type in enumerate(record['Records']):
 				for v, value in enumerate(input_type['values']):
 					# flatten each value to string if it is a list
 					if isinstance(value, list):
 						if len(value) > 1:
 							for i, j in enumerate(value):
 								if isinstance(j, (float, int)):
-									record[0]['Records'][f]['values'][v][i] = str(j)
+									record['Records'][f]['values'][v][i] = str(j)
 								if isinstance(j, list):
 									if len(j) > 1:
 										for ji, jj in enumerate(j):
 											if isinstance(jj, (float, int)):
-												record[0]['Records'][f]['values'][v][i][ji] = str(jj)
-										record[0]['Records'][f]['values'][v][i] = '[' + ', '.join(
-											[jl for jl in record[0]['Records'][f]['values'][v][i]]
+												record['Records'][f]['values'][v][i][ji] = str(jj)
+										record['Records'][f]['values'][v][i] = '[' + ', '.join(
+											[jl for jl in record['Records'][f]['values'][v][i]]
 										) + ']'
-							record[0]['Records'][f]['values'][v] = ', '.join(
-								[l for l in record[0]['Records'][f]['values'][v]]
+							record['Records'][f]['values'][v] = ', '.join(
+								[l for l in record['Records'][f]['values'][v]]
 							)
 						else:
-							record[0]['Records'][f]['values'][v] = record[0]['Records'][f]['values'][v][0]
+							record['Records'][f]['values'][v] = record['Records'][f]['values'][v][0]
 				# then flatten the list of values to a string stored in the record dict
-				if len(record[0]['Records'][f]['values']) > 1:
-					for v, value in enumerate(record[0]['Records'][f]['values']):
+				if len(record['Records'][f]['values']) > 1:
+					for v, value in enumerate(record['Records'][f]['values']):
 						if isinstance(value, (float, int)):
-							record[0]['Records'][f]['values'][v] = str(value)
-					record[0][input_type['input_name']] = ', '.join(
-						[value for value in record[0]['Records'][f]['values']]
+							record['Records'][f]['values'][v] = str(value)
+					record[input_type['input_name']] = ', '.join(
+						[value for value in record['Records'][f]['values']]
 					)
-				elif record[0]['Records'][f]['values']:
-					record[0][input_type['input_name']] = record[0]['Records'][f]['values'][0]
+				elif record['Records'][f]['values']:
+					record[input_type['input_name']] = record['Records'][f]['values'][0]
 		else:  # data_format == 'db'
-			for key in record[0]:
+			for key in record:
 				if key == "Period":
-					if record[0]['record_type'] != 'condition':
-						record[0][key] = None
-					if record[0][key]:
-						if record[0][key][0]:
-							record[0][key][0] = datetime.utcfromtimestamp(record[0][key][0] / 1000).strftime(
+					if record['record_type'] != 'condition':
+						record[key] = None
+					if record[key]:
+						if record[key][0]:
+							record[key][0] = datetime.utcfromtimestamp(record[key][0] / 1000).strftime(
 								"%Y-%m-%d %H:%M")
 						else:
-							record[0][key][0] = 'Undefined'
-						if record[0][key][1]:
-							record[0][key][1] = datetime.utcfromtimestamp(record[0][key][1] / 1000).strftime(
+							record[key][0] = 'Undefined'
+						if record[key][1]:
+							record[key][1] = datetime.utcfromtimestamp(record[key][1] / 1000).strftime(
 								"%Y-%m-%d %H:%M")
 						else:
-							record[0][key][1] = 'Undefined'
-						record[0][key] = ' - '.join(record[0][key])
-				elif key == 'Time' and record[0][key]:
-					record[0][key] = datetime.utcfromtimestamp(record[0][key] / 1000).strftime("%Y-%m-%d %H:%M")
+							record[key][1] = 'Undefined'
+						record[key] = ' - '.join(record[key])
+				elif key == 'Time' and record[key]:
+					record[key] = datetime.utcfromtimestamp(record[key] / 1000).strftime("%Y-%m-%d %H:%M")
 				elif key == 'Submitted at':
-					record[0][key] = datetime.utcfromtimestamp(record[0][key] / 1000).strftime("%Y-%m-%d %H:%M:%S")
-		for key in record[0]:
-			if isinstance(record[0][key], list):
-				if not record[0][key]:
-					if isinstance(record[0][key], list):
-						record[0][key] = None
+					record[key] = datetime.utcfromtimestamp(record[key] / 1000).strftime("%Y-%m-%d %H:%M:%S")
+		for key in record:
+			if isinstance(record[key], list):
+				if not record[key]:
+					if isinstance(record[key], list):
+						record[key] = None
 				else:
-					if len(record[0][key]) > 1:
-						for i, j in enumerate(record[0][key]):
+					if len(record[key]) > 1:
+						for i, j in enumerate(record[key]):
 							if isinstance(j, (float, int)):
-								record[0][key][i] = str(j)
+								record[key][i] = str(j)
 							if isinstance(j, list):
 								for ii,jj in enumerate(j):
 									if isinstance(jj, (float, int)):
-										record[0][key][i][ii] = str(jj)
-								record[0][key][i] = '[' + ', '.join([l for l in record[0][key][i]]) + ']'
-						record[0][key] = ', '.join([str(i) for i in record[0][key]])
+										record[key][i][ii] = str(jj)
+								record[key][i] = '[' + ', '.join([l for l in record[key][i]]) + ']'
+						record[key] = ', '.join([str(i) for i in record[key]])
 					else:
-						record[0][key] = record[0][key][0]
+						record[key] = record[key][0]
 		return record
 
 	def records_to_file(self, result, data_format, file_type):
 		# check if any data found, if not return none
-		first_result = result.peek()
+		first_result = result[0]
 		if not first_result:
 			return {
 				'status': 'SUCCESS',
@@ -1150,9 +1144,9 @@ class Download:
 			'UID',
 			'Replicate'
 		]
-		fieldnames = [i for i in item_fieldnames if i in list(first_result[0].keys())]
+		fieldnames = [i for i in item_fieldnames if i in list(first_result.keys())]
 		if data_format == 'table':
-			inputs = [i['input_name'] for i in first_result[0]['Records']]
+			inputs = [i['input_name'] for i in first_result['Records']]
 			fieldnames += inputs
 		else:
 			fieldnames += [
@@ -1178,17 +1172,17 @@ class Download:
 			for record in result:
 				# check if new fieldnames to add
 				if data_format == 'table':
-					for input_name in [input_type['input_name'] for input_type in record[0]['Records']]:
+					for input_name in [input_type['input_name'] for input_type in record['Records']]:
 						if input_name not in fieldnames:
 							fieldnames.append(input_name)
 				record = self.format_record(record, data_format)
 				row_number += 1
 				col_number = 0
 				for field in fieldnames:
-					if field in record[0]:
-						if record[0][field]:
+					if field in record:
+						if record[field]:
 							used_fields.add(field)
-							worksheet.write(row_number, col_number, record[0][field])
+							worksheet.write(row_number, col_number, record[field])
 					col_number += 1
 			# hide columns not written to,
 			# if we want to actually delete them we need to move to using openpyxl instead of xlsxwriter
@@ -1215,11 +1209,11 @@ class Download:
 						quoting=csv.QUOTE_ALL,
 						extrasaction='ignore')
 					for record in result:
-						for input_name in [input_type['input_name'] for input_type in record[0]['Records']]:
+						for input_name in [input_type['input_name'] for input_type in record['Records']]:
 							if input_name not in fieldnames:
 								fieldnames.append(input_name)
 						record = self.format_record(record, data_format)
-						temp_writer.writerow(record[0])
+						temp_writer.writerow(record)
 				with open(file_path_temp, 'r') as csv_temp_file:
 					with open(file_path, 'w') as csv_file:
 						writer = csv.DictWriter(
@@ -1242,7 +1236,7 @@ class Download:
 					writer.writeheader()
 					for record in result:
 						record = self.format_record(record, data_format)
-						writer.writerow(record[0])
+						writer.writerow(record)
 		download_url = url_for(
 						"download_file",
 						username=self.username,

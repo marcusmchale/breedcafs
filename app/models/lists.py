@@ -2,7 +2,8 @@ from app import logging
 
 from .neo4j_driver import (
 	get_driver,
-	bolt_result
+	single_record,
+	list_records
 )
 
 
@@ -51,15 +52,15 @@ class SelectionList:
 			)
 		statement += (
 			' MATCH (ig)-[: AT_LEVEL]->(level: ItemLevel) '
-			' RETURN DISTINCT [level.name_lower, level.name] '
+			' RETURN DISTINCT level.name_lower as name_lower, level.name as name '
 		)
 		with get_driver().session() as neo4j_session:
-			result = neo4j_session.read_transaction(
-				bolt_result,
+			records = neo4j_session.read_transaction(
+				list_records,
 				statement,
-				parameters
+				**parameters
 			)
-			result = [tuple(record[0]) for record in result]
+			result = [tuple(record.values()) for record in records]
 			return sorted(result, key=lambda x: ["field", "block", "tree", "sample"].index(x[0]))
 
 	@staticmethod
@@ -133,70 +134,69 @@ class SelectionList:
 				' WITH input, collect(DISTINCT level.name_lower) as levels, record_type '
 			)
 			statement += (
-				' RETURN { '
-				'	name: input.name, '
-				'	name_lower: input.name_lower, '
-				'	format: input.format, '
-				'	minimum: input.minimum, '
-				'	maximum: input.maximum, '
-				'	details: input.details, '
-				'	category_list: input.category_list, '
-				'	record_type: record_type.name_lower, '
-				'	levels: levels '
-				' } '
+				' RETURN '
+				'	input.name as name, '
+				'	input.name_lower as name_lower, '
+				'	input.format as format, '
+				'	input.minimum as minimum, '
+				'	input.maximum as maximum, '
+				'	input.details as details, '
+				'	input.category_list as category_list, '
+				'	record_type.name_lower as record_type, '
+				'	levels as levels '
 			)
 		else:
 			statement += (
-				' RETURN [ '
-				'	input.name_lower, '
-				'	input.name '
-				' ] '
+				' RETURN '
+				'	input.name_lower as name_lower, '
+				'	input.name as name '
 			)
 		with get_driver().session() as neo4j_session:
-			result = neo4j_session.read_transaction(
-				bolt_result,
+			records = neo4j_session.read_transaction(
+				list_records,
 				statement,
-				parameters
+				**parameters
 			)
-		return [record[0] for record in result]
+		if details:
+			return records
+		else:
+			return [tuple(record.values()) for record in records]
 
 	@staticmethod
 	def get_partners():
 		parameters = {}
 		query = (
 			' MATCH (partner:Partner) '
-			' RETURN [ '
-			'	partner.name, '
-			'	partner.fullname'
-			' ] '
+			' RETURN '
+			'	partner.name as name, '
+			'	partner.fullname as fullname'
 			' ORDER BY partner.fullname'
 		)
 		with get_driver().session() as neo4j_session:
-			result = neo4j_session.read_transaction(
-				bolt_result,
+			records = neo4j_session.read_transaction(
+				list_records,
 				query,
-				parameters
+				**parameters
 			)
-		return [tuple(record[0]) for record in result]
+		return [tuple(record.values()) for record in records]
 
 	@staticmethod
 	def get_countries():
 		parameters = {}
 		query = (
 			' MATCH (country:Country) '
-			' RETURN [ '
-			'	country.name_lower, '
-			'	country.name'
-			' ] '
+			' RETURN '
+			'	country.name_lower as name_lower, '
+			'	country.name as name '
 			' ORDER BY country.name'
 		)
 		with get_driver().session() as neo4j_session:
-			result = neo4j_session.read_transaction(
-				bolt_result,
+			records = neo4j_session.read_transaction(
+				list_records,
 				query,
-				parameters
+				**parameters
 			)
-		return [tuple(record[0]) for record in result]
+		return [tuple(record.values()) for record in records]
 
 	@staticmethod
 	def get_regions(country=None):
@@ -211,19 +211,18 @@ class SelectionList:
 			)
 			parameters['country'] = country
 		query += (
-			' RETURN [ '
-			'	region.name_lower, '
-			'	region.name'
-			' ] '
+			' RETURN '
+			'	region.name_lower as name_lower, '
+			'	region.name as name'
 			' ORDER BY country.name '
 		)
 		with get_driver().session() as neo4j_session:
-			result = neo4j_session.read_transaction(
-				bolt_result,
+			records = neo4j_session.read_transaction(
+				list_records,
 				query,
-				parameters
+				**parameters
 			)
-		return [tuple(record[0]) for record in result]
+		return [tuple(record.values()) for record in records]
 
 	@staticmethod
 	def get_farms(
@@ -241,18 +240,17 @@ class SelectionList:
 			parameters['region'] = region
 		query += (
 			')<-[:IS_IN]-(farm:Farm)'
-			' RETURN [ '
-			' 	farm.name_lower, '
-			'	farm.name '
-			' ] '
+			' RETURN '
+			' 	farm.name_lower as name_lower, '
+			'	farm.name as name '
 			' ORDER BY farm.name'
 		)
 		with get_driver().session() as neo4j_session:
-			result = neo4j_session.read_transaction(
-				bolt_result,
+			records = neo4j_session.read_transaction(
+				list_records,
 				query,
-				parameters)
-		return [tuple(record[0]) for record in result]
+				**parameters)
+		return [tuple(record.values()) for record in records]
 
 	@staticmethod
 	def get_fields(
@@ -275,18 +273,17 @@ class SelectionList:
 			parameters['farm'] = farm
 		query += (
 			' )<-[:IS_IN]-(field:Field) '
-			' RETURN [ '
-			' 	toString(field.uid), '
-			'	field.name '
-			' ] '
+			' RETURN '
+			' 	toString(field.uid) as uid, '
+			'	field.name as name'
 			' ORDER BY field.name '
 		)
 		with get_driver().session() as neo4j_session:
-			result = neo4j_session.read_transaction(
-				bolt_result,
+			records = neo4j_session.read_transaction(
+				list_records,
 				query,
-				parameters)
-		return [tuple(record[0]) for record in result]
+				**parameters)
+		return [tuple(record.values()) for record in records]
 
 	@staticmethod
 	def get_blocks(
@@ -315,18 +312,17 @@ class SelectionList:
 		query += (
 			' )<-[:IS_IN]-(:FieldBlocks) '
 			' <-[:IS_IN]-(block:Block)'
-			' RETURN [ '
-			' 	block.uid, '
-			'	block.name '
-			' ] '
+			' RETURN '
+			' 	block.uid as uid, '
+			'	block.name as name '
 			' ORDER BY block.name '
 		)
 		with get_driver().session() as neo4j_session:
-			result = neo4j_session.read_transaction(
-				bolt_result,
+			records = neo4j_session.read_transaction(
+				list_records,
 				query,
-				parameters)
-		return [tuple(record[0]) for record in result]
+				**parameters)
+		return [tuple(record.values()) for record in records]
 
 	@staticmethod
 	def get_input_groups(
@@ -396,121 +392,60 @@ class SelectionList:
 			)
 		if partner or username and include_defaults:
 			statement += (
-				' RETURN [ '
-				'	toString(ig.id), '	
+				' RETURN '
+				'	toString(ig.id) as id, '	
 				'	CASE '
 				'		WHEN partner IS NULL THEN ig.name + " (default)" '
 				'		ELSE ig.name '
-				'	END '
-				' ] '
+				'	END as name '
 				' ORDER BY ig.name_lower '
 			)
 		else:
 			statement += (
-				' RETURN [ '
-				'	toString(ig.id), '
-				'	ig.name '
-				' ] '
+				' RETURN '
+				'	toString(ig.id) as id, '
+				'	ig.name as name '
 				' ORDER BY ig.name_lower '
 		)
 		with get_driver().session() as neo4j_session:
-			result = neo4j_session.read_transaction(
-				bolt_result,
+			records = neo4j_session.read_transaction(
+				list_records,
 				statement,
-				parameters
+				**parameters
 			)
-		return [tuple(record[0]) for record in result]
+		return [tuple(record.values()) for record in records]
 
 	@staticmethod
 	def get_record_types():
 		statement = (
 			' MATCH '
 			'	(record_type: RecordType) '
-			' RETURN [ '
-			'	record_type.name_lower, '
-			'	record_type.name'
-			' ] '
+			' RETURN '
+			'	record_type.name_lower as name_lower, '
+			'	record_type.name as name '
 			' ORDER BY record_type.name_lower '
 		)
 		with get_driver().session() as neo4j_session:
-			result = neo4j_session.read_transaction(
-				bolt_result,
-				statement,
-				None
+			records = neo4j_session.read_transaction(
+				list_records,
+				statement
 			)
-		return [tuple(record[0]) for record in result]
+		return [tuple(record.values()) for record in records]
 
 	@staticmethod
 	def get_item_levels():
 		statement = (
 			' MATCH '
 			'	(item_level: ItemLevel) '
-			' RETURN [item_level.name_lower, item_level.name] '
+			' RETURN item_level.name_lower as name_lower, item_level.name as name '
 		)
 		with get_driver().session() as neo4j_session:
-			result = neo4j_session.read_transaction(
-				bolt_result,
-				statement,
-				None
+			records = neo4j_session.read_transaction(
+				list_records,
+				statement
 			)
-		result = [tuple(record[0]) for record in result]
+		result = [tuple(record.values()) for record in records]
 		return sorted(result, key=lambda x: ["field", "block", "tree", "sample"].index(x[0]))
-
-	@staticmethod
-	def get_trials(
-			country=None,
-			region=None,
-			farm=None,
-			field_uid=None
-	):
-		statement = (
-			' MATCH '
-			'	(trial: Trial) '
-		)
-		parameters = {}
-		# checking against string u'None' because wtforms is still broken
-		# https://github.com/wtforms/wtforms/pull/288
-		if field_uid and field_uid != 'None':
-			parameters['field_uid'] = field_uid
-			statement += (
-				' -[:PERFORMED_IN]->(:Field {uid:$field_uid})'
-			)
-		elif farm and farm != 'None':
-			parameters['farm'] = farm
-			parameters['region'] = region
-			parameters['country'] = country
-			statement += (
-				' -[:PERFORMED_IN | IS_IN*..2]->(:Farm {name_lower: toLower($farm)}) '
-				' -[:IS_IN]->(:Region {name_lower: toLower($region)}) '
-				' -[:IS_IN]->(:Country {name_lower: toLower($country)}) '
-			)
-		elif region and region != 'None':
-			parameters['region'] = region
-			parameters['country'] = country
-			statement += (
-				' -[:PERFORM_IN | IS_IN*..3]->(:Region {name_lower: toLower($region)}) '
-				' -[:IS_IN]->(:Country {name_lower: toLower($country)}) '
-			)
-		elif country and country != 'None':
-			parameters['country'] = country
-			statement += (
-				' -[:PERFORM_IN | IS_IN*..4]->(:Region {name_lower: toLower($region)}) '
-				' -[:IS_IN]->(:Country {name_lower: toLower($country)}) '
-			)
-		statement += (
-			' RETURN [ '
-			'	trial.uid, '
-			'	toString(trial.uid) + " - " + trial.name '
-			' ] '
-			' ORDER BY trial.uid '
-		)
-		with get_driver().session() as neo4j_session:
-			result = neo4j_session.read_transaction(
-				bolt_result,
-				statement,
-				parameters
-			)
-		return [tuple(record[0]) for record in result]
 
 
 class ItemList:
@@ -742,64 +677,63 @@ class ItemList:
 	def generate_id_list(self, record_data):
 		statement, parameters = self.build_match_item_statement(record_data)
 		statement += (
-			' RETURN { '
-			'	UID: item.uid, '
-			'	Name: item.name, '
-			'	Varieties: item.varieties, '
-			'	Country: country.name, '
-			'	Region: region.name, '
-			'	Farm: farm.name, '
+			' RETURN '
+			'	item.uid as UID, '
+			'	item.name as Name, '
+			'	item.varieties as Varieties, '
+			'	country.name as Country, '
+			'	region.name as Region, '
+			'	farm.name as Farm, '
 		)
 		if parameters['item_level'] == 'field':
 			statement += (
-				' Field: item.name, '
-				' Elevation: item.elevation, '
-				' Time: apoc.date.format(item.time, "ms", "yyyy-MM-dd HH:mm") '
+				' item.name as Field, '
+				' item.elevation as Elevation, '
+				' apoc.date.format(item.time, "ms", "yyyy-MM-dd HH:mm") as Time'
 			)
 		else:
 			statement += (
-				' Field: field.name, '
-				' `Field UID`: field.uid, '
+				' field.name as Field, '
+				' field.uid as `Field UID`, '
 			)
 			if parameters['item_level'] == 'block':
 				statement += (
-					' Block: item.name, '
-					' Time: apoc.date.format(coalesce(item.time, field.time), "ms", "yyyy-MM-dd HH:mm") '
+					' item.name as Block, '
+					' apoc.date.format(coalesce(item.time, field.time), "ms", "yyyy-MM-dd HH:mm") as Time'
 				)
 			elif parameters['item_level'] == 'tree':
 				statement += (
-					' Block: block.name, '
-					' `Block ID` : block.id, '
-					' `Tree ID`: item.id, '
-					' Row: item.row, '
-					' Column: item.column, '
-					' Time: apoc.date.format(coalesce(item.time, block.time, field.time), "ms", "yyyy-MM-dd HH:mm") '
+					' block.name as Block, '
+					' block.id as `Block ID`, '
+					' item.id as `Tree ID`, '
+					' item.row as Row, '
+					' item.column as Column, '
+					' apoc.date.format(coalesce(item.time, block.time, field.time), "ms", "yyyy-MM-dd HH:mm") as Time'
 				)
 			elif parameters['item_level'] == 'sample':
 				statement += (
-					' Blocks: [x in blocks | x.name], '
-					' `Block IDs` : [x in blocks | x.id], '
-					' `Tree IDs`: [x in trees | x.id], '
-					' `Tree Names`: [x in trees | x.name], '
-					' `Source Sample IDs`: [x in samples | x.id], '
-					' `Source Sample Names`: [x in samples | x.name], '
-					' Unit: item.unit, '
-					' source_level: CASE '
+					' [x in blocks | x.name] as Blocks, '
+					' [x in blocks | x.id] as `Block IDs`, '
+					' [x in trees | x.id] as `Tree IDs`, '
+					' [x in trees | x.name] as `Tree Names`, '
+					' [x in samples | x.id] as `Source Sample IDs`, '
+					' [x in samples | x.name] as `Source Sample Names`, '
+					' item.unit as Unit, '
+					' CASE '
 					'	WHEN size(source_samples) <> 0 THEN "Sample" '
 					'	WHEN size(trees) <> 0 THEN "Tree" '
 					'	WHEN size(blocks) <> 0 THEN "Block" '
 					'	ELSE "Field" '
-					'	END, '
-					' source_ids: CASE '
+					'	END as source_level, '
+					' CASE '
 					'	WHEN size(source_samples) <> 0 THEN [x in source_samples | x.id ] '
 					'	WHEN size(trees) <> 0 THEN [x in trees | x.id ] '
 					'	WHEN size(blocks) <> 0 THEN [x in blocks | x.id ] '
 					'	ELSE [field.uid]  '
-					'	END, '
-					' Time: apoc.date.format(coalesce(item.time, samples[0].time), "ms", "yyyy-MM-dd HH:mm") '
+					'	END as source_ids, '
+					' apoc.date.format(coalesce(item.time, samples[0].time), "ms", "yyyy-MM-dd HH:mm") as Time '
 				)
 		statement += (
-			' } '
 			' ORDER BY '
 		)
 		if parameters['item_level'] == 'field':
@@ -811,8 +745,8 @@ class ItemList:
 				' field.uid, item.id '
 			)
 		with get_driver().session() as neo4j_session:
-			result = neo4j_session.read_transaction(
-				bolt_result,
+			records = neo4j_session.read_transaction(
+				list_records,
 				statement,
-				parameters)
-		return result
+				**parameters)
+		return records

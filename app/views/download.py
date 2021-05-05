@@ -1,9 +1,6 @@
 import os
-from app import (
-	app,
-	ServiceUnavailable,
-	SecurityError
-)
+from app import	app
+from neo4j.exceptions import ServiceUnavailable, AuthError
 from flask import (
 	redirect,
 	flash,
@@ -41,7 +38,7 @@ def download():
 				location_form=location_form,
 				title='Download'
 			)
-		except (ServiceUnavailable, SecurityError):
+		except (ServiceUnavailable, AuthError):
 			flash("Database unavailable")
 			return redirect(url_for('index'))
 
@@ -57,7 +54,7 @@ def download_files():
 				'download_files.html',
 				title='Download Files'
 			)
-		except (ServiceUnavailable, SecurityError):
+		except (ServiceUnavailable, AuthError):
 			flash("Database unavailable")
 			return redirect(url_for('index'))
 
@@ -69,7 +66,7 @@ def download_files_list():
 		return redirect(url_for('login'))
 	else:
 		try:
-			path = os.path.join(app.config['DOWNLOAD_FOLDER'], session['username'])
+			path = os.path.join(app.config['EXPORT_FOLDER'], session['username'])
 			file_list = os.listdir(path)
 			file_list.sort(key=lambda x: os.path.getmtime(os.path.join(path, x)), reverse=True)
 			html_file_table = (
@@ -97,7 +94,7 @@ def download_files_list():
 			return jsonify(
 				html_file_table
 			)
-		except (ServiceUnavailable, SecurityError):
+		except (ServiceUnavailable, AuthError):
 			flash("Database unavailable")
 			return redirect(url_for('index'))
 
@@ -202,7 +199,7 @@ def generate_file():
 					'errors':[location_form.errors, download_form.errors]
 				})
 				return errors
-		except (ServiceUnavailable, SecurityError):
+		except (ServiceUnavailable, AuthError):
 			flash("Database unavailable")
 			return redirect(url_for('index'))
 
@@ -217,15 +214,15 @@ def download_file(username, filename):
 		return redirect(url_for('index'))
 	else:
 		try:
-			if os.path.isfile(os.path.join(app.config['DOWNLOAD_FOLDER'], username.lower(), filename)):
+			if os.path.isfile(os.path.join(app.config['EXPORT_FOLDER'], username.lower(), filename)):
 				return send_from_directory(
-					os.path.join(app.config['DOWNLOAD_FOLDER'], username.lower()),
+					os.path.join(app.config['EXPORT_FOLDER'], username.lower()),
 					filename,
 					as_attachment = True
 				)
 			else:
 				flash('File no longer exists on the server, please generate a new file for download')
 				return redirect(url_for('download'))
-		except (ServiceUnavailable, SecurityError):
+		except (ServiceUnavailable, AuthError):
 			flash("Database unavailable")
 			return redirect(url_for('index'))

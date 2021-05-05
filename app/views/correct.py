@@ -1,8 +1,5 @@
-from app import (
-	app,
-	ServiceUnavailable,
-	SecurityError
-)
+from app import app
+from neo4j.exceptions import ServiceUnavailable, AuthError
 
 from flask import (
 	flash,
@@ -72,7 +69,7 @@ def correct_submit():
 				# as an asynchronous function with celery
 				# result is stored in redis and accessible from the status/task_id endpoint
 				task = Upload.async_correct.apply_async(args=[username, access, upload_object])
-			except (ServiceUnavailable, SecurityError):
+			except (ServiceUnavailable, AuthError):
 				return jsonify({'submitted': 'The database is currently unavailable - please try again later'})
 			return jsonify({'submitted': (
 				'Your file has been uploaded and is being processed.\n'

@@ -1,30 +1,29 @@
 # -*- coding: utf-8 -*-
-import os, logging
+import logging.config
 from celery import Celery
 from redis import StrictRedis, exceptions
 from flask import Flask
 from flask_bcrypt import Bcrypt
 
+
 app = Flask(__name__, instance_relative_config=True)
 app.config.from_object('config')
 app.config.from_pyfile('config.py')
 
-bcrypt = Bcrypt(app)
+logging.config.dictConfig(app.config['LOG_CONFIG'])
+logger = logging.getLogger(__name__)
+logger.info("Start")
 
-# configure logging
-logging.basicConfig(
-	filename=app.config['BREEDCAFS_LOG'],
-	level=logging.DEBUG,
-	format='%(asctime)s %(levelname)-8s %(message)s',
-	datefmt='%Y-%m-%d %H:%M:%S'
-)
+
+bcrypt = Bcrypt(app)
 
 # celery for scheduling large uploads
 celery = Celery(
-	app,
+	app.name,
 	backend=app.config['CELERY_RESULT_BACKEND'],
 	broker=app.config['CELERY_BROKER_URL']
 )
+
 
 celery.conf.update(
 	task_serializer='pickle',
@@ -33,13 +32,10 @@ celery.conf.update(
 	accept_content=['pickle', 'json']
 )
 
+
 # and also use redis (not just with celery) for basic local data store like login attempts and caching
 redis_store = StrictRedis(host='localhost', port=app.config['REDIS_PORT'], db=0)
 redis_exceptions = exceptions
-
-from neo4j import GraphDatabase, ServiceUnavailable, TransactionError
-from neo4j.exceptions import SecurityError
-#from neo4j import watch
 
 from app import views
 

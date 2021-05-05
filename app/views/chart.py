@@ -1,4 +1,5 @@
-from app import app, ServiceUnavailable, SecurityError
+from app import app
+from neo4j.exceptions import ServiceUnavailable, AuthError
 from flask import session, flash, redirect, url_for, request, jsonify
 from app.models import Chart
 from datetime import datetime, timedelta
@@ -10,7 +11,7 @@ def json_submissions():
 		tomorrow = (datetime.utcnow()+timedelta(days=1)).strftime("%Y-%m-%d")
 		yesterday = (datetime.utcnow()-timedelta(days=7)).strftime("%Y-%m-%d")
 		return Chart().get_submissions_range(session['username'], yesterday, tomorrow)
-	except (ServiceUnavailable, SecurityError):
+	except (ServiceUnavailable, AuthError):
 		flash("Database unavailable")
 		return redirect(url_for('index'))
 
@@ -19,7 +20,7 @@ def json_submissions():
 def json_fields_treecount():
 	try:
 		return Chart().get_fields_treecount()
-	except (ServiceUnavailable, SecurityError):
+	except (ServiceUnavailable, AuthError):
 		flash("Database unavailable")
 		return redirect(url_for('index'))
 
@@ -53,7 +54,7 @@ def item_count():
 			return jsonify({
 				"item_count": count
 			})
-		except (ServiceUnavailable, SecurityError):
+		except (ServiceUnavailable, AuthError):
 			return jsonify({
 				'result': 'Database unavailable'
 			})

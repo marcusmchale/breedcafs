@@ -42,12 +42,49 @@ PASSWORD_RESET_SALT = "YET_ANOTHER_KEY_TO_SET"
 # log file called from envars
 # set in httpd.conf if using Apache and in /etc/init.d/celeryd for celery
 # Needed to avoid conflict for access to these whether function is called by celery or by web server
-BREEDCAFS_LOG = os.environ.get('BREEDCAFS_LOG')
-NEO4J_DRIVER_LOG = os.environ.get('NEO4J_DRIVER_LOG')
+DBTOOLS_LOG = os.environ.get('DBTOOLS_LOG')
+NEO4J_LOG = os.environ.get('NEO4J_LOG')
+
+LOG_CONFIG = {
+	'version': 1,
+	'disable_existing_loggers': True,
+	'formatters': {
+		'standard': {
+			'format': '%(asctime)s [%(levelname)s]: %(message)s'
+		},
+		'named': {
+			'format': '%(asctime)s [%(levelname)s] %(name)s: %(message)s'
+		},
+	},
+	'handlers': {
+		'app': {
+			'formatter': 'named',
+			'class': 'logging.FileHandler',
+			'filename': DBTOOLS_LOG
+		},
+		'neo4j': {
+			'formatter': 'named',
+			'class': 'logging.FileHandler',
+			'filename': NEO4J_LOG
+		},
+	},
+	'loggers': {
+		'app': {
+			'level': 'INFO',
+			'handlers': ['app'],
+			'propagate': True
+		},
+		'neo4j': {
+			'level': 'INFO',
+			'handlers': ['neo4j'],
+			'propagate': True
+		}
+	}
+}
 
 # PLace upload and download directories in the instance folder
-UPLOAD_FOLDER = 'import'
-DOWNLOAD_FOLDER = 'export'
+IMPORT_FOLDER = 'import'
+EXPORT_FOLDER = 'export'
 # to enable uploads you will also need to enable import from this directory in neo4j
 # found in /etc/neo4j/neo4j.conf
 # neo4j config: dbms.directories.import = 'insert UPLOAD_FOLDER path'

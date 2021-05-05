@@ -1,4 +1,6 @@
-from app import app, ServiceUnavailable, SecurityError, logging
+from app import app
+from neo4j.exceptions import ServiceUnavailable, AuthError
+
 from flask import (
 	flash, request, redirect, url_for, abort, session, render_template, jsonify
 )
@@ -19,7 +21,7 @@ def upload():
 				form=form,
 				title='Upload'
 			)
-		except (ServiceUnavailable, SecurityError):
+		except (ServiceUnavailable, AuthError):
 			flash("Database unavailable")
 			return redirect(url_for('index'))
 
@@ -117,7 +119,7 @@ def upload_submit():
 				# as an asynchronous function with celery
 				# result is stored in redis and accessible from the status/task_id endpoint
 				task = Upload.async_submit.apply_async(args=[username, upload_object])
-			except (ServiceUnavailable, SecurityError):
+			except (ServiceUnavailable, AuthError):
 				return jsonify({
 					'result': 'The database is currently unavailable - please try again later',
 					'status': 'ERRORS'

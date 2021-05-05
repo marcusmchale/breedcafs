@@ -1,12 +1,10 @@
-from app import ServiceUnavailable, SecurityError, TransactionError
-
+from neo4j.exceptions import ServiceUnavailable, AuthError, TransactionError
+from flask import jsonify
 from app.models import ItemList
 
 from app.cypher import Cypher
 
-from flask import jsonify
-
-from .neo4j_driver import get_driver, neo4j_query, bolt_result
+from .neo4j_driver import get_driver
 
 import datetime
 
@@ -237,7 +235,7 @@ class Record:
 				statement,
 				parameters
 		)
-		return [record[0] for record in result]
+		return [record for record in result]
 
 	def submit_records(self, record_data):
 		record_data['username'] = self.username
@@ -251,7 +249,7 @@ class Record:
 						conflicts_query['statement'],
 						conflicts_query['parameters']
 					)
-				if conflicts.peek():
+				if conflicts:
 					tx.close()
 					html_table = self.result_table(conflicts, record_data['record_type'])['table']
 					return jsonify({
@@ -385,25 +383,25 @@ class Record:
 					variety_update_errors = []
 					while all([
 						len(variety_update_errors) <= 10,
-						result.peek()
+						result
 					]):
 						for record in result:
 							if all([
-								record[0]['current_variety'] and record[0]['set_variety'],
-								record[0]['current_variety'] != record[0]['set_variety']
+								record['current_variety'] and record['set_variety'],
+								record['current_variety'] != record['set_variety']
 							]):
 								variety_update_errors.append(
 									'For '
-									+ str(record[0]['UID'])
+									+ str(record['UID'])
 									+ ' the variety submitted ('
-									+ record[0]['set_variety']
+									+ record['set_variety']
 									+ ') does not match an earlier submission ('
-									+ record[0]['current_variety']
+									+ record['current_variety']
 									+ ') by '
-									+ record[0]['Submitted by']
+									+ record['Submitted by']
 									+ '('
 									+ datetime.datetime.utcfromtimestamp(
-										int(record[0]['Submitted at']) / 1000
+										int(record['Submitted at']) / 1000
 									).strftime("%Y-%m-%d %H:%M:%S")
 									+ ')'
 								)
@@ -645,7 +643,7 @@ class Record:
 					+ html_table
 					)
 				})
-		except (TransactionError, SecurityError, ServiceUnavailable):
+		except (TransactionError, AuthError, ServiceUnavailable):
 			return jsonify({
 				'submitted': (
 					'An error occurred, please try again later'
@@ -1369,7 +1367,6 @@ class Record:
 		header_string += '</p></th><th><p>'.join(headers)
 		header_string += '</p></th></tr>'
 		for record in result:
-			record = record[0]
 			# iterate through the result, building the table.
 			# if we find a conflict we drop the existing table and start only including the conflicts to report
 			if record['submitted_at']:

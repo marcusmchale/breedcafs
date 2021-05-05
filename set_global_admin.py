@@ -4,7 +4,7 @@
 # run this to add global_admin privileges to an account
 
 import os
-from neo4j.v1 import GraphDatabase
+from neo4j import GraphDatabase
 from instance import config
 
 # neo4j config

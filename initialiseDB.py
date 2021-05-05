@@ -5,7 +5,7 @@ import sys
 import os
 import csv
 from flask import Flask
-from neo4j.v1 import GraphDatabase
+from neo4j import GraphDatabase
 from instance import varieties, input_groups
 
 app = Flask(__name__, instance_relative_config=True)

@@ -1,22 +1,19 @@
 from app import (
-	# app,
 	bcrypt,
-	logging,
-	# celery,
-	redis_store,
-	redis_exceptions,
-	ServiceUnavailable,
-	SecurityError
+	redis_store
 )
+import logging
+from neo4j.exceptions import ServiceUnavailable, AuthError
+
 from app.cypher import Cypher
-# from passlib.hash import bcrypt  # using the flask-bcrypt extension now
-from .neo4j_driver import get_driver
+
 from time import time
-# from datetime import datetime
 
 from .neo4j_driver import (
 	get_driver,
-	bolt_result
+	list_records,
+	single_record,
+	no_result
 )
 
 
@@ -31,34 +28,25 @@ class User:
 	def find(self, email):
 		self.email = email
 		with get_driver().session() as neo4j_session:
-			return neo4j_session.read_transaction(self._find)
-
-	def _find(self, tx):
-		for record in tx.run(Cypher.user_find, username=self.username, email=self.email):
-			return record['user']
-
-	def access(self):
-		with get_driver().session() as neo4j_session:
-			return neo4j_session.read_transaction.run(
-				' MATCH (u: User {'
-				'	username_lower: toLower($username) '
-				'	})'
-				' RETURN u.access ',
-				username=self.username
-			)[0]
+			return neo4j_session.read_transaction(
+				single_record,
+				Cypher.user_find,
+				username=self.username,
+				email=self.email
+			)
 
 	def get_user_affiliations(self):
 		with get_driver().session() as neo4j_session:
 			parameters = {
 				'username': self.username
 			}
-			result = neo4j_session.read_transaction(
-				bolt_result,
+			records = neo4j_session.read_transaction(
+				list_records,
 				Cypher.user_affiliations,
-				parameters)
+				**parameters)
 		confirmed = []
 		pending = []
-		for record in result:
+		for record in records:
 			if record['data_shared']:
 				fullname = record['p.fullname'] + " *"
 			else:
@@ -73,83 +61,69 @@ class User:
 
 	def add_affiliations(self, partners):
 		with get_driver().session() as neo4j_session:
-			return [record['p.name'] for record in neo4j_session.write_transaction(self._add_affiliations, partners)]
-
-	def _add_affiliations(self, tx, partners):
-		return tx.run(
-			Cypher.add_affiliations,
-			username = self.username, 
-			partners = partners
-		)
+			records = neo4j_session.write_transaction(
+				list_records,
+				Cypher.add_affiliations,
+				username=self.username,
+				partners=partners
+			)
+			return [record['p.name'] for record in records]
 
 	def remove_affiliations(self, partners):
 		with get_driver().session() as neo4j_session:
-			return [record['p.name'] for record in neo4j_session.write_transaction(self._remove_affiliations, partners)]
-
-	def _remove_affiliations(self, tx, partners):
-		return tx.run(Cypher.remove_affiliations, username = self.username, partners = partners)
+			records = neo4j_session.write_transaction(
+				list_records,
+				Cypher.remove_affiliations,
+				username=self.username,
+				partners=partners
+			)
+			return [record['p.name'] for record in records]
 
 	@staticmethod
 	def get_allowed_emails():
 		try:
 			with get_driver().session() as neo4j_session:
-				result = neo4j_session.read_transaction(User._get_allowed_emails)
+				records = neo4j_session.read_transaction(list_records, Cypher.allowed_emails)
 				return set(
-					[item for sublist in [i['e.allowed'] for i in result] for item in sublist]
+					[item for sublist in [i['e.allowed'] for i in records] for item in sublist]
 				)
-		except (ServiceUnavailable, SecurityError):
+		except (ServiceUnavailable, AuthError):
 			logging.error('Get allowed emails failed due to service unavailable')
 			return {'error': 'The database is unavailable, please try again later.'}
-
-	@staticmethod
-	def _get_allowed_emails(tx):
-		return tx.run(Cypher.allowed_emails)
 
 	def get_user_allowed_emails(self):
 		try:
 			with get_driver().session() as neo4j_session:
-				result = neo4j_session.read_transaction(self._get_user_allowed_emails)
-				return [record[0] for record in result][0]
-		except (ServiceUnavailable, SecurityError):
+				return neo4j_session.read_transaction(single_record, Cypher.user_allowed_emails, username=self.username)
+		except (ServiceUnavailable, AuthError):
 			logging.error('Get user allowed email failed due to service unavailable')
 			return {'error': 'The database is unavailable, please try again later.'}
 
-	def _get_user_allowed_emails(self, tx):
-		return tx.run(Cypher.user_allowed_emails, username = self.username)
-
 	def add_allowed_email(self, email):
-		self.email = email
 		try:
 			with get_driver().session() as neo4j_session:
-				result = neo4j_session.write_transaction(self._add_allowed_email)
-				return [record[0] for record in result]
-		except (ServiceUnavailable, SecurityError):
+				return neo4j_session.write_transaction(
+					single_record,
+					Cypher.add_allowed_email,
+					username=self.username,
+					email=email
+				)
+		except (ServiceUnavailable, AuthError):
 			logging.error('Add allowed email failed due to service unavailable')
 			return {'error': 'The database is unavailable, please try again later.'}
 
-	def _add_allowed_email(self, tx):
-		return tx.run(
-			Cypher.add_allowed_email,
-			username = self.username, 
-			email = self.email
-		)
-
 	def remove_allowed_email(self, email):
-		self.email = email
 		try:
 			with get_driver().session() as neo4j_session:
-				result = neo4j_session.write_transaction(self._remove_allowed_email)
-				return [record[0] for record in result]
-		except (ServiceUnavailable, SecurityError):
+				return neo4j_session.write_transaction(
+					single_record,
+					Cypher.remove_allowed_email,
+					username=self.username,
+					email=email
+				)
+		except (ServiceUnavailable, AuthError):
 			logging.error('Remove allowed email failed due to service unavailable')
 			return {'error': 'The database is unavailable, please try again later.'}
-
-	def _remove_allowed_email(self, tx):
-		return tx.run(
-			Cypher.remove_allowed_email,
-			username = self.username, 
-			email = self.email
-		)
 
 	def register(self, password, email, name, partner):
 		self.password = password
@@ -157,29 +131,28 @@ class User:
 		self.name = name
 		self.partner = partner
 		with get_driver().session() as neo4j_session:
-			neo4j_session.write_transaction(self._register)
+			neo4j_session.write_transaction(
+				no_result,
+				Cypher.user_register,
+				username=self.username,
+				password=bcrypt.generate_password_hash(self.password),
+				email=self.email,
+				name=self.name,
+				partner=self.partner
+			)
 
-	def _register(self, tx):
-		tx.run(
-			Cypher.user_register,
-			username=self.username,
-			password=bcrypt.generate_password_hash(self.password),
-			email=self.email,
-			name=self.name,
-			partner=self.partner
-		)
-
-	def remove(self, email):
-		self.email = email
+	@staticmethod
+	def remove(email):
 		try:
 			with get_driver().session() as neo4j_session:
-				neo4j_session.write_transaction(self._remove)
+				neo4j_session.write_transaction(
+					no_result,
+					Cypher.user_del,
+					email=email
+				)
 			return True
-		except (ServiceUnavailable, SecurityError):
+		except (ServiceUnavailable, AuthError):
 			return False
-
-	def _remove(self, tx):
-		tx.run(Cypher.user_del,	email=self.email)
 
 	def check_confirmed(self, email):
 		user = self.find(email)
@@ -247,7 +220,7 @@ class User:
 					return {'error': 'Username is not confirmed. Please check your email to confirm'}
 			else:
 				return {'error': 'Username is not registered'}
-		except (ServiceUnavailable, SecurityError):
+		except (ServiceUnavailable, AuthError):
 			logging.error('Neo4j database is unavailable')
 			return {'error': 'The database is unavailable, please try again later.'}
 
@@ -255,69 +228,59 @@ class User:
 	@staticmethod
 	def confirm_email(email):
 		with get_driver().session() as neo4j_session:
-			neo4j_session.write_transaction(User._confirm_email, email = email)
-
-	@staticmethod
-	def _confirm_email(tx, email):
-		tx.run(Cypher.confirm_email, email = email)
+			neo4j_session.write_transaction(
+				no_result,
+				Cypher.confirm_email,
+				email=email
+			)
 
 	@staticmethod
 	def password_reset(email, password):
 		with get_driver().session() as neo4j_session:
-			neo4j_session.write_transaction(User._password_reset, email=email, password=password)
-
-	@staticmethod
-	def _password_reset(tx, email, password):
-		tx.run(Cypher.password_reset, email=email, password=bcrypt.generate_password_hash(password))
+			neo4j_session.write_transaction(
+				no_result,
+				Cypher.password_reset,
+				email=email,
+				password=bcrypt.generate_password_hash(password)
+			)
 
 	# this retrieves the list of users the input user is able to confirm
 	def get_users_for_admin(self, access):
 		with get_driver().session() as neo4j_session:
-			return neo4j_session.read_transaction(self._get_users_for_admin, access)
+			if 'global_admin' in access:
+				records = neo4j_session.read_transaction(
+					list_records,
+					Cypher.global_admin_users
+				)
+			elif 'partner_admin' in access:
+				records = neo4j_session.read_transaction(
+					list_records,
+					Cypher.partner_admin_users, username=self.username
+				)
+			else:
+				records = None
+			return records
 
-	def _get_users_for_admin(self, tx, access):
-		# if have global admin, retrieves all user accounts
-		if 'global_admin' in access:
-			users = tx.run(Cypher.global_admin_users)
-		# else if have partner_admin retrieves just those users that registered with a partner
-		# for which the current user has "admin" in relationship with
-		elif 'partner_admin' in access:
-			users = tx.run(Cypher.partner_admin_users, username = self.username)
-		else:
-			users = None
-		return users
-
-	# this confirms/unconfirms lists of users
+	# confirms/unconfirm a list of users
 	@staticmethod
 	def admin_confirm_users(username, access, confirm_list):
 		with get_driver().session() as neo4j_session:
-			return neo4j_session.write_transaction(User._admin_confirm_users, username, access, confirm_list)
-
-	@staticmethod
-	def _admin_confirm_users(tx, username, access, confirm_list):
-		if 'global_admin' in access:
-			query = Cypher.global_confirm_users
-		elif 'partner_admin' in access:
-			query = Cypher.partner_confirm_users
-		else:
-			query = None
-		return tx.run(query, username = username, confirm_list = confirm_list)
+			if 'global_admin' in access:
+				query = Cypher.global_confirm_users
+			elif 'partner_admin' in access:
+				query = Cypher.partner_confirm_users
+			else:
+				return None
+			records = neo4j_session.write_transaction(list_records, query, username=username, confirm_list=confirm_list)
+			return records
 
 	# the below are global_admin only functions to manage partner_admins
 	@staticmethod
 	def admin_get_partner_admins():
 		with get_driver().session() as neo4j_session:
-			return neo4j_session.read_transaction(User._admin_get_partner_admins)
-
-	@staticmethod
-	def _admin_get_partner_admins(tx):
-		return tx.run(Cypher.partner_admins)
+			return neo4j_session.read_transaction(list_records, Cypher.partner_admins)
 
 	@staticmethod
 	def admin_confirm_admins(admins):
 		with get_driver().session() as neo4j_session:
-			return neo4j_session.write_transaction(User._admin_confirm_admins, admins)
-
-	@staticmethod
-	def _admin_confirm_admins(tx, admins):
-		return tx.run(Cypher.confirm_admins, admins = admins)
+			return neo4j_session.write_transaction(list_records, Cypher.confirm_admins, admins=admins)

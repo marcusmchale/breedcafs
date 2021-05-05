@@ -1,8 +1,5 @@
-from app import (
-	app,
-	ServiceUnavailable,
-	SecurityError
-)
+from app import app
+from neo4j.exceptions import ServiceUnavailable, AuthError
 
 
 from flask import (
@@ -68,7 +65,7 @@ def record():
 				record_form=record_form,
 				location_form=location_form
 			)
-		except (ServiceUnavailable, SecurityError):
+		except (ServiceUnavailable, AuthError):
 			flash("Database unavailable")
 			return redirect(url_for('index'))
 
@@ -95,7 +92,7 @@ def input_group_levels():
 			response = make_response(jsonify(input_groups_list))
 			response.content_type = 'application/json'
 			return response
-		except (ServiceUnavailable, SecurityError):
+		except (ServiceUnavailable, AuthError):
 			flash("Database unavailable")
 			return redirect(url_for('index'))
 
@@ -123,7 +120,7 @@ def input_groups():
 			response = make_response(jsonify(input_groups_list))
 			response.content_type = 'application/json'
 			return response
-		except (ServiceUnavailable, SecurityError):
+		except (ServiceUnavailable, AuthError):
 			flash("Database unavailable")
 			return redirect(url_for('index'))
 
@@ -170,7 +167,7 @@ def add_input_group():
 						add_input_group_form.errors
 					]
 				})
-		except (ServiceUnavailable, SecurityError):
+		except (ServiceUnavailable, AuthError):
 			flash("Database unavailable")
 			return redirect(url_for('index'))
 
@@ -205,7 +202,7 @@ def inputs_selection():
 			response = make_response(jsonify(inputs_list))
 			response.content_type = 'application/json'
 			return response
-		except (ServiceUnavailable, SecurityError):
+		except (ServiceUnavailable, AuthError):
 			flash("Database unavailable")
 			return redirect(url_for('index'))
 
@@ -232,7 +229,7 @@ def commit_group_changes():
 				result = recorder.update_group(input_group, input_variables, levels)
 				report = 'Group members set: <ul>'
 				for i in result:
-					report += '<li>' + i + '</li>'
+					report += '<li>' + str(i) + '</li>'
 				report += '</ul>'
 				return jsonify({
 					'submitted': report
@@ -243,7 +240,7 @@ def commit_group_changes():
 						form.errors
 					]
 				})
-		except (ServiceUnavailable, SecurityError):
+		except (ServiceUnavailable, AuthError):
 			flash("Database unavailable")
 			return redirect(url_for('index'))
 
@@ -286,7 +283,7 @@ def add_inputs_to_group():
 						form.errors
 					]
 				})
-		except (ServiceUnavailable, SecurityError):
+		except (ServiceUnavailable, AuthError):
 			flash("Database unavailable")
 			return redirect(url_for('index'))
 
@@ -312,7 +309,7 @@ def input_group_management():
 				add_input_group_form=add_input_group_form,
 				manage_input_group_form=manage_input_group_form
 			)
-		except (ServiceUnavailable, SecurityError):
+		except (ServiceUnavailable, AuthError):
 			flash("Database unavailable")
 			return redirect(url_for('index'))
 
@@ -432,7 +429,7 @@ def generate_template():
 				return jsonify({
 					'errors': [record_form.errors, location_form.errors]
 				})
-		except (ServiceUnavailable, SecurityError):
+		except (ServiceUnavailable, AuthError):
 			flash("Database unavailable")
 			return redirect(url_for('index'))
 
@@ -685,6 +682,6 @@ def submit_records():
 					'errors': [record_form.errors, location_form.errors]
 				})
 				return errors
-		except (ServiceUnavailable, SecurityError):
+		except (ServiceUnavailable, AuthError):
 			flash("Database unavailable")
 			return redirect(url_for('index'))

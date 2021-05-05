@@ -3,7 +3,8 @@
 from app import app
 from app.cypher import Cypher
 from .neo4j_driver import (
-	bolt_result
+	list_records,
+	single_record
 )
 from flask import session
 # from datetime import datetime
@@ -27,11 +28,7 @@ class FindLocations:
 			'	country.name '
 		)
 		with get_driver().session() as neo4j_session:
-			result = neo4j_session.read_transaction(bolt_result, statement, parameters).single()
-			if result:
-				return result.value()
-			else:
-				return None
+			return neo4j_session.read_transaction(single_record, statement, **parameters)
 
 	def find_region(self, region):
 		parameters = {
@@ -49,11 +46,7 @@ class FindLocations:
 			' RETURN region.name '
 		)
 		with get_driver().session() as neo4j_session:
-			result = neo4j_session.read_transaction(bolt_result, statement, parameters).single()
-			if result:
-				return result.value()
-			else:
-				return None
+			return neo4j_session.read_transaction(single_record, statement, **parameters)
 
 	def find_farm(self, region, farm):
 		parameters = {
@@ -75,11 +68,7 @@ class FindLocations:
 			' RETURN farm.name '
 		)
 		with get_driver().session() as neo4j_session:
-			result = neo4j_session.read_transaction(bolt_result, statement, parameters).single()
-			if result:
-				return result.value()
-			else:
-				return None
+			return neo4j_session.read_transaction(single_record, statement, **parameters)
 
 	def find_field(self, region, farm, field):
 		parameters = {
@@ -102,17 +91,12 @@ class FindLocations:
 			'	<-[:IS_IN]-(field:Field { '
 			'		name_lower: toLower(trim($field)) '
 			'	}) '
-			' RETURN [ '
+			' RETURN '
 			'	field.uid, '
 			'	field.name '
-			' ] '
 		)
 		with get_driver().session() as neo4j_session:
-			result = neo4j_session.read_transaction(bolt_result, statement, parameters).single()
-			if result:
-				return result.value()
-			else:
-				return None
+			return neo4j_session.read_transaction(single_record, statement, **parameters)
 
 
 class AddLocations:
@@ -152,11 +136,7 @@ class AddLocations:
 			' RETURN country.name '
 		)
 		with get_driver().session() as neo4j_session:
-			result = neo4j_session.write_transaction(bolt_result, statement, parameters).single()
-			if result:
-				return result.value()
-			else:
-				return None
+			return neo4j_session.write_transaction(single_record, statement, **parameters)
 
 	def add_region(self, region):
 		parameters = {
@@ -196,11 +176,7 @@ class AddLocations:
 			' RETURN region.name '
 		)
 		with get_driver().session() as neo4j_session:
-			result = neo4j_session.write_transaction(bolt_result, statement, parameters).single()
-			if result:
-				return result.value()
-			else:
-				return None
+			return neo4j_session.write_transaction(single_record, statement, **parameters)
 
 	def add_farm(self, region, farm):
 		parameters = {
@@ -244,11 +220,7 @@ class AddLocations:
 			' RETURN farm.name '
 		)
 		with get_driver().session() as neo4j_session:
-			result = neo4j_session.write_transaction(bolt_result, statement, parameters).single()
-			if result:
-				return result.value()
-			else:
-				return None
+			return neo4j_session.write_transaction(single_record, statement, **parameters)
 
 	def add_field(self, region, farm, field):
 		parameters = {
@@ -303,17 +275,12 @@ class AddLocations:
 			'	CREATE '
 			'		(uf)-[s:SUBMITTED {time: datetime.transaction().epochMillis}]->(field) '
 			' ) '
-			' RETURN [ '
+			' RETURN '
 			'	field.uid,'
 			'	field.name '
-			' ] '
 		)
 		with get_driver().session() as neo4j_session:
-			result = neo4j_session.write_transaction(bolt_result, statement, parameters).single()
-			if result:
-				return result.value()
-			else:
-				return None
+			return neo4j_session.write_transaction(single_record, statement, **parameters)
 
 
 class FindFieldItems:
@@ -321,30 +288,25 @@ class FindFieldItems:
 		self.field_uid = field_uid
 
 	def find_block(self, block_name):
+		parameters = {
+			'field_uid': self.field_uid,
+			'block_name': block_name,
+		}
+		statement = (
+			' MATCH '
+			'	(block:Block { '
+			'		name_lower : toLower(trim($block_name)) '
+			'	}) '
+			'	-[:IS_IN]->(:FieldBlocks) '
+			'	-[:IS_IN]->(:Field { '
+			'		uid : toInteger($field_uid) '
+			'	}) '
+			' RETURN '
+			'	block.uid, '
+			'	block.name '
+		)
 		with get_driver().session() as neo4j_session:
-			parameters = {
-				'field_uid': self.field_uid,
-				'block_name': block_name,
-			}
-			statement = (
-				' MATCH '
-				'	(block:Block { '
-				'		name_lower : toLower(trim($block_name)) '
-				'	}) '
-				'	-[:IS_IN]->(:FieldBlocks) '
-				'	-[:IS_IN]->(:Field { '
-				'		uid : toInteger($field_uid) '
-				'	}) '
-				' RETURN [ '
-				'	block.uid, '
-				'	block.name '
-				' ] '
-			)
-			result = neo4j_session.read_transaction(bolt_result, statement, parameters).single()
-			if result:
-				return result.value()
-			else:
-				return None
+			return neo4j_session.read_transaction(single_record, statement, **parameters)
 
 
 class AddFieldItems:
@@ -353,69 +315,64 @@ class AddFieldItems:
 		self.field_uid = field_uid
 
 	def add_block(self, block_name):
+		parameters = {
+			'username': self.username,
+			'field_uid': self.field_uid,
+			'block_name': block_name
+		}
+		statement = (
+			' MATCH '
+			'	(user: User { '
+			'		username_lower: toLower(trim($username)) '
+			'	}) '
+			' MATCH '
+			'	(field: Field { '
+			'		uid: toInteger($field_uid) '
+			'	}) '
+			' MERGE '
+			'	(fb: FieldBlocks) '
+			'	-[:IS_IN]->(field) '
+			' MERGE '
+			'	(counter:Counter { '
+			'		name: "block", '
+			'		uid: (toInteger($field_uid) + "_block") '
+			'	}) '
+			'	-[:FOR]->(fb) '
+			'	ON CREATE SET counter.count = 0 '
+			' SET '
+			'	counter._LOCK_ = true '
+			' MERGE '
+			'	(block: Block: Item { '
+			'		name_lower: toLower(trim($block_name)) '
+			'	}) '
+			'	-[:IS_IN]->(fb) '
+			'	ON MATCH SET '
+			'		block.found = True '
+			' 	ON CREATE SET '
+			'		block.found = False, '
+			'		counter.count = counter.count + 1, '
+			'		block.name = trim($block_name), '
+			'		block.uid = (field.uid + "_B" + counter.count), '
+			'		block.id = counter.count, '
+			'		block.varieties = CASE WHEN field.variety IS NOT NULL THEN [field.variety] END '
+			' REMOVE '
+			'	counter._LOCK_ '
+			' FOREACH (n IN CASE WHEN block.found = False THEN [1] ELSE [] END | '
+			'	MERGE '
+			'		(user)-[:SUBMITTED]->(us: Submissions) '
+			'	MERGE '
+			'		(us)-[:SUBMITTED]->(ui:Items) '
+			'	MERGE '
+			'		(ui)-[:SUBMITTED]->(ub:Blocks) '
+			'	CREATE '
+			'		(ub)-[s:SUBMITTED {time: datetime.transaction().epochMillis}]->(block) '
+			' ) '
+			' RETURN '
+			'	block.uid, '
+			'	block.name '
+		)
 		with get_driver().session() as neo4j_session:
-			parameters = {
-				'username': self.username,
-				'field_uid': self.field_uid,
-				'block_name': block_name
-			}
-			statement = (
-				' MATCH '
-				'	(user: User { '
-				'		username_lower: toLower(trim($username)) '
-				'	}) '
-				' MATCH '
-				'	(field: Field { '
-				'		uid: toInteger($field_uid) '
-				'	}) '
-				' MERGE '
-				'	(fb: FieldBlocks) '
-				'	-[:IS_IN]->(field) '
-				' MERGE '
-				'	(counter:Counter { '
-				'		name: "block", '
-				'		uid: (toInteger($field_uid) + "_block") '
-				'	}) '
-				'	-[:FOR]->(fb) '
-				'	ON CREATE SET counter.count = 0 '
-				' SET '
-				'	counter._LOCK_ = true '
-				' MERGE '
-				'	(block: Block: Item { '
-				'		name_lower: toLower(trim($block_name)) '
-				'	}) '
-				'	-[:IS_IN]->(fb) '
-				'	ON MATCH SET '
-				'		block.found = True '
-				' 	ON CREATE SET '
-				'		block.found = False, '
-				'		counter.count = counter.count + 1, '
-				'		block.name = trim($block_name), '
-				'		block.uid = (field.uid + "_B" + counter.count), '
-				'		block.id = counter.count, '
-				'		block.varieties = CASE WHEN field.variety IS NOT NULL THEN [field.variety] END '
-				' REMOVE '
-				'	counter._LOCK_ '
-				' FOREACH (n IN CASE WHEN block.found = False THEN [1] ELSE [] END | '
-				'	MERGE '
-				'		(user)-[:SUBMITTED]->(us: Submissions) '
-				'	MERGE '
-				'		(us)-[:SUBMITTED]->(ui:Items) '
-				'	MERGE '
-				'		(ui)-[:SUBMITTED]->(ub:Blocks) '
-				'	CREATE '
-				'		(ub)-[s:SUBMITTED {time: datetime.transaction().epochMillis}]->(block) '
-				' ) '
-				' RETURN [ '
-				'	block.uid, '
-				'	block.name '
-				' ] '
-			)
-			result = neo4j_session.write_transaction(bolt_result, statement, parameters).single()
-			if result:
-				return result.value()
-			else:
-				return None
+			return neo4j_session.write_transaction(single_record, statement, **parameters)
 
 	def add_trees(self, tree_count, block_uid=None):
 		parameters = {
@@ -559,35 +516,33 @@ class AddFieldItems:
 				'	(uff)-[:SUBMITTED {time: datetime.transaction().epochMillis}]->(r) '
 			)
 		statement += (
-			' RETURN { '
-			'	Country: country, '
-			'	Region: region, '
-			'	Farm: farm, '
-			'	Field: field.name, '
-			'	`Field UID`: field.uid, '
+			' RETURN '
+			'	country as Country, '
+			'	region as Region, '
+			'	farm as Farm, '
+			'	field.name as Field, '
+			'	field.uid as `Field UID`, '
 		)
 		if block_uid:
 			statement += (
-				'	Block: block.name, '
-				'	`Block ID`: block.id, '
-				'	source_level: "Block", '
-				'	source_id: block.id, '
-				'	Time: coalesce(field.time, block.time), '
+				'	block.name as Block, '
+				'	block.id as `Block ID`, '
+				'	"Block" as source_level, '
+				'	block.id as source_id, '
+				'	coalesce(field.time, block.time) as Time, '
 		)
 		else:
 			statement += (
-				'	source_level: "Field", '
-				'	source_id: field.uid, '
-				'	Time: field.time, '
+				'	"Field" as source_level, '
+				'	field.uid as source_id, '
+				'	field.time as Time, '
 			)
 		statement += (
-			'	UID: tree.uid,	'
-			'	Varieties: tree.varieties '
-			' } '
+			'	tree.uid as UID,	'
+			'	tree.varieties as Varieties '
 		)
 		with get_driver().session() as neo4j_session:
-			result = neo4j_session.write_transaction(bolt_result, statement, parameters)
-			return result
+			return neo4j_session.write_transaction(list_records, statement, **parameters)
 
 # Samples are lowest "level" of item with a relationship "FROM" to any other item/s
 	# The FROM relationship may be directed to other samples, allowing:
@@ -1006,56 +961,52 @@ class AddFieldItems:
 				' CREATE (ufi)-[: SUBMITTED {time: datetime.transaction().epochMillis}]->(r) '
 			)
 		statement += (
-			' RETURN { '
-			'	UID: sample.uid, '
-			'	Country: country.name, '
-			'	Region: region.name, '
-			'	Farm: farm.name, '
-			'	Varieties: varieties, '
+			' RETURN '
+			'	sample.uid as UID, '
+			'	country.name as Country, '
+			'	region.name as Region, '
+			'	farm.name as Farm, '
+			'	varieties as Varieties, '
 		)
 		if level == 'field':
 			statement += (
-				' Field: item.name, '
-				' `Field UID`: item.uid, '
-				' source_level: "Field", '
-				' source_id: item.uid '
+				' item.name as Field, '
+				' item.uid as `Field UID`, '
+				' "Field" as source_level, '
+				' item.uid as source_id '
 			)
 		else:
 			statement += (
-				'	Field: field.name, '
-				'	`Field UID`: field.uid, '
+				'	field.name as Field, '
+				'	field.uid as `Field UID`, '
 			)
 			if level == 'block':
 				statement += (
-					' Block: item.name, '
-					' `Block ID`: item.id, '
-					' source_level: "Block", '
-					' source_id: item.id '
+					' item.name as  Block, '
+					' item.id as `Block ID`, '
+					' "Block" as source_level, '
+					' item.id as source_id '
 				)
 			elif level == 'tree':
 				statement += (
-					' Block: block.name, '
-					' `Block ID` : block.id, '
-					' `Tree ID`: item.id, '
-					' `Tree Name`: item.name, '
-					' source_level: "Tree", '
-					' source_id: item.id '
+					' block.name as Block, '
+					' block.id as `Block ID`, '
+					' item.id as `Tree ID`, '
+					' item.name as `Tree Name`, '
+					' "Tree" as source_level, '
+					' item.id as source_id '
 					)
 			elif level == 'sample':
 				statement += (
-					' Blocks: [x IN blocks | x.name], '
-					' `Block IDs` : [x IN blocks | x.id], '
-					' `Tree IDs`: [x IN trees | x.id], '
-					' `Tree Names`: [x IN trees | x.name], '
-					' `Source Sample IDs` : [x IN source_samples | x.id], '
-					' `Source Sample Names` : [x IN source_samples | x.name], ' 
-					' source_level: "Sample", '
-					' source_id: item.id, '
-					' Unit: item.unit '
+					' [x IN blocks | x.name] as Blocks, '
+					' [x IN blocks | x.id] as `Block IDs`, '
+					' [x IN trees | x.id] as `Tree IDs`, '
+					' [x IN trees | x.name] as `Tree Names`, '
+					' [x IN source_samples | x.id] as `Source Sample IDs` , '
+					' [x IN source_samples | x.name] as `Source Sample Names`, ' 
+					' "Sample" as source_level, '
+					' item.id as source_id, '
+					' item.unit as Unit '
 				)
-		statement += (
-			' } '
-		)
 		with get_driver().session() as neo4j_session:
-			result = neo4j_session.write_transaction(bolt_result, statement, parameters)
-			return result
+			return neo4j_session.write_transaction(list_records, statement, **parameters)

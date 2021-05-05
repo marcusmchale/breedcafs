@@ -1,8 +1,5 @@
-from app import (
-	app,
-	ServiceUnavailable,
-	SecurityError
-)
+from app import app
+from neo4j.exceptions import ServiceUnavailable, AuthError
 from flask import (
 	session,
 	flash,
@@ -39,7 +36,7 @@ def collect():
 				collect_form=collect_form,
 				title='Collect'
 			)
-		except (ServiceUnavailable, SecurityError):
+		except (ServiceUnavailable, AuthError):
 			flash("Database unavailable")
 			return redirect(url_for('index'))
 
@@ -162,6 +159,6 @@ def register_samples():
 				return jsonify({
 					'errors': [collect_form.errors, location_form.errors]
 				})
-		except (ServiceUnavailable, SecurityError):
+		except (ServiceUnavailable, AuthError):
 			flash("Database unavailable")
 			return redirect(url_for('index'))

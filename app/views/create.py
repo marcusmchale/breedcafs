@@ -1,4 +1,5 @@
-from app import app, ServiceUnavailable, SecurityError
+from app import app
+from neo4j.exceptions import ServiceUnavailable, AuthError
 from flask import (
 	session,
 	flash, 
@@ -54,7 +55,7 @@ def create():
 				add_trees_form=add_trees_form,
 				title='Fields and Trees'
 			)
-		except (ServiceUnavailable, SecurityError):
+		except (ServiceUnavailable, AuthError):
 				flash("Database unavailable")
 				return redirect(url_for('index'))
 
@@ -77,7 +78,7 @@ def add_country():
 					return jsonify({"submitted": added})
 			else:
 				return jsonify([form.errors])
-		except (ServiceUnavailable, SecurityError):
+		except (ServiceUnavailable, AuthError):
 			flash("Database unavailable")
 			return redirect(url_for('index'))
 
@@ -104,7 +105,7 @@ def add_region():
 						return jsonify({"submitted": added})
 			else:
 				return jsonify([form.errors])
-		except (ServiceUnavailable, SecurityError):
+		except (ServiceUnavailable, AuthError):
 				flash("Database unavailable")
 				return redirect(url_for('index'))
 
@@ -132,7 +133,7 @@ def add_farm():
 						return jsonify({"submitted": added})
 			else:
 				return jsonify([form.errors])
-		except (ServiceUnavailable, SecurityError):
+		except (ServiceUnavailable, AuthError):
 				flash("Database unavailable")
 				return redirect(url_for('index'))
 
@@ -161,7 +162,7 @@ def add_field():
 						return jsonify({"submitted": {'uid': added[0], 'name': added[1]}})
 			else:
 				return jsonify([form.errors])
-		except (ServiceUnavailable, SecurityError):
+		except (ServiceUnavailable, AuthError):
 				flash("Database unavailable")
 				return redirect(url_for('index'))
 
@@ -190,7 +191,7 @@ def add_block():
 			else:
 				errors = jsonify([location_form.errors, add_block_form.errors])
 				return errors
-		except (ServiceUnavailable, SecurityError):
+		except (ServiceUnavailable, AuthError):
 				flash("Database unavailable")
 				return redirect(url_for('index'))
 
@@ -278,7 +279,7 @@ def add_trees():
 				return jsonify({
 					'errors': [add_trees_form.errors, location_form.errors]
 				})
-		except (ServiceUnavailable, SecurityError):
+		except (ServiceUnavailable, AuthError):
 			flash("Database unavailable")
 			return redirect(url_for('index'))
 

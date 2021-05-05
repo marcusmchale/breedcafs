@@ -1,12 +1,14 @@
-from app import app, os, celery, ServiceUnavailable, SecurityError, logging
-import grp
+from app import app, celery
+import os
+import logging
+from neo4j.exceptions import ServiceUnavailable, AuthError
 from app.cypher import Cypher
 from app.emails import send_email
 from app.models.parsers import Parsers
 from flask import render_template, url_for
 from werkzeug import urls
 from .user import User
-from .neo4j_driver import get_driver, bolt_result
+from .neo4j_driver import get_driver, list_records, single_record
 import csv
 import datetime
 import itertools
@@ -15,6 +17,8 @@ from werkzeug.utils import secure_filename
 from openpyxl import load_workbook
 from zipfile import BadZipfile
 
+
+logger = logging.getLogger(__name__)
 
 class DictReaderInsensitive(csv.DictReader):
 	# overwrites csv.fieldnames property so uses without surrounding whitespace and in lowercase
@@ -675,7 +679,7 @@ class SubmissionRecord:
 class SubmissionResult:
 	def __init__(self, username, filename, submission_type, record_type):
 		self.username = username
-		download_path = os.path.join(app.config['DOWNLOAD_FOLDER'], username)
+		download_path = os.path.join(app.config['EXPORT_FOLDER'], username)
 		if not os.path.isdir(download_path):
 			logging.debug('Creating download path for user: %s', username)
 			os.mkdir(download_path, mode = app.config['EXPORT_FOLDER_PERMISSIONS'])
@@ -749,8 +753,11 @@ class SubmissionResult:
 		}
 
 	def parse_record(self, record):
+		logger.debug("Create submission record")
 		submission_item = SubmissionRecord(record)
+		logger.debug("Created")
 		if submission_item.conflict():
+			logger.debug("Conflict found in item")
 			self.conflicts_found = True
 			submission_item.lists_to_strings()
 			self.conflicts_writer.writerow(submission_item.record)
@@ -760,6 +767,7 @@ class SubmissionResult:
 				# just continue gathering the list of conflicts
 				return
 			submission_item.lists_to_strings()
+			logger.debug("Write record to report")
 			self.submissions_writer.writerow(submission_item.record)
 			if 'Found' in record and record['Found']:
 				self.resubmission_count += 1
@@ -845,35 +853,35 @@ class PropertyUpdateHandler:
 	):
 		row_errors = []
 		for record in result:
-			if not record[0]['item_uid']:
+			if not record['item_uid']:
 				row_errors.append(
-					'Item not found (' + str(record[0]['UID']) + ')'
+					'Item not found (' + str(record['UID']) + ')'
 				)
 			else:
-				if 'existing' in record[0] and record[0]['existing']:
-					if not record[0]['existing'] == record[0]['value']:
+				if 'existing' in record and record['existing']:
+					if not record['existing'] == record['value']:
 						row_errors.append(
 							'Item (' +
-							str(record[0]['item_uid']) +
+							str(record['item_uid']) +
 							') cannot be assigned this' +
 							property_name +
 							' (' +
-							str(record[0]['value']) +
+							str(record['value']) +
 							') as it already has a different value assigned (' +
-							str(record[0]['existing']) +
+							str(record['existing']) +
 							')'
 						)
-				if 'conflicts' in record[0] and record[0]['conflicts']:
+				if 'conflicts' in record and record['conflicts']:
 					row_errors.append(
 						'Item (' +
-						str(record[0]['item_uid']) +
+						str(record['item_uid']) +
 						') cannot be assigned this' +
 						property_name +
 						' (' +
-						str(record[0]['value']) +
+						str(record['value']) +
 						') as directly linked items already have a different value assigned: ' +
 						','.join([
-							'(uid: ' + str(i[0]) + ', ' + property_name + ':' + str(i[1]) + ')' for i in record[0]['conflicts']
+							'(uid: ' + str(i[0]) + ', ' + property_name + ':' + str(i[1]) + ')' for i in record['conflicts']
 						])
 					)
 		if row_errors:
@@ -888,42 +896,42 @@ class PropertyUpdateHandler:
 	):
 		row_errors = []
 		for record in result:
-			if not record[0]['item_uid']: # this shouldn't happen as uids are already checked
+			if not record['item_uid']: # this shouldn't happen as uids are already checked
 				logging.debug(
-					'A variety assignment was attempted but item was not found: ' + str(record[0]['UID'])
+					'A variety assignment was attempted but item was not found: ' + str(record['UID'])
 				)
 				row_errors.append(
-					'Item not found (' + str(record[0]['UID']) + ')'
+					'Item not found (' + str(record['UID']) + ')'
 				)
-			elif not record[0]['assigned_variety']:  # this shouldn't happen as values are already checked
+			elif not record['assigned_variety']:  # this shouldn't happen as values are already checked
 				logging.debug(
-					'A variety assignment was attempted but variety was not found: ' + str(record[0]['value'])
+					'A variety assignment was attempted but variety was not found: ' + str(record['value'])
 				)
 				row_errors.append(
-					'Variety not found (' + str(record[0]['value']) + ')'
+					'Variety not found (' + str(record['value']) + ')'
 				)
 			else:
 				if all([
-					record[0]['existing_variety'],
-					record[0]['existing_variety'] != record[0]['assigned_variety']
+					record['existing_variety'],
+					record['existing_variety'] != record['assigned_variety']
 				]):
 					row_errors.append(
 						'Item (' +
-						str(record[0]['item_uid']) +
+						str(record['item_uid']) +
 						') cannot be assigned this variety '
 						' (' +
-						str(record[0]['assigned_variety']) +
+						str(record['assigned_variety']) +
 						') as it is already assigned a different variety (' +
-						str(record[0]['existing_variety']) +
+						str(record['existing_variety']) +
 						')'
 					)
-				elif record[0]['kin_conflicts']:
+				elif record['kin_conflicts']:
 					row_errors.append(
 						'Item (' +
-						str(record[0]['item_uid']) +
+						str(record['item_uid']) +
 						') cannot be assigned this variety '
 						' (' +
-						str(record[0]['assigned_variety']) +
+						str(record['assigned_variety']) +
 						') as directly linked items already have a different variety assigned (' +
 						','.join(
 							[
@@ -931,22 +939,22 @@ class PropertyUpdateHandler:
 								str(i[0]) +
 								', variety:' +
 								str(i[1]) +
-								')' for i in record[0]['kin_conflicts']
+								')' for i in record['kin_conflicts']
 							]
 						) + ')'
 					)
-				elif record[0]['tree_varieties_error']:
+				elif record['tree_varieties_error']:
 					row_errors.append(
 						'Sample (' +
-						str(record[0]['item_uid']) +
+						str(record['item_uid']) +
 						') cannot be assigned this variety '
 						' (' +
-						str(record[0]['assigned_variety']) +
+						str(record['assigned_variety']) +
 						') as another sample from the same tree already has a different variety assigned (' +
 						','.join([
 							'(uid: ' + str(j[0]) + ', variety: ' + str(j[1]) + ')'
 							for j in i[1][0:5]  # silently only reporting the first 5 items
-						]) for i in record[0]['tree_varieties_error'][0:2]
+						]) for i in record['tree_varieties_error'][0:2]
 					)
 		if row_errors:
 			if property_name not in self.errors:
@@ -961,26 +969,26 @@ class PropertyUpdateHandler:
 		errors = []
 		for record in result:
 			# If we don't find the item
-			if not record[0]['item_uid']:
+			if not record['item_uid']:
 				errors.append(
-					'Item source assignment failed. The item (' + str(record[0]['UID']) + ')' + ') was not found.'
+					'Item source assignment failed. The item (' + str(record['UID']) + ')' + ') was not found.'
 				)
 			# if new source is direct match for self
-			elif record[0]['item_uid'] in [ns[0] for ns in record[0]['new_source_details']]:
+			elif record['item_uid'] in [ns[0] for ns in record['new_source_details']]:
 				errors.append(
 					'Item source assignment failed. An attempt was made to assign item ('
-					+ str(record[0]['UID'])
+					+ str(record['UID'])
 					+ ') to itself. '
 				)
 			# If we don't find the source
-			elif len(record[0]['new_source_details']) == 0:
+			elif len(record['new_source_details']) == 0:
 				errors.append(
 					'Item (' +
-					'UID: ' + record[0]['item_uid']
+					'UID: ' + record['item_uid']
 				)
-				if record[0]['item_name']:
-					errors[-1] += ', name: ' + record[0]['item_name']
-				if len(record[0]['value']) >= 1:
+				if record['item_name']:
+					errors[-1] += ', name: ' + record['item_name']
+				if len(record['value']) >= 1:
 					errors[-1] += (
 							') source assignment failed. The sources were not found: '
 					)
@@ -990,17 +998,17 @@ class PropertyUpdateHandler:
 					)
 				errors[-1] += (
 					', '.join([
-						str(i) for i in record[0]['value']
+						str(i) for i in record['value']
 					])
 				)
-			elif record[0]['unmatched_sources']:
+			elif record['unmatched_sources']:
 				errors.append(
 					'Item (' +
-					'UID: ' + record[0]['item_uid']
+					'UID: ' + record['item_uid']
 				)
-				if record[0]['item_name']:
-					errors[-1] += ', name: ' + record[0]['item_name']
-				if len(record[0]['unmatched_sources']) >= 1:
+				if record['item_name']:
+					errors[-1] += ', name: ' + record['item_name']
+				if len(record['unmatched_sources']) >= 1:
 					errors[-1] += (
 						') source assignment failed. Some sources were not found: '
 					)
@@ -1010,26 +1018,26 @@ class PropertyUpdateHandler:
 					)
 				errors[-1] += (
 					', '.join([
-						str(i) for i in record[0]['unmatched_sources']
+						str(i) for i in record['unmatched_sources']
 					])
 				)
-			elif record[0]['invalid_sources']:
+			elif record['invalid_sources']:
 				errors.append(
 					'Item (' +
-					'UID: ' + record[0]['item_uid']
+					'UID: ' + record['item_uid']
 				)
-				if record[0]['item_name']:
-					errors[-1] += ', name: ' + record[0]['item_name']
-				if len(record[0]['invalid_sources']) >= 1:
+				if record['item_name']:
+					errors[-1] += ', name: ' + record['item_name']
+				if len(record['invalid_sources']) >= 1:
 					errors[-1] += ') source assignment failed. Proposed sources ['
 				else:
 					errors[-1] += ') source assignment failed. Proposed source '
 				errors[-1] += ', '.join([
 					'(uid: ' + str(i[0]) + ', name: ' + str(i[1]) + ')' if i[1]
 					else '(uid: ' + str(i[0]) + ')'
-					for i in record[0]['invalid_sources']
+					for i in record['invalid_sources']
 				])
-				if len(record[0]['invalid_sources']) >= 1:
+				if len(record['invalid_sources']) >= 1:
 					errors[-1] += (
 						'] are not themselves sourced (either directly or indirectly) from '
 					)
@@ -1037,7 +1045,7 @@ class PropertyUpdateHandler:
 					errors[-1] += (
 						' is not itself sourced (either directly or indirectly) from '
 					)
-				if len(record[0]['prior_source_details']) >= 1:
+				if len(record['prior_source_details']) >= 1:
 					errors[-1] += (
 						'any of the existing assigned sources: '
 					)
@@ -1048,28 +1056,28 @@ class PropertyUpdateHandler:
 				errors[-1] += ', '.join([
 					'(uid: ' + str(i[0]) + ', name: ' + str(i[1]) + ')' if i[1]
 					else '(uid: ' + str(i[0]) + ')'
-					for i in record[0]['prior_source_details']
+					for i in record['prior_source_details']
 				])
-			elif record[0]['unrepresented_sources']:
+			elif record['unrepresented_sources']:
 				# this occurs when not all prior sources are represented by the new sources
 				# this occurs in the case of attempting to re-assign to new block(s)/tree(s) without deleting an existing record
 				# and also in re-assigning pooled samples with greater detail
 				errors.append(
 					'Item (' +
-					'UID: ' + record[0]['item_uid']
+					'UID: ' + record['item_uid']
 				)
-				if record[0]['item_name']:
-					errors[-1] += ', name: ' + record[0]['item_name']
-				if len(record[0]['unrepresented_sources']) >= 1:
+				if record['item_name']:
+					errors[-1] += ', name: ' + record['item_name']
+				if len(record['unrepresented_sources']) >= 1:
 					errors[-1] += ') source assignment failed. Existing sources ['
 				else:
 					errors[-1] += ') source assignment failed. Existing source '
 				errors[-1] += ', '.join([
 					'(uid: ' + str(i[0]) + ', name: ' + str(i[1]) + ')' if i[1]
 					else '(uid: ' + str(i[0]) + ')'
-					for i in record[0]['unrepresented_sources']
+					for i in record['unrepresented_sources']
 				])
-				if len(record[0]['unrepresented_sources']) >= 1:
+				if len(record['unrepresented_sources']) >= 1:
 					errors[-1] += (
 						'] would not be represented (either directly or indirectly) by '
 					)
@@ -1077,7 +1085,7 @@ class PropertyUpdateHandler:
 					errors[-1] += (
 						' would not be represented (either directly or indirectly) by '
 					)
-				if len(record[0]['new_source_details']) >= 1:
+				if len(record['new_source_details']) >= 1:
 					errors[-1] += (
 						'the proposed sources: '
 					)
@@ -1088,15 +1096,15 @@ class PropertyUpdateHandler:
 				errors[-1] += ', '.join([
 					'(uid: ' + str(i[0]) + ', name: ' + str(i[1]) + ')' if i[1]
 					else '(uid: ' + str(i[0]) + ')'
-					for i in record[0]['new_source_details']
+					for i in record['new_source_details']
 				])
-			elif record[0]['variety_conflicts']:
+			elif record['variety_conflicts']:
 				errors.append(
 					'Item (' +
-					'UID: ' + record[0]['item_uid']
+					'UID: ' + record['item_uid']
 				)
-				if record[0]['item_name']:
-					errors[-1] += ', name: ' + record[0]['item_name']
+				if record['item_name']:
+					errors[-1] += ', name: ' + record['item_name']
 				errors[-1] += (
 					') source assignment failed. '
 				)
@@ -1105,7 +1113,7 @@ class PropertyUpdateHandler:
 					'proposed source(s) conflicts with the variety that is specified for the item '
 					'or its samples: '
 				)
-				if len(record[0]['variety_conflicts']) >= 2:
+				if len(record['variety_conflicts']) >= 2:
 					errors[-1] += (
 						'The assignment would create many such conflicts so '
 						'only the first two are being reported. '
@@ -1114,19 +1122,19 @@ class PropertyUpdateHandler:
 					'(source uid: ' + str(i['ancestor']) + ', source variety:' + str(i['ancestor_variety']) + ', ' +
 					'descendant item: ' + str(i['descendant']) + ', ' +
 					'descendant variety: ' + str(i['descendant_variety']) + ')'
-					for i in record[0]['variety_conflicts'][0:2]
+					for i in record['variety_conflicts'][0:2]
 				])
-			elif record[0]['tree_varieties_error']:
+			elif record['tree_varieties_error']:
 				errors.append(
 					'Item (' +
-					'UID: ' + record[0]['item_uid']
+					'UID: ' + record['item_uid']
 				)
-				if record[0]['item_name']:
-					errors[-1] += ', name: ' + record[0]['item_name']
+				if record['item_name']:
+					errors[-1] += ', name: ' + record['item_name']
 				errors[-1] += (
 					') source assignment failed. '
 				)
-				if len(record[0]['tree_varieties_error']) >= 2:
+				if len(record['tree_varieties_error']) >= 2:
 					errors[-1] += (
 						'The proposed source assignment would create ambiguous definitions for many trees, '
 						'only the first two are being reported. '
@@ -1138,7 +1146,7 @@ class PropertyUpdateHandler:
 					','.join([
 						'(uid: ' + str(j[0]) + ', variety: ' + str(j[1]) + ')'
 						for j in i[1][0:5]  # silently only reporting the first 5 items
-					]) for i in record[0]['tree_varieties_error'][0:2]
+					]) for i in record['tree_varieties_error'][0:2]
 				])
 		if errors:
 			if property_name not in self.errors:
@@ -1156,12 +1164,11 @@ class PropertyUpdateHandler:
 			'		THEN uid_value[1] '
 			'		ELSE item.name '
 			'		END '
-			'	RETURN { '
-			'		UID: uid_value[0], '
-			'		value: uid_value[1], '
-			'		item_uid: item.uid, '
-			'		existing: existing '
-			'	} '
+			'	RETURN '
+			'		uid_value[0] as UID, '
+			'		uid_value[1] as value, '
+			'		item.uid as item_uid, '
+			'		existing as existing '
 		)
 		result = self.tx.run(
 			statement,
@@ -1183,12 +1190,11 @@ class PropertyUpdateHandler:
 			'		THEN uid_value[1] '
 			'		ELSE item.row '
 			'		END '
-			'	RETURN { '
-			'		UID: uid_value[0], '
-			'		value: uid_value[1], '
-			'		item_uid: item.uid, '
-			'		existing: existing '
-			'	} '
+			'	RETURN '
+			'		uid_value[0] as UID, '
+			'		uid_value[1] as value, '
+			'		item.uid as item_uid, '
+			'		existing as existing '
 		)
 		result = self.tx.run(
 			statement,
@@ -1210,12 +1216,11 @@ class PropertyUpdateHandler:
 			'		THEN uid_value[1] '
 			'		ELSE item.column '
 			'		END '
-			'	RETURN { '
-			'		UID: uid_value[0], '
-			'		value: uid_value[1], '
-			'		item_uid: item.uid, '
-			'		existing: existing '
-			'	} '
+			'	RETURN '
+			'		uid_value[0] as UID, '
+			'		uid_value[1] as value, '
+			'		item.uid as item_uid, '
+			'		existing as existing '
 		)
 		result = self.tx.run(
 			statement,
@@ -1237,12 +1242,11 @@ class PropertyUpdateHandler:
 			'		THEN uid_value[1] '
 			'		ELSE item.location '
 			'		END '
-			'	RETURN { '
-			'		UID: uid_value[0], '
-			'		value: uid_value[1], '
-			'		item_uid: item.uid, '
-			'		existing: existing '
-			'	} '
+			'	RETURN '
+			'		uid_value[0] as UID, '
+			'		uid_value[1] as value, '
+			'		item.uid, '
+			'		existing '
 		)
 		result = self.tx.run(
 			statement,
@@ -1264,12 +1268,11 @@ class PropertyUpdateHandler:
 			'		THEN uid_value[1] '
 			'		ELSE item.unit '
 			'		END '
-			'	RETURN  { '
-			'		UID: uid_value[0], '
-			'		value: uid_value[1], '	
-			'		item_uid: item.uid, '
-			'		existing: existing '
-			'	} '
+			'	RETURN  '
+			'		uid_value[0] as UID, '
+			'		uid_value[1] as value, '	
+			'		item.uid as item_uid, '
+			'		existing '
 		)
 		result = self.tx.run(
 			statement,
@@ -1291,12 +1294,11 @@ class PropertyUpdateHandler:
 			'		THEN toInteger(uid_value[1]) '
 			'		ELSE item.elevation '
 			'		END '
-			'	RETURN  { '
-			'		UID: uid_value[0], '
-			'		value: uid_value[1], '	
-			'		item_uid: item.uid, '
-			'		existing: existing '
-			'	} '
+			'	RETURN  '
+			'		uid_value[0] as UID, '
+			'		uid_value[1] as value, '	
+			'		item.uid as item_uid, '
+			'		existing '
 		)
 		result = self.tx.run(
 			statement,
@@ -1436,28 +1438,28 @@ class PropertyUpdateHandler:
 			'		collect(distinct kin.variety) as varieties, '
 			'		collect(distinct [kin.uid, kin.variety]) as variety_sources '
 			'	SET tree.varieties = CASE WHEN tree.variety IS NOT NULL THEN [tree.variety] ELSE varieties END '
-			'	RETURN  { '
-			'		UID: uid, '
+			'	RETURN  '
+			'		uid as UID, '
 			'		value: value, '
-			'		item_name: tree.name, '
-			'		item_uid: tree.uid, '
-			'		prior_source_details: [[prior_block.uid, prior_block.name]], '
-			'		new_source_details: [[new_block.uid, new_block.name]], '
-			'		unmatched_sources:	CASE WHEN new_block IS NULL THEN [value] END, '
-			'		invalid_sources: CASE '
+			'		tree.name as item_name, '
+			'		tree.uid as item_uid, '
+			'		[[prior_block.uid, prior_block.name]] as prior_source_details, '
+			'		[[new_block.uid, new_block.name]] as new_source_details, '
+			'		CASE WHEN new_block IS NULL THEN [value] END as unmatched_sources, '
+			'		CASE '
 			'			WHEN prior_block IS NOT NULL AND prior_block <> new_block '
 			'			THEN [[new_block.uid, new_block.name]] '
-			'			END, '
-			'		unrepresented_sources: CASE '
+			'			END as invalid_sources, '
+			'		CASE '
 			'			WHEN prior_block IS NOT NULL AND prior_block <> new_block '
 			'			THEN [[prior_block.uid, prior_block.name]] '
-			'			END, '
-			'		variety_conflicts: variety_conflicts, '
-			'		tree_varieties_error: CASE '
+			'			END as unrepresented_sources, '
+			'		variety_conflicts as variety_conflicts, '
+			'		CASE '
 			'			WHEN size(tree.varieties) > 1 '
 			'			THEN '
 			'				collect([tree.uid,variety_sources]) '
-			'			END '
+			'			END as tree_varieties_error '
 			'	} '
 		)
 		result = self.tx.run(
@@ -1704,19 +1706,18 @@ class PropertyUpdateHandler:
 			'			| [x[0]] '
 			'		] as tree_varieties_error '
 			'	SET sample.varieties = CASE WHEN sample.variety IS NOT NULL THEN [sample.variety] ELSE kin_varieties END '
-			'	RETURN  { '
-			'		UID: uid, '
-			'		value: value, '
-			'		item_name: sample.name, '
-			'		item_uid: sample.uid, '
-			'		prior_source_details: prior_source_details,'
-			'		new_source_details: new_source_details, '
-			'		unmatched_sources: unmatched_sources, '
-			'		invalid_sources: invalid_sources, '
-			'		unrepresented_sources: unrepresented_sources, '
-			'		variety_conflicts: variety_conflicts, '
-			'		tree_varieties_error: tree_varieties_error '
-			'	} '
+			'	RETURN  '
+			'		uid as UID, '
+			'		value, '
+			'		sample.name as item_name, '
+			'		sample.uid as item_uid, '
+			'		prior_source_details,'
+			'		new_source_details, '
+			'		unmatched_sources, '
+			'		invalid_sources, '
+			'		unrepresented_sources, '
+			'		variety_conflicts, '
+			'		tree_varieties_error '
 		)
 		for item in self.updates[input_variable]:
 			if 'name' in input_variable:
@@ -1887,17 +1888,16 @@ class PropertyUpdateHandler:
 			'			WHERE "Tree" IN x[1] AND size(x[2]) > 1 '
 			'			| x[0] '
 			'		] as tree_varieties_error '
-			'	RETURN { '
-			'		UID: uid, '
-			'		value: value, '	
-			'		item_uid: item.uid, '
-			'		existing_variety: existing_variety, '
-			'		assigned_variety: variety.name, '
-			'		item_variety: item.variety, '
-			'		item_varieties: item.varieties, '
-			'		tree_varieties_error: tree_varieties_error, '
-			'		kin_conflicts: kin_conflicts '
-			'	} '
+			'	RETURN '
+			'		uid as UID, '
+			'		value, '	
+			'		item.uid as item_uid, '
+			'		existing_variety, '
+			'		variety.name as assigned_variety, '
+			'		item.variety as item_variety, '
+			'		item.varieties as item_varieties, '
+			'		tree_varieties_error, '
+			'		kin_conflicts '
 		)
 		result = self.tx.run(
 			statement,
@@ -1938,12 +1938,11 @@ class PropertyUpdateHandler:
 			'		THEN '
 			'			Null '
 			'		END '
-			'	RETURN  { '
-			'		UID: uid_value[0], '
-			'		value: uid_value[1], '
-			'		item_uid: item.uid, '
-			'		existing: existing '
-			'	} '
+			'	RETURN  '
+			'		uid_value[0] as UID, '
+			'		uid_value[1] as value, '
+			'		item.uid as item_uid, '
+			'		existing '
 		)
 		result = self.tx.run(
 			statement,
@@ -1961,7 +1960,7 @@ class Upload:
 		self.raw_filename = raw_filename
 		self.filename = secure_filename(raw_filename)
 		self.submission_type = submission_type
-		self.file_path = os.path.join(app.config['UPLOAD_FOLDER'], username, self.filename)
+		self.file_path = os.path.join(app.config['IMPORT_FOLDER'], username, self.filename)
 		self.record_types = []
 		self.trimmed_file_paths = dict()
 		self.parse_results = dict()
@@ -2022,7 +2021,7 @@ class Upload:
 
 	def file_save(self, file_data):
 		# create user upload path if not found
-		upload_path = os.path.join(app.config['UPLOAD_FOLDER'], self.username)
+		upload_path = os.path.join(app.config['IMPORT_FOLDER'], self.username)
 		if not os.path.isdir(upload_path):
 			logging.debug('Creating upload path for user: %s', self.username)
 			os.mkdir(upload_path, mode=app.config['IMPORT_FOLDER_PERMISSIONS'] )
@@ -2052,18 +2051,18 @@ class Upload:
 					' MATCH '
 					'	(input: Input)-[:OF_TYPE]->(:RecordType {name_lower:"curve"}) '
 					' WHERE input.name_lower IN $names '
-					' RETURN input.name '
+					' RETURN input '
 				)
 				parameters = {
 					'names': [i.lower for i in wb.sheetnames]
 				}
 				with get_driver().session() as neo4j_session:
-					result = neo4j_session.read_transaction(
-						bolt_result,
+					record = neo4j_session.read_transaction(
+						single_record,
 						statement,
-						parameters
+						**parameters
 					)
-				if not result.single():
+				if not record:
 					return (
 						'This workbook does not appear to contain any of the following accepted worksheets: <br> - '
 						+ '<br>  - '.join([str(i) for i in list(app.config['WORKSHEET_NAMES'].values())])
@@ -2118,19 +2117,19 @@ class Upload:
 			'		OR '
 			'		record_type.name_lower <> $record_type '
 			'	RETURN '
-			'		input_variable, record_type.name_lower '
+			'		input_variable, record_type.name_lower as record_type'
 		)
 		parameters = {
 			'record_type': record_type,
 			'input_variables': self.input_variables[worksheet]
 		}
 		with get_driver().session() as neo4j_session:
-			unrecognised_input_variables = neo4j_session.read_transaction(
-				bolt_result,
+			result = neo4j_session.read_transaction(
+				list_records,
 				statement,
-				parameters
+				**parameters
 			)
-			if unrecognised_input_variables.peek():
+			if result:
 				if self.file_extension == 'xlsx':
 					error_message = '<p>' + worksheet + ' worksheet '
 				else:
@@ -2138,9 +2137,9 @@ class Upload:
 				error_message += (
 					'contains column headers that are not recognised as input variables or required details: </p>'
 				)
-				for input_variable in unrecognised_input_variables :
-					error_message += '<dt>' + input_variable[0] + ':</dt> '
-					input_record_type = input_variable[1]
+				for record in result:
+					error_message += '<dt>' + record['input_variable'] + ':</dt> '
+					input_record_type = record['record_type']
 					if input_record_type:
 						if record_type == 'mixed':
 							error_message += (
@@ -2241,19 +2240,19 @@ class Upload:
 		statement = (
 			' MATCH '
 			'	(input: Input {name_lower: $name})-[:OF_TYPE]->(:RecordType {name_lower:"curve"}) '
-			' RETURN input.name '
+			' RETURN input '
 		)
 		parameters = {
 			'name': worksheet.lower()
 		}
 		with get_driver().session() as neo4j_session:
-			result = neo4j_session.read_transaction(
-				bolt_result,
+			record = neo4j_session.read_transaction(
+				single_record,
 				statement,
-				parameters
+				**parameters
 			)
-		if result.peek():
-			return result.single()[0]
+		if record:
+			return record
 		else:
 			self.error_messages.append(
 				' This workbook contains an unsupported worksheet:<br> "' + worksheet + '"<br><br>'
@@ -2380,7 +2379,7 @@ class Upload:
 			wb = load_workbook(self.file_path, read_only=True, data_only=True)
 			if self.submission_type == 'db':
 				ws = wb['Records']
-			elif self.submission_type == 'table':
+			else:
 				if worksheet in app.config['WORKSHEET_NAMES']:
 					ws = wb[app.config['WORKSHEET_NAMES'][worksheet]]
 				else:
@@ -2446,7 +2445,7 @@ class Upload:
 		self.parse_results[worksheet] = parse_result
 		if submission_type == 'table':
 			record_type = self.get_record_type_from_worksheet(worksheet)
-		elif submission_type == 'db':
+		else:
 			record_type = 'mixed'
 		if record_type == 'curve':
 			x_values = set(self.fieldnames[worksheet]) - self.required_sets[record_type]
@@ -2501,15 +2500,15 @@ class Upload:
 				# todo move this to the parse procedure where we iterate through the file already
 				for row in trimmed_dict_reader:
 					inputs_set.add(row['input variable'].lower())
-				record_types = tx.run(
-					' UNWIND $inputs as input_name'
-					'	MATCH '
-					'	(f:Input { '
-					'		name_lower: input_name '
-					'	})-[:OF_TYPE]->(record_type: RecordType) '
-					' RETURN distinct(record_type.name_lower) ',
-					inputs=list(inputs_set)
-				).value()
+				#record_types = tx.run(
+				#	' UNWIND $inputs as input_name'
+				#	'	MATCH '
+				#	'	(f:Input { '
+				#	'		name_lower: input_name '
+				#	'	})-[:OF_TYPE]->(record_type: RecordType) '
+				#	' RETURN distinct(record_type.name_lower) ',
+				#	inputs=list(inputs_set)
+				#).value()
 				if not set(self.required_sets[record_type]).issubset(set(self.fieldnames[worksheet])):
 					missing_fieldnames = set(self.required_sets[record_type]) - set(self.fieldnames[worksheet])
 					if self.file_extension == 'xlsx':
@@ -2569,8 +2568,7 @@ class Upload:
 				trimmed_dict_reader = DictReaderInsensitive(trimmed_file)
 				row = next(trimmed_dict_reader)
 				# need to check_result sorted by file/dictreader row_index
-				for item in check_result:
-					record = item[0]
+				for record in check_result:
 					while record['row_index'] != int(row['row_index']):
 						row = next(trimmed_dict_reader)
 					if not record['UID']:
@@ -2715,22 +2713,27 @@ class Upload:
 					record_type=record_type
 				)
 			else:
-				logging.warn('Record type not recognised')
+				logger.warning('Record type not recognised')
 			# create a submission result and update properties from result
 			if record_type == 'property':
 				self.property_updater = PropertyUpdateHandler(tx)
 			for record in result:
-				submission_result.parse_record(record[0])
+				record = record.data()
+				logger.debug("parsing record for submission report")
+				submission_result.parse_record(record)
 				if record_type == 'property':
-					if self.property_updater.process_record(record[0]):
+					logger.debug("parsing record for property update")
+					if self.property_updater.process_record(record):
 						break
 			# As we are collecting property updates we need to run the updater at the end
-			if not result.peek():
+			if not result:
 				if record_type == 'property':
+					logger.debug("Updating properties")
 					self.property_updater.update_all()
 
 	@celery.task(bind=True)
 	def async_submit(self, username, upload_object):
+		logger.debug("Start submission")
 		try:
 			upload_object.set_fieldnames()
 			if upload_object.error_messages:
@@ -2751,17 +2754,21 @@ class Upload:
 							'<br>'.join(upload_object.error_messages)
 					)
 				}
+			logger.debug("Start neo4j session")
 			with get_driver().session() as neo4j_session:
 				if upload_object.file_extension in ['csv', 'xlsx']:
 					with neo4j_session.begin_transaction() as tx:
 						for worksheet in list(upload_object.fieldnames.keys()):
 							# todo Stop trimming before parsing, this should be done in one pass of the file
 							# clean up the file removing empty lines and whitespace, lower case headers for matching in db
+							logger.debug("trim file")
 							upload_object.trim_file(worksheet)
 							# parse the trimmed file/worksheet for errors
 							# also adds parse_result to upload_object.parse_result dict (by record_type)
+							logger.debug("parse rows")
 							upload_object.parse_rows(worksheet)
 							# with string parsing performed, now we check against the database for UID, input variable, value
+							logger.debug("check against db")
 							upload_object.db_check(tx, worksheet)
 						if not upload_object.contains_data:
 							upload_object.error_messages.append(
@@ -2769,6 +2776,7 @@ class Upload:
 								+ ' appears to contain no input values. '
 							)
 						if upload_object.error_messages:
+							logging.debug("Errors found")
 							error_messages = '<br>'.join(upload_object.error_messages)
 							with app.app_context():
 								html = render_template(
@@ -2796,12 +2804,16 @@ class Upload:
 						submissions = []
 						for worksheet in list(upload_object.fieldnames.keys()):
 							# submit data
+							logger.debug(f"Submit worksheet: {worksheet}")
 							upload_object.submit(tx, worksheet)
+							logger.debug("Process result for conflicts")
 							submission_result = upload_object.submission_results[worksheet]
 							if submission_result.conflicts_found:
+								logger.debug(f"Conflicts found")
 								conflict_files.append(submission_result.conflicts_file_path)
 								os.unlink(submission_result.submissions_file_path)
 							else:
+								logger.debug(f"No conflicts found")
 								os.unlink(submission_result.conflicts_file_path)
 								if submission_result.submissions_file_path:
 									submissions.append((
@@ -2812,6 +2824,7 @@ class Upload:
 						if conflict_files:
 							# These should only be generated due to concurrent conflicting submissions
 							# or internal conflicts in the submitted file
+							logger.debug("Rolling back submission: conflicts found")
 							tx.rollback()
 							with app.app_context():
 								response = (
@@ -2860,6 +2873,7 @@ class Upload:
 						if 'property' in upload_object.record_types:
 							property_updater = upload_object.property_updater
 							if property_updater.errors:
+								logger.debug("Rolling back submission: Property conflicts")
 								property_updater.format_error_list()
 								error_messages = [
 									item for errors in list(property_updater.errors.values()) for item in errors
@@ -2883,6 +2897,7 @@ class Upload:
 										'status': 'ERRORS',
 										'result': response
 									}
+						logger.debug("Commit to neo4j")
 						tx.commit()
 						# now need app context for the following (this is running asynchronously)
 						with app.app_context():
@@ -2949,7 +2964,7 @@ class Upload:
 						'status': 'SUCCESS',
 						'result': "Nothing done with the file"
 					}
-		except (ServiceUnavailable, SecurityError) as exc:
+		except (ServiceUnavailable, AuthError) as exc:
 			raise self.retry(exc=exc)
 
 	def correct(
@@ -3120,13 +3135,12 @@ class Upload:
 			'	(record)-[:DELETED_FROM]->(if) '
 			' DELETE '
 			'	record_for '
-			' RETURN { '
-			'	time: time, '
-			'	record_time: record.time, '
-			'	uid: uid, '
-			'	`input variable`: input.name_lower, '
-			'	row_index: row_index '
-			' } '
+			' RETURN '
+			'	time as time, '
+			'	record.time as record_time, '
+			'	uid as uid, '
+			'	input.name_lower as `input variable`, '
+			'	row_index as row_index '
 			' ORDER BY row_index '
 		)
 		trimmed_file_path = self.trimmed_file_paths[worksheet]
@@ -3330,7 +3344,7 @@ class Upload:
 							'	collect([input.name_lower, record.value, s.time]) as records, '
 							'	max(s.time) as latest '
 							' WITH item, prior_ancestors, [x IN records WHERE x[2] = latest][0] as record '
-							' WITH item, prior_ancestors, record[0] as input_name_lower, record[1] as value'
+							' WITH item, prior_ancestors, record as input_name_lower, record[1] as value'
 							' MATCH '
 							'	(item)-[: IS_IN | FROM *]->(field: Field) '
 							' OPTIONAL MATCH '
@@ -3562,26 +3576,27 @@ class Upload:
 						record_tally = {}
 						missing_row_indexes = []
 						expected_row_index = 1
-						if not deletion_result.peek():
+						if not deletion_result:
 							missing_row_indexes += list(range(2, upload_object.row_count[worksheet] + 2))
 						else:
 							for record in deletion_result:
 								while (
-										expected_row_index != record[0]['row_index']
+										expected_row_index != record['row_index']
 										and expected_row_index <= upload_object.row_count[worksheet] + 2
 								):
 									expected_row_index += 1
-									if expected_row_index != record[0]['row_index']:
+									if expected_row_index != record['row_index']:
 										missing_row_indexes.append(expected_row_index)
-								if not record[0]['input variable'] in record_tally:
-									record_tally[record[0]['input variable']] = 0
-								record_tally[record[0]['input variable']] += 1
-								if record[0]['input variable'] in property_uid:
-									property_uid[record[0]['input variable']].append(record[0]['uid'])
+								if not record['input variable'] in record_tally:
+									record_tally[record['input variable']] = 0
+								record_tally[record['input variable']] += 1
+								if record['input variable'] in property_uid:
+									property_uid[record['input variable']].append(record['uid'])
 							upload_object.remove_properties(tx, property_uid)
 							if not expected_row_index == upload_object.row_count[worksheet]:
 								missing_row_indexes += list(range(expected_row_index, upload_object.row_count[worksheet] + 2))
 						if missing_row_indexes:
+							logger.debug("Correction failed: some records not found")
 							missing_row_ranges = (
 								list(x) for _, x in itertools.groupby(enumerate(missing_row_indexes), lambda i_x: i_x[0]-i_x[1])
 							)
@@ -3636,7 +3651,7 @@ class Upload:
 							'status': 'SUCCESS',
 							'result': response
 							}
-		except (ServiceUnavailable, SecurityError) as exc:
+		except (ServiceUnavailable, AuthError) as exc:
 			raise self.retry(exc=exc)
 
 
@@ -3646,14 +3661,14 @@ class Resumable:
 		self.resumable_id = resumable_id
 		self.chunk_paths = None
 		user_upload_dir = os.path.join(
-			app.config['UPLOAD_FOLDER'],
+			app.config['IMPORT_FOLDER'],
 			self.username
 		)
 		if not os.path.isdir(user_upload_dir):
 			logging.debug('Creating upload path for user: %s', username)
 			os.mkdir(user_upload_dir, mode=app.config['IMPORT_FOLDER_PERMISSIONS'])
 		self.temp_dir = os.path.join(
-			app.config['UPLOAD_FOLDER'],
+			app.config['IMPORT_FOLDER'],
 			self.username,
 			self.resumable_id
 		)
@@ -3662,7 +3677,7 @@ class Resumable:
 			os.mkdir(self.temp_dir, mode=app.config['IMPORT_FOLDER_PERMISSIONS'])
 		self.filename = secure_filename(raw_filename)
 		self.file_path = os.path.join(
-			app.config['UPLOAD_FOLDER'],
+			app.config['IMPORT_FOLDER'],
 			self.username,
 			self.filename
 		)
@@ -3696,7 +3711,7 @@ class Resumable:
 	def check_for_chunk(self, resumable_id, chunk_number):
 		temp_dir = os.path.join(
 			app.instance_path,
-			app.config['UPLOAD_FOLDER'],
+			app.config['IMPORT_FOLDER'],
 			self.username,
 			resumable_id
 		)
