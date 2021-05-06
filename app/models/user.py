@@ -212,8 +212,8 @@ class User:
 						return {'success': 'Logged in', 'access': user['access']}
 					else:
 						# handle bad login attempts here,
-						redis_store.zadd('bad_logins_user_' + self.username, now, now)
-						redis_store.zadd('bad_logins_ip_' + ip_address, now, now)
+						redis_store.zadd('bad_logins_user_' + self.username, {now: now})
+						redis_store.zadd('bad_logins_ip_' + ip_address, {now: now})
 						logging.info('bad login: ' + ip_address + ' ' + self.username)
 						return {'error': 'Please check your password'}
 				else:
