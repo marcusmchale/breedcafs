@@ -16,6 +16,7 @@ SERVER_NAME = 'www.breedcafs-db.eu'
 
 # URI for bolt driver, 7687 for production, 7688 for dev
 BOLT_URI = "bolt://localhost:7687"
+
 # redis and celery config, 6379 for production, 6380 for dev
 REDIS_PORT = 6379
 CELERY_BROKER_URL = 'redis://localhost:%s/0' % REDIS_PORT
@@ -28,7 +29,6 @@ INSTALL_PATH = '/path/to/breedcafs'
 SECRET_KEY = 'some-secret-key_MAKE_SURE_TO_CHANGE_THIS'
 CONFIRM_EMAIL_SALT = "ANOTHER_KEY_TO_SET"
 PASSWORD_RESET_SALT = "YET_ANOTHER_KEY_TO_SET"
-
 
 # PLace upload and download directories in the instance folder
 IMPORT_FOLDER = 'import'
@@ -54,6 +54,51 @@ MAIL_USE_TLS = False
 MAIL_USERNAME = os.environ.get('MAIL_USERNAME')
 MAIL_PASSWORD = os.environ.get('MAIL_PASSWORD')
 MAIL_ASCII_ATTACHMENTS = True
+
+# log file called from envars
+# set in httpd.conf if using Apache and in /etc/init.d/celeryd for celery
+# Needed to avoid conflict for access to these whether function is called by celery or by web server
+DBTOOLS_LOG = os.environ.get('DBTOOLS_LOG')
+NEO4J_LOG = os.environ.get('NEO4J_LOG')
+
+
+LOG_CONFIG = {
+	'version': 1,
+	'disable_existing_loggers': True,
+	'formatters': {
+		'standard': {
+			'format': '%(asctime)s [%(levelname)s]: %(message)s'
+		},
+		'named': {
+			'format': '%(asctime)s [%(levelname)s] %(name)s: %(message)s'
+		},
+	},
+	'handlers': {
+		'app': {
+			'formatter': 'named',
+			'class': 'logging.FileHandler',
+			'filename': DBTOOLS_LOG
+		},
+		'neo4j': {
+			'formatter': 'named',
+			'class': 'logging.FileHandler',
+			'filename': NEO4J_LOG
+		},
+	},
+	'loggers': {
+		'app': {
+			'level': 'DEBUG',
+			'handlers': ['app'],
+			'propagate': True
+		},
+		'neo4j': {
+			'level': 'DEBUG',
+			'handlers': ['neo4j'],
+			'propagate': True
+		}
+	}
+}
+
 
 # administrator list
 # included as sent from (except broken with gmail SMTP)

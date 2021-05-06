@@ -12,8 +12,8 @@ def application(environ, start_response):
 		'NEO4J_PASSWORD',
 		'MAIL_USERNAME',
 		'MAIL_PASSWORD',
-		'BREEDCAFS_LOG',
-		'NEO4J_DRIVER_LOG'
+		'DBTOOLS_LOG',
+		'NEO4J_LOG'
 	]
 	for VAR in ENVARS:
 		os.environ[VAR] = environ.get(VAR, '')
