@@ -7,27 +7,17 @@
 # Make a copy of this in your flask instance path
 # Set the values in that copy according to your environment
 #####
-import logging
 import os
 
 # The layout template looks for this value to load a splash warning you are on the development site
-# Also checked for which ports to access Neo4j and Redis instances
 # Set to false for production
 DEV = True
 SERVER_NAME = 'www.breedcafs-db.eu'
 
 # URI for bolt driver, 7687 for production, 7688 for dev
-if DEV:
-	BOLT_URI = "bolt://localhost:7688"
-else:
-	BOLT_URI = "bolt://localhost:7687"
-
-
+BOLT_URI = "bolt://localhost:7687"
 # redis and celery config, 6379 for production, 6380 for dev
-if DEV:
-	REDIS_PORT = 6380
-else:
-	REDIS_PORT = 6379
+REDIS_PORT = 6379
 CELERY_BROKER_URL = 'redis://localhost:%s/0' % REDIS_PORT
 CELERY_RESULT_BACKEND = 'redis://localhost:%s/0' % REDIS_PORT
 
