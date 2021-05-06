@@ -60,8 +60,7 @@ LOG_CONFIG = {
 }
 
 
-
-logging.config.dictConfig(app.config['LOG_CONFIG'])
+logging.config.dictConfig(LOG_CONFIG)
 logger = logging.getLogger(__name__)
 logger.info("Start")
 
