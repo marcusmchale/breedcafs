@@ -15,52 +15,8 @@ app.config.from_pyfile('config.py')
 # set in httpd.conf if using Apache and in /etc/init.d/celeryd for celery
 # Needed to avoid conflict for access to these whether function is called by celery or by web server
 # needs to be after app init or wsgi is not running yet so can't get apache envars
-DBTOOLS_LOG = os.environ.get('DBTOOLS_LOG')
-NEO4J_LOG = os.environ.get('NEO4J_LOG')
 
-logger = logging.getLogger(__name__)
-
-logger.info(f"Logging to: {DBTOOLS_LOG}, {NEO4J_LOG}")
-
-LOG_CONFIG = {
-	'version': 1,
-	'disable_existing_loggers': True,
-	'formatters': {
-		'standard': {
-			'format': '%(asctime)s [%(levelname)s]: %(message)s'
-		},
-		'named': {
-			'format': '%(asctime)s [%(levelname)s] %(name)s: %(message)s'
-		},
-	},
-	'handlers': {
-		'app': {
-			'formatter': 'named',
-			'class': 'logging.FileHandler',
-			'filename': DBTOOLS_LOG
-		},
-		'neo4j': {
-			'formatter': 'named',
-			'class': 'logging.FileHandler',
-			'filename': NEO4J_LOG
-		},
-	},
-	'loggers': {
-		'app': {
-			'level': 'INFO',
-			'handlers': ['app'],
-			'propagate': True
-		},
-		'neo4j': {
-			'level': 'INFO',
-			'handlers': ['neo4j'],
-			'propagate': True
-		}
-	}
-}
-
-
-logging.config.dictConfig(LOG_CONFIG)
+logging.config.dictConfig(app.config['LOG_CONFIG'])
 logger = logging.getLogger(__name__)
 logger.info("Start")
 
