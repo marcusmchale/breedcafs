@@ -77,12 +77,14 @@ LOG_CONFIG = {
 		'app': {
 			'formatter': 'named',
 			'class': 'logging.FileHandler',
-			'filename': DBTOOLS_LOG
+			'filename': DBTOOLS_LOG,
+			'encoding': 'UTF-8'
 		},
 		'neo4j': {
 			'formatter': 'named',
 			'class': 'logging.FileHandler',
-			'filename': NEO4J_LOG
+			'filename': NEO4J_LOG,
+			'encoding': 'UTF-8'
 		},
 	},
 	'loggers': {
