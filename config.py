@@ -7,7 +7,7 @@
 # Make a copy of this in your flask instance path
 # Set the values in that copy according to your environment
 #####
-
+import logging
 import os
 
 # The layout template looks for this value to load a splash warning you are on the development site
@@ -44,6 +44,10 @@ PASSWORD_RESET_SALT = "YET_ANOTHER_KEY_TO_SET"
 # Needed to avoid conflict for access to these whether function is called by celery or by web server
 DBTOOLS_LOG = os.environ.get('DBTOOLS_LOG')
 NEO4J_LOG = os.environ.get('NEO4J_LOG')
+
+logger = logging.getLogger(__name__)
+
+logger.info(f"Logging to: {DBTOOLS_LOG}, {NEO4J_LOG}")
 
 LOG_CONFIG = {
 	'version': 1,
