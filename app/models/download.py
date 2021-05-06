@@ -1019,7 +1019,7 @@ class Download:
 				'	CASE '
 				'		WHEN "Field UID" IS NOT NULL THEN "Field UID" '
 				'		ELSE "UID" END, '
-				'	result["ID"] '
+				'	ID '
 			)
 		return statement
 
