@@ -68,7 +68,7 @@ def correct_submit():
 			try:
 				# as an asynchronous function with celery
 				# result is stored in redis and accessible from the status/task_id endpoint
-				task = Upload.async_correct.apply_async(args=[username, access, upload_object])
+				task = Upload.async_correct.apply_async(args=[username, access, upload_object], serialiser='pickle')
 			except (ServiceUnavailable, AuthError):
 				return jsonify({'submitted': 'The database is currently unavailable - please try again later'})
 			return jsonify({'submitted': (

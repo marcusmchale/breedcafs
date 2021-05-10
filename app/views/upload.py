@@ -118,7 +118,7 @@ def upload_submit():
 			try:
 				# as an asynchronous function with celery
 				# result is stored in redis and accessible from the status/task_id endpoint
-				task = Upload.async_submit.apply_async(args=[username, upload_object])
+				task = Upload.async_submit.apply_async(args=[username, upload_object], serialiser='pickle')
 			except (ServiceUnavailable, AuthError):
 				return jsonify({
 					'result': 'The database is currently unavailable - please try again later',
