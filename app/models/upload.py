@@ -20,6 +20,7 @@ from zipfile import BadZipfile
 
 logger = logging.getLogger(__name__)
 
+
 class DictReaderInsensitive(csv.DictReader):
 	# overwrites csv.fieldnames property so uses without surrounding whitespace and in lowercase
 	@property
@@ -1460,7 +1461,6 @@ class PropertyUpdateHandler:
 			'			THEN '
 			'				collect([tree.uid,variety_sources]) '
 			'			END as tree_varieties_error '
-			'	} '
 		)
 		result = self.tx.run(
 			statement,
