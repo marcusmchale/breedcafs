@@ -831,6 +831,7 @@ class PropertyUpdateHandler:
 
 	def update_all(self):
 		for key in self.updates:
+			logging.debug(f"updating {key}")
 			self.update_collection(key)
 
 	def format_error_list(self):
@@ -846,7 +847,6 @@ class PropertyUpdateHandler:
 			input_variable
 	):
 		if self.updates[input_variable] and input_variable in self.function_dict:
-			logging.debug(f"updating input variable {input_variable}")
 			self.function_dict[input_variable](input_variable)
 
 	def error_check(
@@ -2725,8 +2725,11 @@ class Upload:
 				submission_result.parse_record(record)
 				if record_type == 'property':
 					logger.debug("parsing record for property update")
-					if self.property_updater.process_record(record):
-						break
+					try:
+						if self.property_updater.process_record(record):
+							break
+					except Exception as e:
+						from celery.contrib import rdb; rdb.set_trace()
 
 			# As we are collecting property updates we need to run the updater at the end
 			if not result:
