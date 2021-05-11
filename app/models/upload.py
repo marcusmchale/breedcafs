@@ -818,16 +818,20 @@ class PropertyUpdateHandler:
 			self,
 			record
 	):
-		logging.debug("process record")
-		input_variable = record['Input variable'].lower()
-		if input_variable not in self.updates:
-			self.updates[input_variable] = []
-		self.updates[input_variable].append([record['UID'], record['Value']])
-		if len(self.updates[input_variable]) >= self.update_threshold:
-			self.update_collection(input_variable)
-			self.updates[input_variable] = []
-		if input_variable in self.errors and len(self.errors[input_variable]) >= self.error_threshold:
-			return True
+		try:
+			logging.debug("process record")
+			input_variable = record['Input variable'].lower()
+			if input_variable not in self.updates:
+				self.updates[input_variable] = []
+			self.updates[input_variable].append([record['UID'], record['Value']])
+			if len(self.updates[input_variable]) >= self.update_threshold:
+				logging.debug(f"update collection: {input_variable}")
+				self.update_collection(input_variable)
+				self.updates[input_variable] = []
+			if input_variable in self.errors and len(self.errors[input_variable]) >= self.error_threshold:
+				return True
+		except Exception as e:
+			from celery.contrib import rdb; rdb.set_trace()
 
 	def update_all(self):
 		for key in self.updates:
@@ -2725,12 +2729,8 @@ class Upload:
 				submission_result.parse_record(record)
 				if record_type == 'property':
 					logger.debug("parsing record for property update")
-					try:
-						if self.property_updater.process_record(record):
-							break
-					except Exception as e:
-						from celery.contrib import rdb; rdb.set_trace()
-
+					if self.property_updater.process_record(record):
+						break
 			# As we are collecting property updates we need to run the updater at the end
 			if not result:
 				if record_type == 'property':
