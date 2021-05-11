@@ -2719,16 +2719,16 @@ class Upload:
 			if record_type == 'property':
 				self.property_updater = PropertyUpdateHandler(tx)
 			for record in result:
-				record = record.data()
-				logger.debug("parsing record for submission report")
-				submission_result.parse_record(record)
-				if record_type == 'property':
-					logger.debug("parsing record for property update")
-					try:
+				try:
+					record = record.data()
+					logger.debug("parsing record for submission report")
+					submission_result.parse_record(record)
+					if record_type == 'property':
+						logger.debug("parsing record for property update")
 						if self.property_updater.process_record(record):
 							break
-					except Exception as e:
-						from celery.contrib import rdb; rdb.set_trace()
+				except Exception as e:
+					from celery.contrib import rdb; rdb.set_trace()
 
 			# As we are collecting property updates we need to run the updater at the end
 			if not result:
