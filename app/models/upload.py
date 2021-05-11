@@ -1252,7 +1252,7 @@ class PropertyUpdateHandler:
 			'	RETURN '
 			'		uid_value[0] as UID, '
 			'		uid_value[1] as value, '
-			'		item.uid, '
+			'		item.uid as item_uid, '
 			'		existing '
 		)
 		result = self.tx.run(
