@@ -92,8 +92,8 @@ class FindLocations:
 			'		name_lower: toLower(trim($field)) '
 			'	}) '
 			' RETURN '
-			'	field.uid, '
-			'	field.name '
+			'	[field.uid, '
+			'	field.name] '
 		)
 		with get_driver().session() as neo4j_session:
 			return neo4j_session.read_transaction(single_record, statement, **parameters)
@@ -276,8 +276,8 @@ class AddLocations:
 			'		(uf)-[s:SUBMITTED {time: datetime.transaction().epochMillis}]->(field) '
 			' ) '
 			' RETURN '
-			'	field.uid,'
-			'	field.name '
+			'	[field.uid,'
+			'	field.name] '
 		)
 		with get_driver().session() as neo4j_session:
 			return neo4j_session.write_transaction(single_record, statement, **parameters)
@@ -302,8 +302,8 @@ class FindFieldItems:
 			'		uid : toInteger($field_uid) '
 			'	}) '
 			' RETURN '
-			'	block.uid, '
-			'	block.name '
+			'	[block.uid, '
+			'	block.name] '
 		)
 		with get_driver().session() as neo4j_session:
 			return neo4j_session.read_transaction(single_record, statement, **parameters)
@@ -368,8 +368,8 @@ class AddFieldItems:
 			'		(ub)-[s:SUBMITTED {time: datetime.transaction().epochMillis}]->(block) '
 			' ) '
 			' RETURN '
-			'	block.uid, '
-			'	block.name '
+			'	[block.uid, '
+			'	block.name] '
 		)
 		with get_driver().session() as neo4j_session:
 			return neo4j_session.write_transaction(single_record, statement, **parameters)

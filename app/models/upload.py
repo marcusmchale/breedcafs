@@ -252,10 +252,10 @@ class RowParseResult:
 							for conflict in itertools.islice(field_conflicts, 3):
 								existing_value = conflict['existing_value']
 								if isinstance(existing_value, list):
-									existing_value = ', '.join(existing_value)
+									existing_value = ', '.join(str(existing_value))
 								formatted_cells[field] += '\n\n'
 								formatted_cells[field] += ''.join(
-									['Existing value: ', existing_value, '\n']
+									['Existing value: ', str(existing_value), '\n']
 								)
 								if 'time' in conflict and conflict['time']:
 									formatted_cells[field] += (

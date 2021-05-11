@@ -156,7 +156,7 @@ def add_field():
 				else:
 					found = FindLocations(country).find_field(region, farm, text_field)
 					if found:
-						return jsonify({"found": {'uid': found[0], 'name': found[1]}})
+						return jsonify({"found": {'uid': found, 'name': found[1]}})
 					else:
 						added = AddLocations(session['username'], country).add_field(region, farm, text_field)
 						return jsonify({"submitted": {'uid': added[0], 'name': added[1]}})
