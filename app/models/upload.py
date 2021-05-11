@@ -2724,7 +2724,7 @@ class Upload:
 				submission_result.parse_record(record)
 				if record_type == 'property':
 					logger.debug("parsing record for property update")
-					try
+					try:
 						if self.property_updater.process_record(record):
 							break
 					except Exception as e:
