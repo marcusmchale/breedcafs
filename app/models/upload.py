@@ -818,7 +818,7 @@ class PropertyUpdateHandler:
 			self,
 			record
 	):
-
+		logging.debug("process record")
 		input_variable = record['Input variable'].lower()
 		if input_variable not in self.updates:
 			self.updates[input_variable] = []
@@ -846,6 +846,7 @@ class PropertyUpdateHandler:
 			input_variable
 	):
 		if self.updates[input_variable] and input_variable in self.function_dict:
+			logging.debug(f"updating input variable {input_variable}")
 			self.function_dict[input_variable](input_variable)
 
 	def error_check(
@@ -2873,6 +2874,7 @@ class Upload:
 									)
 								}
 						if 'property' in upload_object.record_types:
+							logging.debug("update properties")
 							property_updater = upload_object.property_updater
 							if property_updater.errors:
 								logger.debug("Rolling back submission: Property conflicts")
