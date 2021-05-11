@@ -818,6 +818,7 @@ class PropertyUpdateHandler:
 			self,
 			record
 	):
+
 		input_variable = record['Input variable'].lower()
 		if input_variable not in self.updates:
 			self.updates[input_variable] = []
@@ -897,7 +898,7 @@ class PropertyUpdateHandler:
 	):
 		row_errors = []
 		for record in result:
-			if not record['item_uid']: # this shouldn't happen as uids are already checked
+			if not record['item_uid']:  # this shouldn't happen as uids are already checked
 				logging.debug(
 					'A variety assignment was attempted but item was not found: ' + str(record['UID'])
 				)
@@ -2723,8 +2724,12 @@ class Upload:
 				submission_result.parse_record(record)
 				if record_type == 'property':
 					logger.debug("parsing record for property update")
-					if self.property_updater.process_record(record):
-						break
+					try
+						if self.property_updater.process_record(record):
+							break
+					except Exception as e:
+						from celery.contrib import rdb; rdb.set_trace()
+
 			# As we are collecting property updates we need to run the updater at the end
 			if not result:
 				if record_type == 'property':
