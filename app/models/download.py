@@ -44,7 +44,7 @@ class Download:
 		# create user download path if not found
 		self.user_download_folder = os.path.join(app.config['EXPORT_FOLDER'], username)
 		if not os.path.isdir(self.user_download_folder):
-			os.mkdir(self.user_download_folder, mode=0o770)
+			os.mkdir(self.user_download_folder, mode=app.config['EXPORT_FOLDER_PERMISSIONS'])
 		# prepare variables to write the file
 		self.time = datetime.utcnow().strftime('%Y%m%d-%H%M%S')
 
