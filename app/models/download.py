@@ -25,6 +25,10 @@ from datetime import datetime
 
 from xlsxwriter import Workbook, utility
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 
 # User class related (all uploads are tied to a user) yet more specifically regarding uploads
 class Download:
