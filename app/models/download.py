@@ -992,12 +992,12 @@ class Download:
 				'	Country, '
 				'	ID'
 				' ORDER BY '
-				'	"Input variable", '
+				'	`Input variable`, '
 				'	CASE '
-				'		WHEN "Field UID" IS NOT NULL THEN "Field UID" '
-				'		ELSE "UID" END, '
-				'	"ID", '
-				'	"Replicate" '
+				'		WHEN `Field UID` IS NOT NULL THEN `Field UID` '
+				'		ELSE `UID` END, '
+				'	ID, '
+				'	Replicate '
 			)
 		else:
 			statement += (
@@ -1021,8 +1021,8 @@ class Download:
 				'	ID '
 				' ORDER BY '
 				'	CASE '
-				'		WHEN "Field UID" IS NOT NULL THEN "Field UID" '
-				'		ELSE "UID" END, '
+				'		WHEN `Field UID` IS NOT NULL THEN `Field UID` '
+				'		ELSE `UID` END, '
 				'	ID '
 			)
 		return statement
