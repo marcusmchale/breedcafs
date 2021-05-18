@@ -1126,12 +1126,12 @@ class Download:
 
 	def records_to_file(self, result, data_format, file_type):
 		# check if any data found, if not return none
-		first_result = result[0]
-		if not first_result:
+		if not result:
 			return {
 				'status': 'SUCCESS',
 				'result': 'No records found to match your filters'
 			}
+		first_result = result[0]
 		# prepare the file
 		base_filename = 'records'
 		item_fieldnames = [
