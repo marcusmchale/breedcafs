@@ -197,7 +197,6 @@ def generate_file():
 					'selected_inputs': selected_inputs
 				}
 				records = download_object.collect_records(parameters, data_format)
-				logger.debug(f"First record: {records[0] if records else None}")
 				return jsonify(download_object.records_to_file(records, data_format, file_type))
 			else:
 				errors = jsonify({
