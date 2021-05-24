@@ -764,12 +764,9 @@ class Download:
 			'	-[submitted: SUBMITTED]->(record: Record) '
 			'	-[:RECORD_FOR]->(item_input:ItemInput) '
 			'	-[:FOR_INPUT*..2]->(input:Input) '
-			'	-[:OF_TYPE]->(record_type:RecordType), '
+			'	-[:OF_TYPE]->(record_type: RecordType), '
 			'	(item_input) '
 			'	-[:FOR_ITEM]->(item:Item) '
-			'	-[:FROM | IS_IN *]->(farm: Farm) '
-			'	-[:IS_IN]->(region: Region) '
-			'	-[:IS_IN]->(country: Country) '
 		)
 		filters = []
 		if parameters['selected_inputs']:
@@ -840,190 +837,156 @@ class Download:
 				)
 		if parameters['country']:
 			filters.append(
-				' country.name_lower = toLower(trim($country)) '
+				' (item)-[:FROM| IS_IN*]->(: Country {name_lower: toLower(trim($country))}) '
 			)
 		if parameters['region']:
 			filters.append(
-				' region.name_lower = toLower(trim($region)) '
+				' (item)-[:FROM| IS_IN*]->(: Region {name_lower: toLower(trim($region))}) '
 			)
 		if parameters['farm']:
 			filters.append(
-				' farm.name_lower = toLower(trim($farm)) '
+				' (item)-[:FROM| IS_IN*]->(: Farm {name_lower: toLower(trim($farm))}) '
+			)
+		if parameters['field_uid']:
+			filters.append(
+				' (item.uid = $field_uid OR (item)-[:IS_IN|FROM*]->(:Field {uid:$field_uid})) '
+			)
+		if parameters['block_uid']:
+			filters.append(
+				' (item.uid = $block_uid OR (item)-[:IS_IN|FROM*]->(:Block {uid:$block_uid})) '
+			)
+		if parameters['tree_id_list']:
+			filters.append(
+				' ( '
+				'	"Tree" in labels(item) AND item.id IN $tree_id_list '
+				'	 OR '
+				'	exists {(item)-[:IS_IN|FROM*]->(tz:Tree) WHERE tz.id IN $tree_id_list}'
+				' ) '
+			)
+		if parameters['sample_id_list']:
+			filters.append(
+				' ( '
+				'	"Sample" in labels(item) AND item.id IN $sample_id_list '
+				'	 OR '
+				'	exists {(item)-[:FROM*]->(sz:Sample) WHERE sz.id IN $sample_id_list} '
+				' ) '
 			)
 		if parameters['replicate_id_list']:
 			filters.append(
 				' record.replicate IN $replicate_id_list '
 			)
+
 		if filters:
 			statement += (
 				' WHERE '
 			)
 			statement += ' AND '.join(filters)
 		statement += (
-			' OPTIONAL MATCH (item)-[: FROM*]->(sample_samples: Sample) '
-			' OPTIONAL MATCH (item)-[: FROM*]->(sample_trees: Tree) '
-			' OPTIONAL MATCH (item)-[: FROM | IS_IN*]->(sample_blocks: Block) '
-			' OPTIONAL MATCH (item)-[: FROM | IS_IN*]->(sample_field: Field) '
-			' OPTIONAL MATCH (item)-[: IS_IN]->(: BlockTrees) '
-			'	-[: IS_IN]->(tree_block: Block) '
-			' OPTIONAL MATCH (item)-[: IS_IN]->(: FieldTrees) '
-			'	-[: IS_IN]->(tree_field: Field) '
-			' OPTIONAL MATCH (item)-[: IS_IN]->(: FieldBlocks) '
-			'	-[: IS_IN]->(block_field: Field) '
 			' WITH '
-			'	record_type.name_lower as record_type, '
-			'	input.name as Input, '
-			'	partner.name as Partner, '
-			'	user.name as `Submitted by`, '
 			'	item, '
-			'	item.uid as UID, '
-			'	item.id as ID, '
-			'	item.name as Name,'
-			'	COLLECT(DISTINCT sample_samples.id) as `Source samples`, '
-			'	COLLECT(DISTINCT sample_trees.id) as `Source trees`, '
-			'	COALESCE( '
-			'		CASE WHEN item: Block THEN item.name ELSE Null END, '
-			'		tree_block.name, '
-			'		COLLECT(DISTINCT sample_blocks.name) '
-			'	) as Block, '
-			'	COALESCE( '
-			'		CASE WHEN item: Block THEN item.id ELSE Null END, '
-			'		tree_block.id, '
-			'		COLLECT(DISTINCT sample_blocks.id) '
-			'	) as `Block ID`, '
-			'	COALESCE ( '
-			'		CASE WHEN item: Field THEN item.name ELSE Null END, '
-			'		sample_field.name, '
-			'		tree_field.name, '
-			'		block_field.name '
-			'	) as Field, '
-			'	COALESCE ( '
-			'		CASE WHEN item: Field THEN item.uid ELSE Null END, '
-			'		sample_field.uid, '
-			'		tree_field.uid, '
-			'		block_field.uid '
-			'	) as `Field UID`, '
-			'	farm.name as Farm, '
-			'	region.name as Region, '
-			'	country.name as Country, '
 		)
 		if data_format == 'db':
 			statement += (
-				'	submitted.time as `Submitted at`, '
-				'	record.replicate as Replicate, '
-				'	COALESCE( '
-				'		record.value, '
-				'	[i in range(0, size(record.x_values) - 1 ) | [record.x_values[i], record.y_values[i]]] '
-				'	) as Value, '
-				'	record.time as Time, '
-				'	record.start as Start, '
-				'	record.end as End, '
-				'	record.person as `Recorded by` '
+				'	collect('
+				'		{ '
+				'			record_type:record_type.name_lower, '
+				'			input: input.name, '
+				'			Partner: partner.name, '	
+				'			`Submitted by`: user.name, '
+				'			`Submitted at`: submitted.time, '
+				'			Replicate: record.replicate, '
+				'			Time: record.time, '
+				'			Start: record.start, '
+				'			End: record.end, '
+				'			`Recorded by`: record.person, '
+				'			Value: COALESCE( '
+				'				record.value, '
+				'				[i in range(0, size(record.x_values) - 1 ) | [record.x_values[i], record.y_values[i]]] '
+				'			)'
+				'		}'
+				'	) as Records '
 			)
-		else:  # data_format == 'table'
+		else:
 			statement += (
-				' COLLECT(DISTINCT(COALESCE('
-				'	record.value, '
-				'	[i in range(0, size(record.x_values) - 1 ) | [record.x_values[i], record.y_values[i]]] '
-				' ))) '
-				' as Values '
+				' 	input, '
+				'	record_type, '
+				'	collect( '
+				'		coalesce( '
+				'			record.value,'
+				'			[i in range(0, size(record.x_values) - 1 ) | [record.x_values[i], record.y_values[i]]]'
+				'		)'
+				'	) as values'
+				' WITH '
+				'	item, '
+				'	collect({ '
+				'		input_name: input.name , '
+				'		record_type: record_type.name_lower, '
+				'		values: values '
+				' 	}) as Records'
 			)
-		with_filters = []
-		if parameters['field_uid']:
-			with_filters.append(
-				' ( '
-				'	`Field UID` = $field_uid '
-				' ) '
-			)
-		if parameters['block_uid']:
-			with_filters.append(
-				' ( '
-				'	toInteger(split($block_uid, "_B")[1]) IN ([] + `Block ID`) '
-				' ) '
-			)
-		if parameters['tree_id_list']:
-			with_filters.append(
-				' ( '
-				'	any(x IN `Source trees` WHERE x IN $tree_id_list) '
-				'	OR '
-				'	(	'
-				'		item: Tree '
-				'		AND '
-				'		item.id IN $tree_id_list '
-				'	) '
-				' ) '
-			)
-		if parameters['sample_id_list']:
-			with_filters.append(
-				' (	'
-				'	item: Sample '
-				'	AND '
-				'	item.id IN $sample_id_list '
-				' ) '
-			)
-		if with_filters:
-			statement += (
-				' WHERE '
-			)
-			statement += ' AND '.join(with_filters)
+		statement += (
+			' MATCH source_path = (item)'
+			'	-[:FROM|IS_IN*]->(farm: Farm) '
+			'	-[:IS_IN]->(region: Region) '
+			'	-[:IS_IN]->(country: Country) '
+			' WITH '
+			'	item,'
+			'	farm.name as Farm,'
+			'	region.name as Region,'
+			'	country.name as Country,'
+			'	apoc.coll.toSet( '
+			'		apoc.coll.flatten(collect([n in nodes(source_path) WHERE "Sample" in labels(n) | n.id]))'
+			'	) as `Source samples`, '
+			'	apoc.coll.toSet( '
+			'		apoc.coll.flatten(collect([n in nodes(source_path) WHERE "Tree" in labels(n) | n.id]))'
+			'	) as `Source trees`, '
+			'	apoc.coll.toSet('
+			'		apoc.coll.flatten(collect([n in nodes(source_path) WHERE "Block" in labels(n) | n.id]))'
+			'	) as `Block ID`, '
+			'	apoc.coll.toSet('
+			'		apoc.coll.flatten(collect([n in nodes(source_path) WHERE "Block" in labels(n) | n.name]))'
+			'	) as Block, '
+			'	apoc.coll.flatten(collect([n in nodes(source_path) WHERE "Field" in labels(n) | n]))[0] as field, '
+			'	Records '
+			' WITH '
+			'	item,'
+			'	`Source samples`, `Source trees`, `Block ID`, Block, '
+			'	coalesce(field, item) as field, '
+			'	Farm, Region, Country, Records'
+		)
 		if data_format == 'db':
 			statement += (
+				' UNWIND Records as record '
 				' RETURN '
-				'	record_type, '
-				'	Input as `Input variable`, '
-				'	Partner, '
-				'	`Submitted by`, '
-				'	`Submitted at`, '
-				'	Value, '
-				'	Time, '
-				'	[Start, End] as Period, '
-				'	`Recorded by`, '
-				'	UID, '
-				'	Name,'
-				'	Replicate, '
-				'	`Source samples`, '
-				'	`Source trees`, '
-				'	Block, '
-				'	`Block ID`, '
-				'	Field, '
-				'	`Field UID`, '
-				'	Farm, '
-				'	Region, '
-				'	Country, '
-				'	ID'
-				' ORDER BY '
-				'	`Input variable`, '
-				'	CASE '
-				'		WHEN `Field UID` IS NOT NULL THEN `Field UID` '
-				'		ELSE `UID` END, '
-				'	ID, '
-				'	Replicate '
+				'	record["record_type"] as record_type, '
+				'	record["input"] as `Input variable`, '
+				'	record["Partner"] as Partner, '
+				'	record["Submitted by"] as `Submitted by`, '
+				'	record["Submitted at"] as `Submitted at`, '
+				'	record["Replicate"] as Replicate, '
+				'	record["Time"] as Time, '
+				'	[record["Start"], record["End"]] as Period, '
+				'	record["Recorded by"] as `Recorded by`, '
+				'	record["Value"] as Value, '
 			)
 		else:
 			statement += (
 				' RETURN '
-				'	collect({'
-				'		input_name: Input, '
-				'		record_type: record_type, '
-				'		values: Values '
-				'	}) as Records, '
-				'	UID, '
-				'	Name,'
-				'	`Source samples`, '
-				'	`Source trees`, '
-				'	Block, '
-				'	`Block ID`, '
-				'	Field, '
-				'	`Field UID`, '
-				'	Farm, '
-				'	Region, '
-				'	Country, '
-				'	ID '
-				' ORDER BY '
-				'	CASE '
-				'		WHEN `Field UID` IS NOT NULL THEN `Field UID` '
-				'		ELSE `UID` END, '
-				'	ID '
+				'	Records, '
+			)
+		statement += (
+			'	item.uid as UID, '
+			'	item.name as Name, '
+			'	`Source samples`, `Source trees`, `Block ID`, Block, '
+			'	field.uid as `Field UID`, '
+			'	field.name as Field, '
+			'	Farm, Region, Country, '
+			'	item.id as ID '
+			' ORDER BY field.uid, labels(item)[1], item.id  '
+		)
+		if data_format == 'db':
+			statement += (
+				', record["input"], record["Replicate"] '
 			)
 		return statement
 

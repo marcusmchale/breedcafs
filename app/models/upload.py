@@ -683,7 +683,7 @@ class SubmissionResult:
 		download_path = os.path.join(app.config['EXPORT_FOLDER'], username)
 		if not os.path.isdir(download_path):
 			logging.debug('Creating download path for user: %s', username)
-			os.mkdir(download_path, mode = app.config['EXPORT_FOLDER_PERMISSIONS'])
+			os.mkdir(download_path, mode=app.config['EXPORT_FOLDER_PERMISSIONS'])
 		if os.path.splitext(filename)[1] == '.xlsx':
 			conflicts_filename = '_'.join([
 				os.path.splitext(filename)[0],
@@ -2028,7 +2028,7 @@ class Upload:
 		upload_path = os.path.join(app.config['IMPORT_FOLDER'], self.username)
 		if not os.path.isdir(upload_path):
 			logging.debug('Creating upload path for user: %s', self.username)
-			os.mkdir(upload_path, mode=app.config['IMPORT_FOLDER_PERMISSIONS'] )
+			os.mkdir(upload_path, mode=app.config['IMPORT_FOLDER_PERMISSIONS'])
 		file_data.save(self.file_path)
 
 	def file_format_errors(self):
