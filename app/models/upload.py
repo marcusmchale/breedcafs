@@ -682,7 +682,7 @@ class SubmissionResult:
 		self.username = username
 		download_path = os.path.join(app.config['EXPORT_FOLDER'], username)
 		if not os.path.isdir(download_path):
-			logging.debug('Creating download path for user: %s', username)
+			logger.debug('Creating download path for user: %s', username)
 			os.mkdir(download_path, mode=app.config['EXPORT_FOLDER_PERMISSIONS'])
 		if os.path.splitext(filename)[1] == '.xlsx':
 			conflicts_filename = '_'.join([
@@ -818,22 +818,21 @@ class PropertyUpdateHandler:
 			self,
 			record
 	):
-		logging.debug("process record")
+		logger.debug("process record")
 		input_variable = record['Input variable'].lower()
 		if input_variable not in self.updates:
 			self.updates[input_variable] = []
 		self.updates[input_variable].append([record['UID'], record['Value']])
 		if len(self.updates[input_variable]) >= self.update_threshold:
-			logging.debug(f"update collection: {input_variable}")
+			logger.debug(f"update collection: {input_variable}")
 			self.update_collection(input_variable)
 			self.updates[input_variable] = []
 		if input_variable in self.errors and len(self.errors[input_variable]) >= self.error_threshold:
 			return True
 
-
 	def update_all(self):
 		for key in self.updates:
-			logging.debug(f"updating {key}")
+			logger.debug(f"updating {key}")
 			self.update_collection(key)
 
 	def format_error_list(self):
@@ -902,14 +901,14 @@ class PropertyUpdateHandler:
 		row_errors = []
 		for record in result:
 			if not record['item_uid']:  # this shouldn't happen as uids are already checked
-				logging.debug(
+				logger.debug(
 					'A variety assignment was attempted but item was not found: ' + str(record['UID'])
 				)
 				row_errors.append(
 					'Item not found (' + str(record['UID']) + ')'
 				)
 			elif not record['assigned_variety']:  # this shouldn't happen as values are already checked
-				logging.debug(
+				logger.debug(
 					'A variety assignment was attempted but variety was not found: ' + str(record['value'])
 				)
 				row_errors.append(
@@ -2027,7 +2026,7 @@ class Upload:
 		# create user upload path if not found
 		upload_path = os.path.join(app.config['IMPORT_FOLDER'], self.username)
 		if not os.path.isdir(upload_path):
-			logging.debug('Creating upload path for user: %s', self.username)
+			logger.debug('Creating upload path for user: %s', self.username)
 			os.mkdir(upload_path, mode=app.config['IMPORT_FOLDER_PERMISSIONS'])
 		file_data.save(self.file_path)
 
@@ -2043,7 +2042,7 @@ class Upload:
 			try:
 				wb = load_workbook(self.file_path, read_only=True, data_only=True)
 			except BadZipfile:
-				logging.info(
+				logger.info(
 					'Bad zip file submitted: \n'
 					+ 'username: ' + self.username
 					+ 'filename: ' + self.file_path
@@ -2230,7 +2229,7 @@ class Upload:
 			wb = load_workbook(self.file_path, read_only=True, data_only=True)
 			return wb
 		except BadZipfile:
-			logging.info(
+			logger.info(
 				'Bad zip file submitted: \n'
 				+ 'username: ' + self.username
 				+ 'filename: ' + self.file_path
@@ -2563,7 +2562,7 @@ class Upload:
 						'record_type': record_type
 					}
 				else:
-					logging.warn('record type not recognised')
+					logger.warning('record type not recognised')
 					return
 				check_result = tx.run(
 					statement,
@@ -2730,10 +2729,9 @@ class Upload:
 					if self.property_updater.process_record(record):
 						break
 			# As we are collecting property updates we need to run the updater at the end
-			if not result:
-				if record_type == 'property':
-					logger.debug("Updating properties")
-					self.property_updater.update_all()
+			if record_type == 'property':
+				logger.debug("Updating properties")
+				self.property_updater.update_all()
 
 	@celery.task(bind=True)
 	def async_submit(self, username, upload_object):
@@ -2780,7 +2778,7 @@ class Upload:
 								+ ' appears to contain no input values. '
 							)
 						if upload_object.error_messages:
-							logging.debug("Errors found")
+							logger.debug("Errors found")
 							error_messages = '<br>'.join(upload_object.error_messages)
 							with app.app_context():
 								html = render_template(
@@ -2875,7 +2873,7 @@ class Upload:
 									)
 								}
 						if 'property' in upload_object.record_types:
-							logging.debug("update properties")
+							logger.debug("update properties")
 							property_updater = upload_object.property_updater
 							if property_updater.errors:
 								logger.debug("Rolling back submission: Property conflicts")
@@ -3670,7 +3668,7 @@ class Resumable:
 			self.username
 		)
 		if not os.path.isdir(user_upload_dir):
-			logging.debug('Creating upload path for user: %s', username)
+			logger.debug('Creating upload path for user: %s', username)
 			os.mkdir(user_upload_dir, mode=app.config['IMPORT_FOLDER_PERMISSIONS'])
 		self.temp_dir = os.path.join(
 			app.config['IMPORT_FOLDER'],
@@ -3678,7 +3676,7 @@ class Resumable:
 			self.resumable_id
 		)
 		if not os.path.isdir(self.temp_dir):
-			logging.debug('Creating upload path for user: %s', username)
+			logger.debug('Creating upload path for user: %s', username)
 			os.mkdir(self.temp_dir, mode=app.config['IMPORT_FOLDER_PERMISSIONS'])
 		self.filename = secure_filename(raw_filename)
 		self.file_path = os.path.join(
@@ -3724,7 +3722,7 @@ class Resumable:
 			temp_dir,
 			self.get_chunk_name(chunk_number)
 		)
-		logging.debug('Getting chunk: %s', chunk_file)
+		logger.debug('Getting chunk: %s', chunk_file)
 		if os.path.isfile(chunk_file):
 			return True
 		else:
@@ -3734,7 +3732,7 @@ class Resumable:
 		chunk_name = self.get_chunk_name(chunk_number)
 		chunk_file = os.path.join(self.temp_dir, chunk_name)
 		chunk_data.save(chunk_file)
-		logging.debug('Saved chunk: %s', chunk_file)
+		logger.debug('Saved chunk: %s', chunk_file)
 
 	def complete(self, total_chunks):
 		self.chunk_paths = [
@@ -3758,5 +3756,5 @@ class Resumable:
 				os.unlink(stored_chunk_filename)
 			target_file.close()
 			os.rmdir(self.temp_dir)
-			logging.debug('File saved to: %s', self.file_path)
+			logger.debug('File saved to: %s', self.file_path)
 		return os.path.getsize(self.file_path) == size
