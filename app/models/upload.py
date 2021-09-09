@@ -2727,6 +2727,7 @@ class Upload:
 				if record_type == 'property':
 					logger.debug("parsing record for property update")
 					if self.property_updater.process_record(record):
+						logger.debug("Errors found in property update")
 						break
 			# As we are collecting property updates we need to run the updater at the end
 			if record_type == 'property':

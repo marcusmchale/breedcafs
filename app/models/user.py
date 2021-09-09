@@ -85,7 +85,7 @@ class User:
 			with get_driver().session() as neo4j_session:
 				records = neo4j_session.read_transaction(list_records, Cypher.allowed_emails)
 				return set(
-					[item for sublist in [i['e.allowed'] for i in records] for item in sublist]
+					[item for sublist in [i['allowed'] for i in records] for item in sublist]
 				)
 		except (ServiceUnavailable, AuthError):
 			logging.error('Get allowed emails failed due to service unavailable')
